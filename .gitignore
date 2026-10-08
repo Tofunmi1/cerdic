@@ -1,0 +1,9 @@
+node_modules/
+dist/
+rust/geometry/target/
+src/wasm/
+.env
+.env.local
+test-results/
+playwright-report/
+*.tsbuildinfo

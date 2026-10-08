@@ -1,0 +1,35 @@
+{
+  "name": "spatial-lab",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run wasm:build && bun scripts/dev.ts",
+    "wasm:build": "bun scripts/build-wasm.ts",
+    "build": "bun run wasm:build && bun run typecheck && vite build",
+    "start": "bun server/index.ts",
+    "typecheck": "tsc -b --pretty",
+    "test": "bun run wasm:build && bun test tests/*.test.ts && cargo test --manifest-path rust/geometry/Cargo.toml",
+    "test:e2e": "bun run wasm:build && playwright test"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10",
+    "@react-three/fiber": "^9",
+    "@react-three/xr": "^6",
+    "lucide-react": "^1.53.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "three": "^0.185",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/bun": "^1.4.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/three": "^0.185",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.0.0"
+  }
+}

@@ -1,0 +1,7 @@
+- has to be an engine, huge generative engine 
+- w sound
+- ui design
+- extensionable ?
+
+(rust, c++, typescript)
+- canvas, 3d ?
