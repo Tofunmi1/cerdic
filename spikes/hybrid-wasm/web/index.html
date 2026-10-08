@@ -1,0 +1,11 @@
+<!doctype html><meta charset="utf-8"><title>Hybrid engine spike</title>
+<pre id="out">running…</pre>
+<script type="module">
+import { runEngine } from "./wasi-shim.mjs";
+const bytes = await (await fetch("./engine.opt.wasm")).arrayBuffer();
+try {
+  const r = await runEngine(bytes);
+  window.__spike = { ok: true, bytes: bytes.byteLength, ...r };
+} catch (e) { window.__spike = { ok: false, error: String(e) }; }
+document.getElementById("out").textContent = JSON.stringify(window.__spike, null, 2);
+</script>

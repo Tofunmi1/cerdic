@@ -1,0 +1,21 @@
+[package]
+name = "hybrid_engine"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+rapier3d = "=0.36.0"
+boolmesh = "=0.1.10"
+
+[build-dependencies]
+cc = "1"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
