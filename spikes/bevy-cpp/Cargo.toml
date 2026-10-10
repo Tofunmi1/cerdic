@@ -1,0 +1,28 @@
+[package]
+name = "bevy_cpp"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Throwaway spike: Bevy 0.20.0 checkout lives in the scratchpad (will become a vendored subtree later).
+bevy_ecs = { path = "/private/tmp/claude-501/-Users-mac-Work-victoria-vr-hack/9d098cda-d740-48c5-ac1e-a0a723c575c1/scratchpad/bevy/crates/bevy_ecs" }
+bevy_app = { path = "/private/tmp/claude-501/-Users-mac-Work-victoria-vr-hack/9d098cda-d740-48c5-ac1e-a0a723c575c1/scratchpad/bevy/crates/bevy_app" }
+bevy_asset = { path = "/private/tmp/claude-501/-Users-mac-Work-victoria-vr-hack/9d098cda-d740-48c5-ac1e-a0a723c575c1/scratchpad/bevy/crates/bevy_asset" }
+bevy_mesh = { path = "/private/tmp/claude-501/-Users-mac-Work-victoria-vr-hack/9d098cda-d740-48c5-ac1e-a0a723c575c1/scratchpad/bevy/crates/bevy_mesh" }
+bevy_camera = { path = "/private/tmp/claude-501/-Users-mac-Work-victoria-vr-hack/9d098cda-d740-48c5-ac1e-a0a723c575c1/scratchpad/bevy/crates/bevy_camera" }
+bevy_transform = { path = "/private/tmp/claude-501/-Users-mac-Work-victoria-vr-hack/9d098cda-d740-48c5-ac1e-a0a723c575c1/scratchpad/bevy/crates/bevy_transform" }
+bevy_render = { path = "/private/tmp/claude-501/-Users-mac-Work-victoria-vr-hack/9d098cda-d740-48c5-ac1e-a0a723c575c1/scratchpad/bevy/crates/bevy_render", features = ["webgl"] }
+wasm-bindgen = "=0.2.129"
+
+[build-dependencies]
+cc = "1"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
