@@ -1,0 +1,260 @@
+=== table
+top = box(size=[1.4,0.06,0.8])
+topm = move(top, by=[0,0.75,0])
+leg = box(size=[0.06,0.75,0.06])
+legm = move(leg, by=[0.65,0.375,0.35])
+lx = mirror(legm, axis="x")
+lz = mirror(lx, axis="z")
+t = union(topm, lz)
+tp = part(t, name="table")
+output tp
+=== locker
+body = box(size=[0.5,1.8,0.5])
+cav = box(size=[0.44,1.7,0.46])
+cavm = move(cav, by=[0,0.02,0.05])
+shell = difference(body, cavm)
+door = box(size=[0.5,1.75,0.03])
+vent = box(size=[0.3,0.05,0.2])
+doorv = difference(door, vent)
+doorm = move(doorv, by=[0,0,0.245])
+l = union(shell, doorm)
+lm = move(l, by=[0,0.9,0])
+lp = part(lm, name="locker")
+output lp
+=== lamp
+base = cylinder(radius=0.12, height=0.03)
+stem = cylinder(radius=0.012, height=0.52)
+stemm = move(stem, by=[0,0.27,0])
+shade = cone(radius=0.18, height=0.2, top_radius=0.08)
+shadem = move(shade, by=[0,0.6,0])
+lamp = union(base, stemm, shadem)
+lp = part(lamp, name="lamp")
+output lp
+=== door
+frame = box(size=[1.0,2.1,0.12])
+hole = box(size=[0.9,2.0,0.2])
+holem = move(hole, by=[0,-0.0,0])
+f = difference(frame, holem)
+leaf = box(size=[0.92,2.02,0.04])
+knob = sphere(radius=0.03)
+knobm = move(knob, by=[0.35,0,0.04])
+leaf2 = union(leaf, knobm)
+leaf3 = part(leaf2, name="door_leaf")
+all = union(f, leaf3)
+output all
+=== shelf
+side = box(size=[0.03,1.6,0.3])
+sl = move(side, by=[-0.45,0.8,0])
+sr = move(side, by=[0.45,0.8,0])
+plank = box(size=[0.9,0.03,0.3])
+p1 = move(plank, by=[0,0.3,0])
+p2 = move(plank, by=[0,0.8,0])
+p3 = move(plank, by=[0,1.3,0])
+s = union(sl, sr, p1, p2, p3)
+output s
+=== chair
+seat = box(size=[0.45,0.05,0.45])
+seatm = move(seat, by=[0,0.45,0])
+leg = box(size=[0.04,0.45,0.04])
+legm = move(leg, by=[0.2,0.225,0.2])
+lx = mirror(legm, axis="x")
+lz = mirror(lx, axis="z")
+back = box(size=[0.45,0.5,0.04])
+backm = move(back, by=[0,0.72,-0.205])
+c = union(seatm, lz, backm)
+output c
+=== wine glass
+prof = polygon(points=[[0,0],[0.04,0],[0.04,0.01],[0.008,0.02],[0.008,0.09],[0.05,0.12],[0.05,0.2],[0.045,0.2],[0.045,0.13],[0.005,0.1],[0,0.1]])
+g = revolve(prof)
+output g
+=== vase
+prof = polygon(points=[[0,0],[0.06,0],[0.1,0.1],[0.12,0.2],[0.07,0.3],[0.05,0.35],[0.06,0.4],[0,0.4]])
+v = revolve(prof, segments=48)
+output v
+=== bookshelf row of books
+book = box(size=[0.04,0.25,0.18])
+row = array(book, count=[10,1,1], spacing=[0.045,0,0])
+output row
+=== pillar with base
+col = cylinder(radius=0.25, height=3)
+colm = move(col, by=[0,1.5,0])
+base = box(size=[0.7,0.2,0.7])
+basem = move(base, by=[0,0.1,0])
+cap = box(size=[0.7,0.2,0.7])
+capm = move(cap, by=[0,3.1,0])
+p = union(colm, basem, capm)
+output p
+=== arch
+outer = cylinder(radius=1.0, height=0.4)
+outerr = rotate(outer, degrees=[90,0,0])
+inner = cylinder(radius=0.7, height=0.5)
+innerr = rotate(inner, degrees=[90,0,0])
+ring = difference(outerr, innerr)
+cutbox = box(size=[3,1,1])
+cutm = move(cutbox, by=[0,-0.5,0])
+half = difference(ring, cutm)
+output half
+=== staircase
+step = box(size=[1.0,0.2,0.3])
+steps = repeat(step, count=8, step=[0,0.18,0.28])
+output steps
+=== bed
+frame = box(size=[1.0,0.25,2.0])
+framem = move(frame, by=[0,0.2,0])
+mat = box(size=[0.94,0.18,1.94])
+matm = move(mat, by=[0,0.42,0])
+head = box(size=[1.0,0.9,0.08])
+headm = move(head, by=[0,0.55,-1.0])
+pillow = box(size=[0.5,0.12,0.3])
+pillowm = move(pillow, by=[0,0.57,-0.8])
+b = union(framem, matm, headm, pillowm)
+bp = part(b, name="bed")
+output bp
+=== wall clock
+face = cylinder(radius=0.2, height=0.03)
+facer = rotate(face, degrees=[90,0,0])
+rim = torus(major=0.2, minor=0.015)
+rimr = rotate(rim, degrees=[90,0,0])
+hand = box(size=[0.01,0.14,0.005])
+handm = move(hand, by=[0,0.07,0.015])
+c = union(facer, rimr, handm)
+output c
+=== key
+head0 = torus(major=0.02, minor=0.006)
+head = rotate(head0, degrees=[90,0,0])
+shaft = cylinder(radius=0.006, height=0.1)
+shaftm = move(shaft, by=[0,-0.07,0])
+tooth = box(size=[0.02,0.01,0.006])
+toothm = move(tooth, by=[0.012,-0.11,0])
+k = union(head, shaftm, toothm)
+kp = part(k, name="key")
+output kp
+=== barrel
+prof = polygon(points=[[0,0],[0.25,0],[0.32,0.3],[0.35,0.45],[0.32,0.6],[0.25,0.9],[0,0.9]])
+b = revolve(prof)
+output b
+=== crate
+outer = box(size=[0.6,0.6,0.6])
+cutter = box(size=[0.5,0.62,0.5])
+c = difference(outer, cutter)
+slat = box(size=[0.62,0.06,0.62])
+slats = repeat(slat, count=4, step=[0,0.16,0])
+slatm = move(slats, by=[0,-0.24,0])
+all = union(c, slatm)
+output all
+=== fence
+post = box(size=[0.08,1.0,0.08])
+posts0 = array(post, count=[6,1,1], spacing=[0.5,0,0])
+posts = move(posts0, by=[0,0.5,0])
+rail = box(size=[2.58,0.05,0.04])
+rail1 = move(rail, by=[1.25,0.3,0])
+rail2 = move(rail, by=[1.25,0.7,0])
+f = union(posts, rail1, rail2)
+output f
+=== tree
+trunk = cylinder(radius=0.12, height=1.4)
+trunkm = move(trunk, by=[0,0.7,0])
+crown = sphere(radius=0.8)
+crownm = move(crown, by=[0,1.8,0])
+t = union(trunkm, crownm)
+output t
+=== mug
+cup = cylinder(radius=0.05, height=0.1)
+hole = cylinder(radius=0.045, height=0.1)
+holem = move(hole, by=[0,0.01,0])
+body = difference(cup, holem)
+handle = torus(major=0.03, minor=0.007)
+handlem = move(handle, by=[0.06,0,0])
+m = union(body, handlem)
+output m
+=== signpost
+pole = cylinder(radius=0.03, height=2)
+polem = move(pole, by=[0,1,0])
+sign = box(size=[0.8,0.4,0.03])
+signm = move(sign, by=[0,1.8,0.04])
+s = union(polem, signm)
+sp = part(s, name="sign")
+output sp
+=== sofa
+seat = box(size=[1.8,0.4,0.8])
+back = box(size=[1.8,0.5,0.2])
+backm = move(back, by=[0,0.45,-0.3])
+arm = box(size=[0.2,0.3,0.8])
+arml = move(arm, by=[-0.9,0.35,0])
+armr = mirror(arml, axis="x")
+s = union(seat, backm, armr)
+output s
+=== skull-ish blob (sdf)
+cr = sd_sphere(radius=0.5)
+jaw = sd_box(size=[0.5,0.25,0.5], round=0.08)
+jawm = move(jaw, by=[0,-0.45,0.1])
+sk = sd_union(cr, jawm, smooth=0.1)
+eye = sd_sphere(radius=0.12)
+eyel = move(eye, by=[-0.2,0.05,0.4])
+eyer = move(eye, by=[0.2,0.05,0.4])
+eyes = sd_union(eyel, eyer)
+head = sd_subtract(sk, eyes, smooth=0.03)
+m = mesh_sdf(head, bounds=[1.4,1.6,1.4], resolution=64)
+output m
+=== heart (sdf)
+a = sd_sphere(radius=0.4)
+am = move(a, by=[-0.2,0.2,0])
+b = sd_sphere(radius=0.4)
+bm = move(b, by=[0.2,0.2,0])
+c = sd_capsule(a=[0,-0.5,0], b=[0,0,0], radius=0.3)
+h = sd_union(am, bm, c, smooth=0.25)
+n = sd_noise(h, amount=0.02, frequency=6)
+m = mesh_sdf(n, bounds=[1.4,1.4,1.0], resolution=64)
+output m
+=== dragon-ish creature (sdf)
+body = sd_capsule(a=[-0.6,0,0], b=[0.4,0,0], radius=0.15)
+neck = sd_capsule(a=[0.4,0,0], b=[0.7,0.35,0], radius=0.09)
+head = sd_sphere(radius=0.12)
+headm = move(head, by=[0.78,0.42,0])
+tail = sd_capsule(a=[-0.6,0,0], b=[-1.2,-0.1,0], radius=0.05)
+wing = sd_box(size=[0.5,0.02,0.6], round=0.01)
+wingm = move(wing, by=[0,0.2,0.3])
+d = sd_union(body, neck, headm, tail, wingm, smooth=0.08)
+m = mesh_sdf(d, bounds=[3,1.5,1.5], resolution=96)
+output m
+=== bone (femur-like)
+shaft = capsule(radius=0.04, height=0.4)
+knob = sphere(radius=0.07)
+k1 = move(knob, by=[0.03,0.25,0])
+k2 = move(knob, by=[-0.03,0.25,0])
+k3 = move(knob, by=[0.03,-0.25,0])
+k4 = move(knob, by=[-0.03,-0.25,0])
+b = union(shaft, k1, k2, k3, k4)
+bp = part(b, name="femur")
+output bp
+=== pipe elbow (sweep)
+prof = circle(radius=0.05)
+path = spline(points=[[0,0,0],[0,0.5,0],[0.3,0.8,0],[0.8,0.8,0]])
+pipe = sweep(prof, path)
+output pipe
+=== gear
+disc = cylinder(radius=0.15, height=0.04)
+tooth = box(size=[0.03,0.04,0.04])
+toothm = move(tooth, by=[0.155,0,0])
+teeth = radial(toothm, count=16)
+hole = cylinder(radius=0.03, height=0.05)
+g = union(disc, teeth)
+g2 = difference(g, hole)
+output g2
+=== tray with scattered coins
+tray = box(size=[0.6,0.03,0.4])
+coin = cylinder(radius=0.015, height=0.004)
+coins = scatter(coin, area=[0.5,0.3], count=12, seed=3)
+cm = merge(coins)
+cmm = move(cm, by=[0,0.016,0])
+t = union(tray, cmm)
+output t
+=== pedestal with socket
+base = cylinder(radius=0.3, height=0.9)
+basem = move(base, by=[0,0.45,0])
+top = cylinder(radius=0.35, height=0.05)
+topm = move(top, by=[0,0.925,0])
+p = union(basem, topm)
+ps = socket(p, name="display", at=[0,0.95,0])
+pp = part(ps, name="pedestal")
+output pp
