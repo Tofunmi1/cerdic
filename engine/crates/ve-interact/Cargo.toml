@@ -1,0 +1,16 @@
+[package]
+name = "ve-interact"
+version = "0.0.0"
+description = "Interaction logic with no engine code: ray picking, pointer abstraction, hover/select/grab state machine, two-hand manipulation and hand gestures."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+glam = "0.33"
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

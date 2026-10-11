@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 9e0a993320bd8916839dd0d126a5e1bf07b27f843001ee13fbadceed49e0eaab # shrinks to script = [[FrameSpec { id: 1, present: true, x: 0.0, y: 0.0, select: false, squeeze: true, reach: 0.0 }, FrameSpec { id: 0, present: true, x: 0.0, y: 0.0, select: true, squeeze: false, reach: 0.0 }]]
