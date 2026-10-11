@@ -20,6 +20,6 @@ pub use plugin::{XrCamera, XrInput, XrPlugin, XrRig, apply_xr_frame};
 #[cfg(target_arch = "wasm32")]
 pub use session::{XrError, enter, exit, is_supported};
 pub use state::{
-    SessionState, frames_published, last_error, last_frame, publish_frame, session_state,
-    set_last_error, set_session_state, take_latest,
+    SessionState, frames_published, last_error, last_frame, publish_frame, refresh_hz,
+    session_state, set_last_error, set_refresh_hz, set_session_state, take_latest,
 };

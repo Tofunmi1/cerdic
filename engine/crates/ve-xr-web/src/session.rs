@@ -9,7 +9,9 @@ use web_sys::HtmlCanvasElement;
 
 use crate::bridge::{self, XrBridge};
 use crate::frame::{XrFrame, XrView, parse_controllers};
-use crate::state::{SessionState, publish_frame, session_state, set_last_error, set_session_state};
+use crate::state::{
+    SessionState, publish_frame, session_state, set_last_error, set_refresh_hz, set_session_state,
+};
 
 /// Why a session could not be entered.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -123,6 +125,7 @@ pub async fn enter(canvas: &HtmlCanvasElement, resolution_scale: f32) -> Result<
             return Err(XrError::Request(message));
         }
     };
+    set_refresh_hz(bridge.frame_rate());
     let for_frame = bridge.clone();
     let frame_closure = Closure::<dyn FnMut(f64)>::new(move |time| on_frame(&for_frame, time));
     let end_closure = Closure::<dyn FnMut()>::new(on_session_end);

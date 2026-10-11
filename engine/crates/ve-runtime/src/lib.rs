@@ -6,7 +6,9 @@
 #![cfg(target_arch = "wasm32")]
 
 mod app;
+mod bench_scene;
 mod mock_hmd;
+mod perf;
 mod quality;
 mod scene;
 mod status;
@@ -52,6 +54,20 @@ pub fn set_quality(tier: &str) -> Result<(), JsError> {
         .map_err(|()| JsError::new(&format!("unknown quality tier {tier:?}")))?;
     quality::request(tier);
     Ok(())
+}
+
+/// Turns the automatic quality governor on or off. When on, the quality tier follows measured frame
+/// times (down quickly when over budget, up slowly with headroom).
+#[wasm_bindgen]
+pub fn set_governor(enabled: bool) {
+    perf::set_governor(enabled);
+}
+
+/// Sets the refresh rate the page's window is judged against, for frame statistics and the governor
+/// (default 60). A headset session uses the rate its runtime reports instead.
+#[wasm_bindgen]
+pub fn set_window_hz(hz: f32) {
+    perf::set_window_hz(hz);
 }
 
 /// Whether the browser can present an immersive VR session.

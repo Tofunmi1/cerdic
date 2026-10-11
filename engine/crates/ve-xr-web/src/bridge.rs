@@ -43,6 +43,9 @@ extern "C" {
     #[wasm_bindgen(method, js_name = viewViewport)]
     pub fn view_viewport(this: &XrBridge, index: u32) -> Vec<i32>;
 
+    #[wasm_bindgen(method, js_name = frameRate)]
+    pub fn frame_rate(this: &XrBridge) -> f32;
+
     #[wasm_bindgen(method, js_name = framebufferSize)]
     pub fn framebuffer_size(this: &XrBridge) -> Vec<i32>;
 

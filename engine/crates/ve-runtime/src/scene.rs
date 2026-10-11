@@ -15,6 +15,7 @@ use ve_kernel::{KernelError, Solid};
 use ve_render::{VeAmbientLight, VeDirectionalLight, VeMaterial, VePointLight};
 use ve_xr_web::{XrCamera, XrRig};
 
+use crate::bench_scene::{BenchSpec, bench_scene as bench};
 use crate::{mock_hmd, status, wands};
 
 /// Which built-in scene to show.
@@ -33,6 +34,12 @@ pub(crate) enum SceneKind {
     Xr,
     /// A floor with a cube, a sphere and a pillar casting sun shadows onto it and each other.
     Shadows,
+    /// Benchmark S1: a room with about 40 props (50k triangles).
+    Bench1,
+    /// Benchmark S2: a dense room, about 150 props (200k triangles).
+    Bench2,
+    /// Benchmark S3: a stress room, about 300 props (400k triangles).
+    Bench3,
 }
 
 impl FromStr for SceneKind {
@@ -46,6 +53,9 @@ impl FromStr for SceneKind {
             "stereo" => Ok(Self::Stereo),
             "xr" => Ok(Self::Xr),
             "shadows" => Ok(Self::Shadows),
+            "bench1" => Ok(Self::Bench1),
+            "bench2" => Ok(Self::Bench2),
+            "bench3" => Ok(Self::Bench3),
             _ => Err(()),
         }
     }
@@ -318,6 +328,27 @@ pub(crate) fn spawn_scene(
         SceneKind::Stereo => stereo_scene(&mut commands, &mut meshes),
         SceneKind::Xr => xr_scene(&mut commands, &mut meshes, &mut rig),
         SceneKind::Shadows => shadows_scene(&mut commands, &mut meshes),
+        SceneKind::Bench1 => bench(
+            &mut commands,
+            &mut meshes,
+            &mut ambient,
+            &mut rig,
+            BenchSpec::LIGHT,
+        ),
+        SceneKind::Bench2 => bench(
+            &mut commands,
+            &mut meshes,
+            &mut ambient,
+            &mut rig,
+            BenchSpec::DENSE,
+        ),
+        SceneKind::Bench3 => bench(
+            &mut commands,
+            &mut meshes,
+            &mut ambient,
+            &mut rig,
+            BenchSpec::STRESS,
+        ),
     };
     if let Err(error) = built {
         status::report_error(format!("scene {:?} failed: {error}", *choice));
