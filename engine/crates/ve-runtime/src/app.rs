@@ -1,7 +1,8 @@
 //! Assembles the plugins into the app that the page runs.
 
-use bevy_app::{App, TaskPoolPlugin, Update};
+use bevy_app::{App, Startup, TaskPoolPlugin, Update};
 use bevy_asset::AssetPlugin;
+use bevy_camera::CameraPlugin;
 use bevy_camera::ClearColor;
 use bevy_color::Color;
 use bevy_diagnostic::FrameCountPlugin;
@@ -15,7 +16,7 @@ use bevy_window::WindowPlugin;
 use ve_platform_web::{PlatformError, WebPlatformPlugin};
 use ve_render::VeRenderPlugin;
 
-use crate::status;
+use crate::{scene, status};
 
 /// The colour M3's golden test expects on the canvas (sRGB 26, 51, 102).
 const CLEAR: Color = Color::srgb(0.10, 0.20, 0.40);
@@ -40,10 +41,12 @@ pub(crate) fn start(canvas_id: &str) -> Result<(), PlatformError> {
         ImagePlugin::default(),
         MeshPlugin,
         TransformPlugin,
+        CameraPlugin,
         RenderPlugin::default(),
         VeRenderPlugin,
     ));
     app.insert_resource(ClearColor(CLEAR));
+    app.add_systems(Startup, scene::spawn_demo_scene);
     app.add_systems(Update, status::publish);
     app.run();
     Ok(())

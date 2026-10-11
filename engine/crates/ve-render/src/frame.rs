@@ -1,21 +1,25 @@
-//! Per-frame plumbing: clearing window swap chains and submitting recorded command buffers.
+//! Per-frame plumbing: clearing uncovered window swap chains and submitting recorded command buffers.
 
 use bevy_camera::ClearColor;
+use bevy_ecs::entity::ContainsEntity;
 use bevy_ecs::system::{Query, Res, ResMut};
 use bevy_render::render_resource::{
     CommandEncoderDescriptor, LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor,
     StoreOp,
 };
 use bevy_render::renderer::{PendingCommandBuffers, RenderDevice, RenderQueue};
+use bevy_render::sync_world::MainEntity;
 use bevy_render::view::ExtractedWindow;
 
-/// Clears every window that has a swap chain texture to the [`ClearColor`].
+use crate::schedule::CameraWindows;
+
+/// Clears every window that has a swap chain texture but no camera drawing into it.
 ///
-/// With no cameras this is what puts a colour on the canvas, which proves the whole chain (surface,
-/// device, queue, present) works. Once cameras exist, the camera driver clears the windows it
-/// renders to and this stays as the fallback for uncovered windows.
+/// A window without a camera would otherwise show whatever the surface held before. Covered
+/// windows are cleared by their camera's pass instead.
 pub(crate) fn clear_windows(
-    windows: Query<&ExtractedWindow>,
+    windows: Query<(MainEntity, &ExtractedWindow)>,
+    covered: Res<CameraWindows>,
     clear: Res<ClearColor>,
     device: Res<RenderDevice>,
     queue: Res<RenderQueue>,
@@ -25,11 +29,14 @@ pub(crate) fn clear_windows(
         label: Some("ve_clear_windows"),
     });
     let mut cleared = false;
-    for window in &windows {
+    for (main, window) in &windows {
+        if covered.0.contains(&main.entity()) {
+            continue;
+        }
         let Some(view) = window.swap_chain_texture_view.as_ref() else {
             continue;
         };
-        // The pass only needs to exist: beginning it with `Clear` performs the clear.
+        // Beginning the pass with `Clear` performs the clear; nothing is drawn.
         let _pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some("ve_clear_window"),
             color_attachments: &[Some(RenderPassColorAttachment {
@@ -53,7 +60,7 @@ pub(crate) fn clear_windows(
     }
 }
 
-/// Submits every command buffer recorded this frame (by future render systems) to the GPU queue.
+/// Submits every command buffer recorded this frame by the camera passes to the GPU queue.
 pub(crate) fn submit_pending_command_buffers(
     mut pending: ResMut<PendingCommandBuffers>,
     queue: Res<RenderQueue>,

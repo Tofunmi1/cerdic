@@ -13,12 +13,15 @@
   <canvas id="ve"></canvas>
   <script type="module">
     import init, { start, status } from "./ve_runtime.js";
+    import { bindMemory } from "./wasi_snapshot_preview1.js";
 
     const began = performance.now();
     const state = { ready: false, bootMs: null, error: null, read: () => JSON.parse(status()) };
     window.__ve = state;
     try {
-      await init();
+      const wasm = await init();
+      bindMemory(wasm.memory);
+      state.wasmBytes = () => wasm.memory.buffer.byteLength;
       start("ve");
       const poll = setInterval(() => {
         if (state.read().frames > 0) {

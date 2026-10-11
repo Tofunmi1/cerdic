@@ -8,12 +8,15 @@ publish.workspace = true
 
 [dependencies]
 bevy_app = { path = "../../third_party/bevy/crates/bevy_app" }
-bevy_ecs = { path = "../../third_party/bevy/crates/bevy_ecs" }
 bevy_asset = { path = "../../third_party/bevy/crates/bevy_asset" }
-bevy_mesh = { path = "../../third_party/bevy/crates/bevy_mesh" }
 bevy_camera = { path = "../../third_party/bevy/crates/bevy_camera" }
-bevy_transform = { path = "../../third_party/bevy/crates/bevy_transform" }
+bevy_ecs = { path = "../../third_party/bevy/crates/bevy_ecs" }
+bevy_math = { path = "../../third_party/bevy/crates/bevy_math" }
+bevy_mesh = { path = "../../third_party/bevy/crates/bevy_mesh" }
 bevy_render = { path = "../../third_party/bevy/crates/bevy_render", default-features = false }
+bevy_shader = { path = "../../third_party/bevy/crates/bevy_shader" }
+bevy_transform = { path = "../../third_party/bevy/crates/bevy_transform" }
+bytemuck.workspace = true
 
 # The browser backend: wgpu's WebGL2 (GLES) path. Native builds use the platform backends.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
