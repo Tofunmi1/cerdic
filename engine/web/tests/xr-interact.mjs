@@ -94,6 +94,26 @@ try {
   await settle();
   check((await state()).held.length === 0, "the cube is still held after both squeezes ended");
 
+  // A controller that disappears mid-grab drops the cube once and cannot take it back by returning.
+  await hand("right", x0, 1.4, -0.2, 0);
+  await settle();
+  await hand("right", x0, 1.4, -0.2, 1);
+  await settle();
+  check((await state()).held.some((h) => h.target === "cube"), "the cube was not held before the controller vanished");
+  const eventsBefore = (await state()).events.filter((e) => e.startsWith("drop 2")).length;
+  await page.evaluate(() => { window.__xr.controllers.right.connected = false; });
+  await settle();
+  const gone = await state();
+  check(gone.held.length === 0, "the cube is still held after its controller disappeared");
+  check(gone.events.filter((e) => e.startsWith("drop 2")).length === eventsBefore + 1, "the drop was not reported exactly once");
+  const before = await cube();
+  await hand("right", 1.5, 3.0, -0.2, 1);
+  await page.evaluate(() => { window.__xr.controllers.right.connected = true; });
+  await settle();
+  check((await state()).held.length === 0, "a returning controller took the cube back");
+  const after = await cube();
+  check(after.position.every((v, i) => Math.abs(v - before.position[i]) < 1e-4), "the cube moved while nobody held it");
+
   check(logs.length === 0, `browser logged problems:\n  ${logs.join("\n  ")}`);
 } finally {
   await browser.close();

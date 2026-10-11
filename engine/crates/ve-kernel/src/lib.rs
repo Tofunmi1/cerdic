@@ -15,4 +15,4 @@ mod solid;
 
 pub use error::KernelError;
 pub use mesh::Mesh;
-pub use solid::{Bounds, Solid, simplify};
+pub use solid::{Bounds, MAX_EXTENT, Solid, simplify};

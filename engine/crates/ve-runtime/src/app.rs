@@ -5,6 +5,7 @@ use bevy_asset::AssetPlugin;
 use bevy_camera::{CameraPlugin, ClearColor};
 use bevy_color::Color;
 use bevy_diagnostic::FrameCountPlugin;
+use bevy_ecs::schedule::IntoScheduleConfigs;
 use bevy_image::ImagePlugin;
 use bevy_input::InputPlugin;
 use bevy_log::LogPlugin;
@@ -15,7 +16,7 @@ use bevy_transform::TransformPlugin;
 use bevy_window::WindowPlugin;
 use ve_platform_web::{PlatformError, WebPlatformPlugin};
 use ve_render::VeRenderPlugin;
-use ve_xr_web::XrPlugin;
+use ve_xr_web::{XrPlugin, apply_xr_frame};
 
 use crate::scene::{self, SceneKind};
 use crate::{interact, mock_hmd};
@@ -56,13 +57,19 @@ pub(crate) fn start(canvas_id: &str, scene: SceneKind) -> Result<(), PlatformErr
     app.init_resource::<perf::Perf>();
     interact::plugin(&mut app);
     app.add_systems(Startup, scene::spawn_scene);
+    // The frame's order: the XR frame is applied first (`apply_xr_frame`), then everything that
+    // reads head or controller poses (wands and the interaction chain) sees that same frame, and
+    // the status report is written last so it describes what this frame did.
     app.add_systems(
         Update,
         (
-            status::publish,
+            wands::update_wands.after(apply_xr_frame),
+            status::publish
+                .after(wands::update_wands)
+                .after(interact::highlight_hover),
             mock_hmd::update_mock_hmd,
-            wands::update_wands,
             quality::apply_requested,
+            quality::sync_xr_scale.after(quality::apply_requested),
             perf::track_frame_time,
         ),
     );

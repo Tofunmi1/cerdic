@@ -21,6 +21,7 @@ export class XrBridge {
     this.space = space;
     this.frame = null;
     this.pose = null;
+    this.viewportScale = 1;
     this.ended = false;
     this.endPromise = new Promise((resolve) => session.addEventListener("end", () => { this.ended = true; resolve(); }));
   }
@@ -32,20 +33,28 @@ export class XrBridge {
   static async request(canvas, scale) {
     const gl = canvas.getContext("webgl2");
     if (!gl) throw new Error("the canvas has no WebGL2 context");
-    // Contexts made without xrCompatible must opt in before they can feed an XR layer.
-    if (gl.makeXRCompatible) await gl.makeXRCompatible();
+    // Contexts made without xrCompatible must opt in before they can feed an XR layer. Skipping the
+    // await when the context is already compatible keeps the user's click as fresh as possible.
+    if (gl.makeXRCompatible && !gl.getContextAttributes()?.xrCompatible) await gl.makeXRCompatible();
     const session = await navigator.xr.requestSession("immersive-vr", {
       requiredFeatures: ["local-floor"],
       optionalFeatures: ["hand-tracking"],
     });
-    // No MSAA here: the engine resolves its own multisampled target. Depth is requested so a
-    // compositor that wants it (for reprojection) can have it.
-    const layer = new XRWebGLLayer(session, gl, {
-      antialias: false, depth: true, stencil: false, alpha: false, framebufferScaleFactor: scale,
-    });
-    await session.updateRenderState({ baseLayer: layer, depthNear: 0.05 });
-    const space = await session.requestReferenceSpace("local-floor");
-    return new XrBridge(session, layer, space);
+    // From here on a failure must give the session back: an abandoned session keeps the headset in
+    // its immersive state with nothing drawing to it.
+    try {
+      // No MSAA here: the engine resolves its own multisampled target. Depth is requested so a
+      // compositor that wants it (for reprojection) can have it.
+      const layer = new XRWebGLLayer(session, gl, {
+        antialias: false, depth: true, stencil: false, alpha: false, framebufferScaleFactor: scale,
+      });
+      await session.updateRenderState({ baseLayer: layer, depthNear: 0.05 });
+      const space = await session.requestReferenceSpace("local-floor");
+      return new XrBridge(session, layer, space);
+    } catch (error) {
+      try { await session.end(); } catch { /* it may already be gone */ }
+      throw error;
+    }
   }
 
   /** Calls `callback(timeMs)` once per XR frame, after the pose for that frame has been read. */
@@ -54,10 +63,29 @@ export class XrBridge {
       if (this.ended) return;
       this.frame = frame;
       this.pose = frame.getViewerPose(this.space);
+      this.requestScale();
       callback(time);
       if (!this.ended) this.session.requestAnimationFrame(loop);
     };
     this.session.requestAnimationFrame(loop);
+  }
+
+  /**
+   * Sets the fraction of the layer's resolution each view should render at (the quality tier's
+   * resolution scale). It is applied per frame as a viewport-scale request, which runtimes may grant
+   * only in part or not at all: the viewports each frame reports are what the engine draws into.
+   */
+  setViewportScale(scale) { this.viewportScale = scale; }
+
+  /** Whether the runtime offers viewport scaling, so a requested scale can take effect. */
+  viewportScaleSupported() { return typeof globalThis.XRView === "function" && "requestViewportScale" in globalThis.XRView.prototype; }
+
+  /** Asks every view of this frame for the wanted scale, before any viewport is read. */
+  requestScale() {
+    if (!this.pose) return;
+    for (const view of this.pose.views) {
+      if (typeof view.requestViewportScale === "function") view.requestViewportScale(this.viewportScale);
+    }
   }
 
   /** Calls `callback()` when the session ends, for any reason (user, system or `end()`). */

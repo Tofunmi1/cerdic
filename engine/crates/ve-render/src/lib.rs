@@ -5,6 +5,7 @@
 //! instance-batched meshes with a metallic-roughness PBR shader, a sun, point lights, MSAA and
 //! tonemapping; shadows and quality tiers come next (M6).
 
+mod counters;
 mod extract;
 mod frame;
 mod geometry;
@@ -32,6 +33,7 @@ use bevy_render::view::Msaa;
 use bevy_render::{ExtractSchedule, Render, RenderApp, RenderSystems};
 use bevy_shader::Shader;
 
+pub use counters::{FrameCounts, PassCounts, last_frame_counts};
 pub use light::{MAX_POINT_LIGHTS, VeAmbientLight, VeDirectionalLight, VePointLight};
 pub use material::VeMaterial;
 pub use quality::{QualityTier, RenderQuality};

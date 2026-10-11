@@ -58,8 +58,14 @@ fn vertex(input: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     out.clip_position = view.clip_from_world * world;
     out.world_position = world.xyz;
-    // Correct for rotation and uniform scale; non-uniform scale needs the inverse transpose.
-    out.world_normal = mat3x3<f32>(model[0].xyz, model[1].xyz, model[2].xyz) * input.normal;
+    // The normal matrix is the inverse transpose of the model's 3x3, which stays correct under
+    // non-uniform scale. The cofactor matrix (cross products of the columns) is the inverse transpose
+    // times the determinant, and needs no division, so a collapsed axis gives a zero normal instead
+    // of NaN. Instances with a non-positive determinant are not drawn (see `drawable` in extract.rs).
+    let c0 = model[0].xyz;
+    let c1 = model[1].xyz;
+    let c2 = model[2].xyz;
+    out.world_normal = mat3x3<f32>(cross(c1, c2), cross(c2, c0), cross(c0, c1)) * input.normal;
     out.base_color = input.base_color;
     out.params = input.params;
     out.emissive = input.emissive;

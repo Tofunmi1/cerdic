@@ -11,6 +11,7 @@ use crate::bridge::{self, XrBridge};
 use crate::frame::{XrFrame, XrView, parse_controllers};
 use crate::state::{
     SessionState, publish_frame, session_state, set_last_error, set_refresh_hz, set_session_state,
+    set_viewport_scale_supported, viewport_scale,
 };
 
 /// Why a session could not be entered.
@@ -56,20 +57,23 @@ fn matrix(values: &[f32]) -> Option<Mat4> {
     Some(Mat4::from_cols_array(&array))
 }
 
-/// Reads this frame's poses and controllers from the bridge. `None` when tracking is lost.
+/// Reads this frame's poses and controllers from the bridge. When the head is not tracked the frame
+/// has no views, so the camera keeps its last eyes; the controllers are still read, and a
+/// controller that lost tracking reports no poses, which releases whatever it was holding.
 fn read_frame(bridge: &XrBridge, time_ms: f64) -> Option<XrFrame> {
-    if !bridge.pose_valid() {
-        return None;
-    }
-    let views = (0..bridge.view_count())
-        .map(|index| {
-            Some(XrView {
-                world_from_view: matrix(&bridge.view_world_from_view(index))?,
-                projection: bridge.view_projection(index).try_into().ok()?,
-                viewport: bridge.view_viewport(index).try_into().ok()?,
+    let views = if bridge.pose_valid() {
+        (0..bridge.view_count())
+            .map(|index| {
+                Some(XrView {
+                    world_from_view: matrix(&bridge.view_world_from_view(index))?,
+                    projection: bridge.view_projection(index).try_into().ok()?,
+                    viewport: bridge.view_viewport(index).try_into().ok()?,
+                })
             })
-        })
-        .collect::<Option<Vec<_>>>()?;
+            .collect::<Option<Vec<_>>>()?
+    } else {
+        Vec::new()
+    };
     let size = bridge.framebuffer_size();
     let (width, height) = (
         u32::try_from(*size.first()?).ok()?,
@@ -85,6 +89,8 @@ fn read_frame(bridge: &XrBridge, time_ms: f64) -> Option<XrFrame> {
 
 /// One XR frame: publish the poses for the app to apply, then run an app frame.
 fn on_frame(bridge: &XrBridge, time_ms: f64) {
+    // The wanted view resolution is applied to the next frame's views.
+    bridge.set_viewport_scale(f64::from(viewport_scale()));
     if let Some(frame) = read_frame(bridge, time_ms) {
         publish_frame(frame);
     }
@@ -110,12 +116,13 @@ pub async fn enter(canvas: &HtmlCanvasElement, resolution_scale: f32) -> Result<
     ) {
         return Err(XrError::Busy);
     }
+    // Claim the request before anything is awaited, so a second call cannot slip in meanwhile.
+    set_session_state(SessionState::Requesting);
     if !is_supported().await {
         set_last_error("immersive VR is not available in this browser".to_owned());
         set_session_state(SessionState::Failed);
         return Err(XrError::Unsupported);
     }
-    set_session_state(SessionState::Requesting);
     let bridge = match XrBridge::request(canvas, f64::from(resolution_scale)).await {
         Ok(bridge) => bridge,
         Err(error) => {
@@ -126,6 +133,7 @@ pub async fn enter(canvas: &HtmlCanvasElement, resolution_scale: f32) -> Result<
         }
     };
     set_refresh_hz(bridge.frame_rate());
+    set_viewport_scale_supported(bridge.viewport_scale_supported());
     let for_frame = bridge.clone();
     let frame_closure = Closure::<dyn FnMut(f64)>::new(move |time| on_frame(&for_frame, time));
     let end_closure = Closure::<dyn FnMut()>::new(on_session_end);

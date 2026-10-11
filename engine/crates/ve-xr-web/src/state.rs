@@ -30,6 +30,41 @@ thread_local! {
     static FRAMES: Cell<u64> = const { Cell::new(0) };
     static ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
     static REFRESH_HZ: Cell<f32> = const { Cell::new(0.0) };
+    static VIEWPORT_SCALE: Cell<f32> = const { Cell::new(1.0) };
+    static VIEWPORT_SUPPORTED: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Smallest fraction of the layer's resolution a view can be asked to render at.
+const MIN_VIEWPORT_SCALE: f32 = 0.25;
+
+/// Asks the runtime to render each view at `scale` (0.25 to 1) of the layer's full resolution from
+/// now on. It is a request: the runtime may grant a different size, so read the viewports each
+/// frame brings. The layer itself keeps its allocated size.
+pub fn set_viewport_scale(scale: f32) {
+    let scale = if scale.is_finite() {
+        scale.clamp(MIN_VIEWPORT_SCALE, 1.0)
+    } else {
+        1.0
+    };
+    VIEWPORT_SCALE.with(|cell| cell.set(scale));
+}
+
+/// Records whether the session's runtime offers viewport scaling.
+pub fn set_viewport_scale_supported(supported: bool) {
+    VIEWPORT_SUPPORTED.with(|cell| cell.set(supported));
+}
+
+/// Whether the current session's runtime offers viewport scaling. Without it a requested scale
+/// cannot change the rendered resolution.
+#[must_use]
+pub fn viewport_scale_supported() -> bool {
+    VIEWPORT_SUPPORTED.with(Cell::get)
+}
+
+/// The viewport scale last requested (1 until something asks for less).
+#[must_use]
+pub fn viewport_scale() -> f32 {
+    VIEWPORT_SCALE.with(Cell::get)
 }
 
 /// Records the display refresh rate the session reports (zero when the runtime does not say).
@@ -114,6 +149,19 @@ mod tests {
         assert!((taken.time_ms - 2.0).abs() < f64::EPSILON);
         assert!(take_latest().is_none());
         assert_eq!(frames_published(), 2);
+    }
+
+    #[test]
+    fn the_viewport_scale_is_clamped_and_ignores_garbage() {
+        assert!((viewport_scale() - 1.0).abs() < f32::EPSILON);
+        set_viewport_scale(0.8);
+        assert!((viewport_scale() - 0.8).abs() < f32::EPSILON);
+        set_viewport_scale(0.01);
+        assert!((viewport_scale() - MIN_VIEWPORT_SCALE).abs() < f32::EPSILON);
+        set_viewport_scale(7.0);
+        assert!((viewport_scale() - 1.0).abs() < f32::EPSILON);
+        set_viewport_scale(f32::NAN);
+        assert!((viewport_scale() - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]

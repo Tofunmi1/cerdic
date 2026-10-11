@@ -30,6 +30,8 @@ const TYPES = {
   ".css": "text/css",
 };
 const MAX_REPORT_BYTES = 1_000_000;
+/** Reports kept on disk; older ones are deleted as new ones arrive. */
+const MAX_REPORTS = 200;
 
 /** IPv4 addresses of this machine that another device on the network could use. */
 export function lanAddresses() {
@@ -60,11 +62,40 @@ export function ensureCertificate(directory, addresses) {
   return { key: fs.readFileSync(key), cert: fs.readFileSync(cert) };
 }
 
-/** Resolves a URL path inside `root`, or null if it would leave it. */
+/**
+ * Resolves a URL path inside `root`, or null if it would leave it. A path that cannot be decoded
+ * (bad percent encoding, a NUL byte) also gives null: it never throws.
+ */
 export function safeJoin(root, urlPath) {
-  const relative = decodeURIComponent(urlPath.split("?")[0]);
+  let relative;
+  try {
+    relative = decodeURIComponent(urlPath.split("?")[0]);
+  } catch {
+    return null;
+  }
+  if (relative.includes("\0")) return null;
   const target = path.normalize(path.join(root, relative === "/" ? "index.html" : relative));
   return target === root || target.startsWith(root + path.sep) ? target : null;
+}
+
+/** Writes `text` to a new file in `directory` named after `stem`, never overwriting. Returns the path. */
+function writeUnique(directory, stem, text) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const file = path.join(directory, `${stem}${attempt ? `-${attempt}` : ""}.json`);
+    try {
+      fs.writeFileSync(file, text, { flag: "wx" });
+      return file;
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+    }
+  }
+  throw new Error("could not find a free report file name");
+}
+
+/** Deletes the oldest reports beyond `keep`, so repeated uploads cannot fill the disk. */
+function pruneReports(directory, keep) {
+  const files = fs.readdirSync(directory).filter((name) => name.endsWith(".json")).sort();
+  for (const name of files.slice(0, Math.max(0, files.length - keep))) fs.rmSync(path.join(directory, name), { force: true });
 }
 
 /**
@@ -92,9 +123,10 @@ export async function startServer({
         try {
           const report = JSON.parse(Buffer.concat(chunks).toString("utf8"));
           const scene = String(report.scene ?? "unknown").replace(/[^a-z0-9]/gi, "").slice(0, 24) || "unknown";
+          if (report === null || typeof report !== "object" || Array.isArray(report)) throw new Error("a report is a JSON object");
           fs.mkdirSync(reportsDir, { recursive: true });
-          const file = path.join(reportsDir, `${new Date().toISOString().replace(/[:.]/g, "-")}-${scene}.json`);
-          fs.writeFileSync(file, JSON.stringify(report, null, 2));
+          const file = writeUnique(reportsDir, `${new Date().toISOString().replace(/[:.]/g, "-")}-${scene}`, JSON.stringify(report, null, 2));
+          pruneReports(reportsDir, MAX_REPORTS);
           console.log(`report saved: ${file}`);
           response.writeHead(204).end();
         } catch {
@@ -108,6 +140,10 @@ export async function startServer({
       return;
     }
     const file = safeJoin(dist, request.url ?? "/");
+    if (file === null && /%(?![0-9a-f]{2})/i.test(request.url ?? "")) {
+      response.writeHead(400).end();
+      return;
+    }
     let body;
     try {
       body = file ? fs.readFileSync(file) : null;

@@ -23,5 +23,6 @@ pub use pointers::{controller_pointer, pointer_id};
 pub use session::{XrError, enter, exit, is_supported};
 pub use state::{
     SessionState, frames_published, last_error, last_frame, publish_frame, refresh_hz,
-    session_state, set_last_error, set_refresh_hz, set_session_state, take_latest,
+    session_state, set_last_error, set_refresh_hz, set_session_state, set_viewport_scale,
+    set_viewport_scale_supported, take_latest, viewport_scale, viewport_scale_supported,
 };

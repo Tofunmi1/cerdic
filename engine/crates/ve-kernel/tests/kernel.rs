@@ -36,6 +36,91 @@ fn cylinder_volume_and_cone() {
 }
 
 #[test]
+fn finite_values_beyond_the_renderable_range_are_refused() {
+    // Finite as f64, but they would overflow f32 on the way out of the kernel.
+    let huge = 1.0e300;
+    assert!(Solid::cube([huge, 1.0, 1.0], true).is_err());
+    assert!(Solid::sphere(huge, 16).is_err());
+    assert!(Solid::cylinder(1.0, huge, 1.0, 16, false).is_err());
+    assert!(Solid::cylinder(huge, 1.0, 1.0, 16, false).is_err());
+    let cube = Solid::cube([1.0, 1.0, 1.0], true).unwrap();
+    assert!(cube.translate([huge, 0.0, 0.0]).is_err());
+    // The limit itself is accepted, and a result at it renders finitely.
+    let big = Solid::cube([ve_kernel::MAX_EXTENT, 1.0, 1.0], true).unwrap();
+    assert!(
+        big.to_mesh()
+            .unwrap()
+            .positions
+            .iter()
+            .flatten()
+            .all(|c| c.is_finite())
+    );
+}
+
+#[test]
+fn simplify_refuses_non_finite_positions_like_from_mesh() {
+    let cube = Solid::cube([1.0, 1.0, 1.0], true)
+        .unwrap()
+        .to_mesh()
+        .unwrap();
+    let mut broken = cube.clone();
+    broken.positions[0][1] = f32::NAN;
+    assert_eq!(
+        simplify(&broken, 0.5, 0.01).unwrap_err(),
+        KernelError::NonFinite
+    );
+    broken.positions[0][1] = f32::INFINITY;
+    assert_eq!(
+        simplify(&broken, 0.5, 0.01).unwrap_err(),
+        KernelError::NonFinite
+    );
+    assert!(simplify(&cube, 0.5, 0.01).is_ok());
+}
+
+#[test]
+fn cylinders_stand_along_y() {
+    // Height 3, radius 0.5: about 1 wide and deep, 3 tall (a 96-gon's extent is within 0.5%).
+    let standing = Solid::cylinder(3.0, 0.5, 0.5, 96, false)
+        .unwrap()
+        .bounds()
+        .unwrap();
+    let size = standing.size();
+    assert!(
+        close(size[0], 1.0, 0.01) && close(size[2], 1.0, 0.01),
+        "{size:?}"
+    );
+    assert!(close(size[1], 3.0, 1e-9), "{size:?}");
+    // Not centred: the base is on y = 0. Centred: it straddles the origin.
+    assert!(close(standing.min[1], 0.0, 1e-9) && close(standing.max[1], 3.0, 1e-9));
+    let centred = Solid::cylinder(3.0, 0.5, 0.5, 96, true)
+        .unwrap()
+        .bounds()
+        .unwrap();
+    assert!(close(centred.min[1], -1.5, 1e-9) && close(centred.max[1], 1.5, 1e-9));
+    // The low radius is at the bottom, the high radius at the top, and the volume is unchanged.
+    let cone = Solid::cylinder(2.0, 0.8, 0.2, 96, false).unwrap();
+    let bottom = Solid::cube([4.0, 0.2, 4.0], true)
+        .unwrap()
+        .translate([0.0, 0.1, 0.0])
+        .unwrap();
+    let top = Solid::cube([4.0, 0.2, 4.0], true)
+        .unwrap()
+        .translate([0.0, 1.9, 0.0])
+        .unwrap();
+    let slice_width = |slab: &Solid| {
+        let size = cone.intersect(slab).unwrap().bounds().unwrap().size();
+        size[0]
+    };
+    assert!(
+        slice_width(&bottom) > 1.4,
+        "the wide end is not at the bottom"
+    );
+    assert!(slice_width(&top) < 0.6, "the narrow end is not at the top");
+    let frustum_volume = PI * 2.0 / 3.0 * (0.8 * 0.8 + 0.8 * 0.2 + 0.2 * 0.2);
+    assert!(close(cone.volume(), frustum_volume, 0.05));
+}
+
+#[test]
 fn booleans_obey_set_algebra() {
     let a = Solid::cube([2.0, 2.0, 2.0], true).unwrap();
     let b = a.translate([1.0, 0.0, 0.0]).unwrap();

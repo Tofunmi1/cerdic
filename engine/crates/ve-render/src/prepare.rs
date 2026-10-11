@@ -4,7 +4,7 @@ use std::ops::Range;
 
 use bevy_asset::AssetId;
 use bevy_ecs::prelude::*;
-use bevy_math::{Mat4, Vec3, Vec4};
+use bevy_math::{Mat4, Vec4};
 use bevy_mesh::Mesh;
 use bevy_render::render_resource::{
     BindGroup, BindGroupEntry, BindingResource, BufferUsages, DynamicUniformBuffer, PipelineCache,
@@ -19,7 +19,7 @@ use crate::light::{ExtractedLights, LightsUniform, pack_lights};
 use crate::pipeline::ForwardPipelines;
 use crate::quality::RenderQuality;
 use crate::shadow::{ShadowMap, ShadowState};
-use crate::stereo::StereoViews;
+use crate::stereo::{StereoViews, viewer_position};
 
 /// Per-instance vertex data: the model matrix (four `vec4` columns) and the material.
 #[repr(C)]
@@ -200,7 +200,7 @@ pub(crate) struct LightsGpu {
 pub(crate) fn prepare_lights(
     lights: Res<ExtractedLights>,
     quality: Res<RenderQuality>,
-    views: Query<&ExtractedView>,
+    views: Query<(&ExtractedView, Option<&StereoViews>)>,
     shadow: Res<ShadowState>,
     shadow_map: Res<ShadowMap>,
     mut gpu: ResMut<LightsGpu>,
@@ -209,10 +209,11 @@ pub(crate) fn prepare_lights(
     device: Res<RenderDevice>,
     queue: Res<RenderQueue>,
 ) {
-    let viewer = views
-        .iter()
-        .next()
-        .map_or(Vec3::ZERO, |view| view.world_from_view.translation());
+    let viewer = viewer_position(
+        views
+            .iter()
+            .map(|(view, stereo)| (view.world_from_view.translation(), stereo)),
+    );
     gpu.buffer.set(pack_lights(
         &lights,
         viewer,
@@ -252,6 +253,7 @@ pub(crate) fn prepare_lights(
 #[cfg(test)]
 mod tests {
     use bevy_asset::uuid::Uuid;
+    use bevy_math::Vec3;
 
     use super::*;
     use crate::material::VeMaterial;

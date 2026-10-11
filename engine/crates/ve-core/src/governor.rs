@@ -1,9 +1,19 @@
 //! The frame-time governor: picks a quality level from measured frame times.
 //!
-//! It steps down one level quickly when the 95th-percentile frame time exceeds the budget, and
-//! steps up one level only after a long calm stretch with headroom. Each step down that follows a
-//! step up lengthens the next calm wait (backoff), so a level that is almost affordable is not
-//! retried every few seconds. Levels are plain indices; the caller maps them to quality settings.
+//! The only measurement is the interval between frames. On a display-paced loop that interval stays
+//! at one refresh period however cheap the frame is, so spare capacity is invisible; only a missed
+//! refresh shows (the interval jumps to two periods). The governor therefore works in two moves:
+//!
+//! - **Down, quickly**: when the 95th-percentile interval exceeds the refresh period by more than a
+//!   small margin (the margin absorbs timer jitter), it steps down one level.
+//! - **Up, as a trial**: after a long stretch with no overload it steps up one level, then judges the
+//!   result like any other. If the trial misses refreshes it steps back down, and each step down
+//!   lengthens the next calm wait (backoff), so a level that is almost affordable is not retried
+//!   every few seconds.
+//!
+//! All waits are measured in elapsed milliseconds, not frames, and a pause (a hidden tab, a
+//! suspended session) restarts the judgement instead of counting as a very slow frame. Levels are
+//! plain indices; the caller maps them to quality settings.
 
 use crate::frame_stats::FrameStats;
 
@@ -16,6 +26,9 @@ const MAX_BACKOFF: u32 = 4;
 /// Frames of history the decisions are based on.
 const WINDOW_FRAMES: usize = 120;
 
+/// An interval longer than this is a pause (hidden tab, suspended session), not a slow frame.
+const PAUSE_MS: f32 = 1000.0;
+
 /// Tuning for a [`Governor`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GovernorConfig {
@@ -23,26 +36,27 @@ pub struct GovernorConfig {
     pub budget_ms: f32,
     /// Frames the window must hold before any decision.
     pub min_samples: usize,
-    /// Frames to wait after a change before the next one.
-    pub cooldown_frames: u32,
-    /// A step up needs p95 below `budget_ms * up_headroom`.
-    pub up_headroom: f32,
-    /// Calm frames needed for a step up (before backoff).
-    pub up_hold_frames: u32,
+    /// Milliseconds to wait after a change before the next one.
+    pub cooldown_ms: f32,
+    /// The 95th-percentile interval counts as overload above `budget_ms * overload_margin`.
+    pub overload_margin: f32,
+    /// Milliseconds without overload before a step up (before backoff).
+    pub up_hold_ms: f32,
 }
 
 impl GovernorConfig {
     /// Defaults for a display refreshing at `hz`: judge after about 1.25 seconds of frames (at most
-    /// 90), wait 3 seconds between changes and 8 seconds of 25% headroom before stepping up.
+    /// 90), wait 3 seconds between changes, call overload at 10% over the refresh period and wait
+    /// 8 seconds without overload before trying a higher level.
     #[must_use]
     pub fn for_refresh_rate(hz: f32) -> Self {
         let hz = if hz.is_finite() && hz > 0.0 { hz } else { 60.0 };
         Self {
             budget_ms: 1000.0 / hz,
             min_samples: frames_for_seconds(1.25, hz).clamp(8, 90) as usize,
-            cooldown_frames: frames_for_seconds(3.0, hz),
-            up_headroom: 0.75,
-            up_hold_frames: frames_for_seconds(8.0, hz),
+            cooldown_ms: 3000.0,
+            overload_margin: 1.1,
+            up_hold_ms: 8000.0,
         }
     }
 }
@@ -64,9 +78,10 @@ pub struct Governor {
     levels: usize,
     level: usize,
     stats: FrameStats,
-    since_change: u32,
+    since_change_ms: f32,
     since_check: u32,
-    calm_frames: u32,
+    check_ms: f32,
+    calm_ms: f32,
     backoff: u32,
 }
 
@@ -80,9 +95,10 @@ impl Governor {
             levels,
             level: start.min(levels - 1),
             stats: FrameStats::new(WINDOW_FRAMES, 1000.0 / config.budget_ms.max(1.0)),
-            since_change: 0,
+            since_change_ms: 0.0,
             since_check: 0,
-            calm_frames: 0,
+            check_ms: 0.0,
+            calm_ms: 0.0,
             backoff: 0,
         }
     }
@@ -93,38 +109,52 @@ impl Governor {
         self.level
     }
 
-    /// Records one frame time and returns the new level if it changed.
+    /// Forgets what has been measured, for example when the page became visible again or the
+    /// refresh rate changed. The level and the backoff stay.
+    pub fn restart(&mut self) {
+        self.restart_judgement();
+        self.since_check = 0;
+        self.check_ms = 0.0;
+    }
+
+    /// Records one frame interval and returns the new level if it changed. Non-finite or negative
+    /// intervals are ignored; an interval over a second is a pause and restarts the judgement.
     pub fn observe(&mut self, frame_ms: f32) -> Option<usize> {
+        if !frame_ms.is_finite() || frame_ms < 0.0 {
+            return None;
+        }
+        if frame_ms > PAUSE_MS {
+            self.restart();
+            return None;
+        }
         self.stats.record(frame_ms);
-        self.since_change = self.since_change.saturating_add(1);
+        self.since_change_ms += frame_ms;
+        self.check_ms += frame_ms;
         self.since_check += 1;
         if self.since_check < CHECK_EVERY {
             return None;
         }
         self.since_check = 0;
+        let waited = std::mem::take(&mut self.check_ms);
         let summary = self.stats.summary();
-        if self.since_change < self.config.cooldown_frames
+        if self.since_change_ms < self.config.cooldown_ms
             || summary.frames < self.config.min_samples
         {
             return None;
         }
-        if summary.p95_ms > self.config.budget_ms {
-            self.calm_frames = 0;
+        if summary.p95_ms > self.config.budget_ms * self.config.overload_margin {
+            self.calm_ms = 0.0;
             return self.step_down();
         }
-        if summary.p95_ms < self.config.budget_ms * self.config.up_headroom {
-            self.calm_frames = self.calm_frames.saturating_add(CHECK_EVERY);
-            let hold = self.config.up_hold_frames << self.backoff.min(MAX_BACKOFF);
-            if self.calm_frames >= hold {
-                if self.level + 1 < self.levels {
-                    return Some(self.step_up());
-                }
-                // Settled at the top: forget past trouble.
-                self.backoff = self.backoff.saturating_sub(1);
-                self.calm_frames = 0;
+        self.calm_ms += waited;
+        let hold = self.config.up_hold_ms * f32::from(1_u16 << self.backoff.min(MAX_BACKOFF));
+        if self.calm_ms >= hold {
+            if self.level + 1 < self.levels {
+                return Some(self.step_up());
             }
-        } else {
-            self.calm_frames = 0;
+            // Settled at the top: forget past trouble.
+            self.backoff = self.backoff.saturating_sub(1);
+            self.calm_ms = 0.0;
         }
         None
     }
@@ -148,8 +178,8 @@ impl Governor {
     /// Restarts the judgement after a change: old frames describe the old level.
     fn restart_judgement(&mut self) {
         self.stats.clear_window();
-        self.since_change = 0;
-        self.calm_frames = 0;
+        self.since_change_ms = 0.0;
+        self.calm_ms = 0.0;
     }
 }
 
@@ -160,22 +190,35 @@ mod tests {
     use super::*;
 
     const HZ: f32 = 72.0;
+    /// One refresh period at 72 Hz.
+    const PERIOD: f32 = 1000.0 / HZ;
 
     fn governor(levels: usize, start: usize) -> Governor {
         Governor::new(levels, start, GovernorConfig::for_refresh_rate(HZ))
     }
 
-    /// Frame time of a scene whose cost grows linearly with the level.
-    fn cost(level: usize) -> f32 {
+    /// The interval a display-paced loop reports for a scene whose cost grows with the level: never
+    /// shorter than one refresh period, however cheap the frame.
+    fn paced(level: usize) -> f32 {
         #[expect(clippy::cast_precision_loss, reason = "tiny level index")]
-        let level = level as f32;
-        8.0 + 4.0 * level
+        let cost = 8.0 + 4.0 * level as f32;
+        cost.max(PERIOD)
     }
 
     #[test]
     fn steady_good_frames_at_the_top_change_nothing() {
         let mut governor = governor(3, 2);
-        assert!((0..5000).all(|_| governor.observe(8.0).is_none()));
+        assert!((0..5000).all(|_| governor.observe(PERIOD).is_none()));
+        assert_eq!(governor.level(), 2);
+    }
+
+    #[test]
+    fn timer_jitter_around_the_refresh_period_is_not_overload() {
+        let mut governor = governor(3, 2);
+        for i in 0..20_000 {
+            let jitter = if i % 2 == 0 { 0.1 } else { -0.1 };
+            assert!(governor.observe(PERIOD + jitter).is_none(), "frame {i}");
+        }
         assert_eq!(governor.level(), 2);
     }
 
@@ -193,11 +236,21 @@ mod tests {
     }
 
     #[test]
-    fn calm_frames_step_up_one_level_at_a_time() {
+    fn a_few_missed_refreshes_are_not_overload() {
+        // One missed refresh in twenty is under the 95th percentile.
+        let mut governor = governor(3, 2);
+        for i in 0..20_000 {
+            let ms = if i % 25 == 0 { 2.0 * PERIOD } else { PERIOD };
+            assert!(governor.observe(ms).is_none(), "frame {i}");
+        }
+    }
+
+    #[test]
+    fn calm_paced_frames_step_up_one_level_at_a_time() {
         let mut governor = governor(3, 0);
         let mut seen = Vec::new();
         for _ in 0..20_000 {
-            if let Some(level) = governor.observe(6.0) {
+            if let Some(level) = governor.observe(PERIOD) {
                 seen.push(level);
             }
         }
@@ -206,17 +259,21 @@ mod tests {
 
     #[test]
     fn a_borderline_level_is_not_retried_in_a_loop() {
-        // Level 0 costs 8 ms, 1 costs 12 ms, 2 costs 16 ms against a 13.9 ms budget: level 1 is right.
+        // Levels cost 8, 12 and 16 ms against a 13.9 ms period: level 1 is right.
         let mut governor = governor(3, 2);
         let mut changes = 0;
-        let mut frames_at_top = 0;
-        let total = 40_000;
-        for _ in 0..total {
-            if governor.observe(cost(governor.level())).is_some() {
+        let mut ms_at_top = 0.0_f32;
+        let mut total = 0.0_f32;
+        // About nine minutes: the trials back off from 16 s to 128 s apart, so a trial (up, then
+        // down again) happens only a handful of times.
+        for _ in 0..40_000 {
+            let ms = paced(governor.level());
+            if governor.observe(ms).is_some() {
                 changes += 1;
             }
+            total += ms;
             if governor.level() == 2 {
-                frames_at_top += 1;
+                ms_at_top += ms;
             }
         }
         assert_eq!(
@@ -225,24 +282,52 @@ mod tests {
             "it should settle on the affordable level"
         );
         assert!(
-            changes <= 8,
+            changes <= 14,
             "{changes} changes: the governor is oscillating"
         );
         assert!(
-            frames_at_top < total / 5,
-            "{frames_at_top} frames spent over budget"
+            ms_at_top < total / 5.0,
+            "{ms_at_top} ms spent over budget of {total}"
         );
     }
 
     #[test]
-    fn it_recovers_when_the_load_goes_away() {
+    fn it_recovers_at_a_healthy_72_hz_cadence_after_an_overload() {
+        // The regression from the audit: the load goes away but the loop stays paced at one period.
         let mut governor = governor(3, 2);
         for _ in 0..3000 {
             governor.observe(30.0);
         }
         assert_eq!(governor.level(), 0);
         for _ in 0..60_000 {
-            governor.observe(6.0);
+            governor.observe(PERIOD);
+        }
+        assert_eq!(governor.level(), 2);
+    }
+
+    #[test]
+    fn a_pause_restarts_the_judgement_instead_of_counting_as_overload() {
+        let mut governor = governor(3, 2);
+        for round in 0..200 {
+            for _ in 0..50 {
+                assert!(governor.observe(PERIOD).is_none());
+            }
+            // The tab was hidden for a while.
+            assert!(governor.observe(60_000.0).is_none(), "pause {round}");
+        }
+        assert_eq!(governor.level(), 2);
+    }
+
+    #[test]
+    fn restart_forgets_the_window_but_not_the_level() {
+        let mut governor = governor(3, 2);
+        for _ in 0..80 {
+            governor.observe(PERIOD);
+        }
+        governor.restart();
+        // Slow frames right after a restart cannot count until the window has refilled.
+        for _ in 0..50 {
+            assert!(governor.observe(40.0).is_none());
         }
         assert_eq!(governor.level(), 2);
     }
@@ -257,8 +342,8 @@ mod tests {
     fn config_matches_the_refresh_rate() {
         let config = GovernorConfig::for_refresh_rate(72.0);
         assert!((config.budget_ms - 13.888_889).abs() < 1e-3);
-        assert_eq!(config.cooldown_frames, 216);
-        assert_eq!(config.up_hold_frames, 576);
+        assert!((config.cooldown_ms - 3000.0).abs() < f32::EPSILON);
+        assert!((config.up_hold_ms - 8000.0).abs() < f32::EPSILON);
         assert_eq!(config.min_samples, 90);
         // A slow display needs fewer frames to judge, but never fewer than eight.
         assert_eq!(GovernorConfig::for_refresh_rate(5.0).min_samples, 8);
@@ -275,24 +360,29 @@ mod tests {
                 Just(f32::NAN),
                 Just(f32::INFINITY),
                 Just(-5.0_f32),
+                Just(5_000.0_f32),
             ], 0..3000),
             levels in 1_usize..6,
             start in 0_usize..8,
         ) {
             let config = GovernorConfig::for_refresh_rate(HZ);
             let mut governor = Governor::new(levels, start, config);
-            let mut last_change: Option<usize> = None;
-            for (frame, ms) in samples.into_iter().enumerate() {
+            let mut elapsed = 0.0_f32;
+            let mut last_change: Option<f32> = None;
+            for ms in samples {
                 let before = governor.level();
                 let changed = governor.observe(ms);
+                if ms.is_finite() && ms >= 0.0 {
+                    elapsed += ms;
+                }
                 prop_assert!(governor.level() < levels);
                 if let Some(level) = changed {
                     prop_assert_eq!(level, governor.level());
                     prop_assert_eq!(before.abs_diff(level), 1);
                     if let Some(previous) = last_change {
-                        prop_assert!(frame - previous >= config.cooldown_frames as usize);
+                        prop_assert!(elapsed - previous >= config.cooldown_ms - 1.0);
                     }
-                    last_change = Some(frame);
+                    last_change = Some(elapsed);
                 } else {
                     prop_assert_eq!(before, governor.level());
                 }
