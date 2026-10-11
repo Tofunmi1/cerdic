@@ -12,6 +12,7 @@ bevy_asset = { path = "../../third_party/bevy/crates/bevy_asset" }
 bevy_camera = { path = "../../third_party/bevy/crates/bevy_camera" }
 bevy_color = { path = "../../third_party/bevy/crates/bevy_color" }
 bevy_ecs = { path = "../../third_party/bevy/crates/bevy_ecs" }
+bevy_extract = { path = "../../third_party/bevy/crates/bevy_extract" }
 bevy_log = { path = "../../third_party/bevy/crates/bevy_log" }
 bevy_math = { path = "../../third_party/bevy/crates/bevy_math" }
 bevy_mesh = { path = "../../third_party/bevy/crates/bevy_mesh" }

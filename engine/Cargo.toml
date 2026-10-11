@@ -65,6 +65,7 @@ too_many_arguments = "allow"
 inherits = "dev"
 opt-level = 1
 debug = false
+incremental = false
 
 [profile.release]
 opt-level = 3
@@ -76,6 +77,8 @@ debug = "line-tables-only"
 # Keep dev artifacts small: the vendored Bevy/wgpu tree is large and disks are finite.
 [profile.dev]
 debug = "line-tables-only"
+# Incremental caches grew to several GB for this tree; clean builds of the gates are fast enough.
+incremental = false
 
 [profile.dev.package."*"]
 debug = false

@@ -18,6 +18,7 @@ use crate::extract::{ExtractedMesh, ExtractedMeshes};
 use crate::light::{ExtractedLights, LightsUniform, pack_lights};
 use crate::pipeline::ForwardPipelines;
 use crate::quality::RenderQuality;
+use crate::stereo::StereoViews;
 
 /// Per-instance vertex data: the model matrix (four `vec4` columns) and the material.
 #[repr(C)]
@@ -107,9 +108,28 @@ pub(crate) struct ViewUniform {
     pub(crate) exposure: Vec4,
 }
 
-/// Offset of a view's data in the shared dynamic uniform buffer.
-#[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct ViewUniformSlot(pub(crate) u32);
+impl ViewUniform {
+    /// The uniform for an eye or camera at `world_from_view` with projection `clip_from_view`.
+    pub(crate) fn new(world_from_view: Mat4, clip_from_view: Mat4) -> Self {
+        Self {
+            clip_from_world: clip_from_view * world_from_view.inverse(),
+            camera_position: world_from_view.w_axis.truncate().extend(1.0),
+            exposure: Vec4::new(1.0, 0.0, 0.0, 0.0),
+        }
+    }
+}
+
+/// One drawing of the scene from a viewpoint: where its uniform lives in the shared dynamic buffer
+/// and which part of the target it covers (`None` means the camera's whole target).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ViewSlot {
+    pub(crate) offset: u32,
+    pub(crate) viewport: Option<[u32; 4]>,
+}
+
+/// The slots of a view: one for a normal camera, two (left and right eye) for a stereo camera.
+#[derive(Component, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ViewSlots(pub(crate) Vec<ViewSlot>);
 
 /// All view uniforms for this frame plus the bind group over them.
 #[derive(Resource, Default)]
@@ -122,23 +142,37 @@ pub(crate) struct ViewUniforms {
 pub(crate) fn prepare_view_uniforms(
     mut commands: Commands,
     mut uniforms: ResMut<ViewUniforms>,
-    views: Query<(Entity, &ExtractedView)>,
+    views: Query<(Entity, &ExtractedView, Option<&StereoViews>)>,
     pipelines: Res<ForwardPipelines>,
     pipeline_cache: Res<PipelineCache>,
     device: Res<RenderDevice>,
     queue: Res<RenderQueue>,
 ) {
     uniforms.buffer.clear();
-    for (entity, view) in &views {
-        let clip_from_world = view
-            .clip_from_world
-            .unwrap_or_else(|| view.clip_from_view * view.world_from_view.to_matrix().inverse());
-        let offset = uniforms.buffer.push(&ViewUniform {
-            clip_from_world,
-            camera_position: view.world_from_view.translation().extend(1.0),
-            exposure: Vec4::new(1.0, 0.0, 0.0, 0.0),
-        });
-        commands.entity(entity).insert(ViewUniformSlot(offset));
+    for (entity, view, stereo) in &views {
+        let slots = if let Some(stereo) = stereo {
+            stereo
+                .eyes
+                .iter()
+                .map(|eye| ViewSlot {
+                    offset: uniforms
+                        .buffer
+                        .push(&ViewUniform::new(eye.world_from_view, eye.clip_from_view)),
+                    viewport: Some(eye.viewport),
+                })
+                .collect()
+        } else {
+            let world_from_view = view.world_from_view.to_matrix();
+            let mut uniform = ViewUniform::new(world_from_view, view.clip_from_view);
+            if let Some(clip_from_world) = view.clip_from_world {
+                uniform.clip_from_world = clip_from_world;
+            }
+            vec![ViewSlot {
+                offset: uniforms.buffer.push(&uniform),
+                viewport: None,
+            }]
+        };
+        commands.entity(entity).insert(ViewSlots(slots));
     }
     uniforms.buffer.write_buffer(&device, &queue);
     uniforms.bind_group = uniforms.buffer.binding().map(|binding| {
@@ -255,6 +289,20 @@ mod tests {
         assert!((translation_x(0) - 20.0).abs() < f32::EPSILON);
         assert!((translation_x(1) - 10.0).abs() < f32::EPSILON);
         assert!((translation_x(2) - 30.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn view_uniform_inverts_the_pose_and_records_the_eye_position() {
+        // Any invertible matrix works as a stand-in projection for checking the pose handling.
+        let projection = Mat4::from_scale(Vec3::new(2.0, 3.0, 4.0));
+        let pose = Mat4::from_translation(Vec3::new(1.0, 2.0, 3.0));
+        let uniform = ViewUniform::new(pose, projection);
+        // A point at the eye's own position projects like the view-space origin: onto the axis.
+        let at_eye = uniform.clip_from_world * Vec3::new(1.0, 2.0, 3.0).extend(1.0);
+        let at_origin = projection * Vec3::ZERO.extend(1.0);
+        assert!((at_eye - at_origin).abs().max_element() < 1e-5);
+        assert!((uniform.camera_position.truncate() - Vec3::new(1.0, 2.0, 3.0)).length() < 1e-6);
+        assert!((uniform.camera_position.w - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]

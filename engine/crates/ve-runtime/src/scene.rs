@@ -14,7 +14,7 @@ use bevy_transform::components::Transform;
 use ve_kernel::{KernelError, Solid};
 use ve_render::{VeAmbientLight, VeDirectionalLight, VeMaterial, VePointLight};
 
-use crate::status;
+use crate::{mock_hmd, status};
 
 /// Which built-in scene to show.
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -26,6 +26,8 @@ pub(crate) enum SceneKind {
     Materials,
     /// A floor and spheres lit by three coloured point lights.
     Lights,
+    /// The kernel scene seen through a mock headset: two eyes side by side.
+    Stereo,
 }
 
 impl FromStr for SceneKind {
@@ -36,6 +38,7 @@ impl FromStr for SceneKind {
             "" | "kernel" => Ok(Self::Kernel),
             "materials" => Ok(Self::Materials),
             "lights" => Ok(Self::Lights),
+            "stereo" => Ok(Self::Stereo),
             _ => Err(()),
         }
     }
@@ -78,6 +81,17 @@ fn camera(commands: &mut Commands, eye: Vec3, target: Vec3) {
 }
 
 fn kernel_scene(commands: &mut Commands, meshes: &mut Assets<Mesh>) -> Result<(), KernelError> {
+    spawn_bitten_cube(commands, meshes)?;
+    sun(commands, 3.0);
+    camera(commands, Vec3::new(1.6, 1.3, 2.0), Vec3::ZERO);
+    Ok(())
+}
+
+/// Spawns the cube-minus-sphere that several scenes share.
+fn spawn_bitten_cube(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+) -> Result<(), KernelError> {
     let solid = Solid::cube([1.0, 1.0, 1.0], true)?.difference(&Solid::sphere(0.65, 48)?)?;
     commands.spawn((
         Mesh3d(meshes.add(render_mesh(&solid, false)?)),
@@ -88,8 +102,15 @@ fn kernel_scene(commands: &mut Commands, meshes: &mut Assets<Mesh>) -> Result<()
         },
         Transform::IDENTITY,
     ));
+    Ok(())
+}
+
+/// The kernel scene viewed through the mock headset (two eyes side by side).
+fn stereo_scene(commands: &mut Commands, meshes: &mut Assets<Mesh>) -> Result<(), KernelError> {
+    spawn_bitten_cube(commands, meshes)?;
     sun(commands, 3.0);
-    camera(commands, Vec3::new(1.6, 1.3, 2.0), Vec3::ZERO);
+    let head = mock_hmd::default_head(Vec3::new(0.4, 0.6, 2.2), Vec3::ZERO);
+    mock_hmd::spawn_stereo_camera(commands, head);
     Ok(())
 }
 
@@ -192,6 +213,7 @@ pub(crate) fn spawn_scene(
         SceneKind::Kernel => kernel_scene(&mut commands, &mut meshes),
         SceneKind::Materials => materials_scene(&mut commands, &mut meshes),
         SceneKind::Lights => lights_scene(&mut commands, &mut meshes),
+        SceneKind::Stereo => stereo_scene(&mut commands, &mut meshes),
     };
     if let Err(error) = built {
         status::report_error(format!("scene {:?} failed: {error}", *choice));

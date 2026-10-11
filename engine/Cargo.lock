@@ -3070,6 +3070,7 @@ dependencies = [
  "bevy_camera",
  "bevy_color",
  "bevy_ecs",
+ "bevy_extract",
  "bevy_log",
  "bevy_math",
  "bevy_mesh",
@@ -3102,6 +3103,7 @@ dependencies = [
  "ve-kernel",
  "ve-platform-web",
  "ve-render",
+ "ve-xr-math",
  "wasm-bindgen",
  "web-sys",
 ]

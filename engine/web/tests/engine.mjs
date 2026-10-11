@@ -12,7 +12,7 @@ import { PNG } from "pngjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(here, "..", "dist");
-const SCENES = ["kernel", "materials", "lights"];
+const SCENES = ["kernel", "materials", "lights", "stereo"];
 const types = { ".js": "text/javascript", ".wasm": "application/wasm", ".html": "text/html" };
 const server = http.createServer((req, res) => {
   const requested = req.url.split("?")[0];
@@ -59,6 +59,28 @@ function compareGolden(actual, expected) {
   return { ok: fraction <= GOLDEN.maxBadFraction, message: `${(fraction * 100).toFixed(3)}% of pixels differ by more than ${GOLDEN.channelTolerance}` };
 }
 
+// The two halves of a stereo frame are views of the same scene from eyes 6.4 cm apart: mostly alike,
+// but never identical (parallax shifts silhouettes), and each half must show the object.
+function checkParallax(png, scene) {
+  const half = png.width >> 1;
+  let different = 0;
+  let drawnLeft = 0;
+  let drawnRight = 0;
+  for (let y = 0; y < png.height; y++) {
+    for (let x = 0; x < half; x++) {
+      const left = pixelAt(png, x, y);
+      const right = pixelAt(png, x + half, y);
+      if (Math.max(...left.map((c, i) => Math.abs(c - CLEAR[i]))) > 20) drawnLeft++;
+      if (Math.max(...right.map((c, i) => Math.abs(c - CLEAR[i]))) > 20) drawnRight++;
+      if (Math.max(...left.map((c, i) => Math.abs(c - right[i]))) > 20) different++;
+    }
+  }
+  const total = half * png.height;
+  check(drawnLeft > 2000 && drawnRight > 2000, `[${scene}] an eye shows nothing (left ${drawnLeft}, right ${drawnRight} drawn pixels)`);
+  check(different > total * 0.002, `[${scene}] the eyes are identical: no parallax (${different} differing pixels)`);
+  check(different < total * 0.45, `[${scene}] the eyes disagree too much (${different} of ${total} pixels differ)`);
+}
+
 async function openScene(browser, scene) {
   const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
   const logs = [];
@@ -87,6 +109,8 @@ async function checkScene(browser, scene) {
     if (off > 20) drawn++;
   }
   check(drawn > 2000, `[${scene}] only ${drawn} pixels differ from the background: nothing was drawn`);
+
+  if (scene === "stereo") checkParallax(screenshot, scene);
 
   const goldenPath = path.join(here, "golden", `${scene}-640x360.png`);
   if (process.env.UPDATE_GOLDEN) {

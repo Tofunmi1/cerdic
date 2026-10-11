@@ -16,6 +16,7 @@ use bevy_window::WindowPlugin;
 use ve_platform_web::{PlatformError, WebPlatformPlugin};
 use ve_render::VeRenderPlugin;
 
+use crate::mock_hmd;
 use crate::scene::{self, SceneKind};
 use crate::status;
 
@@ -51,7 +52,7 @@ pub(crate) fn start(canvas_id: &str, scene: SceneKind) -> Result<(), PlatformErr
     app.insert_resource(ClearColor(CLEAR));
     app.insert_resource(scene);
     app.add_systems(Startup, scene::spawn_scene);
-    app.add_systems(Update, status::publish);
+    app.add_systems(Update, (status::publish, mock_hmd::update_mock_hmd));
     app.run();
     Ok(())
 }

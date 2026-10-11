@@ -14,6 +14,7 @@ mod pipeline;
 mod prepare;
 mod quality;
 mod schedule;
+mod stereo;
 mod targets;
 
 use bevy_app::{App, Plugin};
@@ -31,6 +32,7 @@ pub use light::{MAX_POINT_LIGHTS, VeAmbientLight, VeDirectionalLight, VePointLig
 pub use material::VeMaterial;
 pub use quality::RenderQuality;
 pub use schedule::{Forward3d, Forward3dSystems};
+pub use stereo::{StereoEye, StereoViews};
 
 /// Registers the engine's render systems.
 #[derive(Debug, Default, Clone, Copy)]
@@ -45,7 +47,10 @@ impl Plugin for VeRenderPlugin {
                 CameraRenderGraph::new(Forward3d)
             })
             .register_required_components_with::<Camera3d, Msaa>(|| Msaa::Sample4)
-            .add_plugins(ExtractComponentPlugin::<Camera3d>::default());
+            .add_plugins((
+                ExtractComponentPlugin::<Camera3d>::default(),
+                ExtractComponentPlugin::<StereoViews>::default(),
+            ));
 
         let shader = app
             .world_mut()
