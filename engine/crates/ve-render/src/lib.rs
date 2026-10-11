@@ -7,6 +7,7 @@
 
 mod extract;
 mod frame;
+mod geometry;
 mod light;
 mod material;
 mod pass;
@@ -15,6 +16,8 @@ mod prepare;
 mod present;
 mod quality;
 mod schedule;
+mod shadow;
+mod shadow_math;
 mod stereo;
 mod targets;
 
@@ -67,14 +70,23 @@ impl Plugin for VeRenderPlugin {
                         present::PRESENT_SHADER,
                         present::PRESENT_SHADER_NAME,
                     )),
+                    shaders.add(Shader::from_wgsl(
+                        shadow::SHADOW_SHADER,
+                        shadow::SHADOW_SHADER_NAME,
+                    )),
                 )
             });
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
-        if let Some((forward, present)) = shaders {
+        if let Some((forward, present, shadow)) = shaders {
+            let forward = pipeline::ForwardPipelines::new(forward);
             render_app
-                .insert_resource(pipeline::ForwardPipelines::new(forward))
+                .insert_resource(shadow::ShadowPipelines::new(
+                    shadow,
+                    forward.view_layout.clone(),
+                ))
+                .insert_resource(forward)
                 .insert_resource(present::PresentPipelines::new(present));
         }
         add_render_systems(render_app);
@@ -90,6 +102,8 @@ fn add_render_systems(render_app: &mut SubApp) {
         .init_resource::<prepare::ViewUniforms>()
         .init_resource::<prepare::LightsGpu>()
         .init_resource::<quality::RenderQuality>()
+        .init_resource::<shadow::ShadowMap>()
+        .init_resource::<shadow::ShadowState>()
         .init_resource::<schedule::CameraWindows>()
         .add_schedule(Forward3d::base_schedule())
         .add_systems(
@@ -105,7 +119,13 @@ fn add_render_systems(render_app: &mut SubApp) {
             (
                 prepare::prepare_instances,
                 prepare::prepare_view_uniforms,
-                prepare::prepare_lights,
+                // The lights uniform includes the sun's shadow matrix and binds the shadow map.
+                (
+                    shadow::prepare_shadow_map,
+                    shadow::prepare_shadow_state,
+                    prepare::prepare_lights,
+                )
+                    .chain(),
                 targets::prepare_depth_textures,
                 targets::prepare_msaa_targets,
                 targets::prepare_offscreen_targets,
@@ -118,6 +138,7 @@ fn add_render_systems(render_app: &mut SubApp) {
             (
                 pipeline::queue_forward_pipelines,
                 present::queue_present_pipelines,
+                shadow::queue_shadow_pipelines,
             )
                 .in_set(RenderSystems::Queue),
         )
@@ -130,7 +151,12 @@ fn add_render_systems(render_app: &mut SubApp) {
         )
         .add_systems(
             RenderGraph,
-            schedule::camera_driver.in_set(RenderGraphSystems::Render),
+            (
+                // The shadow map must be complete before any camera samples it.
+                shadow::shadow_pass.before(schedule::camera_driver),
+                schedule::camera_driver,
+            )
+                .in_set(RenderGraphSystems::Render),
         )
         .add_systems(
             RenderGraph,

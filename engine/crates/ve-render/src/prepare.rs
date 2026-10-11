@@ -7,8 +7,8 @@ use bevy_ecs::prelude::*;
 use bevy_math::{Mat4, Vec3, Vec4};
 use bevy_mesh::Mesh;
 use bevy_render::render_resource::{
-    BindGroup, BindGroupEntry, BufferUsages, DynamicUniformBuffer, PipelineCache, RawBufferVec,
-    ShaderType, UniformBuffer,
+    BindGroup, BindGroupEntry, BindingResource, BufferUsages, DynamicUniformBuffer, PipelineCache,
+    RawBufferVec, ShaderType, UniformBuffer,
 };
 use bevy_render::renderer::{RenderDevice, RenderQueue};
 use bevy_render::view::ExtractedView;
@@ -18,6 +18,7 @@ use crate::extract::{ExtractedMesh, ExtractedMeshes};
 use crate::light::{ExtractedLights, LightsUniform, pack_lights};
 use crate::pipeline::ForwardPipelines;
 use crate::quality::RenderQuality;
+use crate::shadow::{ShadowMap, ShadowState};
 use crate::stereo::StereoViews;
 
 /// Per-instance vertex data: the model matrix (four `vec4` columns) and the material.
@@ -99,7 +100,7 @@ pub(crate) fn prepare_instances(
 }
 
 /// Uniform data for one view.
-#[derive(Clone, Copy, Debug, ShaderType)]
+#[derive(Clone, Copy, Debug, Default, ShaderType)]
 pub(crate) struct ViewUniform {
     pub(crate) clip_from_world: Mat4,
     /// xyz: world position of the eye.
@@ -200,6 +201,8 @@ pub(crate) fn prepare_lights(
     lights: Res<ExtractedLights>,
     quality: Res<RenderQuality>,
     views: Query<&ExtractedView>,
+    shadow: Res<ShadowState>,
+    shadow_map: Res<ShadowMap>,
     mut gpu: ResMut<LightsGpu>,
     pipelines: Res<ForwardPipelines>,
     pipeline_cache: Res<PipelineCache>,
@@ -210,20 +213,40 @@ pub(crate) fn prepare_lights(
         .iter()
         .next()
         .map_or(Vec3::ZERO, |view| view.world_from_view.translation());
-    gpu.buffer
-        .set(pack_lights(&lights, viewer, quality.max_point_lights));
+    gpu.buffer.set(pack_lights(
+        &lights,
+        viewer,
+        quality.max_point_lights,
+        &shadow.params,
+    ));
     gpu.buffer.write_buffer(&device, &queue);
-    gpu.bind_group = gpu.buffer.binding().map(|binding| {
-        let layout = pipeline_cache.get_bind_group_layout(&pipelines.lights_layout);
-        device.create_bind_group(
-            "ve_lights_bind_group",
-            &layout,
-            &[BindGroupEntry {
+    let (Some(binding), Some(map_view), Some(map_sampler)) = (
+        gpu.buffer.binding(),
+        shadow_map.sampled_view(),
+        shadow_map.sampler(),
+    ) else {
+        gpu.bind_group = None;
+        return;
+    };
+    let layout = pipeline_cache.get_bind_group_layout(&pipelines.lights_layout);
+    gpu.bind_group = Some(device.create_bind_group(
+        "ve_lights_bind_group",
+        &layout,
+        &[
+            BindGroupEntry {
                 binding: 0,
                 resource: binding,
-            }],
-        )
-    });
+            },
+            BindGroupEntry {
+                binding: 1,
+                resource: BindingResource::TextureView(map_view),
+            },
+            BindGroupEntry {
+                binding: 2,
+                resource: BindingResource::Sampler(map_sampler),
+            },
+        ],
+    ));
 }
 
 #[cfg(test)]

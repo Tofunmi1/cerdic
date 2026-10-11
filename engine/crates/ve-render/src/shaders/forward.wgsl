@@ -19,11 +19,16 @@ struct Lights {
     sun_direction: vec4<f32>,
     sun_color: vec4<f32>,
     counts: vec4<f32>,
+    sun_shadow_from_world: mat4x4<f32>,
+    // x: shadows on (1) or off (0), y: filter radius in taps, z: one texel in uv units, w: normal bias.
+    shadow_params: vec4<f32>,
     points: array<PointLight, 8>,
 };
 
 @group(0) @binding(0) var<uniform> view: View;
 @group(1) @binding(0) var<uniform> lights: Lights;
+@group(1) @binding(1) var shadow_map: texture_depth_2d;
+@group(1) @binding(2) var shadow_sampler: sampler_comparison;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -110,6 +115,33 @@ fn tonemap_aces(x: vec3<f32>) -> vec3<f32> {
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
+// Fraction of the sun that reaches this point: 1 in the open, 0 in full shadow. Looks up the sun's
+// shadow map with a comparison sampler (a hardware-filtered tap, or a grid of them), pushing the
+// lookup along the normal so surfaces do not shadow themselves. Level 0 sampling needs no derivatives,
+// so the early returns are fine.
+fn sun_visibility(world_position: vec3<f32>, normal: vec3<f32>) -> f32 {
+    if (lights.shadow_params.x < 0.5) {
+        return 1.0;
+    }
+    let biased = world_position + normal * lights.shadow_params.w;
+    let clip = lights.sun_shadow_from_world * vec4<f32>(biased, 1.0);
+    let ndc = clip.xyz / clip.w;
+    let uv = vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || ndc.z > 1.0) {
+        return 1.0;
+    }
+    let radius = i32(lights.shadow_params.y);
+    var lit = 0.0;
+    for (var dy = -radius; dy <= radius; dy = dy + 1) {
+        for (var dx = -radius; dx <= radius; dx = dx + 1) {
+            let offset = vec2<f32>(f32(dx), f32(dy)) * lights.shadow_params.z;
+            lit += textureSampleCompareLevel(shadow_map, shadow_sampler, uv + offset, ndc.z);
+        }
+    }
+    let side = f32(2 * radius + 1);
+    return lit / (side * side);
+}
+
 @fragment
 fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
     let n = normalize(input.world_normal);
@@ -123,7 +155,8 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
 
     var radiance = vec3<f32>(0.0);
     if (dot(lights.sun_color.rgb, vec3<f32>(1.0)) > 0.0) {
-        radiance += shade(n, v, normalize(lights.sun_direction.xyz), lights.sun_color.rgb, diffuse_color, f0, alpha);
+        let sun_radiance = shade(n, v, normalize(lights.sun_direction.xyz), lights.sun_color.rgb, diffuse_color, f0, alpha);
+        radiance += sun_radiance * sun_visibility(input.world_position, n);
     }
     let count = i32(lights.counts.x);
     for (var i = 0; i < count; i = i + 1) {

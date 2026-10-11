@@ -1,13 +1,11 @@
 //! The forward main pass: draws every instance batch into the view's output texture.
 
-use std::ops::Range;
-
 use bevy_camera::ClearColor;
 use bevy_color::LinearRgba;
 use bevy_ecs::prelude::*;
 use bevy_log::info_once;
+use bevy_render::mesh::RenderMesh;
 use bevy_render::mesh::allocator::MeshAllocator;
-use bevy_render::mesh::{RenderMesh, RenderMeshBufferInfo};
 use bevy_render::render_asset::RenderAssets;
 use bevy_render::render_phase::TrackedRenderPass;
 use bevy_render::render_resource::{
@@ -17,6 +15,7 @@ use bevy_render::render_resource::{
 use bevy_render::renderer::{RenderContext, ViewQuery};
 use bevy_render::view::{Msaa, ViewDepthStencilTexture, ViewTarget};
 
+use crate::geometry::bind_geometry;
 use crate::pipeline::ForwardPipelines;
 use crate::prepare::{Batch, InstanceBatches, LightsGpu, ViewSlot, ViewSlots, ViewUniforms};
 use crate::targets::{ViewMsaaColor, ViewOffscreen, needs_blit, render_format};
@@ -69,29 +68,6 @@ enum Destination<'a> {
     Output(RenderPassColorAttachment<'a>),
     /// The view's offscreen texture; the present pass copies it to the output afterwards.
     Offscreen(&'a WgpuTextureView),
-}
-
-/// What to draw for one batch, independent of which view it is drawn from.
-enum DrawCall {
-    Indexed {
-        indices: Range<u32>,
-        base_vertex: i32,
-    },
-    Direct {
-        vertices: Range<u32>,
-    },
-}
-
-impl DrawCall {
-    fn issue(&self, pass: &mut TrackedRenderPass<'_>, instances: Range<u32>) {
-        match self {
-            Self::Indexed {
-                indices,
-                base_vertex,
-            } => pass.draw_indexed(indices.clone(), *base_vertex, instances),
-            Self::Direct { vertices } => pass.draw(vertices.clone(), instances),
-        }
-    }
 }
 
 /// Points the pass at one view slot: its uniform, and (for stereo) its part of the target.
@@ -209,10 +185,7 @@ fn draw_batch<'a>(
     batch: &Batch,
     slots: &ViewSlots,
 ) {
-    let (Some(render_mesh), Some(vertices)) = (
-        gpu.render_meshes.get(batch.mesh),
-        gpu.allocator.mesh_vertex_slice(&batch.mesh),
-    ) else {
+    let Some(render_mesh) = gpu.render_meshes.get(batch.mesh) else {
         info_once!("forward pass: a mesh is not uploaded to the GPU yet");
         return;
     };
@@ -226,25 +199,10 @@ fn draw_batch<'a>(
         return;
     };
     pass.set_render_pipeline(pipeline);
-    pass.set_vertex_buffer(0, vertices.buffer.slice(..));
-    pass.set_vertex_buffer(1, gpu.instance_buffer.slice(..));
-    let call = match &render_mesh.buffer_info {
-        RenderMeshBufferInfo::Indexed {
-            count,
-            index_format,
-        } => {
-            let Some(indices) = gpu.allocator.mesh_index_slice(&batch.mesh) else {
-                return;
-            };
-            pass.set_index_buffer(indices.buffer.slice(..), *index_format);
-            DrawCall::Indexed {
-                indices: indices.range.start..indices.range.start + count,
-                base_vertex: i32::try_from(vertices.range.start).unwrap_or(0),
-            }
-        }
-        RenderMeshBufferInfo::NonIndexed => DrawCall::Direct {
-            vertices: vertices.range.start..vertices.range.end,
-        },
+    let Some(call) = bind_geometry(pass, gpu.allocator, render_mesh, batch, gpu.instance_buffer)
+    else {
+        info_once!("forward pass: a mesh is not uploaded to the GPU yet");
+        return;
     };
     for slot in &slots.0 {
         bind_slot(pass, gpu.view_bind_group, slot);
