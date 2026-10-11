@@ -20,6 +20,7 @@ bevy_diagnostic = { path = "../../third_party/bevy/crates/bevy_diagnostic" }
 bevy_ecs = { path = "../../third_party/bevy/crates/bevy_ecs", features = ["debug"] }
 bevy_image = { path = "../../third_party/bevy/crates/bevy_image" }
 bevy_input = { path = "../../third_party/bevy/crates/bevy_input" }
+bevy_log = { path = "../../third_party/bevy/crates/bevy_log" }
 bevy_mesh = { path = "../../third_party/bevy/crates/bevy_mesh" }
 bevy_time = { path = "../../third_party/bevy/crates/bevy_time" }
 bevy_transform = { path = "../../third_party/bevy/crates/bevy_transform" }
