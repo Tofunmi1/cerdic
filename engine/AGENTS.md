@@ -5,8 +5,17 @@ tests, licence policy (`cargo deny`), file size cap, crate boundaries. Fix the c
 
 ## Layout
 - `crates/ve-core`   engine-agnostic core: `Name`, `Registry`. No Bevy, no platform code.
-- `xtask`            the gates. `cargo xtask check` / `cargo xtask rules`.
+- `crates/ve-kernel` safe geometry API (`Solid`, `Mesh`) over the C++ kernel; the only `unsafe` is in `ffi.rs`.
+- `crates/ve-kernel-sys` raw FFI + CMake build of `cpp/` for native and wasm.
+- `crates/ve-render` render core on the vendored Bevy render crates (stub until M4).
+- `xtask`            the gates. `cargo xtask check` runs all; also `rules`, `cpp`, `parity` alone.
 - `cpp/`             C++ kernel layer (Manifold, meshopt, our code). C ABI boundary only.
+- `third_party/`     vendored sources (Bevy, Manifold, Clipper2, meshoptimizer), each with VENDOR.md.
+- `tools/`           small helper scripts (for example the Node WASI runner used by `parity`).
+
+Build prerequisites: Rust via `rust-toolchain.toml`, CMake, Ninja, and a wasi-sdk (set `WASI_SDK`,
+default `~/.local/share/toolchains/wasi-sdk-34.0-arm64-macos`). `cargo-deny` and `cargo-nextest`
+are used when installed.
 - `docs/adr/`        one short decision record per big choice. Add one before changing a decision.
 - `../spikes/`       throwaway experiments. Never imported from here; rewrite, do not promote.
 

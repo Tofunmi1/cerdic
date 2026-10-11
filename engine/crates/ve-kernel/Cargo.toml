@@ -1,0 +1,18 @@
+[package]
+name = "ve-kernel"
+version = "0.0.0"
+description = "Safe Rust API over the C++ geometry kernel: solids, booleans, transforms, meshes."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+ve-kernel-sys = { path = "../ve-kernel-sys" }
+thiserror.workspace = true
+
+# Property tests run natively only; proptest does not build for wasm targets.
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

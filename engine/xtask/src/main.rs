@@ -12,6 +12,7 @@
 )]
 
 mod cpp;
+mod parity;
 mod rules;
 
 use std::process::{Command, ExitCode};
@@ -24,8 +25,9 @@ fn main() -> ExitCode {
         "check" => check(),
         "rules" => rules::run(),
         "cpp" => cpp::run(),
+        "parity" => parity::run(),
         _ => {
-            eprintln!("usage: cargo xtask <check|rules|cpp>");
+            eprintln!("usage: cargo xtask <check|rules|cpp|parity>");
             return ExitCode::from(2);
         }
     };
@@ -83,6 +85,7 @@ fn check() -> Result<(), Failure> {
         println!("-- deny: skipped (cargo-deny not installed)");
     }
     cpp::run()?;
+    parity::run()?;
     rules::run()?;
     println!("\nall gates passed");
     Ok(())
