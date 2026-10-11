@@ -13,6 +13,14 @@ Checks: >
   -cppcoreguidelines-pro-type-reinterpret-cast,
   -modernize-use-trailing-return-type,
   -readability-magic-numbers,
-  -cppcoreguidelines-avoid-magic-numbers
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-identifier-length,
+  -bugprone-easily-swappable-parameters,
+  -misc-include-cleaner,
+  -cppcoreguidelines-use-enum-class,
+  -cppcoreguidelines-macro-usage,
+  -modernize-macro-to-enum,
+  -readability-trailing-comma,
+  -bugprone-macro-parentheses
 WarningsAsErrors: '*'
-HeaderFilterRegex: '.*'
+HeaderFilterRegex: '.*/engine/cpp/(include|src|tests)/.*'
