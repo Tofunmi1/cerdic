@@ -13,7 +13,7 @@ type Failure = Box<dyn std::error::Error>;
 const MAX_FILE_LINES: usize = 400;
 
 /// Crates that must stay independent of the rendering engine and platform layers.
-const ENGINE_AGNOSTIC: &[&str] = &["ve-core", "ve-kernel", "ve-kernel-sys"];
+const ENGINE_AGNOSTIC: &[&str] = &["ve-core", "ve-kernel", "ve-kernel-sys", "ve-xr-math"];
 /// Dependency name prefixes the engine-agnostic crates may not use.
 const FORBIDDEN_PREFIXES: &[&str] = &["bevy", "wgpu", "winit", "web-sys", "js-sys", "wasm-bindgen"];
 

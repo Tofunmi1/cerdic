@@ -1,0 +1,17 @@
+[package]
+name = "ve-xr-math"
+version = "0.0.0"
+description = "Pure maths for stereo and XR views: poses, asymmetric projections, eye layout. No engine or platform code."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+glam = "0.33"
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true
