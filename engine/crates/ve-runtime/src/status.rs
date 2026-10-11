@@ -10,6 +10,8 @@ use serde_json::json;
 use ve_render::{RenderQuality, StereoViews};
 use ve_xr_web::{XrCamera, XrInput};
 
+use crate::bench_scene::SceneStats;
+use crate::perf::Perf;
 use crate::wands::Wand;
 
 thread_local! {
@@ -68,12 +70,16 @@ pub(crate) fn publish(
     input: Res<XrInput>,
     wands: Query<(&Wand, &Transform)>,
     quality: Res<RenderQuality>,
+    perf: Res<Perf>,
+    scene_stats: Option<Res<SceneStats>>,
 ) {
     *frames += 1;
     let errors = ERRORS.with(|errors| errors.borrow().clone());
     let mut value = json!({
         "frames": *frames,
         "errors": errors,
+        "perf": perf.report(),
+        "scene": scene_stats.as_deref().map(|s| json!({ "draws": s.draws, "triangles": s.triangles })),
         "quality": {
             "tier": quality.tier.name(),
             "msaa": quality.msaa_samples,

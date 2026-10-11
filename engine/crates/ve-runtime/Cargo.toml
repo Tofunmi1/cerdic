@@ -27,6 +27,7 @@ bevy_transform = { path = "../../third_party/bevy/crates/bevy_transform" }
 bevy_window = { path = "../../third_party/bevy/crates/bevy_window" }
 bevy_render = { path = "../../third_party/bevy/crates/bevy_render", default-features = false, features = ["webgl"] }
 bevy_math = { path = "../../third_party/bevy/crates/bevy_math" }
+ve-core = { path = "../ve-core" }
 ve-kernel = { path = "../ve-kernel" }
 ve-xr-math = { path = "../ve-xr-math" }
 ve-xr-web = { path = "../ve-xr-web" }

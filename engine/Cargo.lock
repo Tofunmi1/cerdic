@@ -3029,6 +3029,7 @@ dependencies = [
 name = "ve-core"
 version = "0.0.0"
 dependencies = [
+ "proptest",
  "thiserror 2.0.21",
 ]
 
@@ -3100,6 +3101,7 @@ dependencies = [
  "bevy_transform",
  "bevy_window",
  "serde_json",
+ "ve-core",
  "ve-kernel",
  "ve-platform-web",
  "ve-render",

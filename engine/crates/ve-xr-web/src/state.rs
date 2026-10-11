@@ -29,6 +29,19 @@ thread_local! {
     static STATE: Cell<SessionState> = const { Cell::new(SessionState::Idle) };
     static FRAMES: Cell<u64> = const { Cell::new(0) };
     static ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
+    static REFRESH_HZ: Cell<f32> = const { Cell::new(0.0) };
+}
+
+/// Records the display refresh rate the session reports (zero when the runtime does not say).
+pub fn set_refresh_hz(hz: f32) {
+    REFRESH_HZ.with(|cell| cell.set(if hz.is_finite() && hz > 0.0 { hz } else { 0.0 }));
+}
+
+/// The refresh rate of the current or last session, if the runtime reported one.
+#[must_use]
+pub fn refresh_hz() -> Option<f32> {
+    let hz = REFRESH_HZ.with(Cell::get);
+    (hz > 0.0).then_some(hz)
 }
 
 /// Stores the newest frame for the app to pick up, replacing an unread one.

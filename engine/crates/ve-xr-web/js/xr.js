@@ -80,6 +80,9 @@ export class XrBridge {
 
   framebufferSize() { return new Int32Array([this.layer.framebufferWidth, this.layer.framebufferHeight]); }
 
+  /** The display refresh rate in Hz, or 0 when the runtime does not report one. */
+  frameRate() { return this.session.frameRate ?? 0; }
+
   /** The layer's framebuffer, or null when the runtime renders to the canvas' own framebuffer. */
   framebuffer() { return this.layer.framebuffer; }
 
