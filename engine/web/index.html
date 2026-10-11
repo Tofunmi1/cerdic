@@ -23,6 +23,7 @@
   <script type="module">
     import init, { start, status, set_quality, set_governor, set_window_hz, xr_supported, enter_xr, exit_xr } from "./ve_runtime.js";
     import { bindMemory } from "./wasi_snapshot_preview1.js";
+    import { watchBenchSession } from "./bench.js";
 
     const params = new URLSearchParams(location.search);
     const began = performance.now();
@@ -56,6 +57,15 @@
       button.hidden = !state.xrSupported;
       // Browsers require a user gesture to start a session, so a click is the real entry point.
       button.addEventListener("click", () => enter_xr("ve").catch((e) => console.error(e)));
+      // Benchmark runs: sample the session, optionally end it after ?seconds=, then report.
+      if (params.get("bench") === "1") {
+        watchBenchSession({
+          read: state.read,
+          exit: () => exit_xr(),
+          scene: params.get("scene") || "kernel",
+          seconds: Number(params.get("seconds") ?? 0),
+        });
+      }
       // Tests and kiosks can enter immediately (an emulated runtime has no gesture requirement).
       if (state.xrSupported && params.get("xr") === "auto") await enter_xr("ve");
     } catch (error) {
