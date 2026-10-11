@@ -14,6 +14,7 @@
 mod cpp;
 mod parity;
 mod rules;
+mod web;
 
 use std::process::{Command, ExitCode};
 
@@ -26,8 +27,10 @@ fn main() -> ExitCode {
         "rules" => rules::run(),
         "cpp" => cpp::run(),
         "parity" => parity::run(),
+        "web" => web::build(web::Profile::from_arg(std::env::args().nth(2).as_deref())),
+        "web-test" => web::test(web::Profile::from_arg(std::env::args().nth(2).as_deref())),
         _ => {
-            eprintln!("usage: cargo xtask <check|rules|cpp|parity>");
+            eprintln!("usage: cargo xtask <check|rules|cpp|parity|web [dev]|web-test [dev]>");
             return ExitCode::from(2);
         }
     };
@@ -64,15 +67,18 @@ fn check() -> Result<(), Failure> {
         run("tests", "cargo", &["test", "--workspace"])?;
     }
     run(
-        "wasm",
+        "wasm-clippy",
         "cargo",
         &[
-            "check",
+            "clippy",
             "--workspace",
             "--exclude",
             "xtask",
             "--target",
             "wasm32-unknown-unknown",
+            "--",
+            "-D",
+            "warnings",
         ],
     )?;
     if has("cargo-deny") {
@@ -86,6 +92,11 @@ fn check() -> Result<(), Failure> {
     }
     cpp::run()?;
     parity::run()?;
+    if has("node") {
+        web::test(web::Profile::Dev)?;
+    } else {
+        println!("-- web-test: skipped (node not found)");
+    }
     rules::run()?;
     println!("\nall gates passed");
     Ok(())

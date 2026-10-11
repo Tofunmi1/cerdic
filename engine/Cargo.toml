@@ -12,6 +12,10 @@ publish = false
 thiserror = "2"
 serde_json = "1"
 proptest = "1"
+wasm-bindgen = "=0.2.129"
+js-sys = "=0.3.106"
+web-sys = "=0.3.106"
+raw-window-handle = "0.6"
 
 # Lints live here, not in prompts: an LLM (or a tired human) cannot talk its way past them.
 [workspace.lints.rust]
@@ -20,6 +24,7 @@ missing_docs = "warn"
 unreachable_pub = "warn"
 unused_must_use = "deny"
 rust_2018_idioms = { level = "warn", priority = -1 }
+elided_lifetimes_in_paths = "allow"  # Bevy system params (Res<T>, Query<&T>) are written without lifetimes
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
@@ -44,6 +49,16 @@ lossy_float_literal = "warn"
 float_cmp = "warn"
 large_stack_arrays = "warn"
 module_name_repetitions = "allow"
+# Bevy system signatures: params are taken by value, queries are nested types, systems take many params.
+needless_pass_by_value = "allow"
+type_complexity = "allow"
+too_many_arguments = "allow"
+
+# Fast iteration for the browser build (`cargo xtask web dev`): light optimisation, no LTO.
+[profile.web-dev]
+inherits = "dev"
+opt-level = 1
+debug = false
 
 [profile.release]
 opt-level = 3

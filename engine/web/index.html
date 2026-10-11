@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Engine</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    #ve { display: block; width: 100vw; height: 100vh; touch-action: none; }
+  </style>
+</head>
+<body>
+  <canvas id="ve"></canvas>
+  <script type="module">
+    import init, { start, status } from "./ve_runtime.js";
+
+    const began = performance.now();
+    const state = { ready: false, bootMs: null, error: null, read: () => JSON.parse(status()) };
+    window.__ve = state;
+    try {
+      await init();
+      start("ve");
+      const poll = setInterval(() => {
+        if (state.read().frames > 0) {
+          state.ready = true;
+          state.bootMs ??= Math.round(performance.now() - began);
+          clearInterval(poll);
+        }
+      }, 50);
+    } catch (error) {
+      state.error = String(error);
+      console.error(error);
+    }
+  </script>
+</body>
+</html>

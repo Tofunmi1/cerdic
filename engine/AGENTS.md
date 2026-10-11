@@ -7,8 +7,12 @@ tests, licence policy (`cargo deny`), file size cap, crate boundaries. Fix the c
 - `crates/ve-core`   engine-agnostic core: `Name`, `Registry`. No Bevy, no platform code.
 - `crates/ve-kernel` safe geometry API (`Solid`, `Mesh`) over the C++ kernel; the only `unsafe` is in `ffi.rs`.
 - `crates/ve-kernel-sys` raw FFI + CMake build of `cpp/` for native and wasm.
-- `crates/ve-render` render core on the vendored Bevy render crates (stub until M4).
-- `xtask`            the gates. `cargo xtask check` runs all; also `rules`, `cpp`, `parity` alone.
+- `crates/ve-render` render core on the vendored Bevy render crates (frame plumbing now; pipelines from M4).
+- `crates/ve-platform-web` browser canvas window, rAF runner, pointer input (wasm32 only).
+- `crates/ve-runtime` the wasm entry point the page calls (`start`, `status`); wasm32 only.
+- `web/`             the page, `dist/` build output and Playwright end-to-end tests.
+- `xtask`            the gates. `cargo xtask check` runs all; also `rules`, `cpp`, `parity`,
+                     `web [dev]` (build the bundle) and `web-test [dev]` (build + browser test).
 - `cpp/`             C++ kernel layer (Manifold, meshopt, our code). C ABI boundary only.
 - `third_party/`     vendored sources (Bevy, Manifold, Clipper2, meshoptimizer), each with VENDOR.md.
 - `tools/`           small helper scripts (for example the Node WASI runner used by `parity`).

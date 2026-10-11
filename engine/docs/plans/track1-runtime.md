@@ -160,7 +160,7 @@ set). Boot time: <= 3 s on desktop. Memory: flat over 30 minutes.
 | M0 Foundation | done | gates verified by planting violations (unwrap, #[allow], forbidden dep, 401-line file) |
 | M1 Vendor/trim Bevy | done | 38 crate dirs vendored (15 MB, tag v0.20.0, b3bdd75), ve-render stub builds native + wasm, deny/clippy/tests/wasm gates green; ve-render wasm tree =      224 crates; spike baseline 7.2 MB wasm (1.82 MB brotli) |
 | M2 C++ kernel | done | C ABI kernel over Manifold 3.5.4 + meshopt 1.3 (vendored, offline CMake). 19 Rust tests + 17 C++ checks under ASan/UBSan, clang-tidy clean (wasm sysroot), native == wasm32-wasip1 output on an 11-line corpus (`cargo xtask parity`). Deviation: proptest robustness tests (512 cases of garbage meshes) stand in for a cargo-fuzz target; spike baseline: boot 69 ms in Chrome |
-| M3 Web platform | pending | |
+| M3 Web platform | done | Canvas window + rAF runner + pointer input (ve-platform-web), clear pass (ve-render), entry point (ve-runtime). Headless Chromium (SwiftShader): backend Gl (WebGL2), boot 529 ms (dev build), ~60 fps, canvas pixels exactly (26,51,102), resize follows viewport, no console errors. Limits seen: texture 8192, bind groups 8, UBO 65536 B, 8 colour attachments. Sizes (unoptimised, with debug info): web-dev 57 MB, release 29 MB; optimisation is M12 |
 | M4 Render core v0 | pending | |
 | M5 Materials/lights/post | pending | |
 | M6 Shadows/tiers | pending | |
