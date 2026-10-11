@@ -18,6 +18,11 @@ web-sys = "=0.3.106"
 raw-window-handle = "0.6"
 bytemuck = { version = "1", features = ["derive"] }
 
+# Vendored, locally patched dependencies (see third_party/PATCHES.md). Every crate that depends on
+# wgpu-hal, directly or through wgpu and Bevy, gets the patched copy.
+[patch.crates-io]
+wgpu-hal = { path = "third_party/wgpu-hal" }
+
 # Lints live here, not in prompts: an LLM (or a tired human) cannot talk its way past them.
 [workspace.lints.rust]
 unsafe_code = "deny"            # FFI/platform crates opt in with #![expect(unsafe_code, reason = "...")]
