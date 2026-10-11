@@ -3034,6 +3034,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ve-interact"
+version = "0.0.0"
+dependencies = [
+ "glam",
+ "proptest",
+]
+
+[[package]]
 name = "ve-kernel"
 version = "0.0.0"
 dependencies = [
