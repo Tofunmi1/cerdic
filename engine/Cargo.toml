@@ -1,0 +1,59 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "xtask"]
+exclude = ["third_party"]  # vendored Bevy is its own workspace (third_party/bevy/VENDOR.md)
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.97.1"
+publish = false
+
+[workspace.dependencies]
+thiserror = "2"
+serde_json = "1"
+
+# Lints live here, not in prompts: an LLM (or a tired human) cannot talk its way past them.
+[workspace.lints.rust]
+unsafe_code = "deny"            # FFI/platform crates opt in with #![expect(unsafe_code, reason = "...")]
+missing_docs = "warn"
+unreachable_pub = "warn"
+unused_must_use = "deny"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# No silent failure paths in library code.
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+# Fix the code, do not silence the lint: #[expect(.., reason = "..")] only.
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+undocumented_unsafe_blocks = "deny"
+# Hygiene that keeps diffs and reviews honest.
+mod_module_files = "warn"
+clone_on_ref_ptr = "warn"
+rc_buffer = "warn"
+lossy_float_literal = "warn"
+float_cmp = "warn"
+large_stack_arrays = "warn"
+module_name_repetitions = "allow"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+debug = "line-tables-only"
+
+# Keep dev artifacts small: the vendored Bevy/wgpu tree is large and disks are finite.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false

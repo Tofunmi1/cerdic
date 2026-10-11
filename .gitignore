@@ -7,3 +7,11 @@ src/wasm/
 test-results/
 playwright-report/
 *.tsbuildinfo
+
+# engine workspace and spikes
+engine/target/
+spikes/**/target/
+spikes/**/node_modules/
+spikes/hybrid-wasm/third_party/
+spikes/hybrid-wasm/build/
+spikes/bevy-cpp/web/*.wasm
