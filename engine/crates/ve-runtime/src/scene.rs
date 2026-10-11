@@ -8,11 +8,12 @@ use bevy_camera::Camera3d;
 use bevy_color::Color;
 use bevy_ecs::resource::Resource;
 use bevy_ecs::system::{Commands, Res, ResMut};
-use bevy_math::Vec3;
+use bevy_math::{Mat4, Vec3};
 use bevy_mesh::{Indices, Mesh, Mesh3d, PrimitiveTopology};
 use bevy_transform::components::Transform;
 use ve_kernel::{KernelError, Solid};
 use ve_render::{VeAmbientLight, VeDirectionalLight, VeMaterial, VePointLight};
+use ve_xr_web::{XrCamera, XrRig};
 
 use crate::{mock_hmd, status};
 
@@ -28,6 +29,8 @@ pub(crate) enum SceneKind {
     Lights,
     /// The kernel scene seen through a mock headset: two eyes side by side.
     Stereo,
+    /// A room-scale scene for a real or emulated headset: the cube at eye height, a floor, lights.
+    Xr,
 }
 
 impl FromStr for SceneKind {
@@ -39,6 +42,7 @@ impl FromStr for SceneKind {
             "materials" => Ok(Self::Materials),
             "lights" => Ok(Self::Lights),
             "stereo" => Ok(Self::Stereo),
+            "xr" => Ok(Self::Xr),
             _ => Err(()),
         }
     }
@@ -81,16 +85,17 @@ fn camera(commands: &mut Commands, eye: Vec3, target: Vec3) {
 }
 
 fn kernel_scene(commands: &mut Commands, meshes: &mut Assets<Mesh>) -> Result<(), KernelError> {
-    spawn_bitten_cube(commands, meshes)?;
+    spawn_bitten_cube(commands, meshes, Vec3::ZERO)?;
     sun(commands, 3.0);
     camera(commands, Vec3::new(1.6, 1.3, 2.0), Vec3::ZERO);
     Ok(())
 }
 
-/// Spawns the cube-minus-sphere that several scenes share.
+/// Spawns the cube-minus-sphere that several scenes share, centred on `position`.
 fn spawn_bitten_cube(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
+    position: Vec3,
 ) -> Result<(), KernelError> {
     let solid = Solid::cube([1.0, 1.0, 1.0], true)?.difference(&Solid::sphere(0.65, 48)?)?;
     commands.spawn((
@@ -100,14 +105,14 @@ fn spawn_bitten_cube(
             roughness: 0.6,
             ..VeMaterial::default()
         },
-        Transform::IDENTITY,
+        Transform::from_translation(position),
     ));
     Ok(())
 }
 
 /// The kernel scene viewed through the mock headset (two eyes side by side).
 fn stereo_scene(commands: &mut Commands, meshes: &mut Assets<Mesh>) -> Result<(), KernelError> {
-    spawn_bitten_cube(commands, meshes)?;
+    spawn_bitten_cube(commands, meshes, Vec3::ZERO)?;
     sun(commands, 3.0);
     let head = mock_hmd::default_head(Vec3::new(0.4, 0.6, 2.2), Vec3::ZERO);
     mock_hmd::spawn_stereo_camera(commands, head);
@@ -201,11 +206,54 @@ fn lights_scene(commands: &mut Commands, meshes: &mut Assets<Mesh>) -> Result<()
     Ok(())
 }
 
+/// A room-scale scene for a headset. The tracking origin (the floor under the user) is placed 2.2 m
+/// in front of a cube floating at eye height; before a session starts, a mono camera shows the same
+/// view and `XrCamera` marks it as the one the headset takes over.
+fn xr_scene(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    rig: &mut XrRig,
+) -> Result<(), KernelError> {
+    rig.0 = Mat4::from_translation(Vec3::new(0.0, 0.0, 2.2));
+    spawn_bitten_cube(commands, meshes, Vec3::new(0.0, 1.4, 0.0))?;
+    let floor = meshes.add(render_mesh(&Solid::cube([6.0, 0.1, 6.0], true)?, false)?);
+    commands.spawn((
+        Mesh3d(floor),
+        VeMaterial {
+            base_color: Color::srgb(0.55, 0.57, 0.62),
+            roughness: 0.9,
+            ..VeMaterial::default()
+        },
+        Transform::from_xyz(0.0, -0.05, 0.0),
+    ));
+    sun(commands, 2.5);
+    for (color, position) in [
+        (Color::srgb(1.0, 0.45, 0.25), Vec3::new(-1.2, 1.8, 0.8)),
+        (Color::srgb(0.3, 0.55, 1.0), Vec3::new(1.2, 1.2, 0.8)),
+    ] {
+        commands.spawn((
+            VePointLight {
+                color,
+                intensity: 9.0,
+                range: 6.0,
+            },
+            Transform::from_translation(position),
+        ));
+    }
+    commands.spawn((
+        Camera3d::default(),
+        XrCamera,
+        Transform::from_xyz(0.0, 1.6, 2.2).looking_at(Vec3::new(0.0, 1.4, 0.0), Vec3::Y),
+    ));
+    Ok(())
+}
+
 /// Startup system: spawns the chosen test scene.
 pub(crate) fn spawn_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut ambient: ResMut<VeAmbientLight>,
+    mut rig: ResMut<XrRig>,
     choice: Res<SceneKind>,
 ) {
     ambient.intensity = 0.2;
@@ -214,6 +262,7 @@ pub(crate) fn spawn_scene(
         SceneKind::Materials => materials_scene(&mut commands, &mut meshes),
         SceneKind::Lights => lights_scene(&mut commands, &mut meshes),
         SceneKind::Stereo => stereo_scene(&mut commands, &mut meshes),
+        SceneKind::Xr => xr_scene(&mut commands, &mut meshes, &mut rig),
     };
     if let Err(error) = built {
         status::report_error(format!("scene {:?} failed: {error}", *choice));

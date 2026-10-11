@@ -90,7 +90,7 @@ pub(crate) fn test(profile: Profile) -> Result<(), Failure> {
         run_in("web", "npm", &["install", "--no-audit", "--no-fund"])?;
     }
     println!("-- web-test: playwright (headless Chromium)");
-    run_in("web", "node", &["tests/engine.mjs"])
+    run_in("web", "npm", &["test", "--silent"])
 }
 
 /// The wasm-bindgen CLI must match the library version in `Cargo.lock` exactly.

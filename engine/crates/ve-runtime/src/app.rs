@@ -15,6 +15,7 @@ use bevy_transform::TransformPlugin;
 use bevy_window::WindowPlugin;
 use ve_platform_web::{PlatformError, WebPlatformPlugin};
 use ve_render::VeRenderPlugin;
+use ve_xr_web::XrPlugin;
 
 use crate::mock_hmd;
 use crate::scene::{self, SceneKind};
@@ -48,6 +49,7 @@ pub(crate) fn start(canvas_id: &str, scene: SceneKind) -> Result<(), PlatformErr
         CameraPlugin,
         RenderPlugin::default(),
         VeRenderPlugin,
+        XrPlugin,
     ));
     app.insert_resource(ClearColor(CLEAR));
     app.insert_resource(scene);

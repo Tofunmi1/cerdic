@@ -29,10 +29,12 @@ bevy_render = { path = "../../third_party/bevy/crates/bevy_render", default-feat
 bevy_math = { path = "../../third_party/bevy/crates/bevy_math" }
 ve-kernel = { path = "../ve-kernel" }
 ve-xr-math = { path = "../ve-xr-math" }
+ve-xr-web = { path = "../ve-xr-web" }
 ve-platform-web = { path = "../ve-platform-web" }
 ve-render = { path = "../ve-render" }
 serde_json.workspace = true
 wasm-bindgen.workspace = true
+wasm-bindgen-futures = "0.4"
 web-sys = { workspace = true, features = ["console"] }
 
 [lints]

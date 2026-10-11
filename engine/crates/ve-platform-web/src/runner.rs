@@ -1,6 +1,6 @@
 //! The `requestAnimationFrame` loop that drives the Bevy `App` in the browser.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use bevy_app::{App, AppExit, PluginsState};
@@ -15,6 +15,31 @@ use crate::canvas::CanvasHandle;
 use crate::input::{self, Listeners, Queue};
 
 type FrameCallback = Rc<RefCell<Option<Closure<dyn FnMut()>>>>;
+
+thread_local! {
+    /// When set, `requestAnimationFrame` no longer runs frames: an external source (the XR session
+    /// loop) calls [`pump_frame`] instead, once per headset frame.
+    static EXTERNALLY_DRIVEN: Cell<bool> = const { Cell::new(false) };
+    /// The running app, so an external frame source can step it.
+    static ACTIVE_RUNNER: RefCell<Option<Rc<RefCell<Runner>>>> = const { RefCell::new(None) };
+}
+
+/// Hands frame pacing to an external source (`true`) or back to `requestAnimationFrame` (`false`).
+///
+/// `WebXR` sessions have their own frame loop; while presenting, the window loop must not also run
+/// frames or the app would update twice per display refresh.
+pub fn set_externally_driven(driven: bool) {
+    EXTERNALLY_DRIVEN.with(|flag| flag.set(driven));
+}
+
+/// Runs one app frame now. Returns `false` if no app is running or it has asked to exit.
+#[must_use]
+pub fn pump_frame() -> bool {
+    ACTIVE_RUNNER.with(|slot| {
+        let runner = slot.borrow().clone();
+        runner.is_some_and(|runner| runner.borrow_mut().frame())
+    })
+}
 
 struct Runner {
     app: App,
@@ -42,15 +67,17 @@ pub(crate) fn run(app: App, canvas: CanvasHandle, queue: Queue, listeners: Liste
 }
 
 fn start(runner: Rc<RefCell<Runner>>) {
+    ACTIVE_RUNNER.with(|slot| *slot.borrow_mut() = Some(Rc::clone(&runner)));
     let slot: FrameCallback = Rc::new(RefCell::new(None));
     let next = Rc::clone(&slot);
     *slot.borrow_mut() = Some(Closure::new(move || {
-        let keep_going = runner.borrow_mut().frame();
+        let keep_going = EXTERNALLY_DRIVEN.with(Cell::get) || runner.borrow_mut().frame();
         if keep_going {
             request_frame(&next);
         } else {
-            // Break the Rc cycle so the runner and its listeners are released.
+            // Break the Rc cycles so the runner and its listeners are released.
             next.borrow_mut().take();
+            ACTIVE_RUNNER.with(|slot| slot.borrow_mut().take());
         }
     }));
     request_frame(&slot);

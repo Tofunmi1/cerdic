@@ -1,7 +1,8 @@
 //! The runtime entry point called from the web page.
 //!
 //! `start(canvas_id, scene)` assembles the engine's plugins into a Bevy app that renders into the
-//! canvas. `status()` reports what the page needs to verify the run (adapter, limits, frame count).
+//! canvas. `status()` reports what the page needs to verify the run (adapter, limits, frame count,
+//! XR session). `enter_xr` and `exit_xr` move the running app into and out of a headset session.
 #![cfg(target_arch = "wasm32")]
 
 mod app;
@@ -11,10 +12,11 @@ mod status;
 
 use std::str::FromStr;
 
+use ve_platform_web::CanvasHandle;
 use wasm_bindgen::prelude::*;
 
 /// Starts the engine on the canvas with the given element id, showing a built-in test scene
-/// (`"kernel"`, `"materials"` or `"lights"`; an empty string means `"kernel"`).
+/// (`"kernel"`, `"materials"`, `"lights"`, `"stereo"` or `"xr"`; an empty string means `"kernel"`).
 ///
 /// # Errors
 /// Fails if the canvas cannot be found or the scene name is unknown.
@@ -29,9 +31,34 @@ pub fn start(canvas_id: &str, scene: &str) -> Result<(), JsError> {
     app::start(canvas_id, scene).map_err(|error| JsError::new(&error.to_string()))
 }
 
-/// JSON describing the running engine: `{ "frames", "adapter", "backend", "limits", "errors" }`.
+/// JSON describing the running engine: `{ "frames", "adapter", "backend", "limits", "errors", "xr" }`.
 #[wasm_bindgen]
 #[must_use]
 pub fn status() -> String {
     status::snapshot()
+}
+
+/// Whether the browser can present an immersive VR session.
+#[wasm_bindgen]
+pub async fn xr_supported() -> bool {
+    ve_xr_web::is_supported().await
+}
+
+/// Enters an immersive VR session on the canvas. On real devices the browser requires this to be
+/// called from a user gesture (for example a button click).
+///
+/// # Errors
+/// Fails if the canvas cannot be found, `WebXR` is unavailable, or the browser refuses the session.
+#[wasm_bindgen]
+pub async fn enter_xr(canvas_id: &str) -> Result<(), JsError> {
+    let canvas = CanvasHandle::find(canvas_id).map_err(|error| JsError::new(&error.to_string()))?;
+    ve_xr_web::enter(canvas.element())
+        .await
+        .map_err(|error| JsError::new(&error.to_string()))
+}
+
+/// Ends the running immersive session, if any.
+#[wasm_bindgen]
+pub async fn exit_xr() {
+    ve_xr_web::exit().await;
 }
