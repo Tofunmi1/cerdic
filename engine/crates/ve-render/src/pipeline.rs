@@ -1,9 +1,10 @@
-//! The forward render pipeline and its per-mesh-layout, per-target-format specialisation.
+//! The forward render pipeline and its per-mesh-layout, per-format, per-sample-count specialisation.
 
 use std::collections::HashMap;
 
 use bevy_asset::Handle;
 use bevy_ecs::prelude::*;
+use bevy_log::warn_once;
 use bevy_mesh::{Mesh, MeshVertexBufferLayoutRef, VertexBufferLayout};
 use bevy_render::mesh::RenderMesh;
 use bevy_render::render_asset::RenderAssets;
@@ -15,20 +16,23 @@ use bevy_render::render_resource::{
     RenderPipelineDescriptor, ShaderStages, StencilState, TextureFormat, VertexAttribute,
     VertexFormat, VertexState, VertexStepMode,
 };
-use bevy_render::view::ViewTarget;
+use bevy_render::view::{Msaa, ViewTarget};
 use bevy_shader::Shader;
 
-use crate::prepare::{DEPTH_FORMAT, InstanceBatches, InstanceData, ViewUniform};
+use crate::light::LightsUniform;
+use crate::prepare::{InstanceBatches, InstanceData, ViewUniform};
+use crate::targets::DEPTH_FORMAT;
 
 /// Source of the forward shader, compiled at runtime by the shader pipeline.
 pub(crate) const FORWARD_SHADER: &str = include_str!("shaders/forward.wgsl");
 
-type PipelineKey = (MeshVertexBufferLayoutRef, TextureFormat);
+type PipelineKey = (MeshVertexBufferLayoutRef, TextureFormat, u32);
 
-/// The forward pipeline family: shared layout and shader, specialised lazily per mesh layout.
+/// The forward pipeline family: shared layouts and shader, specialised lazily.
 #[derive(Resource)]
 pub(crate) struct ForwardPipelines {
     pub(crate) view_layout: BindGroupLayoutDescriptor,
+    pub(crate) lights_layout: BindGroupLayoutDescriptor,
     shader: Handle<Shader>,
     cache: HashMap<PipelineKey, CachedRenderPipelineId>,
 }
@@ -42,30 +46,40 @@ impl ForwardPipelines {
                 uniform_buffer::<ViewUniform>(true),
             ),
         );
+        let lights_layout = BindGroupLayoutDescriptor::new(
+            "ve_lights_layout",
+            &BindGroupLayoutEntries::single(
+                ShaderStages::FRAGMENT,
+                uniform_buffer::<LightsUniform>(false),
+            ),
+        );
         Self {
             view_layout,
+            lights_layout,
             shader,
             cache: HashMap::new(),
         }
     }
 
-    /// The pipeline queued for this mesh layout and output format, if any.
+    /// The pipeline queued for this mesh layout, output format and sample count, if any.
     pub(crate) fn get(
         &self,
         layout: &MeshVertexBufferLayoutRef,
         format: TextureFormat,
+        samples: u32,
     ) -> Option<CachedRenderPipelineId> {
-        self.cache.get(&(layout.clone(), format)).copied()
+        self.cache.get(&(layout.clone(), format, samples)).copied()
     }
 
     fn descriptor(
         &self,
         mesh_layout: VertexBufferLayout,
         format: TextureFormat,
+        samples: u32,
     ) -> RenderPipelineDescriptor {
         RenderPipelineDescriptor {
             label: Some("ve_forward".into()),
-            layout: vec![self.view_layout.clone()],
+            layout: vec![self.view_layout.clone(), self.lights_layout.clone()],
             vertex: VertexState {
                 shader: self.shader.clone(),
                 entry_point: Some("vertex".into()),
@@ -86,7 +100,11 @@ impl ForwardPipelines {
                 stencil: StencilState::default(),
                 bias: DepthBiasState::default(),
             }),
-            multisample: MultisampleState::default(),
+            multisample: MultisampleState {
+                count: samples,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
             fragment: Some(FragmentState {
                 shader: self.shader.clone(),
                 entry_point: Some("fragment".into()),
@@ -102,35 +120,37 @@ impl ForwardPipelines {
     }
 }
 
-/// Instance buffer layout: a model matrix as four `vec4` columns at shader locations 3 to 6.
+/// Instance buffer layout: the model matrix as four `vec4` columns (locations 3 to 6), then base
+/// colour, material parameters and emissive (locations 7 to 9).
 fn instance_layout() -> VertexBufferLayout {
-    let column = u64::try_from(size_of::<[f32; 4]>()).unwrap_or(16);
+    let vec4 = u64::try_from(size_of::<[f32; 4]>()).unwrap_or(16);
     VertexBufferLayout {
-        array_stride: u64::try_from(size_of::<InstanceData>()).unwrap_or(64),
+        array_stride: u64::try_from(size_of::<InstanceData>()).unwrap_or(112),
         step_mode: VertexStepMode::Instance,
-        attributes: (0..4_u32)
+        attributes: (0..7_u32)
             .map(|i| VertexAttribute {
                 format: VertexFormat::Float32x4,
-                offset: column * u64::from(i),
+                offset: vec4 * u64::from(i),
                 shader_location: 3 + i,
             })
             .collect(),
     }
 }
 
-/// Queues a pipeline for every (mesh layout, output format) combination about to be drawn.
+/// Queues a pipeline for every (mesh layout, output format, sample count) about to be drawn.
 pub(crate) fn queue_forward_pipelines(
     mut pipelines: ResMut<ForwardPipelines>,
     pipeline_cache: Res<PipelineCache>,
     render_meshes: Res<RenderAssets<RenderMesh>>,
     batches: Res<InstanceBatches>,
-    views: Query<&ViewTarget>,
+    views: Query<(&ViewTarget, &Msaa)>,
 ) {
-    let formats: Vec<TextureFormat> = views
+    let variants: Vec<(TextureFormat, u32)> = views
         .iter()
-        .filter_map(ViewTarget::out_texture_view_format)
+        .filter_map(|(target, msaa)| Some((target.out_texture_view_format()?, msaa.samples())))
         .collect();
     for batch in &batches.batches {
+        // A mesh that is not uploaded yet is retried next frame.
         let Some(render_mesh) = render_meshes.get(batch.mesh) else {
             continue;
         };
@@ -140,14 +160,15 @@ pub(crate) fn queue_forward_pipelines(
             Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
         ]) else {
             // A mesh without positions and normals cannot be drawn by this pipeline.
+            warn_once!("pipeline queue: a mesh lacks POSITION or NORMAL attributes");
             continue;
         };
-        for &format in &formats {
-            let key = (layout.clone(), format);
+        for &(format, samples) in &variants {
+            let key = (layout.clone(), format, samples);
             if pipelines.cache.contains_key(&key) {
                 continue;
             }
-            let descriptor = pipelines.descriptor(mesh_layout.clone(), format);
+            let descriptor = pipelines.descriptor(mesh_layout.clone(), format, samples);
             let id = pipeline_cache.queue_render_pipeline(descriptor);
             pipelines.cache.insert(key, id);
         }

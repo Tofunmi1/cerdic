@@ -1,15 +1,20 @@
 //! Render core for the engine.
 //!
 //! Built on the vendored Bevy render crates (`third_party/bevy`). Rendering is one ECS schedule per
-//! camera, run by a driver inside the `RenderGraph` schedule. M4 adds the [`Forward3d`] schedule, mesh
-//! extraction with instance batching, and a forward pipeline; materials and lights arrive in M5.
+//! camera, run by a driver inside the `RenderGraph` schedule. The [`Forward3d`] schedule draws
+//! instance-batched meshes with a metallic-roughness PBR shader, a sun, point lights, MSAA and
+//! tonemapping; shadows and quality tiers come next (M6).
 
 mod extract;
 mod frame;
+mod light;
+mod material;
 mod pass;
 mod pipeline;
 mod prepare;
+mod quality;
 mod schedule;
+mod targets;
 
 use bevy_app::{App, Plugin};
 use bevy_asset::Assets;
@@ -22,6 +27,9 @@ use bevy_render::view::Msaa;
 use bevy_render::{ExtractSchedule, Render, RenderApp, RenderSystems};
 use bevy_shader::Shader;
 
+pub use light::{MAX_POINT_LIGHTS, VeAmbientLight, VeDirectionalLight, VePointLight};
+pub use material::VeMaterial;
+pub use quality::RenderQuality;
 pub use schedule::{Forward3d, Forward3dSystems};
 
 /// Registers the engine's render systems.
@@ -31,11 +39,12 @@ pub struct VeRenderPlugin;
 impl Plugin for VeRenderPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ClearColor>()
+            .init_resource::<VeAmbientLight>()
+            .init_resource::<RenderQuality>()
             .register_required_components_with::<Camera3d, CameraRenderGraph>(|| {
                 CameraRenderGraph::new(Forward3d)
             })
-            // M4 renders straight into the output texture, so no multisampling yet (M5 adds it).
-            .register_required_components_with::<Camera3d, Msaa>(|| Msaa::Off)
+            .register_required_components_with::<Camera3d, Msaa>(|| Msaa::Sample4)
             .add_plugins(ExtractComponentPlugin::<Camera3d>::default());
 
         let shader = app
@@ -55,17 +64,29 @@ impl Plugin for VeRenderPlugin {
         }
         render_app
             .init_resource::<extract::ExtractedMeshes>()
+            .init_resource::<light::ExtractedLights>()
             .init_resource::<prepare::InstanceBatches>()
             .init_resource::<prepare::ViewUniforms>()
+            .init_resource::<prepare::LightsGpu>()
+            .init_resource::<quality::RenderQuality>()
             .init_resource::<schedule::CameraWindows>()
             .add_schedule(Forward3d::base_schedule())
-            .add_systems(ExtractSchedule, extract::extract_meshes)
+            .add_systems(
+                ExtractSchedule,
+                (
+                    extract::extract_meshes,
+                    light::extract_lights,
+                    quality::extract_quality,
+                ),
+            )
             .add_systems(
                 Render,
                 (
                     prepare::prepare_instances,
                     prepare::prepare_view_uniforms,
-                    prepare::prepare_depth_textures,
+                    prepare::prepare_lights,
+                    targets::prepare_depth_textures,
+                    targets::prepare_msaa_targets,
                 )
                     .in_set(RenderSystems::PrepareResources),
             )
@@ -99,5 +120,7 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(VeRenderPlugin);
         assert!(app.world().contains_resource::<ClearColor>());
+        assert!(app.world().contains_resource::<VeAmbientLight>());
+        assert!(app.world().contains_resource::<RenderQuality>());
     }
 }

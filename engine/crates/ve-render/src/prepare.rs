@@ -1,33 +1,32 @@
-//! Per-frame GPU data: instance buffer, view uniforms and depth textures.
+//! Per-frame GPU data: instance buffer, view uniforms and the lights uniform.
 
 use std::ops::Range;
 
 use bevy_asset::AssetId;
-use bevy_camera::{Camera3d, Camera3dDepthLoadOp};
 use bevy_ecs::prelude::*;
-use bevy_math::{Mat4, UVec2};
+use bevy_math::{Mat4, Vec3, Vec4};
 use bevy_mesh::Mesh;
-use bevy_render::camera::ExtractedCamera;
 use bevy_render::render_resource::{
     BindGroup, BindGroupEntry, BufferUsages, DynamicUniformBuffer, PipelineCache, RawBufferVec,
-    ShaderType, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+    ShaderType, UniformBuffer,
 };
 use bevy_render::renderer::{RenderDevice, RenderQueue};
-use bevy_render::texture::TextureCache;
-use bevy_render::view::{ExtractedView, Msaa, ViewDepthStencilTexture};
+use bevy_render::view::ExtractedView;
 use bytemuck::{Pod, Zeroable};
 
 use crate::extract::{ExtractedMesh, ExtractedMeshes};
+use crate::light::{ExtractedLights, LightsUniform, pack_lights};
 use crate::pipeline::ForwardPipelines;
+use crate::quality::RenderQuality;
 
-/// Depth format of the forward pass. Bevy projections are reverse-z, so depth clears to 0.
-pub(crate) const DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
-
-/// Model matrix of one instance, laid out as four `vec4` columns (instance vertex attributes).
+/// Per-instance vertex data: the model matrix (four `vec4` columns) and the material.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
 pub(crate) struct InstanceData {
     pub(crate) world_from_local: [[f32; 4]; 4],
+    pub(crate) base_color: [f32; 4],
+    pub(crate) params: [f32; 4],
+    pub(crate) emissive: [f32; 4],
 }
 
 /// A run of consecutive instances that share a mesh and can be drawn with one call.
@@ -56,7 +55,8 @@ impl Default for InstanceBatches {
 /// Sorts instances by mesh and groups equal meshes into consecutive batches.
 ///
 /// Returns the per-instance data in draw order and the batches over it. The sort is stable, so
-/// instances of one mesh keep their extraction order.
+/// instances of one mesh keep their extraction order. Materials ride along as instance data, so
+/// only the mesh decides which instances can share a draw call.
 pub(crate) fn group_into_batches(meshes: &[ExtractedMesh]) -> (Vec<InstanceData>, Vec<Batch>) {
     let mut sorted = meshes.to_vec();
     sorted.sort_by_key(|m| m.mesh);
@@ -66,6 +66,9 @@ pub(crate) fn group_into_batches(meshes: &[ExtractedMesh]) -> (Vec<InstanceData>
         let index = u32::try_from(data.len()).unwrap_or(u32::MAX);
         data.push(InstanceData {
             world_from_local: mesh.world_from_local.to_cols_array_2d(),
+            base_color: mesh.material.base_color,
+            params: mesh.material.params,
+            emissive: mesh.material.emissive,
         });
         match batches.last_mut() {
             Some(batch) if batch.mesh == mesh.mesh => batch.instances.end = index + 1,
@@ -94,11 +97,107 @@ pub(crate) fn prepare_instances(
     instances.buffer.write_buffer(&device, &queue);
 }
 
+/// Uniform data for one view.
+#[derive(Clone, Copy, Debug, ShaderType)]
+pub(crate) struct ViewUniform {
+    pub(crate) clip_from_world: Mat4,
+    /// xyz: world position of the eye.
+    pub(crate) camera_position: Vec4,
+    /// x: exposure multiplier applied before tonemapping.
+    pub(crate) exposure: Vec4,
+}
+
+/// Offset of a view's data in the shared dynamic uniform buffer.
+#[derive(Component, Clone, Copy, Debug)]
+pub(crate) struct ViewUniformSlot(pub(crate) u32);
+
+/// All view uniforms for this frame plus the bind group over them.
+#[derive(Resource, Default)]
+pub(crate) struct ViewUniforms {
+    pub(crate) buffer: DynamicUniformBuffer<ViewUniform>,
+    pub(crate) bind_group: Option<BindGroup>,
+}
+
+/// Writes every view's matrices into the dynamic uniform buffer and rebuilds the bind group.
+pub(crate) fn prepare_view_uniforms(
+    mut commands: Commands,
+    mut uniforms: ResMut<ViewUniforms>,
+    views: Query<(Entity, &ExtractedView)>,
+    pipelines: Res<ForwardPipelines>,
+    pipeline_cache: Res<PipelineCache>,
+    device: Res<RenderDevice>,
+    queue: Res<RenderQueue>,
+) {
+    uniforms.buffer.clear();
+    for (entity, view) in &views {
+        let clip_from_world = view
+            .clip_from_world
+            .unwrap_or_else(|| view.clip_from_view * view.world_from_view.to_matrix().inverse());
+        let offset = uniforms.buffer.push(&ViewUniform {
+            clip_from_world,
+            camera_position: view.world_from_view.translation().extend(1.0),
+            exposure: Vec4::new(1.0, 0.0, 0.0, 0.0),
+        });
+        commands.entity(entity).insert(ViewUniformSlot(offset));
+    }
+    uniforms.buffer.write_buffer(&device, &queue);
+    uniforms.bind_group = uniforms.buffer.binding().map(|binding| {
+        let layout = pipeline_cache.get_bind_group_layout(&pipelines.view_layout);
+        device.create_bind_group(
+            "ve_view_bind_group",
+            &layout,
+            &[BindGroupEntry {
+                binding: 0,
+                resource: binding,
+            }],
+        )
+    });
+}
+
+/// The lights uniform for this frame plus its bind group.
+#[derive(Resource, Default)]
+pub(crate) struct LightsGpu {
+    pub(crate) buffer: UniformBuffer<LightsUniform>,
+    pub(crate) bind_group: Option<BindGroup>,
+}
+
+/// Packs the extracted lights (capped by the quality tier) and rebuilds the lights bind group.
+pub(crate) fn prepare_lights(
+    lights: Res<ExtractedLights>,
+    quality: Res<RenderQuality>,
+    views: Query<&ExtractedView>,
+    mut gpu: ResMut<LightsGpu>,
+    pipelines: Res<ForwardPipelines>,
+    pipeline_cache: Res<PipelineCache>,
+    device: Res<RenderDevice>,
+    queue: Res<RenderQueue>,
+) {
+    let viewer = views
+        .iter()
+        .next()
+        .map_or(Vec3::ZERO, |view| view.world_from_view.translation());
+    gpu.buffer
+        .set(pack_lights(&lights, viewer, quality.max_point_lights));
+    gpu.buffer.write_buffer(&device, &queue);
+    gpu.bind_group = gpu.buffer.binding().map(|binding| {
+        let layout = pipeline_cache.get_bind_group_layout(&pipelines.lights_layout);
+        device.create_bind_group(
+            "ve_lights_bind_group",
+            &layout,
+            &[BindGroupEntry {
+                binding: 0,
+                resource: binding,
+            }],
+        )
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use bevy_asset::uuid::Uuid;
 
     use super::*;
+    use crate::material::VeMaterial;
 
     fn mesh_id(n: u128) -> AssetId<Mesh> {
         AssetId::Uuid {
@@ -109,7 +208,8 @@ mod tests {
     fn instance(mesh: u128, x: f32) -> ExtractedMesh {
         ExtractedMesh {
             mesh: mesh_id(mesh),
-            world_from_local: Mat4::from_translation(bevy_math::Vec3::new(x, 0.0, 0.0)),
+            world_from_local: Mat4::from_translation(Vec3::new(x, 0.0, 0.0)),
+            material: VeMaterial::default().pack(),
         }
     }
 
@@ -156,92 +256,19 @@ mod tests {
         assert!((translation_x(1) - 10.0).abs() < f32::EPSILON);
         assert!((translation_x(2) - 30.0).abs() < f32::EPSILON);
     }
-}
 
-/// Uniform data for one view.
-#[derive(Clone, Copy, Debug, ShaderType)]
-pub(crate) struct ViewUniform {
-    pub(crate) clip_from_world: Mat4,
-}
-
-/// Offset of a view's data in the shared dynamic uniform buffer.
-#[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct ViewUniformSlot(pub(crate) u32);
-
-/// All view uniforms for this frame plus the bind group over them.
-#[derive(Resource, Default)]
-pub(crate) struct ViewUniforms {
-    pub(crate) buffer: DynamicUniformBuffer<ViewUniform>,
-    pub(crate) bind_group: Option<BindGroup>,
-}
-
-/// Writes every view's matrices into the dynamic uniform buffer and rebuilds the bind group.
-pub(crate) fn prepare_view_uniforms(
-    mut commands: Commands,
-    mut uniforms: ResMut<ViewUniforms>,
-    views: Query<(Entity, &ExtractedView)>,
-    pipelines: Res<ForwardPipelines>,
-    pipeline_cache: Res<PipelineCache>,
-    device: Res<RenderDevice>,
-    queue: Res<RenderQueue>,
-) {
-    uniforms.buffer.clear();
-    for (entity, view) in &views {
-        let clip_from_world = view
-            .clip_from_world
-            .unwrap_or_else(|| view.clip_from_view * view.world_from_view.to_matrix().inverse());
-        let offset = uniforms.buffer.push(&ViewUniform { clip_from_world });
-        commands.entity(entity).insert(ViewUniformSlot(offset));
-    }
-    uniforms.buffer.write_buffer(&device, &queue);
-    uniforms.bind_group = uniforms.buffer.binding().map(|binding| {
-        let layout = pipeline_cache.get_bind_group_layout(&pipelines.view_layout);
-        device.create_bind_group(
-            "ve_view_bind_group",
-            &layout,
-            &[BindGroupEntry {
-                binding: 0,
-                resource: binding,
-            }],
-        )
-    });
-}
-
-/// Creates (or reuses, via the texture cache) a depth texture for every 3D camera.
-pub(crate) fn prepare_depth_textures(
-    mut commands: Commands,
-    mut texture_cache: ResMut<TextureCache>,
-    device: Res<RenderDevice>,
-    views: Query<(Entity, &ExtractedCamera, &Camera3d, &Msaa)>,
-) {
-    for (entity, camera, camera_3d, msaa) in &views {
-        let Some(size) = camera.physical_target_size else {
-            continue;
-        };
-        let UVec2 { x, y } = size;
-        let texture = texture_cache.get(
-            &device,
-            TextureDescriptor {
-                label: Some("ve_view_depth"),
-                size: bevy_render::render_resource::Extent3d {
-                    width: x,
-                    height: y,
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: msaa.samples(),
-                dimension: TextureDimension::D2,
-                format: DEPTH_FORMAT,
-                usage: TextureUsages::RENDER_ATTACHMENT,
-                view_formats: &[],
-            },
-        );
-        let clear = match camera_3d.depth_load_op {
-            Camera3dDepthLoadOp::Clear(value) => Some(value),
-            Camera3dDepthLoadOp::Load => None,
-        };
-        commands
-            .entity(entity)
-            .insert(ViewDepthStencilTexture::new(texture, clear, None));
+    #[test]
+    fn different_materials_on_one_mesh_share_a_batch() {
+        let mut shiny = instance(1, 0.0);
+        shiny.material = VeMaterial {
+            metallic: 1.0,
+            roughness: 0.1,
+            ..VeMaterial::default()
+        }
+        .pack();
+        let (data, batches) = group_into_batches(&[shiny, instance(1, 1.0)]);
+        assert_eq!(batches.len(), 1);
+        assert!((data[0].params[0] - 1.0).abs() < f32::EPSILON);
+        assert!(data[1].params[0].abs() < f32::EPSILON);
     }
 }

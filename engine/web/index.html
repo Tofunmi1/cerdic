@@ -22,7 +22,7 @@
       const wasm = await init();
       bindMemory(wasm.memory);
       state.wasmBytes = () => wasm.memory.buffer.byteLength;
-      start("ve");
+      start("ve", new URLSearchParams(location.search).get("scene") ?? "");
       const poll = setInterval(() => {
         if (state.read().frames > 0) {
           state.ready = true;
