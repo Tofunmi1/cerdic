@@ -11,6 +11,7 @@
     reason = "this is a CLI; stderr is its interface"
 )]
 
+mod cpp;
 mod rules;
 
 use std::process::{Command, ExitCode};
@@ -22,8 +23,9 @@ fn main() -> ExitCode {
     let result = match arg.as_str() {
         "check" => check(),
         "rules" => rules::run(),
+        "cpp" => cpp::run(),
         _ => {
-            eprintln!("usage: cargo xtask <check|rules>");
+            eprintln!("usage: cargo xtask <check|rules|cpp>");
             return ExitCode::from(2);
         }
     };
@@ -80,6 +82,7 @@ fn check() -> Result<(), Failure> {
     } else {
         println!("-- deny: skipped (cargo-deny not installed)");
     }
+    cpp::run()?;
     rules::run()?;
     println!("\nall gates passed");
     Ok(())
