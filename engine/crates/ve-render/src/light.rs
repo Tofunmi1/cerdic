@@ -2,10 +2,12 @@
 
 use bevy_color::{Color, LinearRgba};
 use bevy_ecs::prelude::*;
-use bevy_math::{Vec3, Vec4};
+use bevy_math::{Mat4, Vec3, Vec4};
 use bevy_render::Extract;
 use bevy_render::render_resource::ShaderType;
 use bevy_transform::components::GlobalTransform;
+
+use crate::shadow_math::ShadowParams;
 
 /// Upper bound on point lights per frame. Fixed so the uniform block has a known size on WebGL2;
 /// the quality tiers (M6) choose how many are actually used.
@@ -88,6 +90,11 @@ pub(crate) struct LightsUniform {
     pub(crate) sun_color: Vec4,
     /// x: number of valid entries in `points`.
     pub(crate) counts: Vec4,
+    /// World position to the sun's shadow-map clip space.
+    pub(crate) sun_shadow_from_world: Mat4,
+    /// x: 1 when the sun's shadow map is sampled, y: filter radius in taps, z: one texel in uv units,
+    /// w: normal-offset bias in metres.
+    pub(crate) shadow_params: Vec4,
     pub(crate) points: [PointLightUniform; MAX_POINT_LIGHTS],
 }
 
@@ -148,6 +155,7 @@ pub(crate) fn pack_lights(
     lights: &ExtractedLights,
     viewer: Vec3,
     max_points: usize,
+    shadow: &ShadowParams,
 ) -> LightsUniform {
     let mut uniform = LightsUniform::default();
     if let Some(ambient) = lights.ambient {
@@ -158,6 +166,12 @@ pub(crate) fn pack_lights(
         let toward = (-*forward).normalize_or_zero();
         uniform.sun_direction = toward.extend(0.0);
         uniform.sun_color = scaled(LinearRgba::from(sun.color), sun.intensity);
+        if shadow.enabled {
+            uniform.sun_shadow_from_world = shadow.clip_from_world;
+            #[expect(clippy::cast_precision_loss, reason = "the filter radius is 0 or 1")]
+            let radius = shadow.pcf_radius as f32;
+            uniform.shadow_params = Vec4::new(1.0, radius, shadow.texel_uv, shadow.normal_bias);
+        }
     }
 
     let mut order: Vec<&ExtractedPoint> = lights.points.iter().collect();
@@ -194,9 +208,22 @@ mod tests {
         }
     }
 
+    const NO_SHADOW: ShadowParams = ShadowParams {
+        enabled: false,
+        clip_from_world: Mat4::IDENTITY,
+        pcf_radius: 0,
+        texel_uv: 0.0,
+        normal_bias: 0.0,
+    };
+
     #[test]
     fn no_lights_pack_to_zero() {
-        let uniform = pack_lights(&ExtractedLights::default(), Vec3::ZERO, MAX_POINT_LIGHTS);
+        let uniform = pack_lights(
+            &ExtractedLights::default(),
+            Vec3::ZERO,
+            MAX_POINT_LIGHTS,
+            &NO_SHADOW,
+        );
         assert_eq!(uniform, LightsUniform::default());
     }
 
@@ -206,9 +233,38 @@ mod tests {
             sun: Some((Vec3::NEG_Y, VeDirectionalLight::default())),
             ..Default::default()
         };
-        let uniform = pack_lights(&lights, Vec3::ZERO, MAX_POINT_LIGHTS);
+        let uniform = pack_lights(&lights, Vec3::ZERO, MAX_POINT_LIGHTS, &NO_SHADOW);
         assert!((uniform.sun_direction.y - 1.0).abs() < 1e-6);
         assert!(uniform.sun_color.x > 0.0);
+        assert!(
+            uniform.shadow_params.x.abs() < f32::EPSILON,
+            "no shadows were enabled"
+        );
+    }
+
+    #[test]
+    fn enabled_shadows_are_packed_only_when_there_is_a_sun() {
+        let shadow = ShadowParams {
+            enabled: true,
+            clip_from_world: Mat4::from_scale(Vec3::splat(2.0)),
+            pcf_radius: 1,
+            texel_uv: 0.25,
+            normal_bias: 0.05,
+        };
+        let with_sun = ExtractedLights {
+            sun: Some((Vec3::NEG_Y, VeDirectionalLight::default())),
+            ..Default::default()
+        };
+        let packed = pack_lights(&with_sun, Vec3::ZERO, MAX_POINT_LIGHTS, &shadow);
+        assert_eq!(packed.shadow_params, Vec4::new(1.0, 1.0, 0.25, 0.05));
+        assert_eq!(packed.sun_shadow_from_world, shadow.clip_from_world);
+        let without = pack_lights(
+            &ExtractedLights::default(),
+            Vec3::ZERO,
+            MAX_POINT_LIGHTS,
+            &shadow,
+        );
+        assert_eq!(without.shadow_params, Vec4::ZERO);
     }
 
     #[test]
@@ -217,7 +273,7 @@ mod tests {
             points: (0..12_u8).rev().map(|i| point(f32::from(i))).collect(),
             ..Default::default()
         };
-        let uniform = pack_lights(&lights, Vec3::ZERO, 3);
+        let uniform = pack_lights(&lights, Vec3::ZERO, 3, &NO_SHADOW);
         assert!((uniform.counts.x - 3.0).abs() < f32::EPSILON);
         let xs: Vec<f32> = uniform.points[..3]
             .iter()
@@ -237,7 +293,7 @@ mod tests {
             points: (0..20_u8).map(|i| point(f32::from(i))).collect(),
             ..Default::default()
         };
-        let uniform = pack_lights(&lights, Vec3::ZERO, 1000);
+        let uniform = pack_lights(&lights, Vec3::ZERO, 1000, &NO_SHADOW);
         assert!((uniform.counts.x - 8.0).abs() < f32::EPSILON);
     }
 }

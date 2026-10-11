@@ -8,13 +8,13 @@ use bevy_log::warn_once;
 use bevy_mesh::{Mesh, MeshVertexBufferLayoutRef, VertexBufferLayout};
 use bevy_render::mesh::RenderMesh;
 use bevy_render::render_asset::RenderAssets;
-use bevy_render::render_resource::binding_types::uniform_buffer;
+use bevy_render::render_resource::binding_types::{sampler, texture_depth_2d, uniform_buffer};
 use bevy_render::render_resource::{
     BindGroupLayoutDescriptor, BindGroupLayoutEntries, CachedRenderPipelineId, ColorTargetState,
     ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Face, FragmentState,
     FrontFace, MultisampleState, PipelineCache, PrimitiveState, PrimitiveTopology,
-    RenderPipelineDescriptor, ShaderStages, StencilState, TextureFormat, VertexAttribute,
-    VertexFormat, VertexState, VertexStepMode,
+    RenderPipelineDescriptor, SamplerBindingType, ShaderStages, StencilState, TextureFormat,
+    VertexAttribute, VertexFormat, VertexState, VertexStepMode,
 };
 use bevy_render::view::{Msaa, ViewTarget};
 use bevy_shader::Shader;
@@ -46,11 +46,16 @@ impl ForwardPipelines {
                 uniform_buffer::<ViewUniform>(true),
             ),
         );
+        // Lights, then the sun's shadow map and the comparison sampler that reads it.
         let lights_layout = BindGroupLayoutDescriptor::new(
             "ve_lights_layout",
-            &BindGroupLayoutEntries::single(
+            &BindGroupLayoutEntries::sequential(
                 ShaderStages::FRAGMENT,
-                uniform_buffer::<LightsUniform>(false),
+                (
+                    uniform_buffer::<LightsUniform>(false),
+                    texture_depth_2d(),
+                    sampler(SamplerBindingType::Comparison),
+                ),
             ),
         );
         Self {
@@ -122,7 +127,7 @@ impl ForwardPipelines {
 
 /// Instance buffer layout: the model matrix as four `vec4` columns (locations 3 to 6), then base
 /// colour, material parameters and emissive (locations 7 to 9).
-fn instance_layout() -> VertexBufferLayout {
+pub(crate) fn instance_layout() -> VertexBufferLayout {
     let vec4 = u64::try_from(size_of::<[f32; 4]>()).unwrap_or(16);
     VertexBufferLayout {
         array_stride: u64::try_from(size_of::<InstanceData>()).unwrap_or(112),

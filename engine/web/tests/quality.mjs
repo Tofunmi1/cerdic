@@ -49,6 +49,40 @@ try {
   const edges = differingFraction(shots.low, shots.high, 8);
   check(edges > 0.0003, `low and high render the same (${(edges * 100).toFixed(4)}% of pixels differ): MSAA is not applied`);
 
+  // Shadows: against the shadowless low tier, the shadows scene at medium and high gets dark regions
+  // (floor and objects in shade) and no extra light anywhere.
+  const sceneShot = async (tier) => {
+    const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
+    await page.goto(`http://127.0.0.1:${port}/?scene=shadows&quality=${tier}`);
+    await page.waitForFunction(() => window.__ve?.ready || window.__ve?.error, null, { timeout: 90000 });
+    await page.waitForTimeout(400);
+    const png = PNG.sync.read(await page.screenshot());
+    await page.close();
+    return png;
+  };
+  const lit = await sceneShot("low");
+  for (const tier of ["medium", "high"]) {
+    const shaded = await sceneShot(tier);
+    // Low has no anti-aliasing, so silhouette edges differ in both directions; only judge pixels whose
+    // neighbours in the unshadowed picture look the same (flat regions).
+    const sum = (png, x, y) => { const i = (png.width * y + x) * 4; return png.data[i] + png.data[i + 1] + png.data[i + 2]; };
+    let darker = 0;
+    let brighter = 0;
+    for (let y = 2; y < lit.height - 2; y++) {
+      for (let x = 2; x < lit.width - 2; x++) {
+        const here = sum(lit, x, y);
+        const flat = [[-2, 0], [2, 0], [0, -2], [0, 2]].every(([dx, dy]) => Math.abs(sum(lit, x + dx, y + dy) - here) < 30);
+        if (!flat) continue;
+        const change = sum(shaded, x, y) - here;
+        if (change < -60) darker++;
+        if (change > 60) brighter++;
+      }
+    }
+    check(darker > 600, `[${tier}] only ${darker} pixels are darker than the unshadowed picture: no shadows`);
+    check(brighter < 20, `[${tier}] ${brighter} pixels are brighter than the unshadowed picture`);
+    console.log(JSON.stringify({ tier, darkerPixels: darker, brighterPixels: brighter }));
+  }
+
   // Runtime switching: cycle through the tiers and come back to the start.
   const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
   const logs = [];

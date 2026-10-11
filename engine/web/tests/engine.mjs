@@ -12,7 +12,7 @@ import { PNG } from "pngjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(here, "..", "dist");
-const SCENES = ["kernel", "materials", "lights", "stereo"];
+const SCENES = ["kernel", "materials", "lights", "stereo", "shadows"];
 const types = { ".js": "text/javascript", ".wasm": "application/wasm", ".html": "text/html" };
 const server = http.createServer((req, res) => {
   const requested = req.url.split("?")[0];

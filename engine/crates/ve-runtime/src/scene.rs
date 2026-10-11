@@ -31,6 +31,8 @@ pub(crate) enum SceneKind {
     Stereo,
     /// A room-scale scene for a real or emulated headset: the cube at eye height, a floor, lights.
     Xr,
+    /// A floor with a cube, a sphere and a pillar casting sun shadows onto it and each other.
+    Shadows,
 }
 
 impl FromStr for SceneKind {
@@ -43,6 +45,7 @@ impl FromStr for SceneKind {
             "lights" => Ok(Self::Lights),
             "stereo" => Ok(Self::Stereo),
             "xr" => Ok(Self::Xr),
+            "shadows" => Ok(Self::Shadows),
             _ => Err(()),
         }
     }
@@ -249,6 +252,56 @@ fn xr_scene(
     Ok(())
 }
 
+/// Objects standing on a floor under the sun, so shadows land on the floor and on each other.
+fn shadows_scene(commands: &mut Commands, meshes: &mut Assets<Mesh>) -> Result<(), KernelError> {
+    let floor = meshes.add(render_mesh(&Solid::cube([10.0, 0.1, 10.0], true)?, false)?);
+    let shapes = [
+        // Mesh, colour, position of its centre.
+        (
+            meshes.add(render_mesh(&Solid::cube([1.0, 1.0, 1.0], true)?, false)?),
+            Color::srgb(0.85, 0.45, 0.35),
+            Vec3::new(0.6, 0.5, 0.4),
+        ),
+        (
+            meshes.add(render_mesh(&Solid::sphere(0.45, 48)?, true)?),
+            Color::srgb(0.4, 0.7, 0.9),
+            Vec3::new(-1.2, 0.45, 0.9),
+        ),
+        (
+            meshes.add(render_mesh(&Solid::cube([0.25, 1.8, 0.25], true)?, false)?),
+            Color::srgb(0.9, 0.85, 0.5),
+            Vec3::new(-0.1, 0.9, -0.9),
+        ),
+    ];
+    commands.spawn((
+        Mesh3d(floor),
+        VeMaterial {
+            base_color: Color::srgb(0.7, 0.72, 0.75),
+            roughness: 0.9,
+            ..VeMaterial::default()
+        },
+        Transform::from_xyz(0.0, -0.05, 0.0),
+    ));
+    for (mesh, base_color, position) in shapes {
+        commands.spawn((
+            Mesh3d(mesh),
+            VeMaterial {
+                base_color,
+                roughness: 0.55,
+                ..VeMaterial::default()
+            },
+            Transform::from_translation(position),
+        ));
+    }
+    sun(commands, 3.0);
+    camera(
+        commands,
+        Vec3::new(1.6, 2.4, 4.4),
+        Vec3::new(-0.3, 0.3, 0.0),
+    );
+    Ok(())
+}
+
 /// Startup system: spawns the chosen test scene.
 pub(crate) fn spawn_scene(
     mut commands: Commands,
@@ -264,6 +317,7 @@ pub(crate) fn spawn_scene(
         SceneKind::Lights => lights_scene(&mut commands, &mut meshes),
         SceneKind::Stereo => stereo_scene(&mut commands, &mut meshes),
         SceneKind::Xr => xr_scene(&mut commands, &mut meshes, &mut rig),
+        SceneKind::Shadows => shadows_scene(&mut commands, &mut meshes),
     };
     if let Err(error) = built {
         status::report_error(format!("scene {:?} failed: {error}", *choice));
