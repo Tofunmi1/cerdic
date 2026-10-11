@@ -3069,9 +3069,12 @@ dependencies = [
  "bevy_asset",
  "bevy_camera",
  "bevy_ecs",
+ "bevy_math",
  "bevy_mesh",
  "bevy_render",
+ "bevy_shader",
  "bevy_transform",
+ "bytemuck",
 ]
 
 [[package]]
@@ -3086,12 +3089,14 @@ dependencies = [
  "bevy_ecs",
  "bevy_image",
  "bevy_input",
+ "bevy_math",
  "bevy_mesh",
  "bevy_render",
  "bevy_time",
  "bevy_transform",
  "bevy_window",
  "serde_json",
+ "ve-kernel",
  "ve-platform-web",
  "ve-render",
  "wasm-bindgen",

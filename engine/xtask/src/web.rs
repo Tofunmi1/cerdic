@@ -65,6 +65,18 @@ pub(crate) fn build(profile: Profile) -> Result<(), Failure> {
             &wasm,
         ],
     )?;
+    // The linked C++ imports a few wasi functions; point them at the local shim.
+    let glue = format!("{DIST}/ve_runtime.js");
+    // Only the module specifiers change; the import-object keys keep the module name the wasm uses.
+    let patched = fs::read_to_string(&glue)?.replace(
+        "from \"wasi_snapshot_preview1\"",
+        "from \"./wasi_snapshot_preview1.js\"",
+    );
+    fs::write(&glue, patched)?;
+    fs::copy(
+        "web/wasi_snapshot_preview1.js",
+        format!("{DIST}/wasi_snapshot_preview1.js"),
+    )?;
     fs::copy("web/index.html", format!("{DIST}/index.html"))?;
     let size = fs::metadata(format!("{DIST}/ve_runtime_bg.wasm"))?.len();
     println!("   wasm: {size} bytes");
@@ -78,7 +90,7 @@ pub(crate) fn test(profile: Profile) -> Result<(), Failure> {
         run_in("web", "npm", &["install", "--no-audit", "--no-fund"])?;
     }
     println!("-- web-test: playwright (headless Chromium)");
-    run_in("web", "node", &["tests/m3.mjs"])
+    run_in("web", "node", &["tests/engine.mjs"])
 }
 
 /// The wasm-bindgen CLI must match the library version in `Cargo.lock` exactly.

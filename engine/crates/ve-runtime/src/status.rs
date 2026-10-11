@@ -8,6 +8,12 @@ use serde_json::json;
 
 thread_local! {
     static STATUS: RefCell<String> = RefCell::new(json!({ "frames": 0 }).to_string());
+    static ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Records an error so the page can see it in `status()`.
+pub(crate) fn report_error(message: String) {
+    ERRORS.with(|errors| errors.borrow_mut().push(message));
 }
 
 /// Records adapter information, key limits and a frame counter.
@@ -17,7 +23,8 @@ pub(crate) fn publish(
     device: Option<Res<RenderDevice>>,
 ) {
     *frames += 1;
-    let mut value = json!({ "frames": *frames, "errors": [] });
+    let errors = ERRORS.with(|errors| errors.borrow().clone());
+    let mut value = json!({ "frames": *frames, "errors": errors });
     if let Some(info) = adapter {
         value["adapter"] = json!(info.name);
         value["backend"] = json!(format!("{:?}", info.backend));

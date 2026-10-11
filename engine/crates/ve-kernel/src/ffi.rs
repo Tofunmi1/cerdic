@@ -13,6 +13,17 @@ use ve_kernel_sys as sys;
 
 use crate::KernelError;
 
+/// Runs the C++ static constructors once on `wasm32-unknown-unknown`, where nothing else does.
+/// A no-op on every other target (native and WASI start the C++ runtime themselves).
+fn ensure_initialized() {
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    {
+        static INIT: std::sync::Once = std::sync::Once::new();
+        // SAFETY: runs exactly once, before any other kernel call, on the only thread.
+        INIT.call_once(|| unsafe { sys::__wasm_call_ctors() });
+    }
+}
+
 /// Owning handle to a kernel solid.
 pub(crate) struct Handle(NonNull<sys::VeSolid>);
 
@@ -46,6 +57,7 @@ impl Handle {
 }
 
 pub(crate) fn cube(size: [f64; 3], center: bool) -> Result<Handle, KernelError> {
+    ensure_initialized();
     let mut status = sys::VE_OK;
     // SAFETY: `status` is a valid out-pointer for the duration of the call.
     let ptr = unsafe {
@@ -61,6 +73,7 @@ pub(crate) fn cube(size: [f64; 3], center: bool) -> Result<Handle, KernelError> 
 }
 
 pub(crate) fn sphere(radius: f64, segments: i32) -> Result<Handle, KernelError> {
+    ensure_initialized();
     let mut status = sys::VE_OK;
     // SAFETY: `status` is a valid out-pointer for the duration of the call.
     let ptr = unsafe { sys::ve_solid_sphere(radius, segments, &raw mut status) };
@@ -74,6 +87,7 @@ pub(crate) fn cylinder(
     segments: i32,
     center: bool,
 ) -> Result<Handle, KernelError> {
+    ensure_initialized();
     let mut status = sys::VE_OK;
     // SAFETY: `status` is a valid out-pointer for the duration of the call.
     let ptr = unsafe {
@@ -90,6 +104,7 @@ pub(crate) fn cylinder(
 }
 
 pub(crate) fn from_mesh(positions: &[[f32; 3]], indices: &[u32]) -> Result<Handle, KernelError> {
+    ensure_initialized();
     let flat = positions.as_flattened();
     let mut status = sys::VE_OK;
     // SAFETY: `flat` holds `3 * positions.len()` floats and `indices` holds `indices.len()` entries; the
@@ -228,6 +243,7 @@ pub(crate) fn simplify(
     target_ratio: f64,
     target_error: f64,
 ) -> Result<Vec<u32>, KernelError> {
+    ensure_initialized();
     let flat = positions.as_flattened();
     let mut out = vec![0_u32; indices.len()];
     let mut count = 0_usize;

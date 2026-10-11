@@ -144,3 +144,10 @@ unsafe extern "C" {
     /// Releases a solid. Null is allowed.
     pub fn ve_solid_free(s: *mut VeSolid);
 }
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+unsafe extern "C" {
+    /// Runs the C++ static constructors. A `wasm32-unknown-unknown` module is a library with no
+    /// start routine, so nothing else does; it must be called once before any kernel function.
+    pub fn __wasm_call_ctors();
+}

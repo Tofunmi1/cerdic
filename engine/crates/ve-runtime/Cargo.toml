@@ -25,6 +25,8 @@ bevy_time = { path = "../../third_party/bevy/crates/bevy_time" }
 bevy_transform = { path = "../../third_party/bevy/crates/bevy_transform" }
 bevy_window = { path = "../../third_party/bevy/crates/bevy_window" }
 bevy_render = { path = "../../third_party/bevy/crates/bevy_render", default-features = false, features = ["webgl"] }
+bevy_math = { path = "../../third_party/bevy/crates/bevy_math" }
+ve-kernel = { path = "../ve-kernel" }
 ve-platform-web = { path = "../ve-platform-web" }
 ve-render = { path = "../ve-render" }
 serde_json.workspace = true
