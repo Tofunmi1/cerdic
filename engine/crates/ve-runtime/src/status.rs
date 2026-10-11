@@ -7,7 +7,7 @@ use bevy_ecs::system::{Local, Query, Res};
 use bevy_render::renderer::{RenderAdapterInfo, RenderDevice};
 use bevy_transform::components::Transform;
 use serde_json::json;
-use ve_render::StereoViews;
+use ve_render::{RenderQuality, StereoViews};
 use ve_xr_web::{XrCamera, XrInput};
 
 use crate::wands::Wand;
@@ -67,12 +67,20 @@ pub(crate) fn publish(
     xr_cameras: Query<&StereoViews, With<XrCamera>>,
     input: Res<XrInput>,
     wands: Query<(&Wand, &Transform)>,
+    quality: Res<RenderQuality>,
 ) {
     *frames += 1;
     let errors = ERRORS.with(|errors| errors.borrow().clone());
     let mut value = json!({
         "frames": *frames,
         "errors": errors,
+        "quality": {
+            "tier": quality.tier.name(),
+            "msaa": quality.msaa_samples,
+            "shadow_resolution": quality.shadow_resolution,
+            "max_point_lights": quality.max_point_lights,
+            "resolution_scale": quality.resolution_scale,
+        },
         "xr": {
             "state": format!("{:?}", ve_xr_web::session_state()),
             "frames": ve_xr_web::frames_published(),

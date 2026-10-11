@@ -97,10 +97,11 @@ fn on_session_end() {
 
 /// Requests an immersive session on the canvas' WebGL context and starts driving the app from the
 /// headset's frame loop. Browsers require this to be called from a user gesture on real devices.
+/// `resolution_scale` multiplies the runtime's recommended render resolution.
 ///
 /// # Errors
 /// [`XrError`] if `WebXR` is unavailable, a session is already running, or the request fails.
-pub async fn enter(canvas: &HtmlCanvasElement) -> Result<(), XrError> {
+pub async fn enter(canvas: &HtmlCanvasElement, resolution_scale: f32) -> Result<(), XrError> {
     if matches!(
         session_state(),
         SessionState::Presenting | SessionState::Requesting
@@ -113,7 +114,7 @@ pub async fn enter(canvas: &HtmlCanvasElement) -> Result<(), XrError> {
         return Err(XrError::Unsupported);
     }
     set_session_state(SessionState::Requesting);
-    let bridge = match XrBridge::request(canvas).await {
+    let bridge = match XrBridge::request(canvas, f64::from(resolution_scale)).await {
         Ok(bridge) => bridge,
         Err(error) => {
             let message = describe(&error);
