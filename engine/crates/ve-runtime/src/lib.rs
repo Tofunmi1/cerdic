@@ -7,6 +7,7 @@
 
 mod app;
 mod bench_scene;
+mod interact;
 mod mock_hmd;
 mod perf;
 mod quality;
