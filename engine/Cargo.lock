@@ -439,6 +439,7 @@ dependencies = [
  "indexmap",
  "log",
  "nonmax",
+ "rand",
  "serde",
  "slotmap",
  "smallvec",
@@ -537,6 +538,7 @@ dependencies = [
  "bevy_reflect",
  "derive_more",
  "log",
+ "smol_str",
  "thiserror 2.0.21",
 ]
 
@@ -3044,6 +3046,22 @@ name = "ve-kernel-sys"
 version = "0.0.0"
 
 [[package]]
+name = "ve-platform-web"
+version = "0.0.0"
+dependencies = [
+ "bevy_app",
+ "bevy_ecs",
+ "bevy_input",
+ "bevy_math",
+ "bevy_window",
+ "js-sys",
+ "raw-window-handle",
+ "thiserror 2.0.21",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "ve-render"
 version = "0.0.0"
 dependencies = [
@@ -3054,6 +3072,30 @@ dependencies = [
  "bevy_mesh",
  "bevy_render",
  "bevy_transform",
+]
+
+[[package]]
+name = "ve-runtime"
+version = "0.0.0"
+dependencies = [
+ "bevy_app",
+ "bevy_asset",
+ "bevy_camera",
+ "bevy_color",
+ "bevy_diagnostic",
+ "bevy_ecs",
+ "bevy_image",
+ "bevy_input",
+ "bevy_mesh",
+ "bevy_render",
+ "bevy_time",
+ "bevy_transform",
+ "bevy_window",
+ "serde_json",
+ "ve-platform-web",
+ "ve-render",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

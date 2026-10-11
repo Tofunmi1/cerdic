@@ -1,0 +1,13 @@
+{
+  "name": "ve-web",
+  "private": true,
+  "type": "module",
+  "description": "Browser harness for the engine: page, build output and end-to-end tests.",
+  "scripts": {
+    "test": "node tests/m3.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.0",
+    "pngjs": "^7.0.0"
+  }
+}
