@@ -14,6 +14,7 @@ use ve_xr_web::{XrCamera, XrInput};
 use crate::bench_scene::SceneStats;
 use crate::interact::{self, Interactable, InteractionState, Label};
 use crate::perf::Perf;
+use crate::viewer::ViewerRig;
 use crate::wands::Wand;
 
 thread_local! {
@@ -83,6 +84,7 @@ pub(crate) fn publish(
     perf: Res<Perf>,
     scene_stats: Option<Res<SceneStats>>,
     interaction: Res<InteractionState>,
+    viewer: Res<ViewerRig>,
     labelled: Query<(Entity, &Label, &Transform), With<Interactable>>,
 ) {
     *frames += 1;
@@ -98,6 +100,7 @@ pub(crate) fn publish(
         })),
         "render": render_counts(),
         "interact": interact::report(&interaction, &labelled),
+        "viewer": viewer.report(),
         "quality": {
             "tier": quality.tier.name(),
             "msaa": quality.msaa_samples,
