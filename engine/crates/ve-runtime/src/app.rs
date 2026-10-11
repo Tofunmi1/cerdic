@@ -19,6 +19,7 @@ use ve_render::VeRenderPlugin;
 use ve_xr_web::{XrPlugin, apply_xr_frame};
 
 use crate::scene::{self, SceneKind};
+use crate::viewer::ViewerRig;
 use crate::{interact, mock_hmd};
 use crate::{perf, quality, status, wands};
 
@@ -55,6 +56,7 @@ pub(crate) fn start(canvas_id: &str, scene: SceneKind) -> Result<(), PlatformErr
     app.insert_resource(ClearColor(CLEAR));
     app.insert_resource(scene);
     app.init_resource::<perf::Perf>();
+    app.init_resource::<ViewerRig>();
     interact::plugin(&mut app);
     app.add_systems(Startup, scene::spawn_scene);
     // The frame's order: the XR frame is applied first (`apply_xr_frame`), then everything that

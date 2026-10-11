@@ -13,6 +13,7 @@ mod perf;
 mod quality;
 mod scene;
 mod status;
+mod viewer;
 mod wands;
 
 use std::str::FromStr;
@@ -69,6 +70,40 @@ pub fn set_governor(enabled: bool) {
 #[wasm_bindgen]
 pub fn set_window_hz(hz: f32) {
     perf::set_window_hz(hz);
+}
+
+/// Turns the desktop viewer on or off. When on, the scene's camera becomes a free-look camera driven
+/// by `viewer_look` and `viewer_move`. `fov_deg` is the vertical field of view in degrees (0 keeps
+/// the scene's own), `stereo` splits the view into the two eyes of a mock headset, and `speed` is
+/// metres per second.
+#[wasm_bindgen]
+pub fn viewer_configure(enabled: bool, fov_deg: f32, stereo: bool, speed: f32) {
+    viewer::configure(enabled, fov_deg, stereo, speed);
+}
+
+/// Turns the view by a mouse movement, in pixels.
+#[wasm_bindgen]
+pub fn viewer_look(dx: f32, dy: f32) {
+    viewer::add_look(dx, dy);
+}
+
+/// Sets the wanted viewer motion: right, up and forward each in -1..=1, and whether to sprint.
+#[wasm_bindgen]
+pub fn viewer_move(right: f32, up: f32, forward: f32, sprint: bool) {
+    viewer::set_motion(right, up, forward, sprint);
+}
+
+/// Tells the engine whether the page holds the pointer for mouse look. While it does, the crosshair
+/// at the centre of the view hovers, picks and grabs objects.
+#[wasm_bindgen]
+pub fn viewer_set_locked(locked: bool) {
+    viewer::set_locked(locked);
+}
+
+/// Puts the viewer back where the scene started.
+#[wasm_bindgen]
+pub fn viewer_reset() {
+    viewer::request_reset();
 }
 
 /// Whether the browser can present an immersive VR session.

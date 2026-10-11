@@ -29,6 +29,8 @@ use ve_render::{StereoViews, VeMaterial};
 use ve_xr_web::frame::Handedness;
 use ve_xr_web::{XrInput, XrRig, apply_xr_frame, controller_pointer};
 
+use crate::viewer::{ViewerRig, update_viewer};
+
 mod report;
 mod spawn;
 
@@ -193,7 +195,7 @@ pub(crate) fn plugin(app: &mut App) {
         .insert_resource(InteractionState::new())
         .add_systems(
             Update,
-            (track_mouse, run_interaction, highlight_hover)
+            (update_viewer, track_mouse, run_interaction, highlight_hover)
                 .chain()
                 .after(apply_xr_frame),
         );
@@ -218,18 +220,26 @@ fn track_mouse(
     }
 }
 
-/// The mouse as a pointer, when a plain (non-stereo) camera can turn the cursor into a ray.
+/// The mouse as a pointer. While the desktop viewer holds the pointer the ray is the crosshair at
+/// the centre of the view (in mono or split-screen alike); otherwise it is the cursor, through a
+/// plain (non-stereo) camera.
 fn mouse_frame(
     cursor: &mut CursorState,
     buttons: &ButtonInput<MouseButton>,
     cameras: &Query<(&Camera, &GlobalTransform, Option<&StereoViews>), With<Camera3d>>,
+    viewer: &ViewerRig,
 ) -> Option<PointerFrame> {
-    let position = cursor.position?;
-    let (camera, transform, _) = cameras.iter().find(|(_, _, stereo)| stereo.is_none())?;
-    let world_ray = camera.viewport_to_world(transform, position).ok()?;
+    let ray = if let Some((origin, direction)) = viewer.crosshair() {
+        Ray::new(origin, direction)
+    } else {
+        let position = cursor.position?;
+        let (camera, transform, _) = cameras.iter().find(|(_, _, stereo)| stereo.is_none())?;
+        let world_ray = camera.viewport_to_world(transform, position).ok()?;
+        Ray::new(world_ray.origin, *world_ray.direction)
+    };
     Some(PointerFrame {
         id: PointerId(0),
-        ray: Ray::new(world_ray.origin, *world_ray.direction),
+        ray,
         grip: None,
         select: buttons.pressed(MouseButton::Left),
         squeeze: buttons.pressed(MouseButton::Right),
@@ -245,6 +255,7 @@ fn run_interaction(
     xr_input: Res<XrInput>,
     buttons: Res<ButtonInput<MouseButton>>,
     hook: Res<SnapHook>,
+    viewer: Res<ViewerRig>,
     mut cursor: ResMut<CursorState>,
     mut state: ResMut<InteractionState>,
     cameras: Query<(&Camera, &GlobalTransform, Option<&StereoViews>), With<Camera3d>>,
@@ -267,7 +278,7 @@ fn run_interaction(
         })
         .filter(|(_, frame)| frame.ray.is_some() || frame.grip.is_some())
         .collect();
-    let mut frames: Vec<PointerFrame> = mouse_frame(&mut cursor, &buttons, &cameras)
+    let mut frames: Vec<PointerFrame> = mouse_frame(&mut cursor, &buttons, &cameras, &viewer)
         .into_iter()
         .collect();
     frames.extend(hands.iter().map(|(_, frame)| *frame));

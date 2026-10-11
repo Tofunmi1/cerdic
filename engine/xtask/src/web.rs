@@ -77,7 +77,7 @@ pub(crate) fn build(profile: Profile) -> Result<(), Failure> {
         "web/wasi_snapshot_preview1.js",
         format!("{DIST}/wasi_snapshot_preview1.js"),
     )?;
-    for page_file in ["index.html", "bench.js"] {
+    for page_file in ["index.html", "bench.js", "viewer.js"] {
         fs::copy(format!("web/{page_file}"), format!("{DIST}/{page_file}"))?;
     }
     let size = fs::metadata(format!("{DIST}/ve_runtime_bg.wasm"))?.len();

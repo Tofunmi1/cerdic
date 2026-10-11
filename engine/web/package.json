@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Browser harness for the engine: page, build output and end-to-end tests.",
   "scripts": {
-    "test": "node tests/engine.mjs && node tests/xr.mjs && node tests/xr-layer.mjs && node tests/xr-lifecycle.mjs && node tests/xr-resolution.mjs && node tests/interact.mjs && node tests/xr-interact.mjs && node tests/quality.mjs && node tests/perf.mjs && node tests/bench-session.mjs"
+    "test": "node tests/engine.mjs && node tests/xr.mjs && node tests/xr-layer.mjs && node tests/xr-lifecycle.mjs && node tests/xr-resolution.mjs && node tests/interact.mjs && node tests/xr-interact.mjs && node tests/viewer.mjs &&node tests/quality.mjs && node tests/perf.mjs && node tests/bench-session.mjs"
   },
   "devDependencies": {
     "iwer": "^2.5.0",
