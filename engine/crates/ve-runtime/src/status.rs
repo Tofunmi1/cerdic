@@ -2,6 +2,7 @@
 
 use std::cell::RefCell;
 
+use bevy_ecs::entity::Entity;
 use bevy_ecs::query::With;
 use bevy_ecs::system::{Local, Query, Res};
 use bevy_render::renderer::{RenderAdapterInfo, RenderDevice};
@@ -11,6 +12,7 @@ use ve_render::{RenderQuality, StereoViews};
 use ve_xr_web::{XrCamera, XrInput};
 
 use crate::bench_scene::SceneStats;
+use crate::interact::{self, Interactable, InteractionState, Label};
 use crate::perf::Perf;
 use crate::wands::Wand;
 
@@ -72,6 +74,8 @@ pub(crate) fn publish(
     quality: Res<RenderQuality>,
     perf: Res<Perf>,
     scene_stats: Option<Res<SceneStats>>,
+    interaction: Res<InteractionState>,
+    labelled: Query<(Entity, &Label, &Transform), With<Interactable>>,
 ) {
     *frames += 1;
     let errors = ERRORS.with(|errors| errors.borrow().clone());
@@ -80,6 +84,7 @@ pub(crate) fn publish(
         "errors": errors,
         "perf": perf.report(),
         "scene": scene_stats.as_deref().map(|s| json!({ "draws": s.draws, "triangles": s.triangles })),
+        "interact": interact::report(&interaction, &labelled),
         "quality": {
             "tier": quality.tier.name(),
             "msaa": quality.msaa_samples,

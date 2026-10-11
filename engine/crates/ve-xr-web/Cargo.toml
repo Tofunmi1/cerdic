@@ -11,6 +11,7 @@ bevy_app = { path = "../../third_party/bevy/crates/bevy_app" }
 bevy_ecs = { path = "../../third_party/bevy/crates/bevy_ecs" }
 bevy_math = { path = "../../third_party/bevy/crates/bevy_math" }
 thiserror.workspace = true
+ve-interact = { path = "../ve-interact" }
 ve-render = { path = "../ve-render" }
 ve-xr-math = { path = "../ve-xr-math" }
 

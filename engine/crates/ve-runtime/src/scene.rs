@@ -16,7 +16,7 @@ use ve_render::{VeAmbientLight, VeDirectionalLight, VeMaterial, VePointLight};
 use ve_xr_web::{XrCamera, XrRig};
 
 use crate::bench_scene::{BenchSpec, bench_scene as bench};
-use crate::{mock_hmd, status, wands};
+use crate::{interact, mock_hmd, status, wands};
 
 /// Which built-in scene to show.
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -119,6 +119,7 @@ fn spawn_bitten_cube(
             ..VeMaterial::default()
         },
         Transform::from_translation(position),
+        interact::tag(&solid, "cube")?,
     ));
     Ok(())
 }
@@ -240,6 +241,7 @@ fn xr_scene(
         Transform::from_xyz(0.0, -0.05, 0.0),
     ));
     wands::spawn_wands(commands, meshes)?;
+    interact::spawn_lasers(commands, meshes)?;
     sun(commands, 2.5);
     for (color, position) in [
         (Color::srgb(1.0, 0.45, 0.25), Vec3::new(-1.2, 1.8, 0.8)),
@@ -265,20 +267,26 @@ fn xr_scene(
 /// Objects standing on a floor under the sun, so shadows land on the floor and on each other.
 fn shadows_scene(commands: &mut Commands, meshes: &mut Assets<Mesh>) -> Result<(), KernelError> {
     let floor = meshes.add(render_mesh(&Solid::cube([10.0, 0.1, 10.0], true)?, false)?);
-    let shapes = [
-        // Mesh, colour, position of its centre.
+    let solids = [
+        // Solid, smooth shading, label, colour, position of its centre.
         (
-            meshes.add(render_mesh(&Solid::cube([1.0, 1.0, 1.0], true)?, false)?),
+            Solid::cube([1.0, 1.0, 1.0], true)?,
+            false,
+            "box",
             Color::srgb(0.85, 0.45, 0.35),
             Vec3::new(0.6, 0.5, 0.4),
         ),
         (
-            meshes.add(render_mesh(&Solid::sphere(0.45, 48)?, true)?),
+            Solid::sphere(0.45, 48)?,
+            true,
+            "ball",
             Color::srgb(0.4, 0.7, 0.9),
             Vec3::new(-1.2, 0.45, 0.9),
         ),
         (
-            meshes.add(render_mesh(&Solid::cube([0.25, 1.8, 0.25], true)?, false)?),
+            Solid::cube([0.25, 1.8, 0.25], true)?,
+            false,
+            "pillar",
             Color::srgb(0.9, 0.85, 0.5),
             Vec3::new(-0.1, 0.9, -0.9),
         ),
@@ -292,15 +300,16 @@ fn shadows_scene(commands: &mut Commands, meshes: &mut Assets<Mesh>) -> Result<(
         },
         Transform::from_xyz(0.0, -0.05, 0.0),
     ));
-    for (mesh, base_color, position) in shapes {
+    for (solid, smooth, label, base_color, position) in solids {
         commands.spawn((
-            Mesh3d(mesh),
+            Mesh3d(meshes.add(render_mesh(&solid, smooth)?)),
             VeMaterial {
                 base_color,
                 roughness: 0.55,
                 ..VeMaterial::default()
             },
             Transform::from_translation(position),
+            interact::tag(&solid, label)?,
         ));
     }
     sun(commands, 3.0);

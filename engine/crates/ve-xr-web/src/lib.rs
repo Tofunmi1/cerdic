@@ -7,6 +7,7 @@
 
 pub mod frame;
 mod plugin;
+mod pointers;
 mod state;
 
 #[cfg(target_arch = "wasm32")]
@@ -17,6 +18,7 @@ mod layer;
 mod session;
 
 pub use plugin::{XrCamera, XrInput, XrPlugin, XrRig, apply_xr_frame};
+pub use pointers::{controller_pointer, pointer_id};
 #[cfg(target_arch = "wasm32")]
 pub use session::{XrError, enter, exit, is_supported};
 pub use state::{
