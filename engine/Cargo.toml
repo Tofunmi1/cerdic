@@ -11,6 +11,7 @@ publish = false
 [workspace.dependencies]
 thiserror = "2"
 serde_json = "1"
+proptest = "1"
 
 # Lints live here, not in prompts: an LLM (or a tired human) cannot talk its way past them.
 [workspace.lints.rust]
