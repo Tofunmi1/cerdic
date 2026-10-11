@@ -15,3 +15,4 @@ spikes/**/node_modules/
 spikes/hybrid-wasm/third_party/
 spikes/hybrid-wasm/build/
 spikes/bevy-cpp/web/*.wasm
+spikes/xr-framebuffer/web/*.wasm
