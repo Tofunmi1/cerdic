@@ -4,9 +4,10 @@
   "type": "module",
   "description": "Browser harness for the engine: page, build output and end-to-end tests.",
   "scripts": {
-    "test": "node tests/engine.mjs"
+    "test": "node tests/engine.mjs && node tests/xr.mjs"
   },
   "devDependencies": {
+    "iwer": "^2.5.0",
     "playwright": "^1.64.0",
     "pngjs": "^7.0.0"
   }

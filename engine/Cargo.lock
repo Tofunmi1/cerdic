@@ -3104,7 +3104,9 @@ dependencies = [
  "ve-platform-web",
  "ve-render",
  "ve-xr-math",
+ "ve-xr-web",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
 ]
 
@@ -3115,6 +3117,23 @@ dependencies = [
  "glam",
  "proptest",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "ve-xr-web"
+version = "0.0.0"
+dependencies = [
+ "bevy_app",
+ "bevy_ecs",
+ "bevy_math",
+ "js-sys",
+ "thiserror 2.0.21",
+ "ve-platform-web",
+ "ve-render",
+ "ve-xr-math",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

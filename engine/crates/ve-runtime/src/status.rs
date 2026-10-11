@@ -2,9 +2,12 @@
 
 use std::cell::RefCell;
 
-use bevy_ecs::system::{Local, Res};
+use bevy_ecs::query::With;
+use bevy_ecs::system::{Local, Query, Res};
 use bevy_render::renderer::{RenderAdapterInfo, RenderDevice};
 use serde_json::json;
+use ve_render::StereoViews;
+use ve_xr_web::XrCamera;
 
 thread_local! {
     static STATUS: RefCell<String> = RefCell::new(json!({ "frames": 0 }).to_string());
@@ -16,15 +19,47 @@ pub(crate) fn report_error(message: String) {
     ERRORS.with(|errors| errors.borrow_mut().push(message));
 }
 
-/// Records adapter information, key limits and a frame counter.
+/// What the headset camera currently sees: eye separation and the head position between the eyes.
+fn xr_view_info(cameras: &Query<&StereoViews, With<XrCamera>>) -> serde_json::Value {
+    let Some(stereo) = cameras.iter().next() else {
+        return json!(null);
+    };
+    let left = stereo.eyes[0].world_from_view.w_axis.truncate();
+    let right = stereo.eyes[1].world_from_view.w_axis.truncate();
+    let head = (left + right) * 0.5;
+    json!({
+        "eye_separation_m": left.distance(right),
+        "head_position": [head.x, head.y, head.z],
+        "viewports": [stereo.eyes[0].viewport, stereo.eyes[1].viewport],
+    })
+}
+
+/// Records adapter information, key limits, XR session state and a frame counter.
 pub(crate) fn publish(
     mut frames: Local<u64>,
     adapter: Option<Res<RenderAdapterInfo>>,
     device: Option<Res<RenderDevice>>,
+    xr_cameras: Query<&StereoViews, With<XrCamera>>,
 ) {
     *frames += 1;
     let errors = ERRORS.with(|errors| errors.borrow().clone());
-    let mut value = json!({ "frames": *frames, "errors": errors });
+    let mut value = json!({
+        "frames": *frames,
+        "errors": errors,
+        "xr": {
+            "state": format!("{:?}", ve_xr_web::session_state()),
+            "frames": ve_xr_web::frames_published(),
+            "error": ve_xr_web::last_error(),
+            "view": xr_view_info(&xr_cameras),
+            "last_frame": ve_xr_web::last_frame().map(|frame| json!({
+                "views": frame.views.len(),
+                "framebuffer": [frame.framebuffer_size.0, frame.framebuffer_size.1],
+                "viewports": frame.views.iter().map(|v| v.viewport).collect::<Vec<_>>(),
+                "projection_0": frame.views.first().map(|v| v.projection),
+                "controllers": frame.controllers.len(),
+            })),
+        },
+    });
     if let Some(info) = adapter {
         value["adapter"] = json!(info.name);
         value["backend"] = json!(format!("{:?}", info.backend));

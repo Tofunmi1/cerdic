@@ -25,3 +25,4 @@ mod runner;
 pub use canvas::CanvasHandle;
 pub use error::PlatformError;
 pub use plugin::{PlatformStartupError, WebPlatformPlugin};
+pub use runner::{pump_frame, set_externally_driven};

@@ -7,22 +7,37 @@
   <style>
     html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
     #ve { display: block; width: 100vw; height: 100vh; touch-action: none; }
+    #enter-vr {
+      position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+      padding: 12px 22px; border: 1px solid rgba(255,255,255,.35); border-radius: 999px;
+      background: rgba(255,255,255,.14); color: #fff; font: 600 15px system-ui, sans-serif;
+      backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4);
+      cursor: pointer;
+    }
+    #enter-vr[hidden] { display: none; }
   </style>
 </head>
 <body>
   <canvas id="ve"></canvas>
+  <button id="enter-vr" hidden>Enter VR</button>
   <script type="module">
-    import init, { start, status } from "./ve_runtime.js";
+    import init, { start, status, xr_supported, enter_xr, exit_xr } from "./ve_runtime.js";
     import { bindMemory } from "./wasi_snapshot_preview1.js";
 
+    const params = new URLSearchParams(location.search);
     const began = performance.now();
-    const state = { ready: false, bootMs: null, error: null, read: () => JSON.parse(status()) };
+    const state = {
+      ready: false, bootMs: null, error: null, xrSupported: false,
+      read: () => JSON.parse(status()),
+      enterXr: () => enter_xr("ve"),
+      exitXr: () => exit_xr(),
+    };
     window.__ve = state;
     try {
       const wasm = await init();
       bindMemory(wasm.memory);
       state.wasmBytes = () => wasm.memory.buffer.byteLength;
-      start("ve", new URLSearchParams(location.search).get("scene") ?? "");
+      start("ve", params.get("scene") ?? "");
       const poll = setInterval(() => {
         if (state.read().frames > 0) {
           state.ready = true;
@@ -30,6 +45,14 @@
           clearInterval(poll);
         }
       }, 50);
+
+      state.xrSupported = await xr_supported();
+      const button = document.getElementById("enter-vr");
+      button.hidden = !state.xrSupported;
+      // Browsers require a user gesture to start a session, so a click is the real entry point.
+      button.addEventListener("click", () => enter_xr("ve").catch((e) => console.error(e)));
+      // Tests and kiosks can enter immediately (an emulated runtime has no gesture requirement).
+      if (state.xrSupported && params.get("xr") === "auto") await enter_xr("ve");
     } catch (error) {
       state.error = String(error);
       console.error(error);
