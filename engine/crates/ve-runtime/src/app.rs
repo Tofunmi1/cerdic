@@ -19,7 +19,7 @@ use ve_xr_web::XrPlugin;
 
 use crate::mock_hmd;
 use crate::scene::{self, SceneKind};
-use crate::status;
+use crate::{status, wands};
 
 /// The clear colour the golden tests expect on the canvas (sRGB 26, 51, 102).
 const CLEAR: Color = Color::srgb(0.10, 0.20, 0.40);
@@ -54,7 +54,14 @@ pub(crate) fn start(canvas_id: &str, scene: SceneKind) -> Result<(), PlatformErr
     app.insert_resource(ClearColor(CLEAR));
     app.insert_resource(scene);
     app.add_systems(Startup, scene::spawn_scene);
-    app.add_systems(Update, (status::publish, mock_hmd::update_mock_hmd));
+    app.add_systems(
+        Update,
+        (
+            status::publish,
+            mock_hmd::update_mock_hmd,
+            wands::update_wands,
+        ),
+    );
     app.run();
     Ok(())
 }

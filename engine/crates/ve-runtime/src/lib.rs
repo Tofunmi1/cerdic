@@ -9,6 +9,7 @@ mod app;
 mod mock_hmd;
 mod scene;
 mod status;
+mod wands;
 
 use std::str::FromStr;
 

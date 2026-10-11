@@ -5,9 +5,12 @@ use std::cell::RefCell;
 use bevy_ecs::query::With;
 use bevy_ecs::system::{Local, Query, Res};
 use bevy_render::renderer::{RenderAdapterInfo, RenderDevice};
+use bevy_transform::components::Transform;
 use serde_json::json;
 use ve_render::StereoViews;
-use ve_xr_web::XrCamera;
+use ve_xr_web::{XrCamera, XrInput};
+
+use crate::wands::Wand;
 
 thread_local! {
     static STATUS: RefCell<String> = RefCell::new(json!({ "frames": 0 }).to_string());
@@ -34,12 +37,36 @@ fn xr_view_info(cameras: &Query<&StereoViews, With<XrCamera>>) -> serde_json::Va
     })
 }
 
+/// The controllers as the app sees them, with where each hand's wand ended up in the world.
+fn controller_info(input: &XrInput, wands: &Query<(&Wand, &Transform)>) -> serde_json::Value {
+    input
+        .controllers
+        .iter()
+        .map(|controller| {
+            let wand = wands
+                .iter()
+                .find(|(Wand(hand), _)| *hand == controller.handedness)
+                .map(|(_, transform)| transform.translation.to_array());
+            json!({
+                "hand": format!("{:?}", controller.handedness),
+                "tracked": controller.grip.is_some(),
+                "trigger": controller.buttons[0],
+                "squeeze": controller.buttons[1],
+                "axes": controller.axes,
+                "wand_position": wand,
+            })
+        })
+        .collect()
+}
+
 /// Records adapter information, key limits, XR session state and a frame counter.
 pub(crate) fn publish(
     mut frames: Local<u64>,
     adapter: Option<Res<RenderAdapterInfo>>,
     device: Option<Res<RenderDevice>>,
     xr_cameras: Query<&StereoViews, With<XrCamera>>,
+    input: Res<XrInput>,
+    wands: Query<(&Wand, &Transform)>,
 ) {
     *frames += 1;
     let errors = ERRORS.with(|errors| errors.borrow().clone());
@@ -51,6 +78,7 @@ pub(crate) fn publish(
             "frames": ve_xr_web::frames_published(),
             "error": ve_xr_web::last_error(),
             "view": xr_view_info(&xr_cameras),
+            "controllers": controller_info(&input, &wands),
             "last_frame": ve_xr_web::last_frame().map(|frame| json!({
                 "views": frame.views.len(),
                 "framebuffer": [frame.framebuffer_size.0, frame.framebuffer_size.1],
