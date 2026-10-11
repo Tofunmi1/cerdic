@@ -38,8 +38,17 @@ impl std::fmt::Debug for Solid {
     }
 }
 
+/// The largest dimension, offset or coordinate accepted, in metres. Meshes are rendered in `f32`,
+/// whose precision at a thousand kilometres is already coarser than a metre, and a finite `f64`
+/// beyond `f32`'s range would turn into infinities on the way out of the kernel. Rejecting such
+/// values at the boundary keeps every result renderable.
+pub const MAX_EXTENT: f64 = 1.0e6;
+
 fn require_positive(values: [f64; 3], what: &'static str) -> Result<(), KernelError> {
-    if values.iter().all(|v| v.is_finite() && *v > 0.0) {
+    if values
+        .iter()
+        .all(|v| v.is_finite() && *v > 0.0 && *v <= MAX_EXTENT)
+    {
         Ok(())
     } else {
         Err(KernelError::InvalidArgument(what))
@@ -47,7 +56,10 @@ fn require_positive(values: [f64; 3], what: &'static str) -> Result<(), KernelEr
 }
 
 fn require_finite(values: [f64; 3], what: &'static str) -> Result<(), KernelError> {
-    if values.iter().all(|v| v.is_finite()) {
+    if values
+        .iter()
+        .all(|v| v.is_finite() && v.abs() <= MAX_EXTENT)
+    {
         Ok(())
     } else {
         Err(KernelError::InvalidArgument(what))
@@ -104,8 +116,8 @@ impl Solid {
         )?;
         let radii_ok = radius_low.is_finite()
             && radius_high.is_finite()
-            && radius_low >= 0.0
-            && radius_high >= 0.0
+            && (0.0..=MAX_EXTENT).contains(&radius_low)
+            && (0.0..=MAX_EXTENT).contains(&radius_high)
             && (radius_low > 0.0 || radius_high > 0.0);
         if !radii_ok {
             return Err(KernelError::InvalidArgument(
@@ -288,6 +300,9 @@ pub fn simplify(mesh: &Mesh, target_ratio: f64, target_error: f64) -> Result<Mes
         return Err(KernelError::InvalidArgument(
             "mesh index count must be a non-zero multiple of three",
         ));
+    }
+    if mesh.positions.iter().flatten().any(|c| !c.is_finite()) {
+        return Err(KernelError::NonFinite);
     }
     let count = mesh.positions.len();
     if mesh

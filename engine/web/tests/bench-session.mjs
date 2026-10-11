@@ -36,6 +36,12 @@ try {
   check((await request(http, { ...base, path: "/../../../../etc/hosts" })).status === 404, "a path outside web/dist was served");
   check((await request(http, { ...base, path: "/report", method: "POST" }, "not json")).status === 400, "a bad report was accepted");
   check((await request(http, { ...base, path: "/index.html", method: "DELETE" })).status === 405, "DELETE was not refused");
+  // Malformed percent-encoding must be refused with 400, and must not take the server down.
+  check((await request(http, { ...base, path: "/%E0%A4%A" })).status === 400, "bad percent-encoding was not answered with 400");
+  check((await request(http, { ...base, path: "/%" })).status === 400, "a lone % was not answered with 400");
+  check((await request(http, { ...base, path: "/index.html%00.js" })).status === 404, "a NUL byte in the path was served");
+  check((await request(http, { ...base, path: "/report", method: "POST" }, "5")).status === 400, "a report that is not an object was accepted");
+  check((await request(http, { ...base, path: "/" })).status === 200, "the server stopped answering after malformed requests");
   check(fs.existsSync(reportsDir) === false || fs.readdirSync(reportsDir).length === 0, "a bad request left a report file behind");
 
   const browser = await chromium.launch({ args: ["--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
@@ -66,7 +72,12 @@ try {
     check(files.length === 1 && files[0].endsWith("-bench1.json"), `reports saved: ${JSON.stringify(files)}`);
     if (files.length === 1) {
       const report = JSON.parse(fs.readFileSync(path.join(reportsDir, files[0]), "utf8"));
-      check(report.scene === "bench1" && report.scene_stats?.draws === 45, `unexpected scene info ${JSON.stringify(report.scene_stats)}`);
+      check(report.scene === "bench1" && report.scene_stats?.instances === 45, `unexpected scene info ${JSON.stringify(report.scene_stats)}`);
+      // A stereo frame draws every instance once per eye; the report must say what was submitted.
+      check(report.render?.main?.draws === 90, `main pass draws ${report.render?.main?.draws}, expected 90 (45 instances x 2 eyes)`);
+      check(report.render?.main?.triangles === 2 * report.scene_stats.triangles, `main pass triangles ${report.render?.main?.triangles}, expected two views of ${report.scene_stats.triangles}`);
+      check(Array.isArray(report.eye_viewports) && report.eye_viewports.length === 2, "the report has no eye viewports");
+      check(Number.isFinite(report.missed_periods) && report.dropped_frames >= 0, "the report has no drop figures");
       check(report.target_hz > 0 && report.total_frames > 0, `no frames were measured: ${report.total_frames}`);
       check(report.seconds >= 3, `the session lasted ${report.seconds}s, expected about 4`);
       check(report.timeline.length >= 1, "the timeline is empty");
@@ -74,6 +85,17 @@ try {
       check(typeof report.userAgent === "string" && report.errors.length === 0, `report errors: ${JSON.stringify(report.errors)}`);
       console.log(JSON.stringify({ seconds: report.seconds, frames: report.total_frames, fps: report.fps, p95_ms: report.p95_ms, timeline: report.timeline.length }));
     }
+    // A second session is its own measurement: its report starts when it starts, and its totals do
+    // not include the first session.
+    const first = await page.evaluate(() => window.__ve.lastReport);
+    await page.waitForTimeout(3000); // time that must not leak into the next session's duration
+    await page.evaluate(() => window.__ve.enterXr());
+    await page.waitForFunction((when) => window.__ve.lastReport && window.__ve.lastReport.when !== when, first.when, { timeout: 120000 });
+    const second = await page.evaluate(() => window.__ve.lastReport);
+    check(second.seconds >= 3 && second.seconds <= 7, `the second session lasted ${second.seconds}s, expected about 4 (delayed entry must not count)`);
+    check(second.total_frames < first.total_frames * 2 && second.total_frames > 0, `second session frames ${second.total_frames} vs first ${first.total_frames}: totals carried over`);
+    const saved = fs.readdirSync(reportsDir).length;
+    check(saved === 2, `${saved} reports saved after two sessions, expected 2`);
     check(logs.length === 0, `browser logged problems:\n  ${logs.join("\n  ")}`);
   } finally {
     await browser.close();

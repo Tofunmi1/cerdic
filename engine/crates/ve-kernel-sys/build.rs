@@ -75,11 +75,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         None => println!("cargo:rustc-link-lib=dylib=stdc++"),
     }
 
+    // Every vendored tree the CMake build reads, whole: sources, headers and build configuration
+    // (a changed vendor header or CMake option must rebuild without a `cargo clean`).
     for path in [
         "cpp",
-        "third_party/manifold/src",
-        "third_party/manifold/include",
-        "third_party/meshoptimizer/src",
+        "third_party/manifold",
+        "third_party/clipper2",
+        "third_party/meshoptimizer",
     ] {
         println!("cargo:rerun-if-changed={}", engine.join(path).display());
     }

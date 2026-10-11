@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use bevy_asset::Handle;
 use bevy_ecs::prelude::*;
 use bevy_log::warn_once;
-use bevy_math::{Vec3, Vec4};
+use bevy_math::Vec4;
 use bevy_mesh::{Mesh, MeshVertexBufferLayoutRef, VertexBufferLayout};
 use bevy_render::mesh::RenderMesh;
 use bevy_render::mesh::allocator::MeshAllocator;
@@ -26,12 +26,14 @@ use bevy_render::renderer::{RenderContext, RenderDevice, RenderQueue};
 use bevy_render::view::ExtractedView;
 use bevy_shader::Shader;
 
+use crate::counters::{self, Pass};
 use crate::geometry::bind_geometry;
 use crate::light::ExtractedLights;
 use crate::pipeline::instance_layout;
 use crate::prepare::{InstanceBatches, ViewUniform};
 use crate::quality::RenderQuality;
 use crate::shadow_math::{SHADOW_DISTANCE, ShadowParams, sun_shadow_params};
+use crate::stereo::{StereoViews, viewer_position};
 
 /// Source of the shadow shader.
 pub(crate) const SHADOW_SHADER: &str = include_str!("shaders/shadow.wgsl");
@@ -197,7 +199,7 @@ pub(crate) fn prepare_shadow_state(
     lights: Res<ExtractedLights>,
     quality: Res<RenderQuality>,
     map: Res<ShadowMap>,
-    views: Query<&ExtractedView>,
+    views: Query<(&ExtractedView, Option<&StereoViews>)>,
     mut state: ResMut<ShadowState>,
     mut pipelines: ResMut<ShadowPipelines>,
     pipeline_cache: Res<PipelineCache>,
@@ -212,10 +214,11 @@ pub(crate) fn prepare_shadow_state(
         state.params = ShadowParams::default();
         return;
     };
-    let viewer = views
-        .iter()
-        .next()
-        .map_or(Vec3::ZERO, |view| view.world_from_view.translation());
+    let viewer = viewer_position(
+        views
+            .iter()
+            .map(|(view, stereo)| (view.world_from_view.translation(), stereo)),
+    );
     let params = sun_shadow_params(
         -*forward,
         viewer,
@@ -285,6 +288,8 @@ pub(crate) fn shadow_pass(
     allocator: Res<MeshAllocator>,
     mut ctx: RenderContext,
 ) {
+    // The shadow pass opens each frame, so it is where the draw counters roll over.
+    counters::begin_frame();
     if !state.params.enabled {
         return;
     }
@@ -327,7 +332,7 @@ pub(crate) fn shadow_pass(
         if let Some(call) =
             bind_geometry(&mut pass, &allocator, render_mesh, batch, instance_buffer)
         {
-            call.issue(&mut pass, batch.instances.clone());
+            call.issue(&mut pass, batch.instances.clone(), Pass::Shadow);
         }
     }
 }

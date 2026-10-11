@@ -41,6 +41,14 @@ fn xr_view_info(cameras: &Query<&StereoViews, With<XrCamera>>) -> serde_json::Va
     })
 }
 
+/// What the renderer submitted last frame: draw calls and triangles per pass. The main pass counts
+/// every view, so a stereo frame shows twice the draws of a mono one; the shadow pass is extra.
+fn render_counts() -> serde_json::Value {
+    let counts = ve_render::last_frame_counts();
+    let pass = |c: ve_render::PassCounts| json!({ "draws": c.draws, "triangles": c.triangles });
+    json!({ "main": pass(counts.main), "shadow": pass(counts.shadow) })
+}
+
 /// The controllers as the app sees them, with where each hand's wand ended up in the world.
 fn controller_info(input: &XrInput, wands: &Query<(&Wand, &Transform)>) -> serde_json::Value {
     input
@@ -83,7 +91,12 @@ pub(crate) fn publish(
         "frames": *frames,
         "errors": errors,
         "perf": perf.report(),
-        "scene": scene_stats.as_deref().map(|s| json!({ "draws": s.draws, "triangles": s.triangles })),
+        "scene": scene_stats.as_deref().map(|s| json!({
+            "instances": s.instances,
+            "mesh_assets": s.mesh_assets,
+            "triangles": s.triangles,
+        })),
+        "render": render_counts(),
         "interact": interact::report(&interaction, &labelled),
         "quality": {
             "tier": quality.tier.name(),
@@ -98,6 +111,10 @@ pub(crate) fn publish(
             "error": ve_xr_web::last_error(),
             "view": xr_view_info(&xr_cameras),
             "controllers": controller_info(&input, &wands),
+            "viewport_scale": {
+                "requested": ve_xr_web::viewport_scale(),
+                "supported": ve_xr_web::viewport_scale_supported(),
+            },
             "last_frame": ve_xr_web::last_frame().map(|frame| json!({
                 "views": frame.views.len(),
                 "framebuffer": [frame.framebuffer_size.0, frame.framebuffer_size.1],

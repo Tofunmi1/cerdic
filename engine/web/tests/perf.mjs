@@ -6,9 +6,9 @@ import { chromium } from "playwright";
 import { driverAdvisory, serve } from "./support.mjs";
 
 const SPECS = {
-  bench1: { draws: 45, triangles: 50_000 },
-  bench2: { draws: 155, triangles: 200_000 },
-  bench3: { draws: 305, triangles: 400_000 },
+  bench1: { instances: 45, triangles: 50_000 },
+  bench2: { instances: 155, triangles: 200_000 },
+  bench3: { instances: 305, triangles: 400_000 },
 };
 const failures = [];
 const check = (ok, message) => { if (!ok) failures.push(message); };
@@ -34,9 +34,19 @@ try {
     const { page, logs } = await open(`scene=${scene}`);
     await page.waitForFunction(() => window.__ve.read().perf.total_frames >= 3, null, { timeout: 120000 });
     const status = await page.evaluate(() => window.__ve.read());
-    check(status.scene?.draws === spec.draws, `[${scene}] ${status.scene?.draws} draws, expected ${spec.draws}`);
+    check(status.scene?.instances === spec.instances, `[${scene}] ${status.scene?.instances} instances, expected ${spec.instances}`);
+    check(status.scene?.mesh_assets === spec.instances, `[${scene}] ${status.scene?.mesh_assets} mesh assets, expected one per instance`);
     const ratio = status.scene.triangles / spec.triangles;
     check(ratio > 0.9 && ratio < 1.1, `[${scene}] ${status.scene.triangles} triangles, expected about ${spec.triangles}`);
+    // The renderer's own counts must reconcile with the scene: a mono view draws every instance once
+    // (nothing is batched here) and rasterises exactly the scene's triangles; the shadow pass repeats
+    // them when shadows are on.
+    await page.waitForFunction(() => window.__ve.read().render.main.draws > 0, null, { timeout: 60000 });
+    const counted = (await page.evaluate(() => window.__ve.read())).render;
+    check(counted.main.draws === spec.instances, `[${scene}] main pass submitted ${counted.main.draws} draws, expected ${spec.instances}`);
+    check(counted.main.triangles === status.scene.triangles, `[${scene}] main pass drew ${counted.main.triangles} triangles, scene has ${status.scene.triangles}`);
+    const shadowsOn = status.quality.shadow_resolution > 0;
+    check(counted.shadow.draws === (shadowsOn ? spec.instances : 0), `[${scene}] shadow pass submitted ${counted.shadow.draws} draws (shadows ${shadowsOn ? "on" : "off"})`);
     check(status.errors.length === 0, `[${scene}] engine errors: ${status.errors.join("; ")}`);
     check(logs.length === 0, `[${scene}] browser logged problems:\n  ${logs.join("\n  ")}`);
     console.log(JSON.stringify({ scene, ...status.scene }));
@@ -55,14 +65,17 @@ try {
     await page.close();
   }
 
-  // Overload: the stress scene against a 5 Hz budget must walk the tier down, high to medium to low.
+  // Overload: the stress scene against a 5 Hz budget must walk the tier down, high to medium to low
+  // (the budget is artificially long so a slow software renderer still misses it).
   {
     const { page } = await open("scene=bench3&quality=high&governor=1&hz=5");
     await page.waitForFunction(() => window.__ve.read().quality.tier === "low", null, { timeout: 150000 })
       .catch(() => failures.push("the governor never reached the low tier under overload"));
     const status = await page.evaluate(() => window.__ve.read());
     const tiers = status.perf.governor.changes.map((c) => c.tier);
-    check(tiers[0] === "medium" && tiers[1] === "low", `tier changes under overload were ${JSON.stringify(tiers)}`);
+    // It steps down at once, and may spend a trial step back up when a level looks affordable (a
+    // paced loop cannot show spare capacity), but it must end on low without thrashing.
+    check(tiers[0] === "medium" && tiers.at(-1) === "low" && tiers.length <= 6, `tier changes under overload were ${JSON.stringify(tiers)}`);
     check(status.perf.governor.enabled === true, "governor not enabled");
     console.log(JSON.stringify({ overload: tiers, p95: status.perf.p95_ms }));
     await page.close();

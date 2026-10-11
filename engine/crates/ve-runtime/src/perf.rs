@@ -1,7 +1,7 @@
 //! Frame-time measurement and the quality governor, for the status report and for benchmarking on a
 //! headset. The statistics and the governor's decisions live in `ve-core`; this is the glue.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 use bevy_ecs::resource::Resource;
 use bevy_ecs::system::{Res, ResMut};
@@ -19,10 +19,14 @@ const DEFAULT_HEADSET_HZ: f32 = 72.0;
 /// Refresh rate assumed for the page's own window unless the page says otherwise.
 const DEFAULT_WINDOW_HZ: f32 = 60.0;
 
+/// Frames a governor request may stay unapplied before it is considered lost.
+const PENDING_FRAMES: u64 = 120;
+
 /// Tier changes kept for the report.
 const MAX_CHANGES: usize = 24;
 
 thread_local! {
+    static LAST_SESSION: RefCell<Option<serde_json::Value>> = const { RefCell::new(None) };
     static GOVERNOR_ON: Cell<bool> = const { Cell::new(false) };
     static WINDOW_HZ: Cell<f32> = const { Cell::new(DEFAULT_WINDOW_HZ) };
 }
@@ -66,6 +70,7 @@ pub(crate) struct Perf {
     frame: u64,
     /// The tier the governor asked for that has not been applied yet.
     pending: Option<QualityTier>,
+    pending_since: u64,
     changes: Vec<TierChange>,
 }
 
@@ -88,12 +93,20 @@ impl Perf {
             presenting,
             frame: 0,
             pending: None,
+            pending_since: 0,
             changes: Vec::new(),
         }
     }
 
-    /// The figures for the status report.
+    /// The figures for the status report, plus those of the last headset session that ended.
     pub(crate) fn report(&self) -> serde_json::Value {
+        let mut value = self.summary();
+        value["last_session"] = LAST_SESSION.with(|slot| slot.borrow().clone().into());
+        value
+    }
+
+    /// The current figures alone.
+    fn summary(&self) -> serde_json::Value {
         let summary = self.stats.summary();
         let (total_frames, total_dropped) = self.stats.totals();
         json!({
@@ -108,6 +121,7 @@ impl Perf {
             "dropped": summary.dropped,
             "total_frames": total_frames,
             "total_dropped": total_dropped,
+            "missed_periods": self.stats.missed_periods(),
             "governor": {
                 "enabled": GOVERNOR_ON.with(Cell::get),
                 "level": self.governor.level(),
@@ -137,6 +151,12 @@ pub(crate) fn track_frame_time(
         WINDOW_HZ.with(Cell::get)
     };
     if presenting != perf.presenting || (hz - perf.hz).abs() > f32::EPSILON {
+        // Keep the figures of a headset session that just ended, exactly as they stood: the page
+        // polls too slowly to be sure it saw the last frames before the statistics restart.
+        if perf.presenting {
+            let ended = perf.summary();
+            LAST_SESSION.with(|slot| *slot.borrow_mut() = Some(ended));
+        }
         *perf = Perf::new(hz, presenting, quality.tier);
     }
     perf.frame += 1;
@@ -148,7 +168,8 @@ pub(crate) fn track_frame_time(
     perf.stats.record(frame_ms);
 
     if let Some(pending) = perf.pending {
-        if quality.tier == pending {
+        // A request the page overrode (or that never lands) must not block the governor for good.
+        if quality.tier == pending || perf.frame - perf.pending_since > PENDING_FRAMES {
             perf.pending = None;
         }
         return;
@@ -169,6 +190,7 @@ pub(crate) fn track_frame_time(
         quality::request(tier);
         perf.pending = Some(tier);
         let frame = perf.frame;
+        perf.pending_since = frame;
         if perf.changes.len() == MAX_CHANGES {
             perf.changes.remove(0);
         }

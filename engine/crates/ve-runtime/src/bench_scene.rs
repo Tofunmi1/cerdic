@@ -48,19 +48,24 @@ impl BenchSpec {
     };
 }
 
-/// What the scene actually contains, for the status report.
+/// What the scene is made of, for the status report. These describe the authored scene; what the
+/// renderer submits (per eye, per pass) is reported separately from the render counters.
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct SceneStats {
-    /// Mesh draw calls per frame (props plus the room).
-    pub(crate) draws: u32,
-    /// Triangles drawn per frame.
+    /// Mesh instances in the scene (props plus the room).
+    pub(crate) instances: u32,
+    /// Separate mesh assets behind them. The benchmark gives every instance its own asset, so
+    /// nothing is batched; a shared-mesh workload would show fewer assets than instances.
+    pub(crate) mesh_assets: u32,
+    /// Triangles in the scene, counting each instance once.
     pub(crate) triangles: u64,
 }
 
 impl SceneStats {
-    /// Counts one more mesh drawn every frame.
+    /// Counts one more instance with its own mesh asset.
     fn count(&mut self, mesh: &Mesh) {
-        self.draws += 1;
+        self.instances += 1;
+        self.mesh_assets += 1;
         // Flat-shaded meshes have unshared vertices and no index buffer: three vertices a triangle.
         let corners = mesh
             .indices()

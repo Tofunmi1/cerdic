@@ -2,6 +2,8 @@
 
 use glam::{Mat4, Quat, Vec3};
 
+use crate::pose::{Decomposed, decompose};
+
 /// A half-line: `origin + direction * t` for `t >= 0`. The direction is always unit length.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Ray {
@@ -53,15 +55,28 @@ pub enum Shape {
 impl Shape {
     /// The shape of a local-space box `[min, max]` placed by `world_from_local` (translation,
     /// rotation and any scale), as an oriented box.
+    ///
+    /// An oriented box cannot represent every transform, so this returns `None` instead of an
+    /// approximation when the bounds are not finite or inverted, or the transform is not a
+    /// rotation, a positive per-axis scale and a translation: that rules out collapsed axes,
+    /// mirroring and shear (a rotated child under a non-uniformly scaled parent). A caller can hide
+    /// such an object from picking or place it differently; it is never silently mis-picked.
     #[must_use]
-    pub fn from_local_bounds(min: Vec3, max: Vec3, world_from_local: Mat4) -> Self {
-        let (scale, rotation, translation) = world_from_local.to_scale_rotation_translation();
-        let local_center = (min + max) * 0.5;
-        Self::Obb {
-            center: translation + rotation * (scale * local_center),
-            half_extents: ((max - min) * 0.5 * scale).abs(),
-            rotation,
+    pub fn from_local_bounds(min: Vec3, max: Vec3, world_from_local: Mat4) -> Option<Self> {
+        if !(min.is_finite() && max.is_finite() && min.cmple(max).all()) {
+            return None;
         }
+        let Decomposed {
+            scale,
+            rotation,
+            translation,
+        } = decompose(world_from_local)?;
+        let local_center = (min + max) * 0.5;
+        Some(Self::Obb {
+            center: translation + rotation * (scale * local_center),
+            half_extents: (max - min) * 0.5 * scale,
+            rotation,
+        })
     }
 
     /// Distance along `ray` to the first point of the shape at or beyond the ray's origin, if the
@@ -179,7 +194,8 @@ mod tests {
             sphere.raycast(&ray(Vec3::new(0.5, 0.0, 0.0), Vec3::X)),
             Some(0.0)
         );
-        let cube = Shape::from_local_bounds(Vec3::splat(-1.0), Vec3::splat(1.0), Mat4::IDENTITY);
+        let cube =
+            Shape::from_local_bounds(Vec3::splat(-1.0), Vec3::splat(1.0), Mat4::IDENTITY).unwrap();
         assert_eq!(cube.raycast(&ray(Vec3::ZERO, Vec3::Y)), Some(0.0));
     }
 
@@ -191,14 +207,55 @@ mod tests {
             Vec3::new(0.0, 0.0, -10.0),
         );
         // A 1 m cube scaled 2x along x, then turned a quarter about y: it is now 2 m deep along z.
-        let shape = Shape::from_local_bounds(Vec3::splat(-0.5), Vec3::splat(0.5), placed);
+        let shape = Shape::from_local_bounds(Vec3::splat(-0.5), Vec3::splat(0.5), placed).unwrap();
         let distance = shape.raycast(&ray(Vec3::ZERO, Vec3::NEG_Z)).unwrap();
         assert!((distance - 9.0).abs() < 1e-4, "{distance}");
     }
 
     #[test]
+    fn transforms_a_box_cannot_represent_give_no_shape() {
+        let unit = (Vec3::splat(-0.5), Vec3::splat(0.5));
+        let shape = |m: Mat4| Shape::from_local_bounds(unit.0, unit.1, m);
+        assert!(shape(Mat4::from_scale(Vec3::ZERO)).is_none(), "collapsed");
+        assert!(
+            shape(Mat4::from_scale(Vec3::new(-1.0, 1.0, 1.0))).is_none(),
+            "mirrored"
+        );
+        let sheared = Mat4::from_scale(Vec3::new(3.0, 1.0, 1.0)) * Mat4::from_rotation_z(0.6);
+        assert!(
+            shape(sheared).is_none(),
+            "sheared by a rotated child under a stretched parent"
+        );
+        assert!(shape(Mat4::from_cols_array(&[f32::NAN; 16])).is_none());
+        // Bad bounds: not finite, or inverted.
+        assert!(Shape::from_local_bounds(Vec3::splat(f32::NAN), unit.1, Mat4::IDENTITY).is_none());
+        assert!(
+            Shape::from_local_bounds(unit.1, unit.0, Mat4::IDENTITY).is_none(),
+            "min > max"
+        );
+        assert!(
+            Shape::from_local_bounds(unit.0, Vec3::splat(f32::INFINITY), Mat4::IDENTITY).is_none()
+        );
+    }
+
+    #[test]
+    fn a_ray_almost_parallel_to_a_face_gives_a_finite_answer() {
+        let cube =
+            Shape::from_local_bounds(Vec3::splat(-1.0), Vec3::splat(1.0), Mat4::IDENTITY).unwrap();
+        // Skimming just above the top face, then just below it, at a tiny slope.
+        for slope in [1.0e-7_f32, -1.0e-7, 1.0e-12] {
+            let direction = Vec3::new(1.0, slope, 0.0).normalize();
+            let above = cube.raycast(&ray(Vec3::new(-5.0, 1.0 + 1.0e-3, 0.0), direction));
+            let inside = cube.raycast(&ray(Vec3::new(-5.0, 0.999, 0.0), direction));
+            assert!(above.is_none_or(f32::is_finite));
+            assert!(inside.is_some_and(f32::is_finite), "slope {slope}");
+        }
+    }
+
+    #[test]
     fn rays_parallel_to_a_face_miss_or_graze_correctly() {
-        let cube = Shape::from_local_bounds(Vec3::splat(-1.0), Vec3::splat(1.0), Mat4::IDENTITY);
+        let cube =
+            Shape::from_local_bounds(Vec3::splat(-1.0), Vec3::splat(1.0), Mat4::IDENTITY).unwrap();
         assert!(
             cube.raycast(&ray(Vec3::new(-5.0, 2.0, 0.0), Vec3::X))
                 .is_none()

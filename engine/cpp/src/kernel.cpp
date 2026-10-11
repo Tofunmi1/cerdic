@@ -110,7 +110,12 @@ ve_solid* ve_solid_cylinder(double height, double radius_low, double radius_high
     set_status(status, VE_ERR_INVALID_ARG);
     return nullptr;
   }
-  return wrap(Manifold::Cylinder(height, radius_low, radius_high, segments, center != 0), status);
+  // Manifold builds cylinders along +Z; the engine is Y-up, so turn the axis onto +Y here, the one
+  // place the convention is applied. A quarter turn about X takes +Z to +Y, so the low end stays at
+  // y = 0 (or -height/2 when centred) and the high end at the top.
+  return wrap(Manifold::Cylinder(height, radius_low, radius_high, segments, center != 0)
+                  .Rotate(-90.0, 0.0, 0.0),
+              status);
 }
 
 ve_solid* ve_solid_from_mesh(const float* positions, size_t vertex_count, const uint32_t* indices,

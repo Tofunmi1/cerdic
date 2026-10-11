@@ -43,6 +43,7 @@ pub struct FrameStats {
     target_ms: f32,
     total_frames: u64,
     total_dropped: u64,
+    total_missed_periods: u64,
 }
 
 impl FrameStats {
@@ -62,6 +63,7 @@ impl FrameStats {
             target_ms: 1000.0 / hz,
             total_frames: 0,
             total_dropped: 0,
+            total_missed_periods: 0,
         }
     }
 
@@ -84,7 +86,23 @@ impl FrameStats {
         self.total_frames += 1;
         if frame_ms > self.target_ms * DROPPED_FRAME_FACTOR {
             self.total_dropped += 1;
+            // A long interval spans several refreshes, and each one was a frame the display missed.
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "a non-negative count of refresh periods"
+            )]
+            let periods = (frame_ms / self.target_ms).round() as u64;
+            self.total_missed_periods += periods.saturating_sub(1);
         }
+    }
+
+    /// Refresh periods the display missed since the start, counting every period a long frame
+    /// spanned (a 50 ms frame at 72 Hz is three missed periods, though it is one dropped frame).
+    /// This estimates compositor behaviour from frame intervals; it is not compositor telemetry.
+    #[must_use]
+    pub fn missed_periods(&self) -> u64 {
+        self.total_missed_periods
     }
 
     /// Forgets the window (not the lifetime counters), for example after a quality change when old
@@ -182,6 +200,21 @@ mod tests {
         stats.record(26.0);
         assert_eq!(stats.summary().dropped, 1);
         assert_eq!(stats.totals(), (3, 1));
+    }
+
+    #[test]
+    fn a_long_frame_counts_every_refresh_it_spanned() {
+        let mut stats = FrameStats::new(10, 72.0);
+        let period = 1000.0 / 72.0;
+        stats.record(period);
+        stats.record(period * 1.2);
+        assert_eq!(stats.missed_periods(), 0);
+        // One frame, three periods long: it missed two refreshes.
+        stats.record(period * 3.0);
+        assert_eq!(stats.missed_periods(), 2);
+        assert_eq!(stats.totals(), (3, 1));
+        stats.record(period * 2.0);
+        assert_eq!(stats.missed_periods(), 3);
     }
 
     #[test]

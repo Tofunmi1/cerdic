@@ -2,7 +2,7 @@
 
 use std::cell::Cell;
 
-use bevy_ecs::system::ResMut;
+use bevy_ecs::system::{Res, ResMut};
 use ve_render::{QualityTier, RenderQuality};
 
 thread_local! {
@@ -15,13 +15,21 @@ pub(crate) fn request(tier: QualityTier) {
     REQUESTED.with(|slot| slot.set(Some(tier)));
 }
 
-/// The render-resolution scale of the tier the app is on (or about to switch to), for sizing the
-/// headset's framebuffer when a session starts.
-pub(crate) fn resolution_scale() -> f32 {
-    let tier = REQUESTED
-        .with(Cell::get)
-        .unwrap_or_else(|| CURRENT.with(Cell::get));
-    RenderQuality::for_tier(tier).resolution_scale
+/// The resolution scale the headset's layer is allocated at: the largest any tier asks for. A
+/// layer cannot be resized while it is bound, so it is made big enough for the best tier once, and
+/// lower tiers render into a smaller part of it (see [`sync_xr_scale`]).
+pub(crate) fn layer_scale() -> f32 {
+    QualityTier::ALL
+        .iter()
+        .map(|tier| RenderQuality::for_tier(*tier).resolution_scale)
+        .fold(f32::MIN_POSITIVE, f32::max)
+}
+
+/// Asks the headset to render each view at the current tier's share of the allocated layer. A
+/// smaller viewport inside the same allocation cuts the pixels shaded, not the memory held; whether
+/// the runtime grants it shows in the viewports each frame reports.
+pub(crate) fn sync_xr_scale(quality: Res<RenderQuality>) {
+    ve_xr_web::set_viewport_scale(quality.resolution_scale / layer_scale());
 }
 
 /// Switches [`RenderQuality`] to the requested tier, if one is waiting.

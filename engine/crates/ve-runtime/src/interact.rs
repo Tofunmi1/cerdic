@@ -6,7 +6,6 @@
 use std::collections::BTreeSet;
 
 use bevy_app::{App, Update};
-use bevy_asset::Assets;
 use bevy_camera::{Camera, Camera3d};
 use bevy_color::{Color, LinearRgba};
 use bevy_ecs::component::Component;
@@ -19,24 +18,23 @@ use bevy_ecs::system::{Commands, Query, Res, ResMut};
 use bevy_input::ButtonInput;
 use bevy_input::mouse::{MouseButton, MouseScrollUnit, MouseWheel};
 use bevy_math::{Quat, Vec2, Vec3};
-use bevy_mesh::{Mesh, Mesh3d};
 use bevy_time::{Real, Time};
 use bevy_transform::components::{GlobalTransform, Transform};
 use bevy_window::CursorMoved;
 use ve_interact::{
     Hit, Interaction, Placement3, PointerFrame, PointerId, Ray, Shape, TargetId, World,
 };
-use ve_kernel::{Bounds, KernelError, Solid};
+use ve_kernel::Bounds;
 use ve_render::{StereoViews, VeMaterial};
 use ve_xr_web::frame::Handedness;
 use ve_xr_web::{XrInput, XrRig, apply_xr_frame, controller_pointer};
 
-use crate::scene::render_mesh;
-
 mod report;
+mod spawn;
 
 use report::describe;
 pub(crate) use report::report;
+pub(crate) use spawn::{spawn_lasers, tag};
 
 /// How far pointers can pick, in metres.
 const PICK_DISTANCE: f32 = 50.0;
@@ -154,11 +152,13 @@ impl World for SceneWorld<'_, '_, '_> {
         self.objects
             .iter()
             .filter_map(|(entity, interactable, transform)| {
+                // An object whose transform a box cannot represent (collapsed, mirrored, sheared)
+                // is not pickable until it is placed validly again.
                 let shape = Shape::from_local_bounds(
                     interactable.min,
                     interactable.max,
                     transform.to_matrix(),
-                );
+                )?;
                 let distance = shape.raycast(ray).filter(|d| *d <= max_distance)?;
                 Some(Hit {
                     target: target_of(entity),
@@ -253,15 +253,24 @@ fn run_interaction(
     mut lasers: Query<(&Laser, &mut Transform), Without<Interactable>>,
 ) {
     let dt = time.delta_secs();
+    // A controller that lost tracking (no poses) is treated as gone, not as one that let go: the
+    // machine releases what it held and drops its hover exactly once, and it cannot resume a grab
+    // by reappearing with the squeeze still down at a different place.
+    let hands: Vec<(Handedness, PointerFrame)> = xr_input
+        .controllers
+        .iter()
+        .map(|controller| {
+            (
+                controller.handedness,
+                controller_pointer(controller, rig.0, dt),
+            )
+        })
+        .filter(|(_, frame)| frame.ray.is_some() || frame.grip.is_some())
+        .collect();
     let mut frames: Vec<PointerFrame> = mouse_frame(&mut cursor, &buttons, &cameras)
         .into_iter()
         .collect();
-    frames.extend(
-        xr_input
-            .controllers
-            .iter()
-            .map(|controller| controller_pointer(controller, rig.0, dt)),
-    );
+    frames.extend(hands.iter().map(|(_, frame)| *frame));
 
     let readonly = objects.as_readonly();
     let world = SceneWorld {
@@ -270,16 +279,14 @@ fn run_interaction(
     };
     let output = state.machine.update(&frames, &world);
     // Each laser reaches as far as what its controller points at.
-    let reach: Vec<(Handedness, Ray, f32)> = xr_input
-        .controllers
+    let reach: Vec<(Handedness, Ray, f32)> = hands
         .iter()
-        .zip(&frames[frames.len() - xr_input.controllers.len()..])
-        .filter_map(|(controller, frame)| {
+        .filter_map(|(hand, frame)| {
             let ray = frame.ray?;
             let length = world
                 .pick(&ray, LASER_REST * 2.0)
                 .map_or(LASER_REST, |hit| hit.distance);
-            Some((controller.handedness, ray, length))
+            Some((*hand, ray, length))
         })
         .collect();
 
@@ -323,7 +330,7 @@ fn laser_transform(ray: &Ray, length: f32) -> Transform {
 }
 
 /// Raises the emissive colour of hovered objects and puts it back afterwards.
-fn highlight_hover(
+pub(crate) fn highlight_hover(
     mut commands: Commands,
     state: Res<InteractionState>,
     mut objects: Query<(Entity, &mut VeMaterial, Option<&HoverTint>), With<Interactable>>,
@@ -347,46 +354,4 @@ fn highlight_hover(
             _ => {}
         }
     }
-}
-
-/// The components that make a solid's object pickable and grabbable, named `label`.
-///
-/// # Errors
-/// Fails if the kernel cannot measure the solid.
-pub(crate) fn tag(
-    solid: &Solid,
-    label: &'static str,
-) -> Result<(Interactable, Label), KernelError> {
-    Ok((Interactable::from_bounds(&solid.bounds()?), Label(label)))
-}
-
-/// Spawns one thin laser bar per hand, hidden until a controller points somewhere.
-///
-/// # Errors
-/// Fails if the kernel cannot build the bar.
-pub(crate) fn spawn_lasers(
-    commands: &mut Commands,
-    meshes: &mut Assets<Mesh>,
-) -> Result<(), KernelError> {
-    let bar = meshes.add(render_mesh(
-        &Solid::cube([0.004, 0.004, 1.0], true)?,
-        false,
-    )?);
-    for (hand, color) in [
-        (Handedness::Left, Color::srgb(1.0, 0.5, 0.2)),
-        (Handedness::Right, Color::srgb(0.25, 0.5, 1.0)),
-    ] {
-        commands.spawn((
-            Laser(hand),
-            Mesh3d(bar.clone()),
-            VeMaterial {
-                base_color: color,
-                emissive: color,
-                roughness: 1.0,
-                ..VeMaterial::default()
-            },
-            Transform::from_scale(Vec3::ZERO),
-        ));
-    }
-    Ok(())
 }

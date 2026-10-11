@@ -85,7 +85,7 @@ pub async fn xr_supported() -> bool {
 #[wasm_bindgen]
 pub async fn enter_xr(canvas_id: &str) -> Result<(), JsError> {
     let canvas = CanvasHandle::find(canvas_id).map_err(|error| JsError::new(&error.to_string()))?;
-    ve_xr_web::enter(canvas.element(), quality::resolution_scale())
+    ve_xr_web::enter(canvas.element(), quality::layer_scale())
         .await
         .map_err(|error| JsError::new(&error.to_string()))
 }

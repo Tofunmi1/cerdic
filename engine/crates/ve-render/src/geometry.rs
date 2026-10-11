@@ -7,6 +7,7 @@ use bevy_render::mesh::{RenderMesh, RenderMeshBufferInfo};
 use bevy_render::render_phase::TrackedRenderPass;
 use bevy_render::render_resource::Buffer;
 
+use crate::counters::{self, Pass};
 use crate::prepare::Batch;
 
 /// What to draw for one batch, independent of which view it is drawn from.
@@ -21,8 +22,26 @@ pub(crate) enum DrawCall {
 }
 
 impl DrawCall {
-    /// Draws `instances` of the bound mesh.
-    pub(crate) fn issue(&self, pass: &mut TrackedRenderPass<'_>, instances: Range<u32>) {
+    /// Triangles in one instance of the mesh.
+    fn triangles(&self) -> u64 {
+        let corners = match self {
+            Self::Indexed { indices, .. } => indices.len(),
+            Self::Direct { vertices } => vertices.len(),
+        };
+        u64::try_from(corners / 3).unwrap_or(0)
+    }
+
+    /// Draws `instances` of the bound mesh, and counts the call for `counted_as`.
+    pub(crate) fn issue(
+        &self,
+        pass: &mut TrackedRenderPass<'_>,
+        instances: Range<u32>,
+        counted_as: Pass,
+    ) {
+        counters::record(
+            counted_as,
+            self.triangles() * u64::from(instances.end.saturating_sub(instances.start)),
+        );
         match self {
             Self::Indexed {
                 indices,

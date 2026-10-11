@@ -15,6 +15,7 @@ use bevy_render::render_resource::{
 use bevy_render::renderer::{RenderContext, ViewQuery};
 use bevy_render::view::{Msaa, ViewDepthStencilTexture, ViewTarget};
 
+use crate::counters::Pass;
 use crate::geometry::bind_geometry;
 use crate::pipeline::ForwardPipelines;
 use crate::prepare::{Batch, InstanceBatches, LightsGpu, ViewSlot, ViewSlots, ViewUniforms};
@@ -206,6 +207,6 @@ fn draw_batch<'a>(
     };
     for slot in &slots.0 {
         bind_slot(pass, gpu.view_bind_group, slot);
-        call.issue(pass, batch.instances.clone());
+        call.issue(pass, batch.instances.clone(), Pass::Main);
     }
 }

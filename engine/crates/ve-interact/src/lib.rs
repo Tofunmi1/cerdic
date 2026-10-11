@@ -19,4 +19,4 @@ pub use gesture::{PinchConfig, PinchRecognizer, PinchState, gaze_pointer, hand_p
 pub use grab::{Anchor, SCALE_LIMITS, follow_one, follow_two};
 pub use machine::Interaction;
 pub use pointer::{Event, Hit, Output, PointerFrame, PointerId, TargetId, World};
-pub use pose::{Placement3, Pose};
+pub use pose::{Placement3, Pose, rotations_equivalent};
