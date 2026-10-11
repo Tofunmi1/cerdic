@@ -8,9 +8,14 @@ tests, licence policy (`cargo deny`), file size cap, crate boundaries. Fix the c
 - `crates/ve-kernel` safe geometry API (`Solid`, `Mesh`) over the C++ kernel; the only `unsafe` is in `ffi.rs`.
 - `crates/ve-kernel-sys` raw FFI + CMake build of `cpp/` for native and wasm.
 - `crates/ve-render` render core on the vendored Bevy render crates (frame plumbing now; pipelines from M4).
+- `crates/ve-xr-math` pure stereo/XR maths (asymmetric reverse-z projections, eye placement). Engine-agnostic.
+- `crates/ve-xr-web` WebXR layer: JS bridge `js/xr.js` (plain values only), session lifecycle, XR frame
+                     to `StereoViews`, layer framebuffer import (the only unsafe, wasm32 only).
 - `crates/ve-platform-web` browser canvas window, rAF runner, pointer input (wasm32 only).
 - `crates/ve-runtime` the wasm entry point the page calls (`start`, `status`); wasm32 only.
-- `web/`             the page, `dist/` build output and Playwright end-to-end tests.
+- `web/`             the page, `dist/` build output and Playwright end-to-end tests (`tests/engine.mjs`
+                     scenes + goldens, `xr.mjs` and `xr-layer.mjs` against IWER, Meta's emulated Quest 3;
+                     IWER needs `forceInstall` and `stereoEnabled`; real frame time needs the headset).
 - `xtask`            the gates. `cargo xtask check` runs all; also `rules`, `cpp`, `parity`,
                      `web [dev]` (build the bundle) and `web-test [dev]` (build + browser test).
 - `cpp/`             C++ kernel layer (Manifold, meshopt, our code). C ABI boundary only.

@@ -1395,6 +1395,7 @@ pub fn prepare_view_targets(
     mut commands: Commands,
     clear_color_global: Res<ClearColor>,
     render_device: Res<RenderDevice>,
+    render_adapter: Res<crate::renderer::RenderAdapter>,
     mut texture_cache: ResMut<TextureCache>,
     cameras: Query<(
         Entity,
@@ -1408,6 +1409,12 @@ pub fn prepare_view_targets(
     mut main_texture_atomics: Local<HashMap<MainTextureKey, Weak<AtomicUsize>>>,
 ) {
     main_texture_atomics.retain(|_, weak| weak.strong_count() > 0);
+    // PATCH 2 (see third_party/PATCHES.md): WebGL2 has no texture view formats, and asking for one
+    // makes texture creation fail.
+    let view_formats_supported = render_adapter
+        .get_downlevel_capabilities()
+        .flags
+        .contains(wgpu::DownlevelFlags::VIEW_FORMATS);
 
     let mut textures = <HashMap<_, _>>::default();
     for (entity, camera, view, texture_usage, msaa, resolved_space) in cameras.iter() {
@@ -1458,6 +1465,7 @@ pub fn prepare_view_targets(
                 format: main_texture_format,
                 usage: texture_usage.0,
                 view_formats: match main_texture_format {
+                    _ if !view_formats_supported => &[],
                     TextureFormat::Bgra8Unorm => &[TextureFormat::Bgra8UnormSrgb],
                     TextureFormat::Rgba8Unorm => &[TextureFormat::Rgba8UnormSrgb],
                     _ => &[],

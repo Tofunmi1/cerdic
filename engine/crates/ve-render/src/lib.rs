@@ -12,12 +12,13 @@ mod material;
 mod pass;
 mod pipeline;
 mod prepare;
+mod present;
 mod quality;
 mod schedule;
 mod stereo;
 mod targets;
 
-use bevy_app::{App, Plugin};
+use bevy_app::{App, Plugin, SubApp};
 use bevy_asset::Assets;
 use bevy_camera::{Camera3d, ClearColor};
 use bevy_ecs::schedule::IntoScheduleConfigs;
@@ -52,68 +53,90 @@ impl Plugin for VeRenderPlugin {
                 ExtractComponentPlugin::<StereoViews>::default(),
             ));
 
-        let shader = app
+        let shaders = app
             .world_mut()
             .get_resource_mut::<Assets<Shader>>()
             .map(|mut shaders| {
-                shaders.add(Shader::from_wgsl(
-                    pipeline::FORWARD_SHADER,
-                    "ve_forward.wgsl",
-                ))
+                (
+                    shaders.add(Shader::from_wgsl(
+                        pipeline::FORWARD_SHADER,
+                        "ve_forward.wgsl",
+                    )),
+                    shaders.add(Shader::from_wgsl(
+                        present::PRESENT_SHADER,
+                        present::PRESENT_SHADER_NAME,
+                    )),
+                )
             });
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
-        if let Some(shader) = shader {
-            render_app.insert_resource(pipeline::ForwardPipelines::new(shader));
+        if let Some((forward, present)) = shaders {
+            render_app
+                .insert_resource(pipeline::ForwardPipelines::new(forward))
+                .insert_resource(present::PresentPipelines::new(present));
         }
-        render_app
-            .init_resource::<extract::ExtractedMeshes>()
-            .init_resource::<light::ExtractedLights>()
-            .init_resource::<prepare::InstanceBatches>()
-            .init_resource::<prepare::ViewUniforms>()
-            .init_resource::<prepare::LightsGpu>()
-            .init_resource::<quality::RenderQuality>()
-            .init_resource::<schedule::CameraWindows>()
-            .add_schedule(Forward3d::base_schedule())
-            .add_systems(
-                ExtractSchedule,
-                (
-                    extract::extract_meshes,
-                    light::extract_lights,
-                    quality::extract_quality,
-                ),
-            )
-            .add_systems(
-                Render,
-                (
-                    prepare::prepare_instances,
-                    prepare::prepare_view_uniforms,
-                    prepare::prepare_lights,
-                    targets::prepare_depth_textures,
-                    targets::prepare_msaa_targets,
-                )
-                    .in_set(RenderSystems::PrepareResources),
-            )
-            .add_systems(
-                Render,
-                pipeline::queue_forward_pipelines.in_set(RenderSystems::Queue),
-            )
-            .add_systems(
-                Forward3d,
-                pass::forward_pass.in_set(Forward3dSystems::MainPass),
-            )
-            .add_systems(
-                RenderGraph,
-                schedule::camera_driver.in_set(RenderGraphSystems::Render),
-            )
-            .add_systems(
-                RenderGraph,
-                (frame::submit_pending_command_buffers, frame::clear_windows)
-                    .chain()
-                    .in_set(RenderGraphSystems::Submit),
-            );
+        add_render_systems(render_app);
     }
+}
+
+/// Resources and systems of the render world: extraction, preparation, queueing and the passes.
+fn add_render_systems(render_app: &mut SubApp) {
+    render_app
+        .init_resource::<extract::ExtractedMeshes>()
+        .init_resource::<light::ExtractedLights>()
+        .init_resource::<prepare::InstanceBatches>()
+        .init_resource::<prepare::ViewUniforms>()
+        .init_resource::<prepare::LightsGpu>()
+        .init_resource::<quality::RenderQuality>()
+        .init_resource::<schedule::CameraWindows>()
+        .add_schedule(Forward3d::base_schedule())
+        .add_systems(
+            ExtractSchedule,
+            (
+                extract::extract_meshes,
+                light::extract_lights,
+                quality::extract_quality,
+            ),
+        )
+        .add_systems(
+            Render,
+            (
+                prepare::prepare_instances,
+                prepare::prepare_view_uniforms,
+                prepare::prepare_lights,
+                targets::prepare_depth_textures,
+                targets::prepare_msaa_targets,
+                targets::prepare_offscreen_targets,
+                present::prepare_present_sampler,
+            )
+                .in_set(RenderSystems::PrepareResources),
+        )
+        .add_systems(
+            Render,
+            (
+                pipeline::queue_forward_pipelines,
+                present::queue_present_pipelines,
+            )
+                .in_set(RenderSystems::Queue),
+        )
+        .add_systems(
+            Forward3d,
+            (
+                pass::forward_pass.in_set(Forward3dSystems::MainPass),
+                present::present_pass.in_set(Forward3dSystems::Present),
+            ),
+        )
+        .add_systems(
+            RenderGraph,
+            schedule::camera_driver.in_set(RenderGraphSystems::Render),
+        )
+        .add_systems(
+            RenderGraph,
+            (frame::submit_pending_command_buffers, frame::clear_windows)
+                .chain()
+                .in_set(RenderGraphSystems::Submit),
+        );
 }
 
 #[cfg(test)]

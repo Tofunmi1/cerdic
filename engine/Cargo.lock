@@ -3124,8 +3124,10 @@ name = "ve-xr-web"
 version = "0.0.0"
 dependencies = [
  "bevy_app",
+ "bevy_camera",
  "bevy_ecs",
  "bevy_math",
+ "bevy_render",
  "js-sys",
  "thiserror 2.0.21",
  "ve-platform-web",
@@ -3134,6 +3136,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+ "wgpu",
 ]
 
 [[package]]

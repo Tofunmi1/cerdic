@@ -8,4 +8,4 @@
   mesh, camera, transform), copied unmodified. bevy_scene and bevy_android are present only
   because cargo needs every path dependency's manifest (optional/dev deps); they are not compiled. Crates removed from upstream: core_pipeline, pbr,
   ui, winit, gltf, animation, light, text, audio, gilrs, sprite and the rest (see ADR 0001).
-- Local changes: none yet. Every change is a numbered patch described in ../PATCHES.md.
+- Local changes: patch 2 in `bevy_render` (see ../PATCHES.md). Every change is a numbered patch described there.

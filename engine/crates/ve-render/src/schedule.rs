@@ -24,6 +24,8 @@ pub struct Forward3d;
 pub enum Forward3dSystems {
     /// Opaque geometry.
     MainPass,
+    /// Copies the offscreen result to outputs that cannot be rendered to directly.
+    Present,
 }
 
 impl Forward3d {
@@ -35,6 +37,7 @@ impl Forward3d {
             auto_insert_apply_deferred: false,
             ..Default::default()
         });
+        schedule.configure_sets(Forward3dSystems::Present.after(Forward3dSystems::MainPass));
         schedule
     }
 }

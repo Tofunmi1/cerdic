@@ -139,6 +139,20 @@ pub async fn enter(canvas: &HtmlCanvasElement) -> Result<(), XrError> {
     Ok(())
 }
 
+/// The session layer's framebuffer and its size, when the runtime provides one (real headsets do;
+/// emulators draw to the canvas instead).
+pub(crate) fn layer_framebuffer() -> Option<(web_sys::WebGlFramebuffer, u32, u32)> {
+    ACTIVE.with(|slot| {
+        let active = slot.borrow();
+        let bridge = &active.as_ref()?.bridge;
+        let framebuffer = bridge.framebuffer()?;
+        let size = bridge.framebuffer_size();
+        let width = u32::try_from(*size.first()?).ok()?;
+        let height = u32::try_from(*size.get(1)?).ok()?;
+        Some((framebuffer, width, height))
+    })
+}
+
 /// Ends the running session, if any, and waits for the browser to confirm.
 pub async fn exit() {
     let bridge = ACTIVE.with(|slot| slot.borrow().as_ref().map(|active| active.bridge.clone()));
