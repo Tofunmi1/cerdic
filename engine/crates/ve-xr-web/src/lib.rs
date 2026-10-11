@@ -12,6 +12,8 @@ mod state;
 #[cfg(target_arch = "wasm32")]
 mod bridge;
 #[cfg(target_arch = "wasm32")]
+mod layer;
+#[cfg(target_arch = "wasm32")]
 mod session;
 
 pub use plugin::{XrCamera, XrInput, XrPlugin, XrRig, apply_xr_frame};

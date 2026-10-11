@@ -47,6 +47,14 @@ impl Plugin for XrPlugin {
         app.init_resource::<XrRig>()
             .init_resource::<XrInput>()
             .add_systems(Update, apply_xr_frame);
+        #[cfg(target_arch = "wasm32")]
+        app.add_systems(
+            Update,
+            bevy_ecs::schedule::IntoScheduleConfigs::after(
+                crate::layer::bind_layer_framebuffer,
+                apply_xr_frame,
+            ),
+        );
     }
 }
 

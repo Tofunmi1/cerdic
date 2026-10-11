@@ -13,9 +13,32 @@ use bevy_render::view::{Msaa, ViewDepthStencilTexture, ViewTarget};
 /// Depth format of the forward pass. Bevy projections are reverse-z, so depth clears to 0.
 pub(crate) const DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 
+/// Format of the offscreen texture that views with a non-sRGB output render into. It is an sRGB
+/// format so the hardware encodes on write and decodes on sample, keeping the scene linear in shaders.
+pub(crate) const OFFSCREEN_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
+
+/// Whether a view with this output format must render offscreen and be copied to the output by the
+/// present pass: the hardware only applies the sRGB transfer function to sRGB views.
+pub(crate) fn needs_blit(output_format: TextureFormat) -> bool {
+    !output_format.is_srgb()
+}
+
+/// The format the forward pass renders in for a view with this output format.
+pub(crate) fn render_format(output_format: TextureFormat) -> TextureFormat {
+    if needs_blit(output_format) {
+        OFFSCREEN_FORMAT
+    } else {
+        output_format
+    }
+}
+
 /// The multisampled colour texture a view renders into before resolving to its output.
 #[derive(Component, Clone)]
 pub(crate) struct ViewMsaaColor(pub(crate) CachedTexture);
+
+/// The single-sampled texture a blitted view resolves into; the present pass copies it to the output.
+#[derive(Component, Clone)]
+pub(crate) struct ViewOffscreen(pub(crate) CachedTexture);
 
 fn target_extent(camera: &ExtractedCamera) -> Option<Extent3d> {
     camera.physical_target_size.map(|size| Extent3d {
@@ -71,6 +94,7 @@ pub(crate) fn prepare_msaa_targets(
         else {
             continue;
         };
+        let format = render_format(format);
         if msaa.samples() <= 1 {
             commands.entity(entity).remove::<ViewMsaaColor>();
             continue;
@@ -89,5 +113,39 @@ pub(crate) fn prepare_msaa_targets(
             },
         );
         commands.entity(entity).insert(ViewMsaaColor(texture));
+    }
+}
+
+/// Creates the offscreen resolve texture for views whose output needs the present pass, and removes
+/// it from views that render straight to their output.
+pub(crate) fn prepare_offscreen_targets(
+    mut commands: Commands,
+    mut texture_cache: ResMut<TextureCache>,
+    device: Res<RenderDevice>,
+    views: Query<(Entity, &ExtractedCamera, &ViewTarget)>,
+) {
+    for (entity, camera, target) in &views {
+        let (Some(size), Some(format)) = (target_extent(camera), target.out_texture_view_format())
+        else {
+            continue;
+        };
+        if !needs_blit(format) {
+            commands.entity(entity).remove::<ViewOffscreen>();
+            continue;
+        }
+        let texture = texture_cache.get(
+            &device,
+            TextureDescriptor {
+                label: Some("ve_view_offscreen"),
+                size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: OFFSCREEN_FORMAT,
+                usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            },
+        );
+        commands.entity(entity).insert(ViewOffscreen(texture));
     }
 }

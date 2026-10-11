@@ -21,7 +21,7 @@ use bevy_shader::Shader;
 
 use crate::light::LightsUniform;
 use crate::prepare::{InstanceBatches, InstanceData, ViewUniform};
-use crate::targets::DEPTH_FORMAT;
+use crate::targets::{DEPTH_FORMAT, render_format};
 
 /// Source of the forward shader, compiled at runtime by the shader pipeline.
 pub(crate) const FORWARD_SHADER: &str = include_str!("shaders/forward.wgsl");
@@ -147,7 +147,12 @@ pub(crate) fn queue_forward_pipelines(
 ) {
     let variants: Vec<(TextureFormat, u32)> = views
         .iter()
-        .filter_map(|(target, msaa)| Some((target.out_texture_view_format()?, msaa.samples())))
+        .filter_map(|(target, msaa)| {
+            Some((
+                render_format(target.out_texture_view_format()?),
+                msaa.samples(),
+            ))
+        })
         .collect();
     for batch in &batches.batches {
         // A mesh that is not uploaded yet is retried next frame.
