@@ -15,7 +15,7 @@ use ve_kernel::{KernelError, Solid};
 use ve_render::{VeAmbientLight, VeDirectionalLight, VeMaterial, VePointLight};
 use ve_xr_web::{XrCamera, XrRig};
 
-use crate::{mock_hmd, status};
+use crate::{mock_hmd, status, wands};
 
 /// Which built-in scene to show.
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -49,7 +49,7 @@ impl FromStr for SceneKind {
 }
 
 /// Converts a kernel solid to a render mesh, with flat or smooth normals.
-fn render_mesh(solid: &Solid, smooth: bool) -> Result<Mesh, KernelError> {
+pub(crate) fn render_mesh(solid: &Solid, smooth: bool) -> Result<Mesh, KernelError> {
     let kernel_mesh = solid.to_mesh()?;
     let mut mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
@@ -226,6 +226,7 @@ fn xr_scene(
         },
         Transform::from_xyz(0.0, -0.05, 0.0),
     ));
+    wands::spawn_wands(commands, meshes)?;
     sun(commands, 2.5);
     for (color, position) in [
         (Color::srgb(1.0, 0.45, 0.25), Vec3::new(-1.2, 1.8, 0.8)),

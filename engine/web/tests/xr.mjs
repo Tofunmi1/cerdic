@@ -86,6 +86,34 @@ try {
   const second = PNG.sync.read(await page.screenshot());
   check(differingFraction(first, second, 20) > 0.01, "the picture did not change when the head moved");
 
+  // Controllers: a tracked hand puts its wand in the world, moves it with the hand and reads the trigger.
+  const nextFrames = async (n) => {
+    const target = (await xr()).frames + n;
+    await page.waitForFunction((t) => window.__ve.read().xr.frames >= t, target, { timeout: 30000 });
+  };
+  await page.evaluate(() => {
+    const right = window.__xr.controllers.right;
+    right.position.set(0.3, 1.2, -0.2);
+    right.setButtonValueImmediate("trigger", 0);
+  });
+  await nextFrames(6);
+  const handAt = async () => (await page.evaluate(() => window.__ve.read().xr.controllers)).find((c) => c.hand === "Right");
+  const resting = await handAt();
+  check(resting?.tracked === true, "the right controller is not tracked");
+  check(Array.isArray(resting?.wand_position), "the right wand has no position");
+  // The rig sits at z = 2.2, so a controller 0.2 m in front of the origin is about 2.0 in the world.
+  check(Math.abs(resting.wand_position[2] - 2.0) < 0.2 && Math.abs(resting.wand_position[0] - 0.3) < 0.2, `wand at ${resting?.wand_position}, expected near (0.3, 1.2, 2.0)`);
+  await page.evaluate(() => window.__xr.controllers.right.position.set(0.7, 1.2, -0.2));
+  await nextFrames(6);
+  const shifted = await handAt();
+  check(Math.abs(shifted.wand_position[0] - resting.wand_position[0] - 0.4) < 0.03, `wand moved ${shifted.wand_position[0] - resting.wand_position[0]} m, expected 0.4`);
+  check(resting.trigger < 0.05, `trigger reads ${resting.trigger} at rest`);
+  await page.evaluate(() => window.__xr.controllers.right.setButtonValueImmediate("trigger", 1));
+  await nextFrames(6);
+  check((await handAt()).trigger > 0.95, "the trigger press did not reach the app");
+  const leftHand = (await page.evaluate(() => window.__ve.read().xr.controllers)).find((c) => c.hand === "Left");
+  check(leftHand !== undefined, "the left controller is missing");
+
   // Ending the session returns the engine to ordinary rendering on the window loop.
   await page.evaluate(() => window.__ve.exitXr());
   await page.waitForFunction(() => window.__ve.read().xr.state === "Ended", null, { timeout: 30000 });
