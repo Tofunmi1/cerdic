@@ -14,7 +14,7 @@ extern "C" {
     pub type XrBridge;
 
     #[wasm_bindgen(static_method_of = XrBridge, catch)]
-    pub async fn request(canvas: &HtmlCanvasElement) -> Result<XrBridge, JsValue>;
+    pub async fn request(canvas: &HtmlCanvasElement, scale: f64) -> Result<XrBridge, JsValue>;
 
     #[wasm_bindgen(method)]
     pub fn start(this: &XrBridge, callback: &Closure<dyn FnMut(f64)>);

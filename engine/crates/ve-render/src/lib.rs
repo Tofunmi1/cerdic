@@ -18,7 +18,7 @@ mod schedule;
 mod stereo;
 mod targets;
 
-use bevy_app::{App, Plugin, SubApp};
+use bevy_app::{App, Plugin, SubApp, Update};
 use bevy_asset::Assets;
 use bevy_camera::{Camera3d, ClearColor};
 use bevy_ecs::schedule::IntoScheduleConfigs;
@@ -31,7 +31,7 @@ use bevy_shader::Shader;
 
 pub use light::{MAX_POINT_LIGHTS, VeAmbientLight, VeDirectionalLight, VePointLight};
 pub use material::VeMaterial;
-pub use quality::RenderQuality;
+pub use quality::{QualityTier, RenderQuality};
 pub use schedule::{Forward3d, Forward3dSystems};
 pub use stereo::{StereoEye, StereoViews};
 
@@ -48,6 +48,7 @@ impl Plugin for VeRenderPlugin {
                 CameraRenderGraph::new(Forward3d)
             })
             .register_required_components_with::<Camera3d, Msaa>(|| Msaa::Sample4)
+            .add_systems(Update, quality::apply_quality_to_cameras)
             .add_plugins((
                 ExtractComponentPlugin::<Camera3d>::default(),
                 ExtractComponentPlugin::<StereoViews>::default(),

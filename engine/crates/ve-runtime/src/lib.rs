@@ -7,6 +7,7 @@
 
 mod app;
 mod mock_hmd;
+mod quality;
 mod scene;
 mod status;
 mod wands;
@@ -39,6 +40,20 @@ pub fn status() -> String {
     status::snapshot()
 }
 
+/// Switches the render quality tier (`"low"`, `"medium"` or `"high"`). Takes effect on the next
+/// frame, and may be called before `start`.
+///
+/// # Errors
+/// Fails if the tier name is unknown.
+#[wasm_bindgen]
+pub fn set_quality(tier: &str) -> Result<(), JsError> {
+    let tier = tier
+        .parse()
+        .map_err(|()| JsError::new(&format!("unknown quality tier {tier:?}")))?;
+    quality::request(tier);
+    Ok(())
+}
+
 /// Whether the browser can present an immersive VR session.
 #[wasm_bindgen]
 pub async fn xr_supported() -> bool {
@@ -53,7 +68,7 @@ pub async fn xr_supported() -> bool {
 #[wasm_bindgen]
 pub async fn enter_xr(canvas_id: &str) -> Result<(), JsError> {
     let canvas = CanvasHandle::find(canvas_id).map_err(|error| JsError::new(&error.to_string()))?;
-    ve_xr_web::enter(canvas.element())
+    ve_xr_web::enter(canvas.element(), quality::resolution_scale())
         .await
         .map_err(|error| JsError::new(&error.to_string()))
 }

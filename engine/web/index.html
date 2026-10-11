@@ -21,7 +21,7 @@
   <canvas id="ve"></canvas>
   <button id="enter-vr" hidden>Enter VR</button>
   <script type="module">
-    import init, { start, status, xr_supported, enter_xr, exit_xr } from "./ve_runtime.js";
+    import init, { start, status, set_quality, xr_supported, enter_xr, exit_xr } from "./ve_runtime.js";
     import { bindMemory } from "./wasi_snapshot_preview1.js";
 
     const params = new URLSearchParams(location.search);
@@ -31,12 +31,14 @@
       read: () => JSON.parse(status()),
       enterXr: () => enter_xr("ve"),
       exitXr: () => exit_xr(),
+      setQuality: (tier) => set_quality(tier),
     };
     window.__ve = state;
     try {
       const wasm = await init();
       bindMemory(wasm.memory);
       state.wasmBytes = () => wasm.memory.buffer.byteLength;
+      if (params.has("quality")) set_quality(params.get("quality"));
       start("ve", params.get("scene") ?? "");
       const poll = setInterval(() => {
         if (state.read().frames > 0) {

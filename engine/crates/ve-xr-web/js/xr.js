@@ -25,8 +25,11 @@ export class XrBridge {
     this.endPromise = new Promise((resolve) => session.addEventListener("end", () => { this.ended = true; resolve(); }));
   }
 
-  /** Requests a session and wires a WebGL layer for the canvas' context. */
-  static async request(canvas) {
+  /**
+   * Requests a session and wires a WebGL layer for the canvas' context. `scale` multiplies the
+   * runtime's recommended render resolution (the quality tier's setting).
+   */
+  static async request(canvas, scale) {
     const gl = canvas.getContext("webgl2");
     if (!gl) throw new Error("the canvas has no WebGL2 context");
     // Contexts made without xrCompatible must opt in before they can feed an XR layer.
@@ -37,7 +40,9 @@ export class XrBridge {
     });
     // No MSAA here: the engine resolves its own multisampled target. Depth is requested so a
     // compositor that wants it (for reprojection) can have it.
-    const layer = new XRWebGLLayer(session, gl, { antialias: false, depth: true, stencil: false, alpha: false });
+    const layer = new XRWebGLLayer(session, gl, {
+      antialias: false, depth: true, stencil: false, alpha: false, framebufferScaleFactor: scale,
+    });
     await session.updateRenderState({ baseLayer: layer, depthNear: 0.05 });
     const space = await session.requestReferenceSpace("local-floor");
     return new XrBridge(session, layer, space);
