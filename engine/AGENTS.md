@@ -20,7 +20,9 @@ tests, licence policy (`cargo deny`), file size cap, crate boundaries. Fix the c
                      `web [dev]` (build the bundle) and `web-test [dev]` (build + browser test).
 - `cpp/`             C++ kernel layer (Manifold, meshopt, our code). C ABI boundary only.
 - `third_party/`     vendored sources (Bevy, Manifold, Clipper2, meshoptimizer), each with VENDOR.md.
-- `tools/`           small helper scripts (for example the Node WASI runner used by `parity`).
+- `tools/`           small helper scripts (for example the Node WASI runner used by `parity`, and
+                     `serve-lan.mjs`: LAN test server for a headset, receives benchmark reports into
+                     `target/reports/`; its usage is in the file header and printed when it starts).
 
 Build prerequisites: Rust via `rust-toolchain.toml`, CMake, Ninja, and a wasi-sdk (set `WASI_SDK`,
 default `~/.local/share/toolchains/wasi-sdk-34.0-arm64-macos`). `cargo-deny` and `cargo-nextest`
