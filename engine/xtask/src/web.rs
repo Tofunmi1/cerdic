@@ -89,6 +89,22 @@ pub(crate) fn build(profile: Profile) -> Result<(), Failure> {
     let size = fs::metadata(format!("{DIST}/ve_runtime_bg.wasm"))?.len();
     println!("   wasm: {size} bytes");
     build_evaluator(profile, &bindgen)?;
+    // The viewer page is plain JavaScript; it gets the evaluation pipeline and the test MCP bridge
+    // from the same TypeScript the editor uses, bundled into one module.
+    run_in(
+        "..",
+        "bun",
+        &[
+            "build",
+            "src/engine/viewer-bridge.ts",
+            "--outfile",
+            &format!("engine/{DIST}/viewer-bridge.js"),
+            "--target",
+            "browser",
+            "--format",
+            "esm",
+        ],
+    )?;
     Ok(())
 }
 

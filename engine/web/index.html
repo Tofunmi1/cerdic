@@ -26,6 +26,7 @@
       viewer_configure, viewer_look, viewer_move, viewer_set_locked, viewer_reset, viewer_set_lens,
       doc_open, doc_reset, doc_state, doc_apply, doc_undo, doc_redo, doc_save, doc_operators,
     } from "./ve_runtime.js";
+    import * as runtimeApi from "./ve_runtime.js";
     import { bindMemory } from "./wasi_snapshot_preview1.js";
     import { watchBenchSession } from "./bench.js";
     import { createDocApi } from "./document-api.js";
@@ -48,20 +49,43 @@
       if (params.has("quality")) set_quality(params.get("quality"));
       if (params.get("governor") === "1") set_governor(true);
       if (params.has("hz")) set_window_hz(Number(params.get("hz")));
-      start("ve", params.get("scene") ?? "");
+      // ?eval=1 (or ?mcp=1) evaluates the document into geometry; it starts from an empty stage.
+      const mcpParam = params.get("mcp");
+      const evalOn = params.get("eval") === "1" || mcpParam !== null;
+      start("ve", params.get("scene") ?? (evalOn ? "gallery" : ""));
       // The authoring document (typed commands, history, local storage). The panel is opt in.
       state.doc = createDocApi({ doc_open, doc_reset, doc_state, doc_apply, doc_undo, doc_redo, doc_save, doc_operators });
-      if (params.get("doc") === "1" || params.get("viewer") === "1") {
+      if (evalOn) {
+        // Edits are staged, evaluated in a worker and shown; a model can drive the page over MCP.
+        const { attachEvaluation } = await import("./viewer-bridge.js");
+        const port = Number(mcpParam) > 1 ? Number(mcpParam) : 8765;
+        const bridge = attachEvaluation(runtimeApi, {
+          workerUrl: "./eval-worker.js", mcpPort: mcpParam === null ? undefined : port,
+          onChange: () => state.docPanel?.render?.(),
+        });
+        state.doc = bridge.doc;
+        state.evaluation = bridge.evaluation;
+      }
+      const wantsPanel = params.get("doc") === "1" || params.get("viewer") === "1";
+      if (wantsPanel) {
         const { startDocPanel } = await import("./docpanel.js");
         const name = params.get("docname") ?? "default";
         state.doc.open(name);
-        state.docPanel = startDocPanel({ api: state.doc, name });
+        state.docPanel = startDocPanel({ api: state.doc, name, evaluation: state.evaluation });
+      } else if (evalOn) {
+        state.doc.open(params.get("docname") ?? "default");
       }
       // Desktop viewer (mouse look, wide field of view, split screen): opt in with ?viewer=1.
       if (params.get("viewer") === "1") {
         const { startViewer } = await import("./viewer.js");
-        const api = { viewer_configure, viewer_look, viewer_move, viewer_set_locked, viewer_reset, viewer_set_lens, set_quality };
-        state.viewer = startViewer({ canvas: document.getElementById("ve"), api, params });
+        const api = {
+          viewer_configure, viewer_look, viewer_move, viewer_set_locked, viewer_reset, viewer_set_lens, set_quality,
+          viewer_zoom: runtimeApi.viewer_zoom, viewer_orbit: runtimeApi.viewer_orbit, viewer_frame: runtimeApi.viewer_frame,
+          viewer_look_at: runtimeApi.viewer_look_at,
+        };
+        state.viewer = startViewer({
+          canvas: document.getElementById("ve"), api, params, frameBounds: () => state.evaluation?.bounds ?? null,
+        });
       }
       const poll = setInterval(() => {
         if (state.read().frames > 0) {

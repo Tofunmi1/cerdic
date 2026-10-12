@@ -3,6 +3,16 @@ import { uploadResult } from './mesh-upload';
 import type { Candidate, EvaluationStats, Job, Quality, Token, WorkerMessage } from './worker-types';
 import { sameToken } from './worker-types';
 
+function boundsOf(parts: Array<{ positions: Float32Array }>) {
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  for (const part of parts) {
+    for (let i = 0; i < part.positions.length; i += 3) {
+      for (let k = 0; k < 3; k++) { min[k] = Math.min(min[k], part.positions[i + k]); max[k] = Math.max(max[k], part.positions[i + k]); }
+    }
+  }
+  return Number.isFinite(min[0]) ? { min, max } : null;
+}
+
 export class EvaluationHost {
   readonly state = {
     worker: 'booting', generation: 0, queue: 0, revision: null as number | null,
@@ -23,8 +33,12 @@ export class EvaluationHost {
   private recoveryStarted: number | null = null;
   private testMode = new URLSearchParams(location.search).get('evaltest') === '1';
 
+  /** Bounds of the last scene the renderer accepted, in metres. */
+  bounds: { min: number[]; max: number[] } | null = null;
+
   constructor(private runtime: Runtime, private notify: () => void,
-    private resources: { workers: number }) { this.start(); }
+    private resources: { workers: number },
+    private options: { workerUrl?: string; onProjected?: (bounds: { min: number[]; max: number[] }) => void } = {}) { this.start(); }
 
   request(quality: Quality = 'preview', test?: Job['test']) {
     if (this.disposed || this.state.worker === 'failed') return;
@@ -43,7 +57,7 @@ export class EvaluationHost {
 
   private start() {
     this.state.generation++; this.ready = false; this.state.worker = 'booting';
-    const url = `/engine/eval-worker.js${this.testMode ? '?test=1' : ''}`;
+    const url = `${this.options.workerUrl ?? '/engine/eval-worker.js'}${this.testMode ? '?test=1' : ''}`;
     this.worker = new Worker(url, { type: 'module' }); this.resources.workers = 1;
     const generation = this.state.generation;
     this.worker.onmessage = event => {
@@ -104,6 +118,8 @@ export class EvaluationHost {
     this.state.uploadMs = performance.now() - began;
     if (accepted) {
       this.state.revision = message.token.revision;
+      this.bounds = boundsOf(message.parts);
+      if (this.bounds) this.options.onProjected?.(this.bounds);
       if (this.recoveryStarted !== null) { this.state.recoveryMs = performance.now() - this.recoveryStarted; this.recoveryStarted = null; }
     }
     else if (sameToken(this.latest, message.token)) {

@@ -1,16 +1,16 @@
 // A small panel that shows the authoring document and lets you edit it with a few buttons. Every
 // button sends the same typed commands any other editor would; the panel owns no state. Opt in with
-// ?doc=1 or ?viewer=1. Bottom-left, so it does not cover the viewer's panel.
+// ?doc=1 or ?viewer=1. Bottom-right, so it does not cover the viewer's panel on the left.
 
 const BOX = { add_node: { op: "solid.box@1", params: { size: [1, 1, 1] }, label: "box" } };
 const SPHERE = { add_node: { op: "solid.sphere@1", params: { radius: 0.5 }, label: "sphere" } };
 
-export function startDocPanel({ api, name = "default" }) {
+export function startDocPanel({ api, name = "default", evaluation = null }) {
   const panel = document.createElement("div");
   panel.id = "doc-panel";
   panel.innerHTML = `
     <style>
-      #doc-panel { position: fixed; left: 12px; bottom: 12px; width: 300px; padding: 10px 12px; color: #fff;
+      #doc-panel { position: fixed; right: 12px; bottom: 12px; width: 320px; max-height: calc(100vh - 24px); overflow: auto; padding: 10px 12px; color: #fff;
         font: 12px/1.45 system-ui, sans-serif; background: rgba(20,24,40,.72); border: 1px solid rgba(255,255,255,.22);
         border-radius: 14px; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); }
       body.split #doc-panel { opacity: .2; }
@@ -21,7 +21,7 @@ export function startDocPanel({ api, name = "default" }) {
       #doc-status { margin: 4px 0 2px; }
       #doc-message { min-height: 1.4em; opacity: .85; }
       #doc-message.bad { color: #ffb4a8; }
-      #doc-json { max-height: 180px; overflow: auto; font: 11px/1.35 ui-monospace, monospace; white-space: pre-wrap; }
+      #doc-json, #doc-text { max-height: 180px; overflow: auto; font: 11px/1.35 ui-monospace, monospace; white-space: pre-wrap; }
     </style>
     <b>Document</b>
     <div id="doc-status"></div>
@@ -31,6 +31,7 @@ export function startDocPanel({ api, name = "default" }) {
       <button id="doc-save">save</button><button id="doc-load">reload</button>
     </div>
     <div id="doc-message"></div>
+    <details id="doc-text-box" hidden open><summary>Text</summary><div id="doc-text"></div></details>
     <details><summary>JSON</summary><div id="doc-json"></div></details>`;
   document.body.append(panel);
 
@@ -50,6 +51,16 @@ export function startDocPanel({ api, name = "default" }) {
     $("doc-undo").disabled = !s.can_undo || s.read_only;
     $("doc-redo").disabled = !s.can_redo || s.read_only;
     $("doc-json").textContent = JSON.stringify(s.document, null, 1);
+    if (api.text) {
+      // The canonical text form, which is also what a model reads and writes.
+      $("doc-text-box").hidden = false;
+      $("doc-text").textContent = api.text().text ?? "";
+    }
+    if (evaluation) {
+      const e = evaluation.state;
+      $("doc-status").textContent += ` · ${e.worker}`;
+      if (e.lastFailure) say(`${e.lastFailure.code}: ${e.lastFailure.message}`, true);
+    }
     if (s.issues.length) say(describe(s.issues), true);
     return s;
   };
