@@ -12,9 +12,11 @@ mod context;
 mod error;
 mod ffi;
 mod mesh;
+mod profile;
 mod solid;
 
 pub use context::ExecutionContext;
 pub use error::KernelError;
 pub use mesh::Mesh;
+pub use profile::Profile;
 pub use solid::{Bounds, MAX_EXTENT, Solid, simplify};

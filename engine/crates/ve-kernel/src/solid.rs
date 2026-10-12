@@ -77,6 +77,9 @@ fn segments_arg(segments: u32) -> Result<i32, KernelError> {
 }
 
 impl Solid {
+    pub(crate) fn from_handle(handle: Handle) -> Self {
+        Self(handle)
+    }
     /// Unions 2..64 solids with cancellation between boolean-tree operations.
     ///
     /// # Errors

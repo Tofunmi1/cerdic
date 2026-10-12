@@ -25,9 +25,10 @@ fn g2_08_cancel_during_native_boolean_tree() {
     let observer = Arc::clone(&context);
     let signal = Arc::clone(&barrier);
     let task = std::thread::spawn(move || {
-        let solids: Vec<_> = (0..32)
+        // Heavy enough that a 2 ms wait cannot outlast the union, even on a fast machine.
+        let solids: Vec<_> = (0..64)
             .map(|i| {
-                Solid::sphere(1.0, 96)
+                Solid::sphere(1.0, 128)
                     .unwrap()
                     .translate([f64::from(i) * 0.1, 0.0, 0.0])
                     .unwrap()

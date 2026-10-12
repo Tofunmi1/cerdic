@@ -40,7 +40,7 @@ file(GLOB MESHOPT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/meshoptimi
 add_library(ve_meshopt STATIC ${MESHOPT_SOURCES})
 target_include_directories(ve_meshopt PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/meshoptimizer/src")
 
-add_library(ve_kernel STATIC src/kernel.cpp)
+add_library(ve_kernel STATIC src/kernel.cpp src/profiles.cpp)
 target_include_directories(ve_kernel PUBLIC include)
 target_link_libraries(ve_kernel PUBLIC manifold ve_meshopt)
 target_compile_options(ve_kernel PRIVATE -Wall -Wextra -Wpedantic -Werror)

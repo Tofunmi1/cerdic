@@ -665,7 +665,13 @@ passed; native/WASI evaluator and kernel parity, C++ sanitizers and advisories p
 meshes bounded. Software-browser frame gaps are reported, not claimed as hardware performance.
 Audit B02's worker/cancellation paths are covered; Quest CPU/GPU timing remains untested. Next: G3.
 
-G3-G13, V1-V7 and L0-L9 pending; X2-X5 and X7-X9 not performed. No gate has passed merely because this
+**G3 in progress:** checked profile/offset/difference/extrude/revolve C ABI and safe Rust APIs;
+native conformance, sanitizer/tidy checks and native/WASI parity pass. Numerical corrections and
+balanced twisted-side triangulation are recorded in ADR 0010 and
+[`g3-kernel-progress.md`](../modeling/g3-kernel-progress.md). Parser/provider/evaluator integration,
+wall checks, fuzzing and modeling gallery remain; G3 has not passed, and operators remain draft.
+
+G3-G13, V1-V7 and L0-L9 incomplete; X2-X5 and X7-X9 not performed. No gate has passed merely because this
 document was revised. Replace this line with per-milestone evidence as work lands:
 commit, contract version, cases and commands run, pass, fail and skips, benchmark artifact, known
 limitations, next dependency. Run `cargo xtask check --strict` from `engine/`, the separate

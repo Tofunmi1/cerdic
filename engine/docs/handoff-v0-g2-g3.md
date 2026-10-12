@@ -48,8 +48,8 @@ Rules the gate enforces, learned the hard way:
   `#[path = "support/helpers.rs"] mod helpers;` (`mod.rs` is linted). Every helper must be used by every
   file that includes it, or `dead_code` fails the gate.
 - Tests are named after their case id (`g1a_09_...`); write the acceptance tests before the code.
-- Commit messages end with the `Co-Authored-By` line the harness gives you. Commit only when the strict
-  gate is green.
+- Commit messages carry no `Co-Authored-By` or tool-attribution lines (owner rule). Commit only when the
+  strict gate is green.
 
 Gotchas that cost time: the wasm-bindgen glue imports `wasi_snapshot_preview1` several times (replace
 **all** of them with the shim, as `xtask/src/web.rs` does) and imports a `snippets/` directory (ship it

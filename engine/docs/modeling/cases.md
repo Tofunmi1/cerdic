@@ -109,12 +109,12 @@ headset GPU/frame time is untested, and the software-browser run is not a 60 fps
 | G3-06 | Forward reference and cycle | Rejected with node names |
 | G3-07 | `profile.offset` of a rectangle, delta -0.1 | Area equals the analytic offset area (tolerance 1e-6 relative) |
 | G3-08 | `solid.extrude` twist 90 degrees, height h, unit square | Volume equals the untwisted volume within 1e-3; bounds correct |
-| G3-09 | `solid.revolve` of a rectangle about Y, 360 degrees | Volume equals pi (r2^2 - r1^2) h within 1e-3 (segments 64) |
+| G3-09 | `solid.revolve` of a rectangle about Y, 360 degrees | 64 segments: faceted analytic volume within 1e-6 and circle within 2e-3; 128 segments: circle within 1e-3 (ADR 0010) |
 | G3-10 | Revolve 180 degrees | Half the full volume within 1e-3 |
 | G3-11 | Self-intersecting profile | Defined error, no crash |
 | G3-12 | Zero-area profile and zero height extrude | `kernel.invalid_input` or `result.empty` as specified; distinct outcomes |
 | G3-13 | F1: `check.min_wall` passes; widen opening in both profiles | Passes; node IDs unchanged |
-| G3-14 | F1: widen only the outer profile | `constraint.min_wall`; document unchanged |
+| G3-14 | F1: widen only the inner profile | `constraint.min_wall`; document unchanged; widening the outer profile alone thickens the wall (ADR 0010) |
 | G3-15 | Mock: "make a hollow vase" | Produces the F1 document |
 | G3-16 | Mock: "widen its opening" | One batch changing the existing nodes' parameters |
 | G3-17 | Stale revision from the provider | `revision.conflict`; repaired once or reported; cap of one repair |

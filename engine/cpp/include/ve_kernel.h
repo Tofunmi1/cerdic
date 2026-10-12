@@ -16,6 +16,7 @@ extern "C" {
 
 typedef struct ve_solid ve_solid;
 typedef struct ve_context ve_context;
+typedef struct ve_profile ve_profile;
 
 typedef int32_t ve_status;
 enum {
@@ -73,6 +74,24 @@ ve_status ve_simplify(const float* positions, size_t vertex_count, const uint32_
                       uint32_t* out_indices, size_t out_capacity, size_t* out_count);
 
 void ve_solid_free(ve_solid* s);
+
+/* Profiles: flat XY doubles, offsets[loop_count+1], even-odd holes. Max 64 loops,
+ * 4096 points per loop and 16384 total points. Self intersections are rejected. */
+ve_profile* ve_profile_new(const double* points, size_t point_count, const size_t* offsets,
+                           size_t loop_count, ve_status* status);
+void ve_profile_free(ve_profile* profile);
+double ve_profile_area(const ve_profile* profile);
+ve_status ve_profile_counts(const ve_profile* profile, size_t* points, size_t* loops);
+ve_status ve_profile_copy(const ve_profile* profile, double* points, size_t point_capacity,
+                          size_t* offsets, size_t offset_capacity);
+/* Miter corners, miter limit 2. Empty erosion is a valid empty profile. */
+ve_profile* ve_profile_offset(const ve_profile* profile, double delta, ve_status* status);
+ve_profile* ve_profile_difference(const ve_profile* a, const ve_profile* b, ve_status* status);
+/* Radians, Y-up output. Divisions count slabs (1..256); segments 3..512. */
+ve_solid* ve_profile_extrude(const ve_profile* profile, double height, int32_t divisions,
+                             double twist, double top_x, double top_y, ve_status* status);
+ve_solid* ve_profile_revolve(const ve_profile* profile, int32_t segments, double angle,
+                             ve_status* status);
 
 /* Cancellation is permanent; use a fresh context to retry. Status evaluation observes it;
  * mesh extraction and unrelated queries do not. Operations are 0 union, 1 difference, 2 intersect.

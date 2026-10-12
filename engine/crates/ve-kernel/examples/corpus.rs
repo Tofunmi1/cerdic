@@ -5,7 +5,33 @@
     reason = "the corpus reports through stdout for comparison"
 )]
 
-use ve_kernel::{KernelError, Mesh, Solid, simplify};
+use ve_kernel::{KernelError, Mesh, Profile, Solid, simplify};
+
+fn profiles() -> Result<(), KernelError> {
+    let rectangle = Profile::polygon(&[[1.0, 0.0], [2.0, 0.0], [2.0, 3.0], [1.0, 3.0]])?;
+    report(
+        "revolve-full",
+        &rectangle.revolve(64, std::f64::consts::TAU)?,
+    )?;
+    report(
+        "revolve-half",
+        &rectangle.revolve(64, std::f64::consts::PI)?,
+    )?;
+    let square = Profile::polygon(&[[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]])?;
+    report(
+        "extrude-twisted",
+        &square.extrude(2.0, 128, std::f64::consts::FRAC_PI_2, [1.0; 2])?,
+    )?;
+    let offset = square.offset(-0.1)?;
+    println!(
+        "profile-offset area={:.6} loops={:?}",
+        offset.area(),
+        offset.loops()?
+    );
+    let rim = square.difference(&offset)?;
+    report("extrude-with-hole", &rim.extrude(0.1, 1, 0.0, [1.0; 2])?)?;
+    Ok(())
+}
 
 fn report(name: &str, solid: &Solid) -> Result<(), KernelError> {
     let size = solid.bounds()?.size();
@@ -24,6 +50,7 @@ fn report(name: &str, solid: &Solid) -> Result<(), KernelError> {
 }
 
 fn run() -> Result<(), KernelError> {
+    profiles()?;
     let cube = Solid::cube([1.0, 1.0, 1.0], true)?;
     let sphere = Solid::sphere(0.65, 48)?;
     let shifted = cube.translate([0.5, 0.25, 0.0])?;

@@ -87,19 +87,22 @@ otherwise the later one gets a conflict.
 Operators used: `profile.polygon@1`, `solid.revolve@1`, `solid.difference@1`, `check.min_wall@1`.
 ```text
 outer   = profile.polygon(points=[[0,0],[0.06,0],[0.11,0.12],[0.07,0.26],[0.05,0.30],[0,0.30]])
-inner   = profile.polygon(points=[[0,0.01],[0.056,0.01],[0.104,0.12],[0.064,0.26],[0.044,0.31],[0,0.31]])
+inner   = profile.polygon(points=[[0,0.01],[0.056,0.01],[0.104,0.12],[0.064,0.26],[0.040,0.31],[0,0.31]])
 wall    = check.min_wall(outer, inner, min=0.003)
 body    = solid.revolve(outer, angle=360, segments=64)
 cavity  = solid.revolve(inner, angle=360, segments=64)
 vase    = solid.difference(body, cavity)
 output vase
 ```
-`inner` rises above the rim, which opens the vase; its offset from `outer` is about 4 mm, so `wall`
-(inner must lie inside outer eroded by 3 mm) passes.
+`inner` rises above the rim, which opens the vase. The first wall-check domain is monotone-height
+axisymmetric profiles: physical side and bottom clearances below the open rim must be at least
+3 mm. The open cap and rotation axis are not walls. Full eroded-profile containment would reject
+this deliberate rim opening. [ADR 0010](../adr/0010-first-language-numeric-contracts.md) records the
+correction to the original inner radius and the supported constraint domain.
 
 "Widen its opening" is one batch with two `set_param` commands (the last off-axis point of `outer`
-moves 0.05 to 0.07 and of `inner` 0.044 to 0.064), keeping both node IDs, and `wall` still passes.
-A batch that widens only `outer` would thin or break the wall: it must be rejected by `wall` with
+moves 0.05 to 0.07 and of `inner` 0.040 to 0.064), keeping both node IDs, and `wall` still passes.
+A batch that widens only `inner` would thin or break the wall: it must be rejected by `wall` with
 `constraint.min_wall`, naming `wall`, `outer` and `inner`, and the document stays unchanged.
 Sequence: create (mock provider) -> select `vase` in the viewport -> widen opening -> manual edit of
 `segments` in the inspector -> undo -> reload. IDs and parameters match at each step.
