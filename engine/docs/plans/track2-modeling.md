@@ -680,8 +680,18 @@ glow) pulled forward from G10, and `profile.smooth` (corner cutting) as a cheap 
 curves and G7 subdivision. (3) **Order:** G4a, the small operators a model needs to build furniture
 and machines (rect, circle, cone, torus, capsule, mirror, array, radial, repeat), is done before V1,
 because what a model can build limits everything else; G4 proper (groups, instances, sockets) and
-V1 follow. (4) Open decision, not taken: whether the viewer page or the React shell is the editor
-surface (ADR 0007 says the shell; the viewer is the preview).
+V1 follow. (4) **Decided by the owner (2026-10-13), [ADR 0012](../adr/0012-viewer-page-is-the-editing-surface.md):** the
+engine's viewer page, not the React shell, is the editing surface. V1 and V2 are plain-JS panels
+there (`engine/web/panels/`); the criteria below are unchanged, tested "through the real UI" of that page.
+
+**V1 implemented (2026-10-13), on the viewer page:** outliner (parts with the nodes that build them,
+collapse, diagnostic dots), inspector (widgets generated from `OperatorSpec`: units, kinds, drag
+values, label, mute and bypass, delete), history list (labelled transactions, click to step to one),
+problems list (links to nodes), and selection shared with the viewport in both directions (a
+selected node lights up the parts it builds; a click on a part selects its node). Engine side:
+`Session::history()`, `selection_*` exports, a selected-part glow. Not done from the V1 text:
+"instances" in the tree (G4 proper) and a per-part pose in the inspector (parts have no pose in the
+document yet).
 
 G4-G13, V1-V7 and L0-L9 incomplete; X2-X5 and X7-X9 not performed. No gate has passed merely because this
 document was revised. Replace this line with per-milestone evidence as work lands:

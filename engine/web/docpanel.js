@@ -2,10 +2,12 @@
 // button sends the same typed commands any other editor would; the panel owns no state. Opt in with
 // ?doc=1 or ?viewer=1. Bottom-right, so it does not cover the viewer's panel on the left.
 
+import { PANEL_CSS, mountPanels } from "./panels/dock.js";
+
 const BOX = { add_node: { op: "solid.box@1", params: { size: [1, 1, 1] }, label: "box" } };
 const SPHERE = { add_node: { op: "solid.sphere@1", params: { radius: 0.5 }, label: "sphere" } };
 
-export function startDocPanel({ api, name = "default", evaluation = null }) {
+export function startDocPanel({ api, name = "default", evaluation = null, runtime = null }) {
   const panel = document.createElement("div");
   panel.id = "doc-panel";
   panel.innerHTML = `
@@ -22,6 +24,7 @@ export function startDocPanel({ api, name = "default", evaluation = null }) {
       #doc-message { min-height: 1.4em; opacity: .85; }
       #doc-message.bad { color: #ffb4a8; }
       #doc-json, #doc-text { max-height: 180px; overflow: auto; font: 11px/1.35 ui-monospace, monospace; white-space: pre-wrap; }
+      ${PANEL_CSS}
     </style>
     <b>Document</b>
     <div id="doc-status"></div>
@@ -62,15 +65,21 @@ export function startDocPanel({ api, name = "default", evaluation = null }) {
       if (e.lastFailure) say(`${e.lastFailure.code}: ${e.lastFailure.message}`, true);
     }
     if (s.issues.length) say(describe(s.issues), true);
+    panels?.render();
     return s;
   };
   const report = (outcome) => {
-    if (outcome.committed) say(`committed revision ${outcome.committed.revision}`);
+    if (!outcome) say("");
+    else if (outcome.committed) say(`committed revision ${outcome.committed.revision}`);
     else if (outcome.rejected) say(describe(outcome.rejected.diagnostics), true);
     else if (outcome.conflict) say("the document changed underneath: reload and retry", true);
     else if (outcome.already_applied) say("that edit was already applied");
     render();
   };
+  // Outliner, inspector, history and problems; they need the engine's selection (opt in with a runtime).
+  const panels = runtime?.selection_set && api.operators
+    ? mountPanels({ root: panel, api, runtime, evaluation, onOutcome: report })
+    : null;
 
   $("doc-box").addEventListener("click", () => report(api.send([BOX], "add box")));
   $("doc-sphere").addEventListener("click", () => report(api.send([SPHERE], "add sphere")));
@@ -85,5 +94,5 @@ export function startDocPanel({ api, name = "default", evaluation = null }) {
   $("doc-load").addEventListener("click", () => { api.open(name); say("reloaded from storage"); render(); });
 
   render();
-  return { render, panel };
+  return { render, panel, selection: panels?.selection ?? null };
 }

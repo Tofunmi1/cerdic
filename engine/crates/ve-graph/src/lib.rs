@@ -30,7 +30,7 @@ pub use id::{DocId, IdError, MaterialId, NodeId, TransactionId};
 pub use limits::{
     MAX_BATCH_BYTES, MAX_COMMANDS, MAX_DOCUMENT_BYTES, MAX_HISTORY, MAX_HISTORY_BYTES, MAX_NODES,
 };
-pub use session::{Moved, Session};
+pub use session::{History, HistoryItem, Moved, Session};
 pub use spec::{
     Arity, OpId, OpIdError, OperatorRegistry, OperatorSpec, OutputSpec, ParamSpec, PortSpec,
     PortType, Readiness,

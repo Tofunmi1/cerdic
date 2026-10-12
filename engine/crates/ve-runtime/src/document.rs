@@ -101,6 +101,7 @@ fn state_of(host: &Host) -> Value {
         "nodes": doc.nodes.len(),
         "can_undo": host.session.can_undo(),
         "can_redo": host.session.can_redo(),
+        "history": host.session.history(),
         "read_only": host.read_only,
         "saved_generation": host.saved_generation,
         "issues": host.issues,

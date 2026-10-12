@@ -1,4 +1,5 @@
-//! The glow on hovered objects: it fades in and out, and the original colour comes back exactly.
+//! The glow on hovered and selected objects: it fades in and out, and the original colour comes back
+//! exactly.
 
 use bevy_color::{Color, LinearRgba};
 use bevy_ecs::component::Component;
@@ -8,6 +9,8 @@ use bevy_time::{Real, Time};
 use ve_render::VeMaterial;
 
 use super::{Interactable, InteractionState};
+use crate::projection::Authored;
+use crate::selection;
 
 /// How much of an object's colour is added as glow while it is hovered, for objects that can be
 /// grabbed, and for authored geometry that can only be selected (a gentler cue: a whole model
@@ -15,18 +18,23 @@ use super::{Interactable, InteractionState};
 const HOVER_GLOW: f32 = 0.35;
 const SELECT_GLOW: f32 = 0.10;
 
-/// How quickly the glow follows the pointer, per second (about 70 ms to settle).
+/// The steady glow of a selected part, on top of any hover glow.
+const SELECTED_GLOW: f32 = 0.30;
+
+/// How quickly the glow follows the pointer or the selection, per second (about 70 ms to settle).
 const HOVER_FADE_RATE: f32 = 14.0;
 
-/// Marks an object whose emissive colour is raised for hover: the original colour, and how far the
-/// glow has faded in (0 to 1).
+/// Marks an object whose emissive colour is raised: the original colour, and how far the hover glow
+/// and the selection glow have faded in (each 0 to 1).
 #[derive(Component, Clone, Copy, Debug)]
 pub(crate) struct HoverTint {
     original: Color,
     level: f32,
+    selected_level: f32,
 }
 
-/// Fades the emissive colour of hovered objects up and back down, restoring it exactly afterwards.
+/// Fades the emissive colour of hovered and selected objects up and back down, restoring it exactly
+/// afterwards.
 pub(crate) fn highlight_hover(
     mut commands: Commands,
     state: Res<InteractionState>,
@@ -35,32 +43,37 @@ pub(crate) fn highlight_hover(
         Entity,
         &mut VeMaterial,
         &Interactable,
+        Option<&Authored>,
         Option<&mut HoverTint>,
     )>,
 ) {
     let ease = 1.0 - (-HOVER_FADE_RATE * time.delta_secs()).exp();
-    for (entity, mut material, interactable, tint) in &mut objects {
+    for (entity, mut material, interactable, authored, tint) in &mut objects {
         let hovered = state.hovered.contains(&entity);
+        let selected = authored.is_some_and(|part| selection::is_part(part.node()));
         let Some(mut tint) = tint else {
-            if hovered {
+            if hovered || selected {
                 commands.entity(entity).insert(HoverTint {
                     original: material.emissive,
                     level: 0.0,
+                    selected_level: 0.0,
                 });
             }
             continue;
         };
         tint.level += (f32::from(u8::from(hovered)) - tint.level) * ease;
-        if !hovered && tint.level < 0.01 {
+        tint.selected_level += (f32::from(u8::from(selected)) - tint.selected_level) * ease;
+        if !hovered && !selected && tint.level < 0.01 && tint.selected_level < 0.01 {
             material.emissive = tint.original;
             commands.entity(entity).remove::<HoverTint>();
             continue;
         }
-        let glow = if interactable.grabbable {
+        let hover = if interactable.grabbable {
             HOVER_GLOW
         } else {
             SELECT_GLOW
-        } * tint.level;
+        };
+        let glow = hover * tint.level + SELECTED_GLOW * tint.selected_level;
         let (base, original) = (
             LinearRgba::from(material.base_color),
             LinearRgba::from(tint.original),

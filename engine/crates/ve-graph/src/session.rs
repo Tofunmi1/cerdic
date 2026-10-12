@@ -18,10 +18,14 @@ use crate::limits::{
 };
 use crate::spec::OperatorRegistry;
 
+/// The longest label kept for a history entry, in characters.
+const MAX_LABEL: usize = 80;
+
 #[derive(Clone)]
 struct UndoEntry {
     before: Document,
     changed: Vec<NodeId>,
+    label: String,
     bytes: usize,
 }
 
@@ -29,6 +33,34 @@ struct UndoEntry {
 struct RedoEntry {
     after: Document,
     changed: Vec<NodeId>,
+    label: String,
+}
+
+/// One transaction in the history list.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct HistoryItem {
+    /// What the person or tool said the transaction was for ("Edit" when it said nothing).
+    pub label: String,
+    /// Nodes the transaction touched.
+    pub changed: Vec<NodeId>,
+}
+
+/// What undo and redo can reach, for a history panel.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub struct History {
+    /// Transactions that can be undone, oldest first (undo takes the last).
+    pub undo: Vec<HistoryItem>,
+    /// Transactions that can be redone, the next one first.
+    pub redo: Vec<HistoryItem>,
+}
+
+fn history_label(label: Option<&str>) -> String {
+    let text = label.map_or("", str::trim);
+    if text.is_empty() {
+        "Edit".to_owned()
+    } else {
+        text.chars().take(MAX_LABEL).collect()
+    }
 }
 
 /// Where undo or redo moved the document.
@@ -95,6 +127,28 @@ impl Session {
     #[must_use]
     pub fn can_redo(&self) -> bool {
         !self.redo.is_empty()
+    }
+
+    /// The transactions undo and redo can reach, for a history list.
+    #[must_use]
+    pub fn history(&self) -> History {
+        let item = |label: &String, changed: &Vec<NodeId>| HistoryItem {
+            label: label.clone(),
+            changed: changed.clone(),
+        };
+        History {
+            undo: self
+                .undo
+                .iter()
+                .map(|entry| item(&entry.label, &entry.changed))
+                .collect(),
+            redo: self
+                .redo
+                .iter()
+                .rev()
+                .map(|entry| item(&entry.label, &entry.changed))
+                .collect(),
+        }
     }
 
     fn rejected(code: &str, message: impl Into<String>) -> Outcome {
@@ -165,6 +219,7 @@ impl Session {
         self.undo.push_back(UndoEntry {
             before: self.doc.clone(),
             changed: applied.changed.clone(),
+            label: history_label(batch.label.as_deref()),
             bytes,
         });
         self.undo_bytes += bytes;
@@ -218,6 +273,7 @@ impl Session {
         self.redo.push(RedoEntry {
             after: self.doc.clone(),
             changed: entry.changed.clone(),
+            label: entry.label,
         });
         Some(self.install(entry.before, &entry.changed))
     }
@@ -229,6 +285,7 @@ impl Session {
         self.undo.push_back(UndoEntry {
             before: self.doc.clone(),
             changed: entry.changed.clone(),
+            label: entry.label,
             bytes,
         });
         self.undo_bytes += bytes;

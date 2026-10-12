@@ -13,6 +13,8 @@ tests, licence policy (`cargo deny`), file size cap, crate boundaries. Fix the c
                      to `StereoViews`, layer framebuffer import (the only unsafe, wasm32 only).
 - `crates/ve-platform-web` browser canvas window, rAF runner, pointer input (wasm32 only).
 - `crates/ve-runtime` the wasm entry point the page calls (`start`, `status`); wasm32 only.
+- `web/panels/`      the editing panels of the viewer page (outliner, inspector, history, problems;
+                     plain JS, ADR 0012). They own no document state; pure parts are in `graph.js`.
 - `web/`             the page, `dist/` build output and Playwright end-to-end tests (`tests/engine.mjs`
                      scenes + goldens, `xr.mjs` and `xr-layer.mjs` against IWER, Meta's emulated Quest 3;
                      IWER needs `forceInstall` and `stereoEnabled`; real frame time needs the headset).
