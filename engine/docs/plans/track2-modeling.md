@@ -655,7 +655,17 @@ read-only document view and command input, Bun build/test chain, gallery/legacy 
 [`v0-report.md`](../modeling/v0-report.md). Release stripped Brotli q9 3,370,251 B (+12,114 B from G1b).
 Headed pointer lock/headset checks remain untested. Legacy comparison route is retained.
 
-G2-G13, V1-V7 and L0-L9 pending; X2-X5 and X7-X9 not performed. No gate has passed merely because this
+**G2 implemented and strict-gated 2026-10-12:** production evaluator-only WASM worker, stepped pure
+evaluator, Rust-owned candidate sessions, bounded latest-request queue with accumulated commands,
+mesh LRU, native boolean cancellation and browser termination/restart, atomic projection after asset
+readiness, selection revision map and visible status. All 226 native tests and browser acceptance
+passed; native/WASI evaluator and kernel parity, C++ sanitizers and advisories passed. Evidence:
+[`g2-report.md`](../modeling/g2-report.md). Release stripped Brotli q9: runtime 3,398,760 B
+(+28,509 B from V0), evaluator 217,936 B. Large result 2,361,960 B; 100 warm jobs leave cache/live
+meshes bounded. Software-browser frame gaps are reported, not claimed as hardware performance.
+Audit B02's worker/cancellation paths are covered; Quest CPU/GPU timing remains untested. Next: G3.
+
+G3-G13, V1-V7 and L0-L9 pending; X2-X5 and X7-X9 not performed. No gate has passed merely because this
 document was revised. Replace this line with per-milestone evidence as work lands:
 commit, contract version, cases and commands run, pass, fail and skips, benchmark artifact, known
 limitations, next dependency. Run `cargo xtask check --strict` from `engine/`, the separate

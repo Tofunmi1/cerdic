@@ -54,6 +54,9 @@ pub(crate) fn start(canvas_id: &str, scene: SceneKind) -> Result<(), PlatformErr
         XrPlugin,
     ));
     app.insert_resource(ClearColor(CLEAR));
+    app.insert_resource(bevy_render::render_asset::RenderAssetBytesPerFrame::new(
+        8 * 1024 * 1024,
+    ));
     app.insert_resource(scene);
     app.init_resource::<perf::Perf>();
     app.init_resource::<ViewerRig>();
@@ -66,6 +69,7 @@ pub(crate) fn start(canvas_id: &str, scene: SceneKind) -> Result<(), PlatformErr
         Update,
         (
             wands::update_wands.after(apply_xr_frame),
+            crate::projection::update.before(interact::run_interaction),
             status::publish
                 .after(wands::update_wands)
                 .after(interact::highlight_hover),

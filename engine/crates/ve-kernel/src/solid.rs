@@ -77,6 +77,55 @@ fn segments_arg(segments: u32) -> Result<i32, KernelError> {
 }
 
 impl Solid {
+    /// Unions 2..64 solids with cancellation between boolean-tree operations.
+    ///
+    /// # Errors
+    /// Invalid count, kernel failure or permanent cancellation.
+    pub fn union_all_with_context(
+        solids: &[&Self],
+        context: &crate::ExecutionContext,
+    ) -> Result<Self, KernelError> {
+        if !(2..=64).contains(&solids.len()) {
+            return Err(KernelError::InvalidArgument(
+                "batch boolean count must be 2..64",
+            ));
+        }
+        let handles: Vec<_> = solids.iter().map(|solid| &solid.0).collect();
+        ffi::context::union_all(&handles, &context.0).map(Self)
+    }
+    /// Union with cooperative cancellation while evaluating its boolean tree.
+    ///
+    /// # Errors
+    /// Kernel errors or [`KernelError::Cancelled`].
+    pub fn union_with_context(
+        &self,
+        other: &Self,
+        context: &crate::ExecutionContext,
+    ) -> Result<Self, KernelError> {
+        ffi::context::boolean(&self.0, &other.0, 0, &context.0).map(Self)
+    }
+    /// Difference with cooperative cancellation during boolean evaluation.
+    ///
+    /// # Errors
+    /// Kernel errors or [`KernelError::Cancelled`].
+    pub fn difference_with_context(
+        &self,
+        other: &Self,
+        context: &crate::ExecutionContext,
+    ) -> Result<Self, KernelError> {
+        ffi::context::boolean(&self.0, &other.0, 1, &context.0).map(Self)
+    }
+    /// Intersection with cooperative cancellation during boolean evaluation.
+    ///
+    /// # Errors
+    /// Kernel errors or [`KernelError::Cancelled`].
+    pub fn intersect_with_context(
+        &self,
+        other: &Self,
+        context: &crate::ExecutionContext,
+    ) -> Result<Self, KernelError> {
+        ffi::context::boolean(&self.0, &other.0, 2, &context.0).map(Self)
+    }
     /// A box with the given edge lengths, optionally centred on the origin.
     ///
     /// # Errors

@@ -12,6 +12,7 @@ mod gallery;
 mod interact;
 mod mock_hmd;
 mod perf;
+mod projection;
 mod quality;
 mod scene;
 mod status;
@@ -174,6 +175,76 @@ pub fn doc_save() -> String {
 #[must_use]
 pub fn doc_operators() -> String {
     document::operators()
+}
+
+/// The Rust-owned working candidate and its dependency hash.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_candidate_state() -> String {
+    document::staging::state()
+}
+
+/// Stages a batch without committing its document before geometry succeeds.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_stage(batch: &str) -> String {
+    document::staging::apply(batch)
+}
+
+/// Stages an undo for evaluation before it becomes the committed scene.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_stage_undo() -> String {
+    document::staging::step(true)
+}
+
+/// Stages a redo for evaluation before it becomes the committed scene.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_stage_redo() -> String {
+    document::staging::step(false)
+}
+
+/// Binds the current candidate to one exact worker request token.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_bind(token: &str) -> bool {
+    document::staging::bind(token)
+}
+
+/// Discards a failed matching candidate while preserving the committed scene.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_reject(token: &str, code: &str, message: &str) -> bool {
+    document::staging::reject(token, code, message)
+}
+
+/// Starts bounded result staging if this token is still current.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_projection_begin(token: &str) -> bool {
+    projection::begin(token)
+}
+
+/// Queues a small triangle chunk containing interleaved positions and normals.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_projection_chunk(token: &str, node: &str, name: &str, vertices: &[f32]) -> bool {
+    projection::chunk(token, node, name, vertices)
+}
+
+/// Marks a complete candidate; its document commits when the GPU meshes are ready.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_projection_finish(token: &str) -> bool {
+    projection::finish(token)
+}
+
+/// Projection resource and upload counters.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_projection_status() -> String {
+    projection::status()
 }
 
 /// Whether the browser can present an immersive VR session.

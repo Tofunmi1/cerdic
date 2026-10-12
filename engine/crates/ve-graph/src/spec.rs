@@ -204,7 +204,7 @@ impl OperatorSpec {
 }
 
 /// All known operators, ordered by name and version.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct OperatorRegistry {
     entries: Registry<OperatorSpec>,
 }

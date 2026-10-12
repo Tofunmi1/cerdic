@@ -17,6 +17,7 @@ mod pipeline;
 mod prepare;
 mod present;
 mod quality;
+mod readiness;
 mod schedule;
 mod shadow;
 mod shadow_math;
@@ -39,6 +40,7 @@ pub use lens::{LensMode, LensWarp};
 pub use light::{MAX_POINT_LIGHTS, VeAmbientLight, VeDirectionalLight, VePointLight};
 pub use material::VeMaterial;
 pub use quality::{QualityTier, RenderQuality};
+pub use readiness::mesh_ready;
 pub use schedule::{Forward3d, Forward3dSystems};
 pub use stereo::{StereoEye, StereoViews};
 
@@ -126,6 +128,7 @@ fn add_render_systems(render_app: &mut SubApp) {
             Render,
             (
                 prepare::prepare_instances,
+                readiness::publish,
                 prepare::prepare_view_uniforms,
                 // The lights uniform includes the sun's shadow matrix and binds the shadow map.
                 (

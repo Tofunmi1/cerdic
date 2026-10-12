@@ -106,17 +106,30 @@ fn ray_sphere(ray: &Ray, center: Vec3, radius: f32) -> Option<f32> {
     if radius.is_nan() || radius < 0.0 {
         return None;
     }
-    let to_center = center - ray.origin;
-    let along = to_center.dot(ray.direction);
-    let off_axis_squared = to_center.length_squared() - along * along;
-    let radius_squared = radius * radius;
+    // Form the perpendicular vector directly in double precision. Subtracting squared
+    // distances loses the small radius when the ray starts far from the sphere.
+    let to_center = center.as_dvec3() - ray.origin.as_dvec3();
+    let direction = ray.direction.as_dvec3();
+    let direction_squared = direction.length_squared();
+    let along = to_center.dot(direction) / direction_squared;
+    let off_axis_squared = (to_center - direction * along).length_squared();
+    let radius_squared = f64::from(radius).powi(2);
     if off_axis_squared > radius_squared {
         return None;
     }
-    let half_chord = (radius_squared - off_axis_squared).sqrt();
+    let half_chord = ((radius_squared - off_axis_squared) / direction_squared).sqrt();
     let near = along - half_chord;
     let far = along + half_chord;
-    if far < 0.0 { None } else { Some(near.max(0.0)) }
+    if far < 0.0 {
+        None
+    } else {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the picking API returns f32 distances; intermediates avoid cancellation in f64"
+        )]
+        let distance = near.max(0.0) as f32;
+        Some(distance)
+    }
 }
 
 /// The slab method: intersect the ray with the three pairs of parallel planes.

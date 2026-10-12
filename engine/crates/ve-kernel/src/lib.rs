@@ -8,11 +8,13 @@
     reason = "the audited FFI layer lives in the private `ffi` module"
 )]
 
+mod context;
 mod error;
 mod ffi;
 mod mesh;
 mod solid;
 
+pub use context::ExecutionContext;
 pub use error::KernelError;
 pub use mesh::Mesh;
 pub use solid::{Bounds, MAX_EXTENT, Solid, simplify};

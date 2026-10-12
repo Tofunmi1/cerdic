@@ -86,11 +86,13 @@ pub(crate) fn publish(
     interaction: Res<InteractionState>,
     viewer: Res<ViewerRig>,
     labelled: Query<(Entity, &Label, &Transform), With<Interactable>>,
+    authored: Query<(Entity, &crate::projection::Authored)>,
 ) {
     *frames += 1;
     let errors = ERRORS.with(|errors| errors.borrow().clone());
     let mut value = json!({
         "frames": *frames,
+        "authored": crate::projection::selections(&authored),
         "errors": errors,
         "perf": perf.report(),
         "scene": scene_stats.as_deref().map(|s| json!({

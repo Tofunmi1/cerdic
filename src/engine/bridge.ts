@@ -3,7 +3,9 @@ import type { Command, CommandBatch, Diagnostic, Document, Outcome } from './gen
 export type DocumentView = {
   id: string; revision: number; nodes: number; can_undo: boolean; can_redo: boolean;
   read_only: boolean; saved_generation: number | null; issues: Diagnostic[]; document: Document;
+  pending_document?: Document | null;
 };
+export type StageResult = Outcome | { pending: Outcome };
 export interface Runtime {
   default(): Promise<{ memory: WebAssembly.Memory }>;
   start(canvas: string, scene: string): void;
@@ -14,6 +16,16 @@ export interface Runtime {
   doc_undo(): string;
   doc_redo(): string;
   doc_save(): string;
+  doc_candidate_state(): string;
+  doc_stage(batch: string): string;
+  doc_stage_undo(): string;
+  doc_stage_redo(): string;
+  eval_bind(token: string): boolean;
+  eval_reject(token: string, code: string, message: string): boolean;
+  eval_projection_begin(token: string): boolean;
+  eval_projection_chunk(token: string, node: string, name: string, vertices: Float32Array): boolean;
+  eval_projection_finish(token: string): boolean;
+  eval_projection_status(): string;
   viewer_configure(enabled: boolean, fov: number, stereo: boolean, speed: number): void;
   viewer_move(right: number, up: number, forward: number, sprint: boolean): void;
   viewer_look(x: number, y: number): void;
@@ -23,23 +35,24 @@ export interface Runtime {
   exit_xr(): Promise<void>;
 }
 
-export function documentBridge(runtime: Runtime, notify: () => void) {
+export function documentBridge(runtime: Runtime, notify: () => void, evaluate?: () => void) {
   const state = (): DocumentView => JSON.parse(runtime.doc_state());
   return {
     state,
-    apply(batch: CommandBatch): Outcome {
+    apply(batch: CommandBatch): StageResult {
       if (!Number.isSafeInteger(batch.base_revision)) throw new Error('Unsafe document revision');
-      const result: Outcome = JSON.parse(runtime.doc_apply(JSON.stringify(batch)));
+      const result: StageResult = JSON.parse(evaluate ? runtime.doc_stage(JSON.stringify(batch)) : runtime.doc_apply(JSON.stringify(batch)));
+      if ('pending' in result) evaluate?.();
       notify();
       return result;
     },
-    send(commands: Command[], label: string): Outcome {
+    send(commands: Command[], label: string): StageResult {
       const current = state();
-      return this.apply({ doc: current.id, base_revision: current.revision,
+      return this.apply({ doc: current.id, base_revision: current.pending_document?.revision ?? current.revision,
         transaction: `t_${crypto.randomUUID()}`, label, commands });
     },
-    undo() { const result: unknown = JSON.parse(runtime.doc_undo()); notify(); return result; },
-    redo() { const result: unknown = JSON.parse(runtime.doc_redo()); notify(); return result; },
+    undo() { const result: unknown = JSON.parse(evaluate ? runtime.doc_stage_undo() : runtime.doc_undo()); if (result) evaluate?.(); notify(); return result; },
+    redo() { const result: unknown = JSON.parse(evaluate ? runtime.doc_stage_redo() : runtime.doc_redo()); if (result) evaluate?.(); notify(); return result; },
     save() { const result: unknown = JSON.parse(runtime.doc_save()); notify(); return result; },
   };
 }

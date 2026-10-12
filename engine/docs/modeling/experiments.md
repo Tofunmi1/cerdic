@@ -79,3 +79,11 @@ yet, so only termination was tested); jobs that take seconds; Safari and Quest B
 brotli) rather than loading the 3.4 MB runtime twice. Termination plus restart is a sound recovery
 path (under 100 ms). ADR 0006 is accepted with this evidence. G2 must still measure the large-transfer
 case, add the ABI for cooperative cancellation, and test on the headset.
+
+### Production G2 follow-through
+
+The production evaluator and worker now exist separately from the disposable spike; details and
+reproducible evidence are in [g2-report.md](g2-report.md). Large transferable results, cooperative
+native boolean cancellation, hard timeout/crash recovery and cache/upload bounds are covered by the
+production tests. Current release evaluator is 217,936 B stripped Brotli q9. Headset CPU cost and
+hardware frame time remain open; production software-browser measurements do not replace those tests.

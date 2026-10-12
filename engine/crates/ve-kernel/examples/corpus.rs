@@ -35,6 +35,20 @@ fn run() -> Result<(), KernelError> {
     report("cube-sphere", &diff)?;
     report("union", &cube.union(&shifted)?)?;
     report("intersect", &cube.intersect(&shifted)?)?;
+    let context = ve_kernel::ExecutionContext::new()?;
+    report(
+        "context-union",
+        &Solid::union_all_with_context(&[&cube, &shifted], &context)?,
+    )?;
+    context.cancel();
+    if matches!(
+        cube.union_with_context(&shifted, &context),
+        Err(KernelError::Cancelled)
+    ) {
+        println!("context-cancelled=true");
+    } else {
+        return Err(KernelError::InvalidArgument("cancellation parity failed"));
+    }
     report(
         "rotated",
         &cube.scale([1.0, 2.0, 3.0])?.rotate([10.0, 20.0, 30.0])?,
