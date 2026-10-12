@@ -7,6 +7,7 @@ use crate::limits::{MAX_LIST_VALUES, MAX_STRING_BYTES};
 /// A parameter value as it appears in a document or a command.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub enum Value {
     /// A true or false switch.
     Bool(bool),

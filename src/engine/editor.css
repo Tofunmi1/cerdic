@@ -1,0 +1,21 @@
+.engine-editor { position: fixed; inset: 0; display: grid; grid-template-rows: 54px minmax(0, 1fr) 66px; color: #edf1fa; background: #0c1018; font: 13px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.engine-editor * { box-sizing: border-box; }
+.engine-editor header { grid-column: 1/-1; display: flex; align-items: center; gap: 24px; padding: 0 20px; border-bottom: 1px solid #ffffff20; }
+.engine-editor header span { color: #aebbd0; flex: 1; }
+.engine-editor aside { padding: 16px; overflow: auto; border-right: 1px solid #ffffff20; }
+.engine-editor h2 { font-size: 13px; letter-spacing: .04em; margin: 20px 0 8px; }
+.engine-editor p { color: #aebbd0; overflow-wrap: anywhere; }
+.engine-editor button { border: 1px solid #ffffff30; border-radius: 9px; padding: 7px 12px; background: #ffffff0f; color: inherit; font: inherit; cursor: pointer; }
+.engine-editor button:hover { background: #ffffff20; }
+.engine-editor button:disabled { opacity: .4; cursor: default; }
+.engine-editor :focus-visible { outline: 2px solid #a3c5ff; outline-offset: 2px; }
+.engine-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.engine-editor label { display: block; margin-top: 18px; margin-bottom: 7px; }
+.engine-editor textarea { width: 100%; min-height: 100px; resize: vertical; color: #eef2ff; background: #070a11; border: 1px solid #ffffff30; border-radius: 8px; padding: 10px; }
+.engine-editor input[type=range] { width: 100%; }
+.engine-editor pre { font: 11px/1.5 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.engine-stage { min-width: 0; min-height: 0; position: relative; }
+.engine-canvas-pane { width: 100%; height: 100%; }
+.engine-canvas-pane canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.engine-hint { position: absolute; bottom: 16px; left: 16px; right: 16px; padding: 10px 14px; border: 1px solid #ffffff30; border-radius: 12px; background: #101624b3; backdrop-filter: blur(12px); pointer-events: none; }
+.engine-editor footer { grid-column: 1/-1; padding: 10px 18px; border-top: 1px solid #ffffff20; overflow: auto; white-space: pre-wrap; font: 11px/1.4 ui-monospace, monospace; }

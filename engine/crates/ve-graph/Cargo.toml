@@ -7,10 +7,18 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+ts-rs = { version = "=12.0.1", optional = true }
 ve-core = { path = "../ve-core" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+
+[features]
+typescript = ["dep:ts-rs"]
+
+[[example]]
+name = "typescript"
+required-features = ["typescript"]
 
 # Property tests run natively only; proptest does not build for wasm targets.
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]

@@ -47,6 +47,21 @@ fn main() -> ExitCode {
 }
 
 fn check() -> Result<(), Failure> {
+    run(
+        "bridge-schema",
+        "cargo",
+        &[
+            "run",
+            "-p",
+            "ve-graph",
+            "--features",
+            "typescript",
+            "--example",
+            "typescript",
+            "--",
+            "--check",
+        ],
+    )?;
     run("fmt", "cargo", &["fmt", "--all", "--check"])?;
     run(
         "clippy",
@@ -97,11 +112,11 @@ fn check() -> Result<(), Failure> {
     }
     cpp::run()?;
     parity::run()?;
-    if has("node") {
+    if has("bun") {
         web::test(web::Profile::Dev)?;
     } else {
-        println!("-- web-test: skipped (node not found)");
-        skipped.push("web-test (node not found)");
+        println!("-- web-test: skipped (bun not found)");
+        skipped.push("web-test (bun not found)");
     }
     rules::run()?;
     finish(&skipped)

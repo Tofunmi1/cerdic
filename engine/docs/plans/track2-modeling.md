@@ -650,7 +650,12 @@ G2: large transfers, cooperative cancellation in the C ABI, headset CPU cost.
 iframe). It found and fixed two engine bugs with regression tests: any window or panel resize killed the
 engine (missing `WindowResized` message; `web/tests/resize.mjs`), and hover stuck when the pointer left
 the canvas (`pointerleave` and pointer capture; `interact.mjs`). Details in `docs/modeling/experiments.md`.
-V0, G2-G13, V1-V7 and L0-L9 pending; X2-X5 and X7-X9 not performed. No gate has passed merely because this
+**V0 implemented and strict-gated 2026-10-12:** Rust-derived TS bridge (ADR 0009), React canvas host,
+read-only document view and command input, Bun build/test chain, gallery/legacy comparison. Evidence:
+[`v0-report.md`](../modeling/v0-report.md). Release stripped Brotli q9 3,370,251 B (+12,114 B from G1b).
+Headed pointer lock/headset checks remain untested. Legacy comparison route is retained.
+
+G2-G13, V1-V7 and L0-L9 pending; X2-X5 and X7-X9 not performed. No gate has passed merely because this
 document was revised. Replace this line with per-milestone evidence as work lands:
 commit, contract version, cases and commands run, pass, fail and skips, benchmark artifact, known
 limitations, next dependency. Run `cargo xtask check --strict` from `engine/`, the separate

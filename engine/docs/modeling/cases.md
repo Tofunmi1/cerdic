@@ -53,6 +53,12 @@ unless a case says otherwise. "Mock" means the labelled deterministic mock provi
 | G1b-15 | Read-only document (newer file) in the page | Opens with the reason; edits and saves are `store.read_only`; the stored file is unchanged; the panel says READ-ONLY |
 
 ## V0: editor shell
+
+Implemented and gated 2026-10-12: [V0 report](v0-report.md). V0-06 used a temporary Rust serde
+field rename to prove the schema check fails; V0-08 screenshots were reviewed against the report's
+composition rubric. The legacy viewport is retained as a comparison route. Headed pointer lock and
+headset behavior remain untested; browser checks use SwiftShader.
+
 | ID | Input | Expected |
 |---|---|---|
 | V0-01 | Load the editor | Canvas renders the gallery; no console errors |

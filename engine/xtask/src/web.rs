@@ -95,10 +95,13 @@ pub(crate) fn build(profile: Profile) -> Result<(), Failure> {
 pub(crate) fn test(profile: Profile) -> Result<(), Failure> {
     build(profile)?;
     if !Path::new("web/node_modules/playwright").exists() {
-        run_in("web", "npm", &["install", "--no-audit", "--no-fund"])?;
+        run_in("web", "bun", &["install", "--frozen-lockfile"])?;
     }
     println!("-- web-test: playwright (headless Chromium)");
-    run_in("web", "npm", &["test", "--silent"])
+    run_in("web", "bun", &["run", "test"])?;
+    run_in("..", "bun", &["run", "typecheck"])?;
+    run_in("..", "bun", &["scripts/build-engine.ts", "--copy-only"])?;
+    run("bun", &["web/tests/editor.mjs"])
 }
 
 /// The wasm-bindgen CLI must match the library version in `Cargo.lock` exactly.

@@ -87,6 +87,7 @@ pub enum Readiness {
 /// Identifies one version of one operator, written `family.name@N`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS), ts(type = "string"))]
 pub struct OpId {
     family: Name,
     version: u32,

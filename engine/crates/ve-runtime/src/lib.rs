@@ -8,6 +8,7 @@
 mod app;
 mod bench_scene;
 mod document;
+mod gallery;
 mod interact;
 mod mock_hmd;
 mod perf;
