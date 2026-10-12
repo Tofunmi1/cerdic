@@ -36,10 +36,10 @@ unless a case says otherwise. "Mock" means the labelled deterministic mock provi
 ## G1b: persistence and bridge
 | ID | Input | Expected |
 |---|---|---|
-| G1b-01 | Save, reload | Equal document, IDs, layout, history boundaries |
-| G1b-02 | Crash between write and rename (simulated) | Previous save intact and loadable |
-| G1b-03 | Truncated file | `store.corrupt`; previous save kept |
-| G1b-04 | File with schema 99 | `store.newer_version`; file bytes unchanged |
+| G1b-01 | Save, reload | Equal document: IDs, layout, revision and the ID counter (the undo history is not saved: a reloaded session starts with empty history) |
+| G1b-02 | A torn write (half of a save lands) on the older of the two slots | The newest intact save loads; the damaged copy is reported as a warning; loading writes nothing |
+| G1b-03 | Truncated or bit-flipped file | One slot damaged: the other loads with a `store.corrupt` warning. Both damaged: `store.corrupt` error. A flipped byte is caught by the checksum |
+| G1b-04 | File with schema 99, with a valid and with an unrecognised checksum | `store.newer_version` for both, on load and on save; file bytes unchanged; a save never overwrites it |
 | G1b-05 | File with an unknown operator | `store.unknown_op` listing node IDs; file kept; other nodes viewable |
 | G1b-06 | Frozen schema-1 fixture, migration test hook | Migrates to current schema; result equals expected document |
 | G1b-07 | Migration step that fails | `store.migration_failed`; previous save kept |
@@ -47,7 +47,10 @@ unless a case says otherwise. "Mock" means the labelled deterministic mock provi
 | G1b-09 | Document at the 2 MiB limit, then over | Accepts, then refuses with a clear error |
 | G1b-10 | Viewer bridge: send a batch from the page | The engine document changes; the page shows the new revision |
 | G1b-11 | Bridge: malformed batch | Rejected with diagnostics; no engine error |
-| G1b-12 | Two tabs, same document | Each save is atomic; the later load shows a coherent document, never a mix |
+| G1b-12 | Two tabs, same document | Each save is whole; a later load is exactly one tab's last saved document, never a mix. Edits in two tabs are not merged: the last save wins (generation 3 over 2) |
+| G1b-13 | Floating-point values saved and reloaded | Bit-identical (parsing is exact), so checksums and document equality hold |
+| G1b-14 | A reloaded or migrated document with an ID counter behind its IDs | New nodes never get an ID already in use |
+| G1b-15 | Read-only document (newer file) in the page | Opens with the reason; edits and saves are `store.read_only`; the stored file is unchanged; the panel says READ-ONLY |
 
 ## V0: editor shell
 | ID | Input | Expected |

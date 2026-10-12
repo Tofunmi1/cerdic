@@ -28,6 +28,7 @@ bevy_window = { path = "../../third_party/bevy/crates/bevy_window" }
 bevy_render = { path = "../../third_party/bevy/crates/bevy_render", default-features = false, features = ["webgl"] }
 bevy_math = { path = "../../third_party/bevy/crates/bevy_math" }
 ve-core = { path = "../ve-core" }
+ve-graph = { path = "../ve-graph" }
 ve-interact = { path = "../ve-interact" }
 ve-kernel = { path = "../ve-kernel" }
 ve-xr-math = { path = "../ve-xr-math" }
@@ -37,7 +38,7 @@ ve-render = { path = "../ve-render" }
 serde_json.workspace = true
 wasm-bindgen.workspace = true
 wasm-bindgen-futures = "0.4"
-web-sys = { workspace = true, features = ["console"] }
+web-sys = { workspace = true, features = ["console", "DomException", "Storage", "Window"] }
 
 [lints]
 workspace = true

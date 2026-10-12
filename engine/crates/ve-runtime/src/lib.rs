@@ -7,6 +7,7 @@
 
 mod app;
 mod bench_scene;
+mod document;
 mod interact;
 mod mock_hmd;
 mod perf;
@@ -111,6 +112,67 @@ pub fn viewer_set_lens(name: &str) -> bool {
 #[wasm_bindgen]
 pub fn viewer_reset() {
     viewer::request_reset();
+}
+
+/// Opens the document called `name` from local storage (or starts an empty one with `seed`) and
+/// returns the state as JSON: `{ id, revision, nodes, can_undo, can_redo, read_only,
+/// saved_generation, issues, document }`. A document that cannot be loaded opens read-only with the
+/// reasons in `issues`; storage is not modified.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_open(name: &str, seed: u32) -> String {
+    document::open(name, u64::from(seed))
+}
+
+/// Starts an empty document called `name`, replacing the session (nothing is saved yet).
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_reset(name: &str, seed: u32) -> String {
+    document::reset(name, u64::from(seed))
+}
+
+/// The current document and session state, as for `doc_open`.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_state() -> String {
+    document::state()
+}
+
+/// Applies a command batch (JSON) and returns the outcome as JSON: `committed`, `rejected`,
+/// `conflict` or `already_applied`. Bad input is a `rejected` outcome, never an exception.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_apply(batch_json: &str) -> String {
+    document::apply(batch_json)
+}
+
+/// Undoes the last transaction: `{ revision, changed }`, or `null` if there is nothing to undo.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_undo() -> String {
+    document::step(true)
+}
+
+/// Redoes the last undone transaction: `{ revision, changed }`, or `null`.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_redo() -> String {
+    document::step(false)
+}
+
+/// Saves the document to local storage: `{ generation }`, or `{ error }` with a diagnostic. The
+/// previous save stays intact if this one fails.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_save() -> String {
+    document::save()
+}
+
+/// Every operator the session knows, as JSON: ports, parameters with bounds, readiness.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_operators() -> String {
+    document::operators()
 }
 
 /// Whether the browser can present an immersive VR session.

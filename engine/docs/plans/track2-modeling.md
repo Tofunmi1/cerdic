@@ -530,7 +530,16 @@ attribute loss; every G1a case has a test named after it (`crates/ve-graph/tests
 `crates/ve-geometry/tests`); `cargo xtask check --strict` green; wasm clippy clean. Known limits:
 operators are `Draft` (nothing evaluates yet), history keeps full snapshots capped at 200 entries or
 16 MiB, frames and reroutes arrive with V2.
-G1b, V0, G2-G13 and V1-V7 pending; X1-X7 not performed. No gate has passed merely because this
+**G1b done 2026-10-12:** `ve-graph::store` (envelope with schema, generation, checksum and operator
+manifest; two-slot save so a torn write cannot damage the newest save; migrations with a frozen
+schema-0 fixture; read-only opening of files this build cannot edit; saving never overwrites a newer
+file), a `ve-runtime` document host with a `localStorage` backend, `doc_*` wasm functions, the page's
+`state.doc` API and a visible document panel (`?doc=1` or `?viewer=1`). Cases G1b-01 to G1b-09
+natively (`crates/ve-graph/tests/g1b.rs`), G1b-10 to G1b-12 and the read-only case in
+`web/tests/document.mjs`. Release wasm +118 KB brotli (3.24 to 3.36 MB stripped). Decisions made:
+the undo history is not saved; two tabs are not merged (last save wins); `serde_json` now parses
+floats exactly (`float_roundtrip`) because the default parser failed bit-exact reload.
+V0, G2-G13 and V1-V7 pending; X1-X7 not performed. No gate has passed merely because this
 document was revised. Replace this line with per-milestone evidence as work lands:
 commit, contract version, cases and commands run, pass, fail and skips, benchmark artifact, known
 limitations, next dependency. Run `cargo xtask check --strict` from `engine/`, the separate

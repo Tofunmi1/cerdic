@@ -55,7 +55,9 @@ string. Severity: `error` blocks a commit, `warning` does not, `info` is progres
 | `store.corrupt` | error | Saved data failed validation | Previous save kept |
 | `store.quota` | error | Storage quota exceeded | Bytes needed |
 | `store.newer_version` | error | File written by a newer schema | File kept untouched |
-| `store.unknown_op` | error | File uses an operator this build lacks | File kept, node ids listed |
+| `store.unknown_op` | error | File uses an operator this build lacks | File kept, shown read-only, node ids listed |
+| `store.unavailable` | error | Storage cannot be read or written (blocked, disabled) | Previous save kept |
+| `store.read_only` | error | Edit or save refused on a document that is read-only (unknown operators, or it failed to load) | Open with a build that can edit it |
 | `store.migration_failed` | error | A migration step failed | Previous save kept |
 | `provider.invalid_patch` | error | Provider output did not validate | Counts toward the repair cap |
 | `provider.budget` | error | Calls, tokens or time cap reached | |

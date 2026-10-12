@@ -15,6 +15,7 @@ mod links;
 mod nodes;
 mod session;
 mod spec;
+mod store;
 mod value;
 
 pub use builtin::builtin_registry;
@@ -33,4 +34,5 @@ pub use spec::{
     Arity, OpId, OpIdError, OperatorRegistry, OperatorSpec, OutputSpec, ParamSpec, PortSpec,
     PortType, Readiness,
 };
+pub use store::{Backend, BackendError, DocStore, Loaded, MemoryBackend, MigrationStep, Migrator};
 pub use value::{ParamIssue, ParamType, Unit, Value};

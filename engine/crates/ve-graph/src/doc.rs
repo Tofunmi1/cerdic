@@ -154,20 +154,28 @@ impl Document {
 
     /// Issues a node ID, or `None` if the 40-bit space is used up.
     pub(crate) fn issue_node_id(&mut self) -> Option<NodeId> {
-        (self.ids.next < (1 << 40)).then(|| {
+        // A loaded or migrated document may have a counter behind the IDs it already uses, so an
+        // issued ID is checked against the nodes that exist.
+        while self.ids.next < (1 << 40) {
             let id = NodeId::generated(self.ids.next, self.ids.salt);
             self.ids.next += 1;
-            id
-        })
+            if self.node(&id).is_none() {
+                return Some(id);
+            }
+        }
+        None
     }
 
     /// Issues a material ID, or `None` if the 40-bit space is used up.
     pub(crate) fn issue_material_id(&mut self) -> Option<MaterialId> {
-        (self.ids.next < (1 << 40)).then(|| {
+        while self.ids.next < (1 << 40) {
             let id = MaterialId::generated(self.ids.next, self.ids.salt);
             self.ids.next += 1;
-            id
-        })
+            if self.materials.iter().all(|m| m.id != id) {
+                return Some(id);
+            }
+        }
+        None
     }
 
     /// The node with this ID.

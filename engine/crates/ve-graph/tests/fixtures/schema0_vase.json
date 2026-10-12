@@ -1,0 +1,45 @@
+{
+  "id": "d_7k2m9q4x",
+  "revision": 12,
+  "nodes": [
+    {
+      "id": "n_a1b2c3d4",
+      "op": "profile.polygon@1",
+      "label": "outer",
+      "params": { "points": [[0, 0], [0.06, 0], [0.11, 0.12], [0.07, 0.26], [0.05, 0.3], [0, 0.3]] },
+      "inputs": {}
+    },
+    {
+      "id": "n_b2c3d4e5",
+      "op": "profile.polygon@1",
+      "label": "inner",
+      "params": { "points": [[0, 0.01], [0.056, 0.01], [0.104, 0.12], [0.064, 0.26], [0.044, 0.31], [0, 0.31]] },
+      "inputs": {}
+    },
+    {
+      "id": "n_c3d4e5f6",
+      "op": "solid.revolve@1",
+      "params": { "angle": 6.283185307179586, "segments": 64 },
+      "inputs": { "in": { "node": "n_a1b2c3d4", "port": "out" } }
+    },
+    {
+      "id": "n_d4e5f6g7",
+      "op": "solid.revolve@1",
+      "params": { "angle": 6.283185307179586, "segments": 64 },
+      "inputs": { "in": { "node": "n_b2c3d4e5", "port": "out" } }
+    },
+    {
+      "id": "n_e5f6g7h8",
+      "op": "solid.difference@1",
+      "params": {},
+      "inputs": { "in": [ { "node": "n_c3d4e5f6", "port": "out" }, { "node": "n_d4e5f6g7", "port": "out" } ] }
+    }
+  ],
+  "outputs": [ { "name": "vase", "from": { "node": "n_e5f6g7h8", "port": "out" } } ],
+  "editor": {
+    "positions": { "n_a1b2c3d4": [120, 80], "n_e5f6g7h8": [640, 200] },
+    "collapsed": [],
+    "frames": [ { "label": "profiles", "nodes": ["n_a1b2c3d4", "n_b2c3d4e5"] } ],
+    "reroutes": []
+  }
+}
