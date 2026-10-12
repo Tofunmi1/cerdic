@@ -90,6 +90,32 @@ try {
   await api("viewer_reset");
   await settle();
 
+  // Lenses: a fisheye bends the whole frame and a headset lens bends each eye; both change the
+  // picture, both still draw, and a lens that does not fit the layout is ignored rather than wrong.
+  const lens = async (name, fov, split) => {
+    await api("viewer_configure", true, fov, split, 3);
+    await api("viewer_set_lens", name);
+    await settle(10);
+    return PNG.sync.read(await page.screenshot());
+  };
+  check((await api("viewer_set_lens", "bogus")) === false, "an unknown lens name was accepted");
+  const flat = await lens("off", 130, false);
+  const fisheye = await lens("fisheye", 130, false);
+  check((await view()).lens === "fisheye", `the lens was not reported: ${(await view()).lens}`);
+  check(differingFraction(flat, fisheye, 20) > 0.1, "the fisheye did not change the picture");
+  check(drawnPixels(fisheye, 0, fisheye.width) > 2000, "the fisheye drew nothing");
+  const corner = (png) => { const i = 4 * (3 * png.width + 3); return png.data[i] + png.data[i + 1] + png.data[i + 2]; };
+  check(corner(fisheye) === 0, "the fisheye corner is not black: the source cannot fill it");
+  const mismatched = await lens("headset", 130, false);
+  check(differingFraction(flat, mismatched, 8) < 0.01, "a headset lens changed a single (not split) view");
+  const plainSplit = await lens("off", 100, true);
+  const headset = await lens("headset", 100, true);
+  check(differingFraction(plainSplit, headset, 20) > 0.1, "the headset lens did not change the split view");
+  check(drawnPixels(headset, 0, headset.width >> 1) > 2000 && drawnPixels(headset, headset.width >> 1, headset.width) > 2000, "an eye vanished under the headset lens");
+  await lens("off", 90, false);
+  await api("viewer_reset");
+  await settle();
+
   // A click on the view asks for the pointer; a refusal (headless browsers refuse) must not error.
   await page.mouse.click(320, 180);
   await page.waitForTimeout(300);

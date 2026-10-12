@@ -17,9 +17,10 @@ use bevy_render::view::{Msaa, ViewDepthStencilTexture, ViewTarget};
 
 use crate::counters::Pass;
 use crate::geometry::bind_geometry;
+use crate::lens::LensWarp;
 use crate::pipeline::ForwardPipelines;
 use crate::prepare::{Batch, InstanceBatches, LightsGpu, ViewSlot, ViewSlots, ViewUniforms};
-use crate::targets::{ViewMsaaColor, ViewOffscreen, needs_blit, render_format};
+use crate::targets::{ViewMsaaColor, ViewOffscreen, blits, render_format};
 
 /// Chooses the pass's colour attachment on top of the view's `output` attachment.
 ///
@@ -104,6 +105,7 @@ pub(crate) fn forward_pass(
     render_meshes: Res<RenderAssets<RenderMesh>>,
     allocator: Res<MeshAllocator>,
     clear: Res<ClearColor>,
+    lens: Res<LensWarp>,
     mut ctx: RenderContext,
 ) {
     let (target, depth, slots, msaa, msaa_color, offscreen) = view.into_inner();
@@ -112,10 +114,10 @@ pub(crate) fn forward_pass(
         info_once!("forward pass skipped: the view has no output texture");
         return;
     };
-    let format = render_format(output_format);
+    let format = render_format(output_format, *lens);
     // Views that need the present pass render offscreen; the present pass takes the output
     // attachment (and so marks it written). Others take it here.
-    let destination = if needs_blit(output_format) {
+    let destination = if blits(output_format, *lens) {
         let Some(offscreen) = offscreen else {
             info_once!("forward pass skipped: the offscreen target is not ready");
             return;

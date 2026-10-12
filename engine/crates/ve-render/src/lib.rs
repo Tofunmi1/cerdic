@@ -9,6 +9,7 @@ mod counters;
 mod extract;
 mod frame;
 mod geometry;
+mod lens;
 mod light;
 mod material;
 mod pass;
@@ -34,6 +35,7 @@ use bevy_render::{ExtractSchedule, Render, RenderApp, RenderSystems};
 use bevy_shader::Shader;
 
 pub use counters::{FrameCounts, PassCounts, last_frame_counts};
+pub use lens::{LensMode, LensWarp};
 pub use light::{MAX_POINT_LIGHTS, VeAmbientLight, VeDirectionalLight, VePointLight};
 pub use material::VeMaterial;
 pub use quality::{QualityTier, RenderQuality};
@@ -49,6 +51,7 @@ impl Plugin for VeRenderPlugin {
         app.init_resource::<ClearColor>()
             .init_resource::<VeAmbientLight>()
             .init_resource::<RenderQuality>()
+            .init_resource::<LensWarp>()
             .register_required_components_with::<Camera3d, CameraRenderGraph>(|| {
                 CameraRenderGraph::new(Forward3d)
             })
@@ -104,6 +107,8 @@ fn add_render_systems(render_app: &mut SubApp) {
         .init_resource::<prepare::ViewUniforms>()
         .init_resource::<prepare::LightsGpu>()
         .init_resource::<quality::RenderQuality>()
+        .init_resource::<lens::LensWarp>()
+        .init_resource::<lens::LensGpu>()
         .init_resource::<shadow::ShadowMap>()
         .init_resource::<shadow::ShadowState>()
         .init_resource::<schedule::CameraWindows>()
@@ -114,6 +119,7 @@ fn add_render_systems(render_app: &mut SubApp) {
                 extract::extract_meshes,
                 light::extract_lights,
                 quality::extract_quality,
+                lens::extract_lens,
             ),
         )
         .add_systems(
@@ -132,6 +138,7 @@ fn add_render_systems(render_app: &mut SubApp) {
                 targets::prepare_msaa_targets,
                 targets::prepare_offscreen_targets,
                 present::prepare_present_sampler,
+                lens::prepare_lens,
             )
                 .in_set(RenderSystems::PrepareResources),
         )

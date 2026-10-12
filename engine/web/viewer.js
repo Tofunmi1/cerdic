@@ -32,11 +32,34 @@ export function startViewer({ canvas, api, params }) {
     fov: Number(params.get("fov") ?? 90),
     stereo: params.get("stereo") === "1",
     speed: Number(params.get("speed") ?? 3),
+    lens: params.get("lens") ?? "off",
   };
+  // A fisheye needs a wide view to bend; a headset lens needs two eyes. Pick lens, field of view
+  // and split screen together so every choice shows something sensible.
+  if (state.lens === "fisheye") { state.stereo = false; state.fov = Math.max(state.fov, 130); }
+  if (state.lens === "headset") state.stereo = true;
   const held = new Set();
   let sprint = false;
 
-  const apply = () => api.viewer_configure(true, state.fov, state.stereo, state.speed);
+  const apply = () => {
+    api.viewer_configure(true, state.fov, state.stereo, state.speed);
+    api.viewer_set_lens(state.lens);
+    document.body.classList.toggle("split", state.stereo);
+  };
+  const chooseLens = (lens) => {
+    state.lens = lens;
+    if (lens === "fisheye") { state.stereo = false; state.fov = Math.max(state.fov, 130); }
+    if (lens === "headset") state.stereo = true;
+    syncControls();
+    apply();
+  };
+  const setStereo = (on) => {
+    state.stereo = on;
+    // The lens that needs the other layout would do nothing, so drop it.
+    if (state.lens === (on ? "fisheye" : "headset")) state.lens = "off";
+    syncControls();
+    apply();
+  };
   const sendMotion = () => {
     let x = 0, y = 0, z = 0;
     for (const code of held) {
@@ -65,7 +88,8 @@ export function startViewer({ canvas, api, params }) {
     if (event.code in KEYS) { held.add(event.code); event.preventDefault(); sendMotion(); }
     else if (event.code === "ShiftLeft" || event.code === "ShiftRight") { sprint = true; sendMotion(); }
     else if (event.code === "KeyR") api.viewer_reset();
-    else if (event.code === "KeyV") { state.stereo = !state.stereo; stereoBox.checked = state.stereo; apply(); }
+    else if (event.code === "KeyV") setStereo(!state.stereo);
+    else if (event.code === "KeyL") chooseLens({ off: "fisheye", fisheye: "headset", headset: "off" }[state.lens] ?? "off");
     else if (event.code === "KeyH") hud.hidden = !hud.hidden;
   });
   window.addEventListener("keyup", (event) => {
@@ -88,6 +112,9 @@ export function startViewer({ canvas, api, params }) {
       #viewer-hud select { padding: 4px; border-radius: 6px; }
       #viewer-hud .keys { margin-top: 10px; opacity: .75; font-size: 12px; }
       #viewer-hud.locked { opacity: .35; }
+      /* In split screen the panel sits over an eye: fade it until the cursor is on it. */
+      body.split #viewer-hud { opacity: .2; }
+      body.split #viewer-hud:hover { opacity: 1; }
       #crosshair { position: fixed; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px;
         border: 2px solid rgba(255,255,255,.85); border-radius: 50%; pointer-events: none; display: none; mix-blend-mode: difference; }
       body.look #crosshair { display: block; }
@@ -96,10 +123,18 @@ export function startViewer({ canvas, api, params }) {
     <label>Scene</label><select id="v-scene"></select>
     <label>Field of view <span id="v-fov-text"></span></label><input id="v-fov" type="range" min="50" max="150" step="1">
     <label><input id="v-stereo" type="checkbox"> Split-screen mock headset (V)</label>
+    <label>Lens (L)</label><select id="v-lens">
+      <option value="off">Flat perspective</option>
+      <option value="fisheye">Fisheye (whole view)</option>
+      <option value="headset">Headset lenses (split screen)</option></select>
     <label>Quality</label><select id="v-quality"><option>low</option><option>medium</option><option selected>high</option></select>
     <div class="keys">Click the view to look around (Esc to release).<br>
-      WASD / arrows move, Space / Q up/down, Shift sprint,<br>R reset view, V split screen, H hide this panel.<br>
-      Released: hover, click and drag objects. Held: the dot picks and grabs; the wheel pushes and pulls.</div>`;
+      WASD / arrows move, Space / Q up/down, Shift sprint,<br>R reset view, V split screen, L lens, H hide this panel.<br>
+      Released: hover, click and drag objects. Held: the dot picks and grabs; the wheel pushes and pulls.</div>
+    <div class="keys">Headset benchmark pages (for a Quest on the LAN server):
+      <a href="?scene=bench1&bench=1" style="color:#9cf">S1</a> ·
+      <a href="?scene=bench2&bench=1" style="color:#9cf">S2</a> ·
+      <a href="?scene=bench3&bench=1" style="color:#9cf">S3</a></div>`;
   document.body.append(hud);
   const cross = document.createElement("div");
   cross.id = "crosshair";
@@ -116,16 +151,22 @@ export function startViewer({ canvas, api, params }) {
   });
   const fovInput = hud.querySelector("#v-fov");
   const fovText = hud.querySelector("#v-fov-text");
-  fovInput.value = state.fov;
-  fovText.textContent = `${state.fov}°`;
+  const stereoBox = hud.querySelector("#v-stereo");
+  const lensSelect = hud.querySelector("#v-lens");
+  function syncControls() {
+    fovInput.value = state.fov;
+    fovText.textContent = `${state.fov}°`;
+    stereoBox.checked = state.stereo;
+    lensSelect.value = state.lens;
+  }
+  syncControls();
   fovInput.addEventListener("input", () => {
     state.fov = Number(fovInput.value);
-    fovText.textContent = `${state.fov}°`;
+    syncControls();
     apply();
   });
-  const stereoBox = hud.querySelector("#v-stereo");
-  stereoBox.checked = state.stereo;
-  stereoBox.addEventListener("change", () => { state.stereo = stereoBox.checked; apply(); });
+  stereoBox.addEventListener("change", () => setStereo(stereoBox.checked));
+  lensSelect.addEventListener("change", () => chooseLens(lensSelect.value));
   const quality = hud.querySelector("#v-quality");
   quality.value = params.get("quality") || "high";
   quality.addEventListener("change", () => api.set_quality(quality.value));

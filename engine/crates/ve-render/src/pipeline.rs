@@ -19,6 +19,7 @@ use bevy_render::render_resource::{
 use bevy_render::view::{Msaa, ViewTarget};
 use bevy_shader::Shader;
 
+use crate::lens::LensWarp;
 use crate::light::LightsUniform;
 use crate::prepare::{InstanceBatches, InstanceData, ViewUniform};
 use crate::targets::{DEPTH_FORMAT, render_format};
@@ -148,13 +149,14 @@ pub(crate) fn queue_forward_pipelines(
     pipeline_cache: Res<PipelineCache>,
     render_meshes: Res<RenderAssets<RenderMesh>>,
     batches: Res<InstanceBatches>,
+    lens: Res<LensWarp>,
     views: Query<(&ViewTarget, &Msaa)>,
 ) {
     let variants: Vec<(TextureFormat, u32)> = views
         .iter()
         .filter_map(|(target, msaa)| {
             Some((
-                render_format(target.out_texture_view_format()?),
+                render_format(target.out_texture_view_format()?, *lens),
                 msaa.samples(),
             ))
         })
