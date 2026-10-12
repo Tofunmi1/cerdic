@@ -1,0 +1,6 @@
+prof = profile.polygon@1(points=[[0, 0], [0.06, 0], [0.08, 0.04], [0.08, 0.1], [0.03, 0.16], [0.025, 0.22], [0.03, 0.23], [0.03, 0.235], [0.02, 0.235], [0, 0.235]])
+b = solid.revolve@1(prof, angle=360deg, segments=40)
+cork = solid.cylinder@1(radius=0.022, height=0.04, segments=24)
+corkm = xform.move@1(cork, by=[0, 0.245, 0])
+p = solid.union@1(b, corkm)
+output result = p

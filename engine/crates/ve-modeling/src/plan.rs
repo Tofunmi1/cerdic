@@ -187,7 +187,33 @@ fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usize, Fail>
         reason = "registry bounds segments to 3..512 before estimation"
     )]
     let segments = segments as usize;
+    let divisions = node
+        .params
+        .get("divisions")
+        .and_then(ve_graph::Value::as_f64)
+        .unwrap_or(1.0);
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "registry bounds divisions to 1..256 before estimation"
+    )]
+    let divisions = divisions as usize;
+    // Profile nodes count points instead of triangles; they feed the solids built from them.
     match node.op.family().as_str() {
+        "profile.polygon" => Ok(match node.params.get("points") {
+            Some(ve_graph::Value::List(points)) => points.len(),
+            _ => 0,
+        }),
+        "profile.offset" => Ok(inputs.sum::<usize>().saturating_mul(2)),
+        "profile.difference" => Ok(inputs.sum::<usize>().saturating_mul(4)),
+        "check.min_wall" => Ok(0),
+        "solid.extrude" => Ok(inputs
+            .sum::<usize>()
+            .saturating_mul(divisions.saturating_mul(4).saturating_add(2))),
+        "solid.revolve" => Ok(inputs
+            .sum::<usize>()
+            .saturating_mul(segments)
+            .saturating_mul(2)),
         "solid.box" => Ok(12),
         "solid.sphere" => Ok(segments.saturating_mul(segments).saturating_mul(2)),
         "solid.cylinder" => Ok(segments.saturating_mul(4)),

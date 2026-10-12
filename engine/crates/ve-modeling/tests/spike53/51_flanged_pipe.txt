@@ -1,0 +1,8 @@
+pipe = solid.cylinder@1(radius=0.05, height=0.4, segments=24)
+bore = solid.cylinder@1(radius=0.04, height=0.42, segments=24)
+fl = solid.cylinder@1(radius=0.09, height=0.02, segments=24)
+f1 = xform.move@1(fl, by=[0, 0.19, 0])
+f2 = xform.move@1(fl, by=[0, -0.19, 0])
+body = solid.union@1(pipe, f1, f2)
+out = solid.difference@1(body, bore)
+output result = out

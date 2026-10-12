@@ -14,6 +14,12 @@ string. Severity: `error` blocks a commit, `warning` does not, `info` is progres
 | `parse.unknown_op` | error | Operator not registered or not `ready` | Closest names by edit distance |
 | `parse.unknown_param` | error | Parameter not declared by the operator | List valid parameters |
 | `parse.missing_param` | error | Required parameter absent | Name it with its type and unit |
+| `parse.duplicate_name` | error | Two statements define the same node name | The second definition's span |
+| `parse.forward_reference` | error | A statement reads a node defined later | Define inputs first |
+| `parse.unknown_name` | error | A statement reads a name no statement defines | |
+| `provider.invalid_patch` | error | A provider reply is not exactly one bounded patch (prose, code, extra fields, empty or oversized); nothing was applied, no repair is attempted | |
+| `provider.unsupported` | error | The provider does not handle the request | What it does handle |
+| `provider.failed` | error | The provider failed to answer | |
 | `param.type` | error | Wrong type | Expected type |
 | `param.range` | error | Outside declared range | Nearest valid value and the range |
 | `param.unit` | error | Unit mismatch or missing unit | Expected unit |

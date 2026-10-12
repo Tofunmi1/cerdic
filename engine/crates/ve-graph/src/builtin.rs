@@ -13,13 +13,10 @@ const EXTENT: f64 = 1.0e6;
 
 const SOLID: &[PortType] = &[PortType::Solid];
 const PROFILE: &[PortType] = &[PortType::Profile];
-const ANY: &[PortType] = &[
-    PortType::Solid,
-    PortType::Profile,
-    PortType::Curve,
-    PortType::Sdf,
-    PortType::Inst,
-];
+/// What the transforms accept. Only solids evaluate today; profiles, curves, implicit surfaces and
+/// instances join the list when their transforms exist, so a draft graph cannot silently evaluate
+/// to nothing.
+const XFORMABLE: &[PortType] = &[PortType::Solid];
 
 fn length(name: &'static str, doc: &'static str) -> ParamSpec {
     ParamSpec {
@@ -90,8 +87,33 @@ fn all_specs() -> Vec<Option<OperatorSpec>> {
     all.extend(booleans());
     all.extend(transforms());
     all.extend(profiles());
+    all.extend(from_profiles());
+    for spec in all.iter_mut().flatten() {
+        if READY.contains(&spec.id.to_string().as_str()) {
+            spec.readiness = Readiness::Ready;
+        }
+    }
     all
 }
+
+/// Operators whose conformance cases pass (`crates/ve-modeling/tests/g3.rs` and `g3_ready.rs`).
+const READY: &[&str] = &[
+    "solid.box@1",
+    "solid.sphere@1",
+    "solid.cylinder@1",
+    "solid.union@1",
+    "solid.difference@1",
+    "solid.intersect@1",
+    "xform.move@1",
+    "xform.rotate@1",
+    "xform.scale@1",
+    "profile.polygon@1",
+    "profile.offset@1",
+    "profile.difference@1",
+    "solid.extrude@1",
+    "solid.revolve@1",
+    "check.min_wall@1",
+];
 
 fn primitives() -> Vec<Option<OperatorSpec>> {
     let solid = OutputSpec::Fixed(PortType::Solid);
@@ -163,7 +185,7 @@ fn transforms() -> Vec<Option<OperatorSpec>> {
         spec(
             "xform.move@1",
             "Moves its input.",
-            vec![single("in", ANY)],
+            vec![single("in", XFORMABLE)],
             same,
             vec![vec3(
                 "by",
@@ -176,7 +198,7 @@ fn transforms() -> Vec<Option<OperatorSpec>> {
         spec(
             "xform.rotate@1",
             "Rotates its input about the origin (X, then Y, then Z).",
-            vec![single("in", ANY)],
+            vec![single("in", XFORMABLE)],
             same,
             vec![vec3(
                 "angles",
@@ -189,7 +211,7 @@ fn transforms() -> Vec<Option<OperatorSpec>> {
         spec(
             "xform.scale@1",
             "Scales its input about the origin.",
-            vec![single("in", ANY)],
+            vec![single("in", XFORMABLE)],
             same,
             vec![vec3(
                 "by",
@@ -244,6 +266,95 @@ fn profiles() -> Vec<Option<OperatorSpec>> {
     ]
 }
 
+fn number(
+    name: &'static str,
+    unit: Unit,
+    bounds: (f64, f64),
+    default: f64,
+    doc: &'static str,
+) -> ParamSpec {
+    ParamSpec {
+        name,
+        ty: ParamType::Num {
+            unit,
+            min: bounds.0,
+            max: bounds.1,
+        },
+        default: Some(Value::Num(default)),
+        doc,
+    }
+}
+
+/// Profile edits, solids built from profiles, and constraints on them.
+fn from_profiles() -> Vec<Option<OperatorSpec>> {
+    let solid = OutputSpec::Fixed(PortType::Solid);
+    let profile = OutputSpec::Fixed(PortType::Profile);
+    vec![
+        spec(
+            "profile.offset@1",
+            "Grows (positive) or shrinks (negative) a profile; mitred corners, limit 2.",
+            vec![single("in", PROFILE)],
+            profile,
+            vec![ParamSpec {
+                name: "delta",
+                ty: ParamType::Num {
+                    unit: Unit::Length,
+                    min: -EXTENT,
+                    max: EXTENT,
+                },
+                default: None,
+                doc: "Distance in metres; an erosion that removes everything gives an empty profile.",
+            }],
+        ),
+        spec(
+            "profile.difference@1",
+            "The first profile minus all the others.",
+            vec![variadic("in", PROFILE)],
+            profile,
+            vec![],
+        ),
+        spec(
+            "solid.extrude@1",
+            "Stands a profile along Y from 0 to height (profile Y maps to -Z).",
+            vec![single("in", PROFILE)],
+            solid,
+            vec![
+                length("height", "Height in metres."),
+                ParamSpec {
+                    name: "divisions",
+                    ty: ParamType::Int { min: 1, max: 256 },
+                    default: Some(Value::Int(1)),
+                    doc: "Vertical slabs; use 16 or more with a twist.",
+                },
+                number(
+                    "twist",
+                    Unit::Angle,
+                    (-10.0 * std::f64::consts::TAU, 10.0 * std::f64::consts::TAU),
+                    0.0,
+                    "Rotation of the top relative to the base, in radians.",
+                ),
+                ParamSpec {
+                    name: "top_scale",
+                    ty: ParamType::Vec2 {
+                        unit: Unit::Ratio,
+                        min: 1.0e-3,
+                        max: 1.0e3,
+                    },
+                    default: Some(Value::List(vec![Value::Num(1.0), Value::Num(1.0)])),
+                    doc: "Size of the top relative to the base, per axis.",
+                },
+            ],
+        ),
+        spec(
+            "check.min_wall@1",
+            "Fails when the wall between an outer and an inner profile is thinner than `min`.",
+            vec![single("outer", PROFILE), single("inner", PROFILE)],
+            OutputSpec::Fixed(PortType::Check),
+            vec![length("min", "Smallest allowed wall thickness in metres.")],
+        ),
+    ]
+}
+
 /// The registry of operators every document can use.
 #[must_use]
 pub fn builtin_registry() -> OperatorRegistry {
@@ -261,12 +372,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn every_builtin_registers_and_is_a_draft() {
+    fn every_builtin_registers_and_only_the_g3_operators_are_ready() {
         let specs = all_specs();
         assert!(specs.iter().all(Option::is_some));
         let registry = builtin_registry();
         assert_eq!(registry.iter().count(), specs.len());
-        assert_eq!(registry.ready().count(), 0);
+        assert_eq!(registry.ready().count(), READY.len());
     }
 
     #[test]

@@ -18,6 +18,18 @@ pub enum Severity {
     Info,
 }
 
+/// A place in text source: 1-based line and column, and the length in characters.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
+pub struct Span {
+    /// Line, starting at 1.
+    pub line: u32,
+    /// Column of the first character, starting at 1.
+    pub col: u32,
+    /// Number of characters covered.
+    pub len: u32,
+}
+
 /// A problem found while validating, planning or evaluating.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
@@ -43,6 +55,9 @@ pub struct Diagnostic {
     /// Other nodes that took part (the members of a cycle, the source of a bad link).
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub related: Vec<NodeId>,
+    /// Where in the text source the problem is, for diagnostics from text input.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub span: Option<Span>,
     /// The limit that was hit.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<f64>,
@@ -67,10 +82,18 @@ impl Diagnostic {
             port: None,
             param: None,
             related: Vec::new(),
+            span: None,
             limit: None,
             observed: None,
             suggestion: None,
         }
+    }
+
+    /// Places the problem in the text source.
+    #[must_use]
+    pub fn at_span(mut self, span: Span) -> Self {
+        self.span = Some(span);
+        self
     }
 
     /// An error built from a refused parameter value.

@@ -1,0 +1,10 @@
+frame = solid.box@1(size=[1, 2.1, 0.12])
+hole = solid.box@1(size=[0.9, 2, 0.2])
+holem = xform.move@1(hole, by=[0, 0, 0])
+f = solid.difference@1(frame, holem)
+leaf = solid.box@1(size=[0.88, 1.98, 0.04])
+knob = solid.sphere@1(radius=0.03, segments=24)
+knobm = xform.move@1(knob, by=[0.35, 0, 0.04])
+leaf2 = solid.union@1(leaf, knobm)
+all = solid.union@1(f, leaf2)
+output door_leaf = all

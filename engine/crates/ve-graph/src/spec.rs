@@ -25,6 +25,8 @@ pub enum PortType {
     Sdf,
     /// A set of instances.
     Inst,
+    /// The verdict of a constraint node; carries no geometry.
+    Check,
 }
 
 /// How many links an input port takes.

@@ -1,0 +1,5 @@
+# A five-pointed star (outer radius 100 mm, inner 45 mm) extruded 500 mm, twisting 120 degrees while
+# tapering to 60 percent at the top.
+star = profile.polygon@1(points=[[0, 0.1], [-0.026451, 0.036406], [-0.095106, 0.030902], [-0.042798, -0.013906], [-0.058779, -0.080902], [0, -0.045], [0.058779, -0.080902], [0.042798, -0.013906], [0.095106, 0.030902], [0.026451, 0.036406]])
+tower = solid.extrude@1(star, height=500mm, divisions=64, twist=120deg, top_scale=[0.6, 0.6])
+output tower

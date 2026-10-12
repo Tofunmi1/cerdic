@@ -1,0 +1,13 @@
+body = solid.box@1(size=[0.6, 0.6, 0.5])
+cav = solid.box@1(size=[0.5, 0.5, 0.45])
+cavm = xform.move@1(cav, by=[0, 0, 0.05])
+shell = solid.difference@1(body, cavm)
+door = solid.box@1(size=[0.56, 0.56, 0.06])
+doorm = xform.move@1(door, by=[0, 0, 0.26])
+dial = solid.cylinder@1(radius=0.07, height=0.04, segments=24)
+dialr = xform.rotate@1(dial, angles=[90, 0, 0])
+dialm = xform.move@1(dialr, by=[0, 0, 0.31])
+handle = solid.box@1(size=[0.03, 0.16, 0.03])
+handlem = xform.move@1(handle, by=[0.18, 0, 0.3])
+s = solid.union@1(shell, doorm, dialm, handlem)
+output safe = s

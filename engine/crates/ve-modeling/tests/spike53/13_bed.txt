@@ -1,0 +1,10 @@
+frame = solid.box@1(size=[1, 0.25, 2])
+framem = xform.move@1(frame, by=[0, 0.2, 0])
+mat = solid.box@1(size=[0.94, 0.18, 1.94])
+matm = xform.move@1(mat, by=[0, 0.42, 0])
+head = solid.box@1(size=[1, 0.9, 0.08])
+headm = xform.move@1(head, by=[0, 0.55, -1])
+pillow = solid.box@1(size=[0.5, 0.12, 0.3])
+pillowm = xform.move@1(pillow, by=[0, 0.57, -0.8])
+b = solid.union@1(framem, matm, headm, pillowm)
+output bed = b

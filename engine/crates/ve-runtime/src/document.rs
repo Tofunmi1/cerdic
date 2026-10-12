@@ -13,6 +13,7 @@ use ve_graph::{
 };
 use wasm_bindgen::JsCast;
 pub(crate) mod staging;
+pub(crate) mod text;
 
 /// The browser's `localStorage` as a [`Backend`].
 struct LocalBackend;

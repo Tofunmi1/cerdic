@@ -1,0 +1,12 @@
+base = solid.box@1(size=[0.8, 0.4, 0.5])
+basem = xform.move@1(base, by=[0, 0.2, 0])
+lid0 = solid.cylinder@1(radius=0.25, height=0.8, segments=24)
+lid1 = xform.rotate@1(lid0, angles=[0, 0, 90])
+half = solid.box@1(size=[0.82, 0.3, 0.6])
+halfm = xform.move@1(half, by=[0, -0.15, 0])
+lid = solid.difference@1(lid1, halfm)
+lidm = xform.move@1(lid, by=[0, 0.4, 0])
+lock = solid.box@1(size=[0.08, 0.1, 0.04])
+lockm = xform.move@1(lock, by=[0, 0.4, 0.26])
+c = solid.union@1(basem, lidm, lockm)
+output chest = c

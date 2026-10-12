@@ -1,0 +1,13 @@
+top = solid.box@1(size=[1.4, 0.04, 0.7])
+topm = xform.move@1(top, by=[0, 0.74, 0])
+side = solid.box@1(size=[0.04, 0.72, 0.66])
+sl = xform.move@1(side, by=[-0.68, 0.36, 0])
+sr = xform.move@1(side, by=[0.68, 0.36, 0])
+back = solid.box@1(size=[1.32, 0.6, 0.02])
+backm = xform.move@1(back, by=[0, 0.4, -0.32])
+drawer = solid.box@1(size=[0.4, 0.15, 0.04])
+d1 = xform.move@1(drawer, by=[0.45, 0.6, 0.34])
+d2 = xform.move@1(drawer, by=[0.45, 0.4, 0.34])
+d3 = xform.move@1(drawer, by=[0.45, 0.2, 0.34])
+desk = solid.union@1(topm, sl, sr, backm, d1, d2, d3)
+output desk = desk

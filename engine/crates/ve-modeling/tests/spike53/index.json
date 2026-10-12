@@ -1,0 +1,826 @@
+[
+ {
+  "id": "01_table",
+  "title": "table",
+  "status": "deferred",
+  "kinds": [
+   "box",
+   "move",
+   "mirror",
+   "union",
+   "part"
+  ],
+  "reason": "mirror needs the instance and symmetry operators (G4)"
+ },
+ {
+  "id": "02_locker",
+  "title": "locker",
+  "status": "changed",
+  "kinds": [
+   "box",
+   "move",
+   "difference",
+   "union",
+   "part"
+  ],
+  "reason": "part names become output names",
+  "volume": 0.15334000000000003,
+  "size": [
+   0.5,
+   1.8,
+   0.52
+  ],
+  "components": 1
+ },
+ {
+  "id": "03_lamp",
+  "title": "lamp",
+  "status": "deferred",
+  "kinds": [
+   "cylinder",
+   "move",
+   "cone",
+   "union",
+   "part"
+  ],
+  "reason": "cone is not yet a conformance-tested primitive; add with the next primitive batch"
+ },
+ {
+  "id": "04_door",
+  "title": "door",
+  "status": "changed",
+  "kinds": [
+   "box",
+   "move",
+   "difference",
+   "sphere",
+   "union",
+   "part"
+  ],
+  "reason": "part names become output names",
+  "volume": 0.1057970002806133,
+  "size": [
+   1,
+   2.1,
+   0.13
+  ],
+  "components": 2
+ },
+ {
+  "id": "05_shelf",
+  "title": "shelf",
+  "status": "supported",
+  "kinds": [
+   "box",
+   "move",
+   "union"
+  ],
+  "reason": "same operators and semantics",
+  "volume": 0.05228999999999998,
+  "size": [
+   0.93,
+   1.6,
+   0.3
+  ],
+  "components": 1
+ },
+ {
+  "id": "06_chair",
+  "title": "chair",
+  "status": "deferred",
+  "kinds": [
+   "box",
+   "move",
+   "mirror",
+   "union"
+  ],
+  "reason": "mirror needs the instance and symmetry operators (G4)"
+ },
+ {
+  "id": "07_wine_glass",
+  "title": "wine glass",
+  "status": "supported",
+  "kinds": [
+   "polygon",
+   "revolve"
+  ],
+  "reason": "same operators and semantics",
+  "volume": 0.0002879011875646636,
+  "size": [
+   0.1,
+   0.2,
+   0.1
+  ],
+  "components": 1
+ },
+ {
+  "id": "08_vase",
+  "title": "vase",
+  "status": "supported",
+  "kinds": [
+   "polygon",
+   "revolve"
+  ],
+  "reason": "same operators and semantics",
+  "volume": 0.009784243249937173,
+  "size": [
+   0.24,
+   0.4,
+   0.24
+  ],
+  "components": 1
+ },
+ {
+  "id": "09_bookshelf_row_of_books",
+  "title": "bookshelf row of books",
+  "status": "deferred",
+  "kinds": [
+   "box",
+   "array"
+  ],
+  "reason": "grid instancing arrives with groups and instances (G4)"
+ },
+ {
+  "id": "10_pillar_with_base",
+  "title": "pillar with base",
+  "status": "supported",
+  "kinds": [
+   "cylinder",
+   "move",
+   "box",
+   "union"
+  ],
+  "reason": "same operators and semantics",
+  "volume": 0.7395199947152936,
+  "size": [
+   0.7,
+   3.2,
+   0.7
+  ],
+  "components": 1
+ },
+ {
+  "id": "11_arch",
+  "title": "arch",
+  "status": "supported",
+  "kinds": [
+   "cylinder",
+   "rotate",
+   "difference",
+   "box",
+   "move"
+  ],
+  "reason": "same operators and semantics",
+  "volume": 0.31679451120548546,
+  "size": [
+   2,
+   1,
+   0.4
+  ],
+  "components": 1
+ },
+ {
+  "id": "12_staircase",
+  "title": "staircase",
+  "status": "deferred",
+  "kinds": [
+   "box",
+   "repeat"
+  ],
+  "reason": "linear and spiral repetition is G4"
+ },
+ {
+  "id": "13_bed",
+  "title": "bed",
+  "status": "changed",
+  "kinds": [
+   "box",
+   "move",
+   "union",
+   "part"
+  ],
+  "reason": "part names become output names",
+  "volume": 0.9075560000000001,
+  "size": [
+   1,
+   0.925,
+   2.04
+  ],
+  "components": 1
+ },
+ {
+  "id": "14_wall_clock",
+  "title": "wall clock",
+  "status": "deferred",
+  "kinds": [
+   "cylinder",
+   "rotate",
+   "torus",
+   "box",
+   "move",
+   "union"
+  ],
+  "reason": "torus is not yet a conformance-tested primitive; revolve a circle profile instead"
+ },
+ {
+  "id": "15_key",
+  "title": "key",
+  "status": "deferred",
+  "kinds": [
+   "torus",
+   "cylinder",
+   "move",
+   "box",
+   "union",
+   "part"
+  ],
+  "reason": "torus is not yet a conformance-tested primitive; revolve a circle profile instead"
+ },
+ {
+  "id": "16_barrel",
+  "title": "barrel",
+  "status": "supported",
+  "kinds": [
+   "polygon",
+   "revolve"
+  ],
+  "reason": "same operators and semantics",
+  "volume": 0.2580498715175089,
+  "size": [
+   0.7,
+   0.9,
+   0.7
+  ],
+  "components": 1
+ },
+ {
+  "id": "17_crate",
+  "title": "crate",
+  "status": "deferred",
+  "kinds": [
+   "box",
+   "difference",
+   "repeat",
+   "move",
+   "union"
+  ],
+  "reason": "linear and spiral repetition is G4"
+ },
+ {
+  "id": "18_fence",
+  "title": "fence",
+  "status": "deferred",
+  "kinds": [
+   "box",
+   "array",
+   "move",
+   "union"
+  ],
+  "reason": "grid instancing arrives with groups and instances (G4)"
+ },
+ {
+  "id": "19_tree",
+  "title": "tree",
+  "status": "supported",
+  "kinds": [
+   "cylinder",
+   "move",
+   "sphere",
+   "union"
+  ],
+  "reason": "same operators and semantics",
+  "volume": 2.10577407362516,
+  "size": [
+   1.6,
+   2.6,
+   1.6
+  ],
+  "components": 1
+ },
+ {
+  "id": "20_mug",
+  "title": "mug",
+  "status": "deferred",
+  "kinds": [
+   "cylinder",
+   "move",
+   "difference",
+   "torus",
+   "union"
+  ],
+  "reason": "torus is not yet a conformance-tested primitive; revolve a circle profile instead"
+ },
+ {
+  "id": "21_signpost",
+  "title": "signpost",
+  "status": "changed",
+  "kinds": [
+   "cylinder",
+   "move",
+   "box",
+   "union",
+   "part"
+  ],
+  "reason": "part names become output names",
+  "volume": 0.015147755663024166,
+  "size": [
+   0.8,
+   2,
+   0.085
+  ],
+  "components": 1
+ },
+ {
+  "id": "22_sofa",
+  "title": "sofa",
+  "status": "deferred",
+  "kinds": [
+   "box",
+   "move",
+   "mirror",
+   "union"
+  ],
+  "reason": "mirror needs the instance and symmetry operators (G4)"
+ },
+ {
+  "id": "23_skull_ish_blob_sdf",
+  "title": "skull-ish blob (sdf)",
+  "status": "deferred",
+  "kinds": [
+   "sd_sphere",
+   "sd_box",
+   "move",
+   "sd_union",
+   "sd_subtract",
+   "mesh_sdf"
+  ],
+  "reason": "implicit surfaces and meshing are G8"
+ },
+ {
+  "id": "24_heart_sdf",
+  "title": "heart (sdf)",
+  "status": "deferred",
+  "kinds": [
+   "sd_sphere",
+   "move",
+   "sd_capsule",
+   "sd_union",
+   "sd_noise",
+   "mesh_sdf"
+  ],
+  "reason": "implicit surfaces and meshing are G8"
+ },
+ {
+  "id": "25_dragon_ish_creature_sdf",
+  "title": "dragon-ish creature (sdf)",
+  "status": "deferred",
+  "kinds": [
+   "sd_capsule",
+   "sd_sphere",
+   "move",
+   "sd_box",
+   "sd_union",
+   "mesh_sdf"
+  ],
+  "reason": "implicit surfaces and meshing are G8"
+ },
+ {
+  "id": "26_bone_femur_like",
+  "title": "bone (femur-like)",
+  "status": "deferred",
+  "kinds": [
+   "capsule",
+   "sphere",
+   "move",
+   "union",
+   "part"
+  ],
+  "reason": "capsule is not yet a conformance-tested primitive"
+ },
+ {
+  "id": "27_pipe_elbow_sweep",
+  "title": "pipe elbow (sweep)",
+  "status": "deferred",
+  "kinds": [
+   "circle",
+   "spline",
+   "sweep"
+  ],
+  "reason": "splines are G5; sweep needs curves and frames (G5)"
+ },
+ {
+  "id": "28_gear",
+  "title": "gear",
+  "status": "deferred",
+  "kinds": [
+   "cylinder",
+   "box",
+   "move",
+   "radial",
+   "union",
+   "difference"
+  ],
+  "reason": "radial repetition is G4"
+ },
+ {
+  "id": "29_tray_with_scattered_coins",
+  "title": "tray with scattered coins",
+  "status": "deferred",
+  "kinds": [
+   "box",
+   "cylinder",
+   "scatter",
+   "merge",
+   "move",
+   "union"
+  ],
+  "reason": "scatter and merge are instance operators (G4)"
+ },
+ {
+  "id": "30_pedestal_with_socket",
+  "title": "pedestal with socket",
+  "status": "deferred",
+  "kinds": [
+   "cylinder",
+   "move",
+   "union",
+   "socket",
+   "part"
+  ],
+  "reason": "sockets are semantic parts (G4)"
+ },
+ {
+  "id": "31_wall_safe",
+  "title": "wall safe",
+  "status": "changed",
+  "kinds": [
+   "box",
+   "move",
+   "difference",
+   "cylinder",
+   "rotate",
+   "union",
+   "part"
+  ],
+  "reason": "part names become output names",
+  "volume": 0.09202274239408113,
+  "size": [
+   0.6,
+   0.6,
+   0.58
+  ],
+  "components": 1
+ },
+ {
+  "id": "32_treasure_chest",
+  "title": "treasure chest",
+  "status": "changed",
+  "kinds": [
+   "box",
+   "move",
+   "cylinder",
+   "rotate",
+   "difference",
+   "union",
+   "part"
+  ],
+  "reason": "part names become output names",
+  "volume": 0.237898878780515,
+  "size": [
+   0.8,
+   0.65,
+   0.53
+  ],
+  "components": 1
+ },
+ {
+  "id": "33_desk_with_drawers",
+  "title": "desk with drawers",
+  "status": "changed",
+  "kinds": [
+   "box",
+   "move",
+   "union",
+   "part"
+  ],
+  "reason": "part names become output names",
+  "volume": 0.10025600000000004,
+  "size": [
+   1.4,
+   0.76,
+   0.71
+  ],
+  "components": 4
+ },
+ {
+  "id": "34_window_wall",
+  "title": "window wall",
+  "status": "supported",
+  "kinds": [
+   "box",
+   "move",
+   "difference",
+   "union"
+  ],
+  "reason": "same operators and semantics",
+  "volume": 1.326,
+  "size": [
+   3,
+   2.6,
+   0.3
+  ],
+  "components": 1
+ },
+ {
+  "id": "35_hospital_bed",
+  "title": "hospital bed",
+  "status": "deferred",
+  "kinds": [
+   "box",
+   "move",
+   "cylinder",
+   "mirror",
+   "union",
+   "part"
+  ],
+  "reason": "mirror needs the instance and symmetry operators (G4)"
+ },
+ {
+  "id": "36_keypad",
+  "title": "keypad",
+  "status": "deferred",
+  "kinds": [
+   "box",
+   "array",
+   "move",
+   "union",
+   "part"
+  ],
+  "reason": "grid instancing arrives with groups and instances (G4)"
+ },
+ {
+  "id": "37_torch",
+  "title": "torch",
+  "status": "deferred",
+  "kinds": [
+   "cone",
+   "move",
+   "sd_sphere",
+   "scale",
+   "mesh_sdf",
+   "union"
+  ],
+  "reason": "cone is not yet a conformance-tested primitive; add with the next primitive batch; implicit surfaces and meshing are G8"
+ },
+ {
+  "id": "38_potion_bottle",
+  "title": "potion bottle",
+  "status": "supported",
+  "kinds": [
+   "polygon",
+   "revolve",
+   "cylinder",
+   "move",
+   "union"
+  ],
+  "reason": "same operators and semantics",
+  "volume": 0.0026510340244951854,
+  "size": [
+   0.16,
+   0.265,
+   0.16
+  ],
+  "components": 1
+ },
+ {
+  "id": "39_anatomical_heart",
+  "title": "anatomical heart",
+  "status": "deferred",
+  "kinds": [
+   "sd_sphere",
+   "scale",
+   "move",
+   "sd_capsule",
+   "sd_union",
+   "sd_noise",
+   "mesh_sdf",
+   "part"
+  ],
+  "reason": "implicit surfaces and meshing are G8"
+ },
+ {
+  "id": "40_lung_lobe",
+  "title": "lung lobe",
+  "status": "deferred",
+  "kinds": [
+   "sd_sphere",
+   "scale",
+   "move",
+   "sd_subtract",
+   "sd_noise",
+   "mesh_sdf"
+  ],
+  "reason": "implicit surfaces and meshing are G8"
+ },
+ {
+  "id": "41_kidney",
+  "title": "kidney",
+  "status": "deferred",
+  "kinds": [
+   "sd_sphere",
+   "scale",
+   "move",
+   "sd_subtract",
+   "mesh_sdf"
+  ],
+  "reason": "implicit surfaces and meshing are G8"
+ },
+ {
+  "id": "42_vertebra",
+  "title": "vertebra",
+  "status": "deferred",
+  "kinds": [
+   "cylinder",
+   "torus",
+   "move",
+   "rotate",
+   "box",
+   "union",
+   "part"
+  ],
+  "reason": "torus is not yet a conformance-tested primitive; revolve a circle profile instead"
+ },
+ {
+  "id": "43_eyeball",
+  "title": "eyeball",
+  "status": "changed",
+  "kinds": [
+   "sphere",
+   "move",
+   "cylinder",
+   "rotate",
+   "union",
+   "part"
+  ],
+  "reason": "part names become output names",
+  "volume": 0.00723787898914117,
+  "size": [
+   0.24,
+   0.24,
+   0.275
+  ],
+  "components": 1
+ },
+ {
+  "id": "44_stethoscope_tube",
+  "title": "stethoscope tube",
+  "status": "deferred",
+  "kinds": [
+   "circle",
+   "spline",
+   "sweep",
+   "cylinder",
+   "move",
+   "union"
+  ],
+  "reason": "splines are G5; sweep needs curves and frames (G5)"
+ },
+ {
+  "id": "45_syringe",
+  "title": "syringe",
+  "status": "deferred",
+  "kinds": [
+   "cylinder",
+   "move",
+   "box",
+   "cone",
+   "union"
+  ],
+  "reason": "cone is not yet a conformance-tested primitive; add with the next primitive batch"
+ },
+ {
+  "id": "46_hex_bolt",
+  "title": "hex bolt",
+  "status": "changed",
+  "kinds": [
+   "cylinder",
+   "move",
+   "union",
+   "part"
+  ],
+  "reason": "part names become output names",
+  "volume": 0.000035019081023827524,
+  "size": [
+   0.04,
+   0.072,
+   0.035
+  ],
+  "components": 1
+ },
+ {
+  "id": "47_l_bracket",
+  "title": "L bracket",
+  "status": "supported",
+  "kinds": [
+   "box",
+   "move",
+   "union",
+   "cylinder",
+   "difference"
+  ],
+  "reason": "same operators and semantics",
+  "volume": 0.0000927638034503142,
+  "size": [
+   0.1,
+   0.1,
+   0.05
+  ],
+  "components": 1
+ },
+ {
+  "id": "48_i_beam",
+  "title": "I beam",
+  "status": "supported",
+  "kinds": [
+   "box",
+   "move",
+   "union"
+  ],
+  "reason": "same operators and semantics",
+  "volume": 0.008000000000000002,
+  "size": [
+   0.1,
+   0.22,
+   2
+  ],
+  "components": 1
+ },
+ {
+  "id": "49_coil_spring",
+  "title": "coil spring",
+  "status": "deferred",
+  "kinds": [
+   "circle",
+   "spline",
+   "sweep"
+  ],
+  "reason": "splines are G5; sweep needs curves and frames (G5)"
+ },
+ {
+  "id": "50_turbine_blade_loft",
+  "title": "turbine blade loft",
+  "status": "deferred",
+  "kinds": [
+   "rect",
+   "loft"
+  ],
+  "reason": "loft needs curves and frames (G5)"
+ },
+ {
+  "id": "51_flanged_pipe",
+  "title": "flanged pipe",
+  "status": "supported",
+  "kinds": [
+   "cylinder",
+   "move",
+   "union",
+   "difference"
+  ],
+  "reason": "same operators and semantics",
+  "volume": 0.0018138038680784664,
+  "size": [
+   0.18,
+   0.4,
+   0.18
+  ],
+  "components": 1
+ },
+ {
+  "id": "52_spiral_staircase",
+  "title": "spiral staircase",
+  "status": "deferred",
+  "kinds": [
+   "box",
+   "move",
+   "radial",
+   "cylinder",
+   "union"
+  ],
+  "reason": "radial repetition is G4"
+ },
+ {
+  "id": "53_clock_tower",
+  "title": "clock tower",
+  "status": "deferred",
+  "kinds": [
+   "box",
+   "move",
+   "cone",
+   "cylinder",
+   "rotate",
+   "union",
+   "part"
+  ],
+  "reason": "cone is not yet a conformance-tested primitive; add with the next primitive batch"
+ }
+]

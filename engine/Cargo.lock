@@ -3143,6 +3143,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ve-provider"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "ve-graph",
+ "ve-modeling",
+]
+
+[[package]]
 name = "ve-render"
 version = "0.0.0"
 dependencies = [

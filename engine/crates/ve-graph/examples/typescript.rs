@@ -4,7 +4,7 @@ use ts_rs::{Config, TS};
 use ve_graph::{
     Alias, Command, CommandBatch, Diagnostic, DocId, Document, EditorLayer, Flags, IdState,
     InputRef, Material, MaterialId, Node, NodeId, NodeRef, OpId, OutRef, Outcome, Output, PortRef,
-    Severity, TransactionId, Value,
+    Severity, Span, TransactionId, Value,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -31,6 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Output::decl(&cfg),
         PortRef::decl(&cfg),
         Severity::decl(&cfg),
+        Span::decl(&cfg),
         TransactionId::decl(&cfg),
         Value::decl(&cfg),
     ];

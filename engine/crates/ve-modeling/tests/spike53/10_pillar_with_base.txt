@@ -1,0 +1,8 @@
+col = solid.cylinder@1(radius=0.25, height=3, segments=24)
+colm = xform.move@1(col, by=[0, 1.5, 0])
+base = solid.box@1(size=[0.7, 0.2, 0.7])
+basem = xform.move@1(base, by=[0, 0.1, 0])
+cap = solid.box@1(size=[0.7, 0.2, 0.7])
+capm = xform.move@1(cap, by=[0, 3.1, 0])
+p = solid.union@1(colm, basem, capm)
+output result = p

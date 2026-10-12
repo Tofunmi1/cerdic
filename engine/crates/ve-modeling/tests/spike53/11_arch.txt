@@ -1,0 +1,9 @@
+outer = solid.cylinder@1(radius=1, height=0.4, segments=24)
+outerr = xform.rotate@1(outer, angles=[90, 0, 0])
+inner = solid.cylinder@1(radius=0.7, height=0.5, segments=24)
+innerr = xform.rotate@1(inner, angles=[90, 0, 0])
+ring = solid.difference@1(outerr, innerr)
+cutbox = solid.box@1(size=[3, 1, 1])
+cutm = xform.move@1(cutbox, by=[0, -0.5, 0])
+half = solid.difference@1(ring, cutm)
+output result = half

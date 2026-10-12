@@ -21,6 +21,7 @@ const ENGINE_AGNOSTIC: &[&str] = &[
     "ve-kernel",
     "ve-kernel-sys",
     "ve-modeling",
+    "ve-provider",
     "ve-xr-math",
 ];
 /// Dependency name prefixes the engine-agnostic crates may not use.

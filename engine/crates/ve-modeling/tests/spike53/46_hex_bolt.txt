@@ -1,0 +1,6 @@
+head0 = solid.cylinder@1(radius=0.02, height=0.012, segments=6)
+headm = xform.move@1(head0, by=[0, 0.006, 0])
+shaft = solid.cylinder@1(radius=0.011, height=0.06, segments=24)
+shaftm = xform.move@1(shaft, by=[0, -0.03, 0])
+b = solid.union@1(headm, shaftm)
+output bolt = b

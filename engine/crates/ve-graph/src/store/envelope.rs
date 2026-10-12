@@ -72,13 +72,6 @@ pub(crate) fn encode(doc: &Document, generation: u64) -> Result<String, Box<Diag
     })
 }
 
-#[cfg_attr(
-    target_family = "wasm",
-    expect(
-        clippy::unnecessary_box_returns,
-        reason = "a diagnostic is over 128 bytes on 64-bit targets, where boxing keeps Result small; wasm32 is under the threshold"
-    )
-)]
 fn corrupt(why: impl Into<String>) -> Box<Diagnostic> {
     Box::new(Diagnostic::error("store.corrupt", why).suggest("the previous save, if any, was kept"))
 }

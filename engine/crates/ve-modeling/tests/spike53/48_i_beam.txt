@@ -1,0 +1,6 @@
+web = solid.box@1(size=[0.01, 0.2, 2])
+fl = solid.box@1(size=[0.1, 0.01, 2])
+top = xform.move@1(fl, by=[0, 0.105, 0])
+bot = xform.move@1(fl, by=[0, -0.105, 0])
+b = solid.union@1(web, top, bot)
+output result = b

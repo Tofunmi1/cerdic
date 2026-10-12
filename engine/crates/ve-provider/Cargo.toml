@@ -1,0 +1,19 @@
+[package]
+name = "ve-provider"
+version = "0.0.0"
+description = "Provider boundary: bounded typed patches from an assistant, applied through the normal commands."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+ve-graph = { path = "../ve-graph" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+ve-modeling = { path = "../ve-modeling" }
+
+[lints]
+workspace = true

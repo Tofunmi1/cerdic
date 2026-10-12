@@ -67,7 +67,9 @@ try {
   await doc(a, "redo");
   check((await doc(a, "state")).nodes === 2, "redo did not restore it");
   const ops = await doc(a, "operators");
-  check(ops.some((o) => o.id === "solid.revolve@1") && ops.every((o) => o.readiness === "draft"), "operator list is wrong");
+  const ready = new Set(ops.filter((o) => o.readiness === "ready").map((o) => o.id));
+  check(ready.has("solid.revolve@1") && ready.has("check.min_wall@1") && ready.has("profile.offset@1") && ops.length === ready.size,
+    "operator list is wrong: every shipped operator passes its conformance cases and is ready");
 
   // Save, then a fresh page (a reload) gets the identical document back.
   const saved = await doc(a, "save");
