@@ -42,6 +42,12 @@ fn the_vase_is_a_hollow_solid_of_the_expected_volume() {
 }
 
 #[test]
+fn the_ceramic_vase_is_a_smooth_hollow_solid_with_a_surface() {
+    let v = volume("ceramic_vase");
+    assert!(v > 1.0e-3 && v < 4.0e-3, "{v}");
+}
+
+#[test]
 fn the_twisted_tower_has_the_tapered_prism_volume() {
     let star_area = 5.0 * 0.1 * 0.045 * (std::f64::consts::PI / 5.0).sin();
     let analytic = star_area * 0.5 * (1.0 + 0.6 + 0.36) / 3.0;

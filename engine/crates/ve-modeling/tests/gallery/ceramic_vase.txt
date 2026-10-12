@@ -1,0 +1,13 @@
+# A glossy red ceramic vase: a handful of profile points rounded into a smooth curve by corner cutting
+# (keep_axis keeps the base flat), revolved, hollowed, with a 3 mm minimum wall and a ceramic surface.
+# The cavity profile rises above the rim, which opens the vase.
+outer_rough = profile.polygon@1(points=[[0, 0], [0.055, 0], [0.105, 0.10], [0.085, 0.22], [0.045, 0.28], [0.05, 0.32], [0, 0.32]])
+inner_rough = profile.polygon@1(points=[[0, 0.02], [0.046, 0.02], [0.090, 0.10], [0.070, 0.22], [0.034, 0.28], [0.038, 0.40], [0, 0.40]])
+outer = profile.smooth@1(outer_rough, iterations=3, keep_axis=true)
+inner = profile.smooth@1(inner_rough, iterations=3, keep_axis=true)
+wall = check.min_wall@1(outer, inner, min=3mm)
+body = solid.revolve@1(outer, segments=96)
+cavity = solid.revolve@1(inner, segments=96)
+vessel = solid.difference@1(body, cavity)
+ceramic = solid.material@1(vessel, color=[0.78, 0.08, 0.07], metallic=0, roughness=0.18)
+output vase = ceramic

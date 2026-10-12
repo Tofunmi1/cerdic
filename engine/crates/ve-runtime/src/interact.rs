@@ -7,14 +7,13 @@ use std::collections::BTreeSet;
 
 use bevy_app::{App, Update};
 use bevy_camera::{Camera, Camera3d};
-use bevy_color::{Color, LinearRgba};
 use bevy_ecs::component::Component;
 use bevy_ecs::entity::Entity;
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::IntoScheduleConfigs;
 use bevy_ecs::query::{With, Without};
 use bevy_ecs::resource::Resource;
-use bevy_ecs::system::{Commands, Query, Res, ResMut};
+use bevy_ecs::system::{Query, Res, ResMut};
 use bevy_input::ButtonInput;
 use bevy_input::mouse::{MouseButton, MouseScrollUnit, MouseWheel};
 use bevy_math::{Quat, Vec2, Vec3};
@@ -25,15 +24,17 @@ use ve_interact::{
     Hit, Interaction, Placement3, PointerFrame, PointerId, Ray, Shape, TargetId, World,
 };
 use ve_kernel::Bounds;
-use ve_render::{StereoViews, VeMaterial};
+use ve_render::StereoViews;
 use ve_xr_web::frame::Handedness;
 use ve_xr_web::{XrInput, XrRig, apply_xr_frame, controller_pointer};
 
 use crate::viewer::{ViewerRig, update_viewer};
 
+mod hover;
 mod report;
 mod spawn;
 
+pub(crate) use hover::highlight_hover;
 use report::describe;
 pub(crate) use report::report;
 pub(crate) use spawn::{spawn_lasers, tag};
@@ -47,9 +48,6 @@ const LASER_REST: f32 = 3.0;
 /// Metres of push or pull per mouse-wheel line, and per pixel of wheel delta.
 const WHEEL_LINE: f32 = 0.25;
 const WHEEL_PIXEL: f32 = 0.002;
-
-/// How much of an object's colour is added as glow while it is hovered.
-const HOVER_GLOW: f32 = 0.35;
 
 /// Events kept for the status report.
 const LOG_LINES: usize = 24;
@@ -86,10 +84,6 @@ impl Interactable {
 /// A short name for an object, for the status report and the event log.
 #[derive(Component, Clone, Debug)]
 pub(crate) struct Label(pub(crate) String);
-
-/// Marks an object whose emissive colour is currently raised for hover, remembering the original.
-#[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct HoverTint(Color);
 
 /// A controller's laser pointer.
 #[derive(Component, Clone, Copy, Debug)]
@@ -350,32 +344,5 @@ fn laser_transform(ray: &Ray, length: f32) -> Transform {
         translation: ray.at(length * 0.5),
         rotation: Quat::from_rotation_arc(Vec3::NEG_Z, ray.direction),
         scale: Vec3::new(1.0, 1.0, length),
-    }
-}
-
-/// Raises the emissive colour of hovered objects and puts it back afterwards.
-pub(crate) fn highlight_hover(
-    mut commands: Commands,
-    state: Res<InteractionState>,
-    mut objects: Query<(Entity, &mut VeMaterial, Option<&HoverTint>), With<Interactable>>,
-) {
-    for (entity, mut material, tint) in &mut objects {
-        let hovered = state.hovered.contains(&entity);
-        match (hovered, tint) {
-            (true, None) => {
-                commands.entity(entity).insert(HoverTint(material.emissive));
-                let base = LinearRgba::from(material.base_color);
-                material.emissive = Color::linear_rgb(
-                    base.red * HOVER_GLOW,
-                    base.green * HOVER_GLOW,
-                    base.blue * HOVER_GLOW,
-                );
-            }
-            (false, Some(HoverTint(original))) => {
-                material.emissive = *original;
-                commands.entity(entity).remove::<HoverTint>();
-            }
-            _ => {}
-        }
     }
 }

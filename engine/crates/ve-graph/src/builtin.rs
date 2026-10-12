@@ -111,6 +111,7 @@ const READY: &[&str] = &[
     "xform.scale@1",
     "profile.polygon@1",
     "profile.offset@1",
+    "profile.smooth@1",
     "profile.difference@1",
     "solid.extrude@1",
     "solid.revolve@1",

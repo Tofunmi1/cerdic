@@ -71,6 +71,12 @@ Example (a vase, with a 3 mm minimum wall that the engine enforces):
   vase = solid.difference@1(body, cavity)
   output vase
 
+Smooth shapes: a few well-chosen profile points are enough if you round them with
+profile.smooth@1(profile, iterations=3, keep_axis=true), which turns the corners into a smooth curve
+(keep_axis=true for a profile you will revolve, so its base stays flat). For a hollow vessel, revolve
+an outer and an inner profile and subtract; let the inner profile rise above the outer rim to open
+the top, and add check.min_wall@1 to keep the wall thick enough. Lay out real dimensions in metres.
+
 Colour and finish: solid.material@1(solid, color=[r,g,b], metallic=0, roughness=0.5, emissive=[0,0,0])
 gives a solid a surface (colour is sRGB 0..1 as in a colour picker, metallic 0 plastic/paint/wood to 1
 bare metal, roughness 0 mirror to 1 matte, emissive glows above 1). The shape is unchanged. Put it on

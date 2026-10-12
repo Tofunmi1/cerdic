@@ -23,6 +23,8 @@ use crate::{interact, mock_hmd, status, wands};
 pub(crate) enum SceneKind {
     /// Editor comparison gallery with the legacy starter's dimensions and poses.
     Gallery,
+    /// An empty lit room (floor, walls, sun, warm lights) for looking at authored models.
+    Stage,
     /// A cube with a spherical bite, flat shaded, under a sun.
     #[default]
     Kernel,
@@ -50,6 +52,7 @@ impl FromStr for SceneKind {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "gallery" => Ok(Self::Gallery),
+            "stage" => Ok(Self::Stage),
             "" | "kernel" => Ok(Self::Kernel),
             "materials" => Ok(Self::Materials),
             "lights" => Ok(Self::Lights),
@@ -335,6 +338,9 @@ pub(crate) fn spawn_scene(
     ambient.intensity = 0.2;
     let built = match *choice {
         SceneKind::Gallery => crate::gallery::spawn(&mut commands, &mut meshes),
+        SceneKind::Stage => {
+            crate::bench_scene::stage_scene(&mut commands, &mut meshes, &mut ambient)
+        }
         SceneKind::Kernel => kernel_scene(&mut commands, &mut meshes),
         SceneKind::Materials => materials_scene(&mut commands, &mut meshes),
         SceneKind::Lights => lights_scene(&mut commands, &mut meshes),
