@@ -642,7 +642,11 @@ the undo history is not saved; two tabs are not merged (last save wins); `serde_
 floats exactly (`float_roundtrip`) because the default parser failed bit-exact reload.
 **Embedded logic planned 2026-10-12** (`docs/modeling/logic.md`, ADR 0008, gates L0-L9, experiments X8
 and X9, decisions D12-D15, an escape-room door fixture); no logic code exists yet.
-V0, G2-G13, V1-V7 and L0-L9 pending; X1-X9 not performed. No gate has passed merely because this
+**X1 done 2026-10-12** (`docs/modeling/experiments.md`): the evaluator-only module is 183 KB brotli,
+starts in 31 to 70 ms, keeps the main thread at 60 fps during a job, and a stuck job is terminated and
+restarted in 46 to 70 ms with identical results; ADR 0006 accepted (two modules, one source). Open for
+G2: large transfers, cooperative cancellation in the C ABI, headset CPU cost.
+V0, G2-G13, V1-V7 and L0-L9 pending; X2-X9 not performed. No gate has passed merely because this
 document was revised. Replace this line with per-milestone evidence as work lands:
 commit, contract version, cases and commands run, pass, fail and skips, benchmark artifact, known
 limitations, next dependency. Run `cargo xtask check --strict` from `engine/`, the separate

@@ -1,5 +1,5 @@
 # 0006: Geometry evaluation runs in a worker
-- Status: proposed (confirmed or revised by experiment X1 before G2)
+- Status: accepted 2026-10-12 after experiment X1 (evidence in `docs/modeling/experiments.md`)
 - Date: 2026-10-12
 
 ## Context
@@ -16,8 +16,11 @@ gives cooperative cancellation only for some operations.
 - No threads, SharedArrayBuffer or isolation headers are introduced.
 - Jobs and results carry document ID, revision, request ID, worker generation, quality and dependency
   hash; stale results are discarded.
-- Packaging (one module reused by both entries, or two) is decided by X1 from measured size,
-  startup and transfer cost.
+- Packaging: **two modules from one source.** X1 measured the evaluator-only module at 183 KB brotli
+  against 3.36 MB for the full runtime, a cold start of 31 to 70 ms, and a stuck job terminated and
+  restarted in 46 to 70 ms with identical results, so a separate small module beats loading the
+  runtime twice. Still open for G2: large transfers, cooperative cancellation in the C ABI, and the
+  CPU cost of a worker on a headset.
 
 ## Consequences
 ADR 0001 stays accepted: this is one codebase with two entry points, not a second engine. G2
