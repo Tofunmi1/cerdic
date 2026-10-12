@@ -1,0 +1,8 @@
+sclera = solid.sphere@1(radius=0.12, segments=24)
+cornea = solid.sphere@1(radius=0.06, segments=24)
+cornm = xform.move@1(cornea, by=[0, 0, 0.095])
+iris = solid.cylinder@1(radius=0.035, height=0.01, segments=24)
+irisr = xform.rotate@1(iris, angles=[90, 0, 0])
+irism = xform.move@1(irisr, by=[0, 0, 0.15])
+e = solid.union@1(sclera, cornm, irism)
+output eye = e

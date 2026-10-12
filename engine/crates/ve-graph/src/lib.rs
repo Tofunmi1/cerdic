@@ -16,11 +16,12 @@ mod nodes;
 mod session;
 mod spec;
 mod store;
+mod text;
 mod value;
 
 pub use builtin::builtin_registry;
 pub use command::{Alias, Command, CommandBatch, InputRef, NodeRef, OutRef, Outcome};
-pub use diag::{Diagnostic, Severity};
+pub use diag::{Diagnostic, Severity, Span};
 pub use doc::{
     Document, EditorLayer, EvalHash, Flags, IdState, Material, Node, OUT_PORT, Output, PortRef,
     SCHEMA,
@@ -35,4 +36,5 @@ pub use spec::{
     PortType, Readiness,
 };
 pub use store::{Backend, BackendError, DocStore, Loaded, MemoryBackend, MigrationStep, Migrator};
+pub use text::{TextBatch, parse_text, to_text};
 pub use value::{ParamIssue, ParamType, Unit, Value};

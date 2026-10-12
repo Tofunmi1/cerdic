@@ -17,6 +17,8 @@ export interface Runtime {
   doc_redo(): string;
   doc_save(): string;
   doc_candidate_state(): string;
+  doc_parse_text(text: string): string;
+  doc_text(): string;
   doc_stage(batch: string): string;
   doc_stage_undo(): string;
   doc_stage_redo(): string;
@@ -30,6 +32,7 @@ export interface Runtime {
   viewer_move(right: number, up: number, forward: number, sprint: boolean): void;
   viewer_look(x: number, y: number): void;
   viewer_set_locked(locked: boolean): void;
+  viewer_look_at(px: number, py: number, pz: number, tx: number, ty: number, tz: number): boolean;
   xr_supported(): Promise<boolean>;
   enter_xr(canvas: string): Promise<void>;
   exit_xr(): Promise<void>;
@@ -51,6 +54,13 @@ export function documentBridge(runtime: Runtime, notify: () => void, evaluate?: 
       return this.apply({ doc: current.id, base_revision: current.pending_document?.revision ?? current.revision,
         transaction: `t_${crypto.randomUUID()}`, label, commands });
     },
+    // The text form: `{ diagnostics }` when it does not read, else the staged outcome of its commands.
+    sendText(text: string, label: string): StageResult | { diagnostics: Diagnostic[] } {
+      const read = JSON.parse(runtime.doc_parse_text(text)) as { commands?: Command[]; diagnostics?: Diagnostic[] };
+      if (!read.commands) return { diagnostics: read.diagnostics ?? [] };
+      return this.send(read.commands, label);
+    },
+    text(): { text?: string; error?: Diagnostic } { return JSON.parse(runtime.doc_text()); },
     undo() { const result: unknown = JSON.parse(evaluate ? runtime.doc_stage_undo() : runtime.doc_undo()); if (result) evaluate?.(); notify(); return result; },
     redo() { const result: unknown = JSON.parse(evaluate ? runtime.doc_stage_redo() : runtime.doc_redo()); if (result) evaluate?.(); notify(); return result; },
     save() { const result: unknown = JSON.parse(runtime.doc_save()); notify(); return result; },

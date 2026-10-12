@@ -10,13 +10,6 @@ use crate::limits::{MAX_VARIADIC, count};
 use crate::nodes::unknown_node;
 use crate::spec::{Arity, OperatorRegistry, OutputSpec, PortType};
 
-#[cfg_attr(
-    target_family = "wasm",
-    expect(
-        clippy::unnecessary_box_returns,
-        reason = "a diagnostic is over 128 bytes on 64-bit targets, where boxing keeps Result small; wasm32 is under the threshold"
-    )
-)]
 fn port_error(code: &str, message: String, node: &NodeId, port: &str) -> Fail {
     Box::new(Diagnostic::error(code, message).at_node(node).at_port(port))
 }

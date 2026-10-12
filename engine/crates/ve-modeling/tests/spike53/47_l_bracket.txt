@@ -1,0 +1,9 @@
+a = solid.box@1(size=[0.1, 0.01, 0.05])
+b = solid.box@1(size=[0.01, 0.1, 0.05])
+bm = xform.move@1(b, by=[-0.045, 0.045, 0])
+br = solid.union@1(a, bm)
+h = solid.cylinder@1(radius=0.006, height=0.02, segments=24)
+hm = xform.move@1(h, by=[0.02, 0, 0])
+hm2 = xform.move@1(h, by=[0.02, 0, 0.015])
+out = solid.difference@1(br, hm, hm2)
+output result = out

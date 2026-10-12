@@ -1,0 +1,6 @@
+trunk = solid.cylinder@1(radius=0.12, height=1.4, segments=24)
+trunkm = xform.move@1(trunk, by=[0, 0.7, 0])
+crown = solid.sphere@1(radius=0.8, segments=24)
+crownm = xform.move@1(crown, by=[0, 1.8, 0])
+t = solid.union@1(trunkm, crownm)
+output result = t

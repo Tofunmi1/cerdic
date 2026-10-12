@@ -59,6 +59,8 @@ struct Input {
     reset: bool,
     /// The lens the page asked for; it only applies where it makes sense (see `wanted_lens`).
     lens: LensMode,
+    /// A pose to jump to on the next frame: position, yaw and pitch (see `set_look_at`).
+    pose: Option<(Vec3, f32, f32)>,
 }
 
 impl Default for Input {
@@ -74,6 +76,7 @@ impl Default for Input {
             sprint: false,
             reset: false,
             lens: LensMode::Off,
+            pose: None,
         }
     }
 }
@@ -158,6 +161,20 @@ fn wanted_lens(input: &Input, split: bool, presenting: bool) -> LensMode {
     }
 }
 
+/// Jumps the viewer to `position` looking at `target` on the next frame (the fixed review views of
+/// `docs/modeling/fixtures.md`). Needs the viewer to be on; non-finite values or a zero-length view
+/// are ignored. Returns whether the pose was accepted.
+pub(crate) fn set_look_at(position: Vec3, target: Vec3) -> bool {
+    let direction = target - position;
+    if !(position.is_finite() && target.is_finite()) || direction.length() < 1.0e-6 {
+        return false;
+    }
+    let yaw = (-direction.x).atan2(-direction.z);
+    let pitch = (direction.y / direction.length()).asin();
+    with_input(|input| input.pose = Some((position, yaw, pitch)));
+    true
+}
+
 /// Puts the view back where the scene started.
 pub(crate) fn request_reset() {
     with_input(|input| input.reset = true);
@@ -215,6 +232,13 @@ impl ViewerRig {
 /// The horizontal field of view (radians) of one eye that has the given vertical one and aspect.
 fn horizontal_fov(vertical: f32, aspect: f32) -> f32 {
     2.0 * ((vertical * 0.5).tan() * aspect).atan()
+}
+
+/// Applies a pose the page asked to jump to (see `set_look_at`).
+fn jump_to_pose(rig: &mut ViewerRig, input: &Input) {
+    if let Some((position, yaw, pitch)) = input.pose {
+        (rig.position, rig.yaw, rig.pitch) = (position, yaw, pitch);
+    }
 }
 
 /// Turns the viewer by the mouse movement and moves it by the wanted motion, for `dt` seconds.
@@ -284,6 +308,9 @@ pub(crate) fn update_viewer(
         let snapshot = *input;
         input.look = Vec2::ZERO;
         input.reset = false;
+        if snapshot.enabled {
+            input.pose = None;
+        }
         snapshot
     });
     rig.locked = input.enabled && input.locked;
@@ -318,6 +345,7 @@ pub(crate) fn update_viewer(
         (rig.position, rig.yaw, rig.pitch) = (position, yaw, pitch);
     }
 
+    jump_to_pose(&mut rig, &input);
     step(&mut rig, &input, time.delta_secs());
     let rotation = rig.rotation();
     let vertical = vertical_fov(&input);

@@ -1,0 +1,9 @@
+wall = solid.box@1(size=[3, 2.6, 0.2])
+wallm = xform.move@1(wall, by=[0, 1.3, 0])
+hole = solid.box@1(size=[1, 1.2, 0.3])
+holem = xform.move@1(hole, by=[0, 1.5, 0])
+w = solid.difference@1(wallm, holem)
+sill = solid.box@1(size=[1.2, 0.05, 0.3])
+sillm = xform.move@1(sill, by=[0, 0.875, 0.05])
+out = solid.union@1(w, sillm)
+output result = out

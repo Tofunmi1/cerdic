@@ -110,6 +110,17 @@ pub fn viewer_set_lens(name: &str) -> bool {
     viewer::set_lens(name)
 }
 
+/// Jumps the viewer to a position looking at a target (metres), for fixed review views. Returns
+/// false for non-finite values or a zero-length view. The viewer must be on.
+#[wasm_bindgen]
+#[must_use]
+pub fn viewer_look_at(px: f32, py: f32, pz: f32, tx: f32, ty: f32, tz: f32) -> bool {
+    viewer::set_look_at(
+        bevy_math::Vec3::new(px, py, pz),
+        bevy_math::Vec3::new(tx, ty, tz),
+    )
+}
+
 /// Puts the viewer back where the scene started.
 #[wasm_bindgen]
 pub fn viewer_reset() {
@@ -175,6 +186,21 @@ pub fn doc_save() -> String {
 #[must_use]
 pub fn doc_operators() -> String {
     document::operators()
+}
+
+/// Reads the text form into commands: `{ commands, spans }` or `{ diagnostics }` (each with a source
+/// span). The page wraps the commands in a batch for the current revision.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_parse_text(text: &str) -> String {
+    document::text::parse(text)
+}
+
+/// The working document as canonical text: `{ text }` or `{ error }`.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_text() -> String {
+    document::text::print()
 }
 
 /// The Rust-owned working candidate and its dependency hash.

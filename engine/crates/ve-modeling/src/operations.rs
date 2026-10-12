@@ -1,5 +1,5 @@
 //! Operators consume immutable mesh values. Native solids exist only while one node executes.
-use crate::{Fail, cache::Value, fail};
+use crate::{Fail, cache::Value, fail, profile_ops};
 use std::rc::Rc;
 use ve_graph::{Node, Value as Param};
 use ve_kernel::{ExecutionContext, KernelError, Mesh, Solid};
@@ -13,10 +13,7 @@ pub(crate) fn execute(
         return Err(fail("eval.cancelled", "evaluation was cancelled"));
     }
     if node.flags.muted {
-        return Ok(Value {
-            mesh: Mesh::default(),
-            volume: 0.0,
-        });
+        return Ok(Value::nothing());
     }
     if node.flags.bypass {
         let input = inputs
@@ -25,37 +22,31 @@ pub(crate) fn execute(
         return Ok(Value {
             mesh: input.mesh.clone(),
             volume: input.volume,
+            loops: input.loops.clone(),
         });
     }
     let family = node.op.family().as_str();
+    if family.starts_with("profile.") || family == "check.min_wall" {
+        return profile_ops::run(node, inputs);
+    }
     let first_empty = inputs.first().is_some_and(|input| input.mesh.is_empty());
     if ((family == "solid.difference" || family.starts_with("xform.")) && first_empty)
         || (family == "solid.intersect" && inputs.iter().any(|input| input.mesh.is_empty()))
         || (family == "solid.union" && inputs.iter().all(|input| input.mesh.is_empty()))
     {
-        return Ok(Value {
-            mesh: Mesh::default(),
-            volume: 0.0,
-        });
+        return Ok(Value::nothing());
     }
     let nonempty: Vec<_> = inputs
         .iter()
         .filter(|input| !input.mesh.is_empty())
         .map(Rc::clone)
         .collect();
-    let result = solid(node, &nonempty, context).map_err(|error| {
-        Box::new(
-            ve_graph::Diagnostic::error(
-                if error == KernelError::Cancelled {
-                    "eval.cancelled"
-                } else {
-                    "kernel.invalid_input"
-                },
-                error.to_string(),
-            )
-            .at_node(&node.id),
-        )
-    })?;
+    let built = if matches!(family, "solid.extrude" | "solid.revolve") {
+        profile_ops::to_solid(node, inputs)
+    } else {
+        solid(node, &nonempty, context)
+    };
+    let result = built.map_err(|error| kernel_fail(node, &error))?;
     if context.is_cancelled() {
         return Err(fail("eval.cancelled", "cancelled result discarded"));
     }
@@ -66,10 +57,22 @@ pub(crate) fn execute(
             .to_mesh()
             .map_err(|e| fail("kernel.failed", e.to_string()))?
     };
-    Ok(Value {
-        mesh,
-        volume: result.volume(),
-    })
+    Ok(Value::solid(mesh, result.volume()))
+}
+
+/// A kernel refusal as a diagnostic naming the node; cancellation keeps its own code.
+pub(crate) fn kernel_fail(node: &Node, error: &KernelError) -> Fail {
+    Box::new(
+        ve_graph::Diagnostic::error(
+            if *error == KernelError::Cancelled {
+                "eval.cancelled"
+            } else {
+                "kernel.invalid_input"
+            },
+            error.to_string(),
+        )
+        .at_node(&node.id),
+    )
 }
 
 fn solid(

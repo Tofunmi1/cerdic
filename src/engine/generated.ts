@@ -168,6 +168,10 @@ param: string | null,
  */
 related?: Array<NodeId>, 
 /**
+ * Where in the text source the problem is, for diagnostics from text input.
+ */
+span?: Span | null, 
+/**
  * The limit that was hit.
  */
 limit: number | null, 
@@ -365,5 +369,18 @@ node: NodeId,
  */
 port: string, };
 export type Severity = "error" | "warning" | "info";
+export type Span = { 
+/**
+ * Line, starting at 1.
+ */
+line: number, 
+/**
+ * Column of the first character, starting at 1.
+ */
+col: number, 
+/**
+ * Number of characters covered.
+ */
+len: number, };
 export type TransactionId = string;
 export type Value = boolean | number | number | string | Array<Value>;

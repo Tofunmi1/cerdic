@@ -16,24 +16,10 @@ use crate::links;
 use crate::spec::{OpId, OperatorSpec};
 use crate::value::Value;
 
-#[cfg_attr(
-    target_family = "wasm",
-    expect(
-        clippy::unnecessary_box_returns,
-        reason = "a diagnostic is over 128 bytes on 64-bit targets, where boxing keeps Result small; wasm32 is under the threshold"
-    )
-)]
 pub(crate) fn unknown_node(id: &NodeId) -> Fail {
     Box::new(Diagnostic::error("graph.unknown_node", format!("there is no node {id}")).at_node(id))
 }
 
-#[cfg_attr(
-    target_family = "wasm",
-    expect(
-        clippy::unnecessary_box_returns,
-        reason = "a diagnostic is over 128 bytes on 64-bit targets, where boxing keeps Result small; wasm32 is under the threshold"
-    )
-)]
 fn unknown_op(ctx: &Ctx<'_>, text: &str) -> Fail {
     let hints = ctx.reg.suggest(text);
     let mut d = Diagnostic::error("parse.unknown_op", format!("unknown operator {text:?}"));

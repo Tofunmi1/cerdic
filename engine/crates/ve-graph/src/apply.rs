@@ -67,13 +67,6 @@ pub(crate) struct Applied {
     pub(crate) changed: Vec<NodeId>,
 }
 
-#[cfg_attr(
-    target_family = "wasm",
-    expect(
-        clippy::unnecessary_box_returns,
-        reason = "a diagnostic is over 128 bytes on 64-bit targets, where boxing keeps Result small; wasm32 is under the threshold"
-    )
-)]
 pub(crate) fn fail(code: &str, message: impl Into<String>) -> Fail {
     Box::new(Diagnostic::error(code, message))
 }

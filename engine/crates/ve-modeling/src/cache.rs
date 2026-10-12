@@ -3,15 +3,42 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 use ve_kernel::Mesh;
 
+/// What one node produced: a solid's mesh, a profile's canonical f64 loops, or neither (a check).
 pub(crate) struct Value {
     pub(crate) mesh: Mesh,
     pub(crate) volume: f64,
+    pub(crate) loops: Vec<Vec<[f64; 2]>>,
 }
 
 impl Value {
+    pub(crate) fn solid(mesh: Mesh, volume: f64) -> Self {
+        Self {
+            mesh,
+            volume,
+            loops: Vec::new(),
+        }
+    }
+
+    pub(crate) fn profile(loops: Vec<Vec<[f64; 2]>>) -> Self {
+        Self {
+            mesh: Mesh::default(),
+            volume: 0.0,
+            loops,
+        }
+    }
+
+    pub(crate) fn nothing() -> Self {
+        Self::solid(Mesh::default(), 0.0)
+    }
+
     pub(crate) fn bytes(&self) -> usize {
         self.mesh.positions.capacity() * size_of::<[f32; 3]>()
             + self.mesh.indices.capacity() * size_of::<u32>()
+            + self
+                .loops
+                .iter()
+                .map(|l| l.capacity() * size_of::<[f64; 2]>() + size_of::<Vec<[f64; 2]>>())
+                .sum::<usize>()
             + size_of::<Self>()
     }
 }

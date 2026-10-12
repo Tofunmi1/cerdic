@@ -1,0 +1,6 @@
+pole = solid.cylinder@1(radius=0.03, height=2, segments=24)
+polem = xform.move@1(pole, by=[0, 1, 0])
+sign = solid.box@1(size=[0.8, 0.4, 0.03])
+signm = xform.move@1(sign, by=[0, 1.8, 0.04])
+s = solid.union@1(polem, signm)
+output sign = s

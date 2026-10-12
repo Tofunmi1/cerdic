@@ -1,0 +1,9 @@
+side = solid.box@1(size=[0.03, 1.6, 0.3])
+sl = xform.move@1(side, by=[-0.45, 0.8, 0])
+sr = xform.move@1(side, by=[0.45, 0.8, 0])
+plank = solid.box@1(size=[0.9, 0.03, 0.3])
+p1 = xform.move@1(plank, by=[0, 0.3, 0])
+p2 = xform.move@1(plank, by=[0, 0.8, 0])
+p3 = xform.move@1(plank, by=[0, 1.3, 0])
+s = solid.union@1(sl, sr, p1, p2, p3)
+output result = s
