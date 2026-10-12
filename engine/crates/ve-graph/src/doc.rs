@@ -20,6 +20,7 @@ pub const OUT_PORT: &str = "out";
 
 /// A reference to an output port of a node.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub struct PortRef {
     /// The node.
     pub node: NodeId,
@@ -29,6 +30,7 @@ pub struct PortRef {
 
 /// Switches on a node.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub struct Flags {
     /// Skip the node (its output is empty).
     #[serde(default)]
@@ -40,6 +42,7 @@ pub struct Flags {
 
 /// One node of the graph.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub struct Node {
     /// Stable identity.
     pub id: NodeId,
@@ -59,6 +62,7 @@ pub struct Node {
 
 /// A named result of the document.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub struct Output {
     /// The output's name.
     pub name: String,
@@ -68,6 +72,7 @@ pub struct Output {
 
 /// A material definition (typed in a later gate; free-form data until then).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub struct Material {
     /// Stable identity.
     pub id: MaterialId,
@@ -77,6 +82,7 @@ pub struct Material {
 
 /// Where the editor drew things. Saved and undoable, but outside the evaluation hash.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub struct EditorLayer {
     /// Node positions `[x, y]`.
     #[serde(default)]
@@ -88,6 +94,7 @@ pub struct EditorLayer {
 
 /// How identifiers are issued. The counter only moves forward, so an ID is never reused.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub struct IdState {
     /// The next value to encode.
     pub next: u64,
@@ -97,6 +104,7 @@ pub struct IdState {
 
 /// The whole authored document.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub struct Document {
     /// Schema version of this data.
     pub schema: u32,

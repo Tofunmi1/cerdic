@@ -14,6 +14,7 @@ use crate::value::Value;
 /// the batch is applied.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS), ts(type = "string"))]
 pub struct Alias(String);
 
 impl Alias {
@@ -59,6 +60,7 @@ impl From<Alias> for String {
 /// A node named in a command: by its real ID, or by an alias the same batch defined.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS), ts(type = "string"))]
 pub enum NodeRef {
     /// An existing node.
     Id(NodeId),
@@ -94,6 +96,7 @@ impl From<NodeId> for NodeRef {
 
 /// An output port named in a command.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub struct OutRef {
     /// The producing node.
     pub node: NodeRef,
@@ -114,6 +117,7 @@ impl OutRef {
 
 /// An input port of a node, optionally at a position in a variadic list.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub struct InputRef {
     /// The consuming node.
     pub node: NodeRef,
@@ -128,6 +132,7 @@ pub struct InputRef {
 /// One edit. Batches apply all of their commands or none.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub enum Command {
     /// Adds a node with a freshly issued ID.
     AddNode {
@@ -234,6 +239,7 @@ pub enum Command {
 
 /// A set of commands applied atomically against one revision.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub struct CommandBatch {
     /// The document this batch is for.
     pub doc: DocId,
@@ -273,6 +279,7 @@ impl CommandBatch {
 /// What happened to a batch.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub enum Outcome {
     /// Applied; the document is now at `revision`.
     Committed {

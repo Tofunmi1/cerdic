@@ -1,5 +1,6 @@
 node_modules/
 dist/
+public/engine/
 rust/geometry/target/
 src/wasm/
 .env

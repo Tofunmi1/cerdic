@@ -60,6 +60,7 @@ macro_rules! generated_id {
         $(#[$doc])*
         #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
         #[serde(try_from = "String", into = "String")]
+        #[cfg_attr(feature = "typescript", derive(ts_rs::TS), ts(type = "string"))]
         pub struct $name(String);
 
         impl $name {
@@ -123,6 +124,7 @@ generated_id!(
 /// The idempotency key of a command batch: `t_` plus 1 to 64 characters from `[A-Za-z0-9_-]`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS), ts(type = "string"))]
 pub struct TransactionId(String);
 
 impl TransactionId {

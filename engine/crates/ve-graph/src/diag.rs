@@ -8,6 +8,7 @@ use crate::value::ParamIssue;
 /// How serious a diagnostic is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub enum Severity {
     /// Blocks a commit.
     Error,
@@ -19,6 +20,7 @@ pub enum Severity {
 
 /// A problem found while validating, planning or evaluating.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 pub struct Diagnostic {
     /// Stable dotted code, for example `graph.cycle`.
     pub code: String,
