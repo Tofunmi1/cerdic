@@ -646,7 +646,11 @@ and X9, decisions D12-D15, an escape-room door fixture); no logic code exists ye
 starts in 31 to 70 ms, keeps the main thread at 60 fps during a job, and a stuck job is terminated and
 restarted in 46 to 70 ms with identical results; ADR 0006 accepted (two modules, one source). Open for
 G2: large transfers, cooperative cancellation in the C ABI, headset CPU cost.
-V0, G2-G13, V1-V7 and L0-L9 pending; X2-X9 not performed. No gate has passed merely because this
+**X6 done 2026-10-12:** the engine embeds in a React 19 shell (persistent canvas pattern; D8 stands, no
+iframe). It found and fixed two engine bugs with regression tests: any window or panel resize killed the
+engine (missing `WindowResized` message; `web/tests/resize.mjs`), and hover stuck when the pointer left
+the canvas (`pointerleave` and pointer capture; `interact.mjs`). Details in `docs/modeling/experiments.md`.
+V0, G2-G13, V1-V7 and L0-L9 pending; X2-X5 and X7-X9 not performed. No gate has passed merely because this
 document was revised. Replace this line with per-milestone evidence as work lands:
 commit, contract version, cases and commands run, pass, fail and skips, benchmark artifact, known
 limitations, next dependency. Run `cargo xtask check --strict` from `engine/`, the separate

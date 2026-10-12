@@ -54,6 +54,14 @@ try {
     await settle();
     check(!(await state()).hover.some((h) => h.target === "box"), "the box is still hovered after moving off it");
 
+    // The pointer leaving the canvas (onto another panel of an editor) clears the hover too.
+    await page.mouse.move(spot.x, spot.y);
+    await settle();
+    check((await state()).hover.some((h) => h.target === "box"), "the box is not hovered before the pointer leaves");
+    await page.evaluate(() => document.getElementById("ve").dispatchEvent(new PointerEvent("pointerleave")));
+    await settle();
+    check((await state()).hover.length === 0, "the hover stayed after the pointer left the canvas");
+
     // A click without moving reports a click and moves nothing.
     const before = await object("box");
     await page.mouse.move(spot.x, spot.y);

@@ -20,7 +20,7 @@ use bevy_input::mouse::{MouseButton, MouseScrollUnit, MouseWheel};
 use bevy_math::{Quat, Vec2, Vec3};
 use bevy_time::{Real, Time};
 use bevy_transform::components::{GlobalTransform, Transform};
-use bevy_window::CursorMoved;
+use bevy_window::{CursorLeft, CursorMoved};
 use ve_interact::{
     Hit, Interaction, Placement3, PointerFrame, PointerId, Ray, Shape, TargetId, World,
 };
@@ -205,10 +205,16 @@ pub(crate) fn plugin(app: &mut App) {
 fn track_mouse(
     mut cursor: ResMut<CursorState>,
     mut moved: MessageReader<CursorMoved>,
+    mut left: MessageReader<CursorLeft>,
     mut wheel: MessageReader<MouseWheel>,
 ) {
+    // In arrival order is not kept across the two readers; a leave after a move in one frame wins,
+    // which is the right outcome (the pointer ended up outside).
     for event in moved.read() {
         cursor.position = Some(event.position);
+    }
+    if left.read().count() > 0 {
+        cursor.position = None;
     }
     for event in wheel.read() {
         let per_unit = match event.unit {
