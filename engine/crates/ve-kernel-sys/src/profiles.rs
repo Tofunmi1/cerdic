@@ -35,10 +35,11 @@ unsafe extern "C" {
         offsets: *mut usize,
         offset_capacity: usize,
     ) -> VeStatus;
-    /// Miter offset; empty erosion is valid.
+    /// Offset with miter (0) or round (1) corners; empty erosion is valid.
     pub fn ve_profile_offset(
         profile: *const VeProfile,
         delta: f64,
+        join: i32,
         status: *mut VeStatus,
     ) -> *mut VeProfile;
     /// Difference of borrowed profiles.

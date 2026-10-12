@@ -12,6 +12,7 @@ pub(super) fn describe(ty: &ParamType) -> String {
         ParamType::Int { .. } => "a whole number".to_owned(),
         ParamType::Bool => "true or false".to_owned(),
         ParamType::Str { .. } => "text in quotes".to_owned(),
+        ParamType::Choice { options } => format!("one of {} in quotes", options.join(", ")),
         ParamType::Vec2 { unit, .. } => format!("[x, y] ({})", unit_name(*unit)),
         ParamType::Vec3 { unit, .. } => format!("[x, y, z] ({})", unit_name(*unit)),
         ParamType::Points2 { .. } => "a list of [x, y] points (metres)".to_owned(),
@@ -85,7 +86,9 @@ fn coerce(ty: &ParamType, lit: &Lit) -> Result<Value, Fail> {
         (ParamType::Int { .. }, _) => Err(wrong("a whole number")),
         (ParamType::Bool, Lit::Bool(b, _)) => Ok(Value::Bool(*b)),
         (ParamType::Bool, _) => Err(wrong("true or false")),
-        (ParamType::Str { .. }, Lit::Text(t, _)) => Ok(Value::Str(t.clone())),
+        (ParamType::Str { .. } | ParamType::Choice { .. }, Lit::Text(t, _)) => {
+            Ok(Value::Str(t.clone()))
+        }
         (ParamType::Str { .. }, _) => Err(wrong("text in quotes")),
         (ParamType::Vec2 { unit, .. } | ParamType::Vec3 { unit, .. }, Lit::List(items, _)) => items
             .iter()

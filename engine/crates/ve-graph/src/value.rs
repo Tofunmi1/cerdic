@@ -75,6 +75,11 @@ pub enum ParamType {
         /// Longest accepted text, in bytes.
         max_len: usize,
     },
+    /// One of a fixed set of words, stored as text.
+    Choice {
+        /// The accepted words.
+        options: &'static [&'static str],
+    },
     /// Two numbers, each within `min..=max`.
     Vec2 {
         /// Meaning of the numbers.
@@ -194,6 +199,16 @@ impl ParamType {
                 #[expect(clippy::cast_precision_loss, reason = "lengths are far below 2^53")]
                 Value::Str(s) => Err(ParamIssue::range(0.0, max_len as f64, s.len() as f64)),
                 _ => Err(ParamIssue::wrong_type("text")),
+            },
+            Self::Choice { options } => match value {
+                Value::Str(s) if options.contains(&s.as_str()) => Ok(value.clone()),
+                Value::Str(s) => Err(ParamIssue {
+                    code: "param.range",
+                    message: format!("{s:?} is not one of {}", options.join(", ")),
+                    limit: None,
+                    observed: None,
+                }),
+                _ => Err(ParamIssue::wrong_type("one of the listed words")),
             },
             Self::Vec2 { min, max, .. } => components(value, 2, min, max).map(Value::List),
             Self::Vec3 { min, max, .. } => components(value, 3, min, max).map(Value::List),

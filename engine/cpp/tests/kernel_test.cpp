@@ -36,11 +36,20 @@ void profile_test() {
                         ve_profile_free);
   check(profile != nullptr && status == VE_OK, "profile polygon builds");
   check(near(ve_profile_area(profile.get()), 1.0, 1e-9), "profile area");
-  const Profile smaller(ve_profile_offset(profile.get(), -0.1, &status), ve_profile_free);
+  const Profile smaller(ve_profile_offset(profile.get(), -0.1, VE_JOIN_MITER, &status),
+                        ve_profile_free);
   check(smaller != nullptr && near(ve_profile_area(smaller.get()), 0.64, 1e-6), "offset area");
+  // Growing a unit square by r with round corners adds 4r + pi r^2 (the arcs are inscribed, so a
+  // 64-segment circle falls just short of the full circle).
+  const Profile rounded(ve_profile_offset(profile.get(), 0.1, VE_JOIN_ROUND, &status),
+                        ve_profile_free);
+  check(rounded != nullptr && near(ve_profile_area(rounded.get()), 1.0 + 0.4 + M_PI * 0.01, 2e-3),
+        "round offset area");
+  check(ve_profile_offset(profile.get(), 0.1, 7, &status) == nullptr, "unknown join rejected");
   const Profile hole(ve_profile_difference(profile.get(), smaller.get(), &status), ve_profile_free);
   check(hole != nullptr && near(ve_profile_area(hole.get()), 0.36, 1e-6), "profile difference");
-  const Profile empty(ve_profile_offset(profile.get(), -1.0, &status), ve_profile_free);
+  const Profile empty(ve_profile_offset(profile.get(), -1.0, VE_JOIN_MITER, &status),
+                      ve_profile_free);
   check(empty != nullptr && ve_profile_area(empty.get()) == 0.0, "empty erosion valid");
   const Solid extruded(ve_profile_extrude(profile.get(), 2.0, 128, M_PI / 2.0, 1.0, 1.0, &status),
                        ve_solid_free);
@@ -74,7 +83,8 @@ void profile_test() {
         "divisions bounded");
   check(ve_profile_revolve(profile.get(), 513, M_PI, &status) == nullptr,
         "revolve segments bounded");
-  check(ve_profile_offset(profile.get(), NAN, &status) == nullptr, "nonfinite offset rejected");
+  check(ve_profile_offset(profile.get(), NAN, VE_JOIN_MITER, &status) == nullptr,
+        "nonfinite offset rejected");
 }
 
 void cancellation_test(const ve_solid* cube, const ve_solid* sphere) {

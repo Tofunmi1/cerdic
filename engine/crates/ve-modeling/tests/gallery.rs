@@ -54,10 +54,13 @@ fn the_twisted_tower_has_the_tapered_prism_volume() {
 
 #[test]
 fn the_offset_plate_matches_the_plate_plus_rim_volume() {
-    let base = (0.16 * 0.1 - 4.0 * 0.006 * 0.006) * 0.005;
-    let rim = (0.152 * 0.092 - 0.146 * 0.086) * 0.002;
+    // Area of a 140 x 80 mm rectangle grown by r with round corners: w*h + 2r(w+h) + pi r^2.
+    let grown = |r: f64| 0.14 * 0.08 + 2.0 * r * (0.14 + 0.08) + std::f64::consts::PI * r * r;
+    let hole = 0.0002 * 0.0002 + 4.0 * 0.0029 * 0.0002 + std::f64::consts::PI * 0.0029 * 0.0029;
+    let base = (grown(0.01) - 4.0 * hole) * 0.005;
+    let rim = (grown(0.006) - grown(0.003)) * 0.002;
     assert!(
-        near(volume("offset_plate"), base + rim, 1.0e-3),
+        near(volume("offset_plate"), base + rim, 3.0e-3),
         "{} against {}",
         volume("offset_plate"),
         base + rim

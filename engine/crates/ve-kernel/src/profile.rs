@@ -64,12 +64,21 @@ impl Profile {
         self.area() <= 0.0
     }
 
-    /// Miter offset in metres (miter limit 2); erosion may validly return empty.
+    /// Offset in metres with mitred corners (miter limit 2); erosion may validly return empty.
     ///
     /// # Errors
     /// Invalid distance or oversized output.
     pub fn offset(&self, delta: f64) -> Result<Self, KernelError> {
-        ffi::offset(&self.0, delta).map(Self)
+        ffi::offset(&self.0, delta, false).map(Self)
+    }
+
+    /// Offset in metres with round corners (64 segments per full circle), so growing a convex
+    /// outline rounds its corners and shrinking one rounds the hollows. Erosion may return empty.
+    ///
+    /// # Errors
+    /// Invalid distance or oversized output.
+    pub fn offset_round(&self, delta: f64) -> Result<Self, KernelError> {
+        ffi::offset(&self.0, delta, true).map(Self)
     }
 
     /// Removes the other profile without changing either input.

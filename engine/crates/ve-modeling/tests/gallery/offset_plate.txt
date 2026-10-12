@@ -1,14 +1,21 @@
-# A 160 x 100 mm plate, 5 mm thick, with four square corner holes and a raised rim made from two
-# offsets of the outline (4 mm and 7 mm in from the edge), 2 mm tall.
-plate = profile.polygon@1(points=[[-0.08, -0.05], [0.08, -0.05], [0.08, 0.05], [-0.08, 0.05]])
-hole_a = profile.polygon@1(points=[[-0.071, -0.041], [-0.065, -0.041], [-0.065, -0.035], [-0.071, -0.035]])
-hole_b = profile.polygon@1(points=[[0.065, -0.041], [0.071, -0.041], [0.071, -0.035], [0.065, -0.035]])
-hole_c = profile.polygon@1(points=[[0.065, 0.035], [0.071, 0.035], [0.071, 0.041], [0.065, 0.041]])
-hole_d = profile.polygon@1(points=[[-0.071, 0.035], [-0.065, 0.035], [-0.065, 0.041], [-0.071, 0.041]])
+# A 160 x 100 mm plate with 10 mm rounded corners, 5 mm thick, four 6 mm round holes 12 mm in from
+# the edges, and a 2 mm raised rim between 4 and 7 mm in from the edge. Every outline is an offset:
+# the plate is a 140 x 80 mm rectangle grown by 10 mm with round corners, each hole is a tiny square
+# grown by 2.9 mm, and the rim is two round-cornered inward offsets of the plate outline.
+core = profile.polygon@1(points=[[-0.07, -0.04], [0.07, -0.04], [0.07, 0.04], [-0.07, 0.04]])
+plate = profile.offset@1(core, delta=10mm, join="round")
+seed_a = profile.polygon@1(points=[[-0.0681, -0.0381], [-0.0679, -0.0381], [-0.0679, -0.0379], [-0.0681, -0.0379]])
+seed_b = profile.polygon@1(points=[[0.0679, -0.0381], [0.0681, -0.0381], [0.0681, -0.0379], [0.0679, -0.0379]])
+seed_c = profile.polygon@1(points=[[0.0679, 0.0379], [0.0681, 0.0379], [0.0681, 0.0381], [0.0679, 0.0381]])
+seed_d = profile.polygon@1(points=[[-0.0681, 0.0379], [-0.0679, 0.0379], [-0.0679, 0.0381], [-0.0681, 0.0381]])
+hole_a = profile.offset@1(seed_a, delta=2.9mm, join="round")
+hole_b = profile.offset@1(seed_b, delta=2.9mm, join="round")
+hole_c = profile.offset@1(seed_c, delta=2.9mm, join="round")
+hole_d = profile.offset@1(seed_d, delta=2.9mm, join="round")
 drilled = profile.difference@1(plate, hole_a, hole_b, hole_c, hole_d)
 base = solid.extrude@1(drilled, height=5mm)
-outer_edge = profile.offset@1(plate, delta=-4mm)
-inner_edge = profile.offset@1(plate, delta=-7mm)
+outer_edge = profile.offset@1(plate, delta=-4mm, join="round")
+inner_edge = profile.offset@1(plate, delta=-7mm, join="round")
 ring = profile.difference@1(outer_edge, inner_edge)
 rim = solid.extrude@1(ring, height=2mm)
 rim_up = xform.move@1(rim, by=[0, 0.005, 0])

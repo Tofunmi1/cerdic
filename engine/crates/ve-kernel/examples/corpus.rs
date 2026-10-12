@@ -28,6 +28,12 @@ fn profiles() -> Result<(), KernelError> {
         offset.area(),
         offset.loops()?
     );
+    let rounded = square.offset_round(0.1)?;
+    println!(
+        "profile-offset-round area={:.6} points={}",
+        rounded.area(),
+        rounded.loops()?.iter().map(Vec::len).sum::<usize>()
+    );
     let rim = square.difference(&offset)?;
     report("extrude-with-hole", &rim.extrude(0.1, 1, 0.0, [1.0; 2])?)?;
     Ok(())

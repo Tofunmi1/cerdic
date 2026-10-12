@@ -84,8 +84,11 @@ double ve_profile_area(const ve_profile* profile);
 ve_status ve_profile_counts(const ve_profile* profile, size_t* points, size_t* loops);
 ve_status ve_profile_copy(const ve_profile* profile, double* points, size_t point_capacity,
                           size_t* offsets, size_t offset_capacity);
-/* Miter corners, miter limit 2. Empty erosion is a valid empty profile. */
-ve_profile* ve_profile_offset(const ve_profile* profile, double delta, ve_status* status);
+/* Corner treatment of an offset. Round joins use 64 segments per full circle. */
+typedef enum { VE_JOIN_MITER = 0, VE_JOIN_ROUND = 1 } ve_join;
+/* Miter corners (limit 2) or round corners. Empty erosion is a valid empty profile. */
+ve_profile* ve_profile_offset(const ve_profile* profile, double delta, int32_t join,
+                              ve_status* status);
 ve_profile* ve_profile_difference(const ve_profile* a, const ve_profile* b, ve_status* status);
 /* Radians, Y-up output. Divisions count slabs (1..256); segments 3..512. */
 ve_solid* ve_profile_extrude(const ve_profile* profile, double height, int32_t divisions,
