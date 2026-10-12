@@ -88,6 +88,7 @@ const TOOLS = [
   { name: 'apply_commands', description: 'Applies typed commands, for example [{"set_param":{"node":"n_abc12345","param":"segments","value":96}}]. Commands: add_node, remove_node, connect, disconnect, set_param, set_label, set_flags, set_output. Atomic.', inputSchema: object({ commands: { type: 'array', items: { type: 'object' } }, label: { type: 'string' } }, ['commands']) },
   { name: 'undo', description: 'Undoes the last committed edit.', inputSchema: object({}) },
   { name: 'redo', description: 'Redoes the last undone edit.', inputSchema: object({}) },
+  { name: 'frame_view', description: 'Moves the editor camera so the whole model fills the view, from a three-quarter angle. Call it after building something so the person watching sees it.', inputSchema: object({}) },
   { name: 'set_view', description: 'Moves the editor camera: position and target as [x, y, z] metres, so the person watching can see the result.', inputSchema: object({ position: { type: 'array', items: { type: 'number' } }, target: { type: 'array', items: { type: 'number' } } }, ['position', 'target']) },
 ];
 

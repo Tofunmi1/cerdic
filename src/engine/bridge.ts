@@ -11,6 +11,7 @@ export interface Runtime {
   start(canvas: string, scene: string): void;
   status(): string;
   doc_open(name: string, seed: number): string;
+  doc_reset(name: string, seed: number): string;
   doc_state(): string;
   doc_apply(batch: string): string;
   doc_undo(): string;
@@ -34,6 +35,9 @@ export interface Runtime {
   viewer_look(x: number, y: number): void;
   viewer_set_locked(locked: boolean): void;
   viewer_look_at(px: number, py: number, pz: number, tx: number, ty: number, tz: number): boolean;
+  viewer_zoom(amount: number): void;
+  viewer_orbit(dx: number, dy: number): void;
+  viewer_frame(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number): boolean;
   xr_supported(): Promise<boolean>;
   enter_xr(canvas: string): Promise<void>;
   exit_xr(): Promise<void>;

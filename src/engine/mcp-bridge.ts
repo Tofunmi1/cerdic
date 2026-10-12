@@ -3,12 +3,22 @@
 // editor, so the model gets no capability a person lacks. Local testing only: it connects to
 // 127.0.0.1 and trusts whatever is listening there.
 import type { Command } from './generated';
-import type { host as Host } from './host';
+import type { documentBridge, Runtime } from './bridge';
+import type { EvaluationHost } from './evaluation';
+
+/** What the bridge needs from the page: the engine, its document and its evaluation host. */
+export type McpHost = {
+  readonly ready: boolean;
+  doc: ReturnType<typeof documentBridge> | null;
+  evaluation: EvaluationHost | null;
+  runtime: Runtime | null;
+};
+type Host = McpHost;
 
 type Call = { id: number; method: string; params: Record<string, unknown> };
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export function connectMcpBridge(host: typeof Host, port: number) {
+export function connectMcpBridge(host: Host, port: number) {
   let socket: WebSocket | null = null;
   let stopped = false;
   const open = () => {
@@ -30,7 +40,7 @@ export function connectMcpBridge(host: typeof Host, port: number) {
 
 // Waits until the staged edit has been evaluated: the worker is idle and either the new revision was
 // projected or a failure was reported.
-async function settle(host: typeof Host, pendingRevision: number | undefined, failureBefore: unknown) {
+async function settle(host: Host, pendingRevision: number | undefined, failureBefore: unknown) {
   const began = Date.now();
   for (;;) {
     await sleep(40);
@@ -41,7 +51,7 @@ async function settle(host: typeof Host, pendingRevision: number | undefined, fa
   }
 }
 
-async function edit(host: typeof Host, stage: () => unknown) {
+async function edit(host: Host, stage: () => unknown) {
   const evaluation = host.evaluation!;
   const before = evaluation.state.lastFailure;
   const revisionBefore = host.doc!.state().revision;
@@ -58,7 +68,7 @@ async function edit(host: typeof Host, stage: () => unknown) {
   };
 }
 
-async function run(host: typeof Host, method: string, params: Record<string, unknown>) {
+async function run(host: Host, method: string, params: Record<string, unknown>) {
   if (!host.ready || !host.doc || !host.evaluation || !host.runtime) throw new Error('the engine is still starting');
   const doc = host.doc, runtime = host.runtime;
   switch (method) {
@@ -87,6 +97,11 @@ async function run(host: typeof Host, method: string, params: Record<string, unk
     }
     case 'undo': return edit(host, () => { const moved = doc.undo(); return moved ? { pending: { committed: { revision: (moved as { revision: number }).revision } } } : { nothing: 'there is nothing to undo' }; });
     case 'redo': return edit(host, () => { const moved = doc.redo(); return moved ? { pending: { committed: { revision: (moved as { revision: number }).revision } } } : { nothing: 'there is nothing to redo' }; });
+    case 'frame_view': {
+      const bounds = host.evaluation.bounds;
+      if (!bounds) return { ok: false, reason: 'there is no model to frame yet' };
+      return { ok: runtime.viewer_frame(...bounds.min as [number, number, number], ...bounds.max as [number, number, number]), bounds };
+    }
     case 'set_view': {
       const [p, t] = [params.position, params.target] as [number[], number[]];
       return { ok: runtime.viewer_look_at(p[0], p[1], p[2], t[0], t[1], t[2]) };

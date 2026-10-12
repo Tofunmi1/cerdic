@@ -21,6 +21,7 @@ use ve_xr_math::{FovTangents, MockHmd, Pose};
 use ve_xr_web::{SessionState, XrCamera, session_state};
 
 use crate::mock_hmd::{MockHead, stereo_views};
+use crate::viewer_nav;
 
 /// Radians of turn per pixel of mouse movement.
 const SENSITIVITY: f32 = 0.0022;
@@ -234,11 +235,17 @@ fn horizontal_fov(vertical: f32, aspect: f32) -> f32 {
     2.0 * ((vertical * 0.5).tan() * aspect).atan()
 }
 
-/// Applies a pose the page asked to jump to (see `set_look_at`).
+/// Applies a pose the page asked to jump to (see `set_look_at`), then its zoom, orbit and framing.
 fn jump_to_pose(rig: &mut ViewerRig, input: &Input) {
     if let Some((position, yaw, pitch)) = input.pose {
         (rig.position, rig.yaw, rig.pitch) = (position, yaw, pitch);
     }
+    viewer_nav::apply(
+        &mut rig.position,
+        &mut rig.yaw,
+        &mut rig.pitch,
+        vertical_fov(input),
+    );
 }
 
 /// Turns the viewer by the mouse movement and moves it by the wanted motion, for `dt` seconds.

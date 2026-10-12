@@ -4,9 +4,8 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { readFile } from 'node:fs/promises';
-import { driverAdvisory } from './support.mjs';
+import { driverAdvisory, serve } from './support.mjs';
 
-const root = new URL('../../../', import.meta.url).pathname;
 const server = new URL('../../tools/mcp/server.mjs', import.meta.url).pathname;
 const vase = await readFile(new URL('../../crates/ve-modeling/tests/gallery/vase.txt', import.meta.url), 'utf8');
 
@@ -45,7 +44,7 @@ function client(port) {
 
 const lonely = client(8798);
 const mcp = client(8799);
-const vite = Bun.spawn(['bun', 'x', 'vite', '--host', '127.0.0.1', '--port', '5190'], { cwd: root, stdout: 'ignore', stderr: 'inherit' });
+const { server: pageServer, port: pagePort } = await serve();
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const logs = [];
 try {
@@ -62,12 +61,13 @@ try {
   assert.match((await lonely.tool('get_guide')).data, /output/, 'the guide explains the language');
   console.log('MCP protocol basics ok');
 
-  for (let i = 0; i < 100; i++) { try { if ((await fetch('http://127.0.0.1:5190')).ok) break; } catch {} await Bun.sleep(100); }
   const page = await browser.newPage({ viewport: { width: 1100, height: 750 } });
   page.on('pageerror', e => logs.push(e.message));
   page.on('console', m => { if (m.type() === 'error' && !driverAdvisory.test(m.text())) logs.push(m.text()); });
-  await page.goto(`http://127.0.0.1:5190/?docname=mcp-${Date.now()}&evaltest=1&mcp=8799`);
-  await page.waitForFunction(() => window.__spatial?.ready && window.__spatial.evaluation.state.worker === 'idle', null, { timeout: 60000 });
+  // The engine's own viewer page (panel, field of view, lenses), with evaluation and the MCP bridge on.
+  await page.goto(`http://127.0.0.1:${pagePort}/?viewer=1&docname=mcp-${Date.now()}&mcp=8799`);
+  await page.waitForFunction(() => window.__ve?.ready && window.__ve.evaluation?.state.worker === 'idle', null, { timeout: 60000 });
+  assert(await page.evaluate(() => !!document.getElementById('viewer-hud') && !!document.getElementById('doc-panel')), 'the viewer panel and the document panel are shown');
   let status;
   for (let i = 0; i < 100 && !(status = await mcp.tool('get_status')).data?.revision && status.isError; i++) await Bun.sleep(100);
   assert(!status.isError, `the page connected: ${JSON.stringify(status.data)}`);
@@ -115,8 +115,41 @@ try {
   assert.equal(undone.data.text, before.text, 'undo restores the earlier text');
   assert.equal((await mcp.tool('set_view', { position: [0.5, 0.4, 0.6], target: [0, 0.15, 0] })).data.ok, true);
   console.log('MCP widen, undo and view');
+
+  // Looking at the model in the viewer: frame it, zoom with the wheel, orbit with Alt + drag.
+  const frames = async (n = 4) => {
+    const start = await page.evaluate(() => window.__ve.read().frames);
+    await page.waitForFunction((count) => window.__ve.read().frames > count, start + n);
+  };
+  const camera = () => page.evaluate(() => window.__ve.read().viewer.position);
+  const centre = await page.evaluate(() => { const b = window.__ve.evaluation.bounds; return b.min.map((v, i) => (v + b.max[i]) / 2); });
+  const away = (p) => Math.hypot(p[0] - centre[0], p[1] - centre[1], p[2] - centre[2]);
+  assert.equal((await mcp.tool('frame_view')).data.ok, true);
+  await frames();
+  const framed = away(await camera());
+  assert(framed > 0.3 && framed < 3, `the model is framed from a sensible distance (${framed.toFixed(2)} m)`);
+  await page.mouse.move(640, 400);
+  await page.mouse.wheel(0, -500);
+  await frames();
+  const zoomedIn = away(await camera());
+  assert(zoomedIn < framed * 0.75, `the wheel zooms in (${framed.toFixed(2)} to ${zoomedIn.toFixed(2)} m)`);
+  await page.mouse.wheel(0, 1500);
+  await frames();
+  assert(away(await camera()) > zoomedIn * 1.5, 'the wheel zooms back out');
+  const orbitFrom = await camera();
+  await page.keyboard.down('Alt');
+  await page.mouse.move(600, 400);
+  await page.mouse.down();
+  await page.mouse.move(760, 430, { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+  await frames();
+  const orbitTo = await camera();
+  assert(Math.hypot(orbitTo[0] - orbitFrom[0], orbitTo[2] - orbitFrom[2]) > 0.05, 'Alt + drag orbits sideways');
+  assert(Math.abs(away(orbitTo) - away(orbitFrom)) < 0.02 * away(orbitFrom), 'orbiting keeps the distance');
+  console.log('viewer zoom, orbit and frame');
   assert.deepEqual(logs, [], 'no page errors');
   console.log('MCP acceptance passed');
 } finally {
-  await browser.close(); vite.kill(); mcp.close(); lonely.close();
+  await browser.close(); pageServer.close(); mcp.close(); lonely.close();
 }

@@ -17,6 +17,7 @@ mod quality;
 mod scene;
 mod status;
 mod viewer;
+mod viewer_nav;
 mod wands;
 
 use std::str::FromStr;
@@ -119,6 +120,37 @@ pub fn viewer_look_at(px: f32, py: f32, pz: f32, tx: f32, ty: f32, tz: f32) -> b
         bevy_math::Vec3::new(px, py, pz),
         bevy_math::Vec3::new(tx, ty, tz),
     )
+}
+
+/// Zooms the viewer toward its focus: wheel movement, positive zooms out, about 100 per notch.
+#[wasm_bindgen]
+pub fn viewer_zoom(amount: f32) {
+    viewer_nav::zoom(amount);
+}
+
+/// Orbits the viewer around its focus by a drag, in pixels.
+#[wasm_bindgen]
+pub fn viewer_orbit(dx: f32, dy: f32) {
+    viewer_nav::orbit(dx, dy);
+}
+
+/// Moves the viewer so the box from `min` to `max` (metres) fills the view, and makes its centre the
+/// point that zoom and orbit work around. Returns false for non-finite or empty boxes.
+#[wasm_bindgen]
+#[must_use]
+pub fn viewer_frame(
+    min_x: f32,
+    min_y: f32,
+    min_z: f32,
+    max_x: f32,
+    max_y: f32,
+    max_z: f32,
+) -> bool {
+    let (lo, hi) = (
+        bevy_math::Vec3::new(min_x, min_y, min_z),
+        bevy_math::Vec3::new(max_x, max_y, max_z),
+    );
+    viewer_nav::frame((lo + hi) * 0.5, ((hi - lo).length() * 0.5).max(0.02))
 }
 
 /// Puts the viewer back where the scene started.

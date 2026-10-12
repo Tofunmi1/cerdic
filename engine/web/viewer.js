@@ -7,6 +7,7 @@
 // the runtime exposes: viewer_configure, viewer_look, viewer_move, viewer_set_locked, viewer_reset.
 
 const SCENES = [
+  ["gallery", "Authored document (your model)"],
   ["xr", "Room: bitten cube, floor, lights"],
   ["shadows", "Shadows: box, ball, pillar"],
   ["kernel", "Kernel: cube minus sphere"],
@@ -27,8 +28,10 @@ const KEYS = {
   KeyQ: [0, -1, 0], KeyC: [0, -1, 0],
 };
 
-export function startViewer({ canvas, api, params }) {
+export function startViewer({ canvas, api, params, frameBounds = () => null }) {
+  const evalOn = params.get("eval") === "1" || params.has("mcp");
   const state = {
+    orbitMode: false,
     fov: Number(params.get("fov") ?? 90),
     stereo: params.get("stereo") === "1",
     speed: Number(params.get("speed") ?? 3),
@@ -83,8 +86,43 @@ export function startViewer({ canvas, api, params }) {
   document.addEventListener("mousemove", (event) => {
     if (document.pointerLockElement === canvas) api.viewer_look(event.movementX, event.movementY);
   });
+  // Inspecting a model: the wheel (or a trackpad scroll or pinch) zooms toward it, and dragging while
+  // holding Alt, or with "drag to orbit" on, circles it. These run before the engine's own pointer
+  // handling and keep an orbit drag from also grabbing an object.
+  const frame = () => {
+    const bounds = frameBounds();
+    if (bounds) api.viewer_frame(...bounds.min, ...bounds.max);
+  };
+  canvas.addEventListener("wheel", (event) => {
+    if (document.pointerLockElement === canvas || event.buttons & 1) return;
+    event.preventDefault();
+    api.viewer_zoom(event.deltaY * (event.deltaMode === 1 ? 33 : 1));
+  }, { passive: false });
+  let orbiting = null;
+  const orbitWanted = (event) => event.button === 1 || (event.button === 0 && (event.altKey || state.orbitMode));
+  window.addEventListener("pointerdown", (event) => {
+    if (event.target !== canvas || document.pointerLockElement === canvas || !orbitWanted(event)) return;
+    orbiting = event.pointerId;
+    canvas.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+  window.addEventListener("pointermove", (event) => {
+    if (orbiting !== event.pointerId) return;
+    api.viewer_orbit(event.movementX, event.movementY);
+    event.stopImmediatePropagation();
+  }, true);
+  const endOrbit = (event) => {
+    if (orbiting !== event.pointerId) return;
+    orbiting = null;
+    event.stopImmediatePropagation();
+  };
+  window.addEventListener("pointerup", endOrbit, true);
+  window.addEventListener("pointercancel", endOrbit, true);
   window.addEventListener("keydown", (event) => {
     if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement) return;
+    if (event.code === "KeyF") { frame(); return; }
+    if (event.code === "KeyO") { state.orbitMode = !state.orbitMode; syncControls(); return; }
     if (event.code in KEYS) { held.add(event.code); event.preventDefault(); sendMotion(); }
     else if (event.code === "ShiftLeft" || event.code === "ShiftRight") { sprint = true; sendMotion(); }
     else if (event.code === "KeyR") api.viewer_reset();
@@ -123,6 +161,8 @@ export function startViewer({ canvas, api, params }) {
     <label>Scene</label><select id="v-scene"></select>
     <label>Field of view <span id="v-fov-text"></span></label><input id="v-fov" type="range" min="50" max="150" step="1">
     <label><input id="v-stereo" type="checkbox"> Split-screen mock headset (V)</label>
+    <label><input id="v-orbit" type="checkbox"> Drag to orbit (O)</label>
+    <button id="v-frame" type="button" style="margin-top:6px;padding:3px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.12);color:#fff;font:inherit;cursor:pointer">Frame model (F)</button>
     <label>Lens (L)</label><select id="v-lens">
       <option value="off">Flat perspective</option>
       <option value="fisheye">Fisheye (whole view)</option>
@@ -130,6 +170,7 @@ export function startViewer({ canvas, api, params }) {
     <label>Quality</label><select id="v-quality"><option>low</option><option>medium</option><option selected>high</option></select>
     <div class="keys">Click the view to look around (Esc to release).<br>
       WASD / arrows move, Space / Q up/down, Shift sprint,<br>R reset view, V split screen, L lens, H hide this panel.<br>
+      Not holding the mouse: wheel or scroll zooms, Alt + drag (or O, then drag) orbits, F frames the model.<br>
       Released: hover, click and drag objects. Held: the dot picks and grabs; the wheel pushes and pulls.</div>
     <div class="keys">Headset benchmark pages (for a Quest on the LAN server):
       <a href="?scene=bench1&bench=1" style="color:#9cf">S1</a> ·
@@ -142,7 +183,7 @@ export function startViewer({ canvas, api, params }) {
 
   const sceneSelect = hud.querySelector("#v-scene");
   for (const [id, label] of SCENES) sceneSelect.add(new Option(label, id));
-  sceneSelect.value = params.get("scene") || "xr";
+  sceneSelect.value = params.get("scene") || (evalOn ? "gallery" : "xr");
   sceneSelect.addEventListener("change", () => {
     const next = new URLSearchParams(location.search);
     next.set("scene", sceneSelect.value);
@@ -153,7 +194,11 @@ export function startViewer({ canvas, api, params }) {
   const fovText = hud.querySelector("#v-fov-text");
   const stereoBox = hud.querySelector("#v-stereo");
   const lensSelect = hud.querySelector("#v-lens");
+  const orbitBox = hud.querySelector("#v-orbit");
+  orbitBox.addEventListener("change", () => { state.orbitMode = orbitBox.checked; });
+  hud.querySelector("#v-frame").addEventListener("click", frame);
   function syncControls() {
+    orbitBox.checked = state.orbitMode;
     fovInput.value = state.fov;
     fovText.textContent = `${state.fov}°`;
     stereoBox.checked = state.stereo;
