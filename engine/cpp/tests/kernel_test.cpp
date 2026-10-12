@@ -26,6 +26,57 @@ void check(bool ok, const char* what) {
 
 bool near(double a, double b, double tol) { return std::fabs(a - b) <= tol; }
 
+void profile_test() {
+  ve_status status = VE_OK;
+  const std::array<double, 8> points = {0, 0, 1, 0, 1, 1, 0, 1};
+  const std::array<size_t, 2> offsets = {0, 4};
+  using Profile = std::unique_ptr<ve_profile, decltype(&ve_profile_free)>;
+  using Solid = std::unique_ptr<ve_solid, decltype(&ve_solid_free)>;
+  const Profile profile(ve_profile_new(points.data(), 4, offsets.data(), 1, &status),
+                        ve_profile_free);
+  check(profile != nullptr && status == VE_OK, "profile polygon builds");
+  check(near(ve_profile_area(profile.get()), 1.0, 1e-9), "profile area");
+  const Profile smaller(ve_profile_offset(profile.get(), -0.1, &status), ve_profile_free);
+  check(smaller != nullptr && near(ve_profile_area(smaller.get()), 0.64, 1e-6), "offset area");
+  const Profile hole(ve_profile_difference(profile.get(), smaller.get(), &status), ve_profile_free);
+  check(hole != nullptr && near(ve_profile_area(hole.get()), 0.36, 1e-6), "profile difference");
+  const Profile empty(ve_profile_offset(profile.get(), -1.0, &status), ve_profile_free);
+  check(empty != nullptr && ve_profile_area(empty.get()) == 0.0, "empty erosion valid");
+  const Solid extruded(ve_profile_extrude(profile.get(), 2.0, 128, M_PI / 2.0, 1.0, 1.0, &status),
+                       ve_solid_free);
+  check(extruded != nullptr && near(ve_solid_volume(extruded.get()), 2.0, 0.002),
+        "twisted extrusion volume");
+  const Solid revolved(ve_profile_revolve(profile.get(), 64, 2.0 * M_PI, &status), ve_solid_free);
+  check(revolved != nullptr && status == VE_OK, "revolve builds");
+  size_t count = 0;
+  size_t loops = 0;
+  check(ve_profile_counts(profile.get(), &count, &loops) == VE_OK && count == 4 && loops == 1,
+        "profile counts");
+  std::array<double, 8> copied = {};
+  std::array<size_t, 2> copied_offsets = {};
+  check(ve_profile_copy(profile.get(), copied.data(), copied.size(), copied_offsets.data(), 2) ==
+            VE_OK,
+        "profile copy");
+  check(ve_profile_copy(profile.get(), copied.data(), 1, copied_offsets.data(), 2) ==
+            VE_ERR_BUFFER_TOO_SMALL,
+        "short profile buffer");
+  const std::array<size_t, 2> bad_offsets = {0, 5};
+  check(ve_profile_new(points.data(), 4, bad_offsets.data(), 1, &status) == nullptr,
+        "invalid offsets");
+  check(ve_profile_new(nullptr, 4, offsets.data(), 1, &status) == nullptr, "null profile data");
+  check(ve_profile_new(points.data(), 4, nullptr, 1, &status) == nullptr, "null offsets");
+  const std::array<double, 8> crossed = {0, 0, 1, 1, 0, 1, 1, 0};
+  check(ve_profile_new(crossed.data(), 4, offsets.data(), 1, &status) == nullptr,
+        "self intersection rejected");
+  check(ve_profile_extrude(profile.get(), 0, 1, 0, 1, 1, &status) == nullptr,
+        "zero height rejected");
+  check(ve_profile_extrude(profile.get(), 1, 257, 0, 1, 1, &status) == nullptr,
+        "divisions bounded");
+  check(ve_profile_revolve(profile.get(), 513, M_PI, &status) == nullptr,
+        "revolve segments bounded");
+  check(ve_profile_offset(profile.get(), NAN, &status) == nullptr, "nonfinite offset rejected");
+}
+
 void cancellation_test(const ve_solid* cube, const ve_solid* sphere) {
   ve_status status = VE_OK;
   const std::unique_ptr<ve_context, decltype(&ve_context_free)> context(ve_context_new(),
@@ -109,6 +160,7 @@ int main() {
         "open mesh rejected");
 
   cancellation_test(cube, sphere);
+  profile_test();
   for (ve_solid* s : {cube, sphere, diff, rebuilt}) {
     ve_solid_free(s);
   }

@@ -8,11 +8,8 @@
 
 #include "manifold/manifold.h"
 #include "meshoptimizer.h"
+#include "solid_handle.hpp"
 #include "ve_kernel.h"
-
-struct ve_solid {
-  manifold::Manifold m;
-};
 
 struct ve_context {
   manifold::ExecutionContext value;

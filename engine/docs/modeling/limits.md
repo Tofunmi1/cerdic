@@ -67,7 +67,7 @@ diagnostic naming the limit and the observed value; the document stays unchanged
 ## Fixture manifest (names used by tests and reports)
 | ID | Fixture | Size and workload |
 |---|---|---|
-| F1 | Vase (see `commands.md`) | 8 nodes, 64-segment revolve |
+| F1 | Vase (see `commands.md`) | 6 nodes, 64-segment revolve |
 | F2 | Wheel assembly | 4 instances of one group, about 60 nodes; G4 |
 | F3 | Synthetic 200-node graph | mixed chains and fans of cheap booleans and transforms |
 | F4 | Synthetic 500-node graph | same generator, larger |

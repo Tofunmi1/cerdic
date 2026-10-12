@@ -8,6 +8,10 @@ type Failure = Box<dyn std::error::Error>;
 
 const SOURCES: &[&str] = &[
     "cpp/src/kernel.cpp",
+    "cpp/src/profiles.cpp",
+    "cpp/src/profile_validation.hpp",
+    "cpp/src/solid_handle.hpp",
+    "cpp/src/extrusion.hpp",
     "cpp/tests/kernel_test.cpp",
     "cpp/include/ve_kernel.h",
 ];
@@ -88,6 +92,7 @@ fn tidy(sdk: &std::path::Path) -> Result<(), Failure> {
             "-p",
             WASM_DIR,
             "cpp/src/kernel.cpp",
+            "cpp/src/profiles.cpp",
             "cpp/tests/kernel_test.cpp",
         ],
     )

@@ -5,6 +5,8 @@
 #![expect(unsafe_code, reason = "this crate is the raw FFI boundary")]
 
 use core::ffi::c_int;
+mod profiles;
+pub use profiles::*;
 
 /// Opaque handle to a solid owned by the C++ side. Release with [`ve_solid_free`].
 #[repr(C)]

@@ -54,3 +54,4 @@ are used when installed.
   third-party models, no external 3D generators.
 - GPL-licensed code stays out of the engine. Nothing is published or deployed without owner approval.
 - Missing support (browser, headset, library) is ours to build.
+- Commits and PRs carry no `Co-Authored-By`, "Generated with" or other tool or agent attribution.
