@@ -111,6 +111,34 @@ fn shade(
     return (diffuse + specular) * radiance * n_dot_l;
 }
 
+// A procedural studio, seen from the middle: a blue-grey sky that brightens toward the horizon, a
+// dim floor, a large soft light box up and to the front, and a cooler strip light low at the side.
+// Rough surfaces blur the boxes (wider, dimmer) toward the average colour, standing in for a prefiltered
+// environment map.
+fn environment(dir: vec3<f32>, roughness: f32) -> vec3<f32> {
+    let blur = roughness * roughness;
+    let sky = mix(vec3<f32>(0.62, 0.68, 0.76), vec3<f32>(0.20, 0.32, 0.58), clamp(dir.y, 0.0, 1.0));
+    let floor_color = vec3<f32>(0.34, 0.31, 0.28);
+    var env = mix(floor_color, sky, smoothstep(-0.2, 0.2, dir.y));
+    let key = normalize(vec3<f32>(-0.4, 0.75, 0.55));
+    let key_edge = mix(0.93, 0.35, blur);
+    env += vec3<f32>(5.0, 4.8, 4.5) * mix(1.0, 0.25, blur) * smoothstep(key_edge, key_edge + 0.05, dot(dir, key));
+    let rim = normalize(vec3<f32>(0.85, 0.25, -0.45));
+    let rim_edge = mix(0.90, 0.30, blur);
+    env += vec3<f32>(1.2, 1.5, 2.0) * mix(1.0, 0.25, blur) * smoothstep(rim_edge, rim_edge + 0.05, dot(dir, rim));
+    return mix(env, vec3<f32>(0.40, 0.44, 0.52), blur * 0.6);
+}
+
+// Split-sum environment BRDF, Karis's analytic fit: the scale and bias on f0 for a given roughness.
+fn env_brdf(f0: vec3<f32>, roughness: f32, n_dot_v: f32) -> vec3<f32> {
+    let c0 = vec4<f32>(-1.0, -0.0275, -0.572, 0.022);
+    let c1 = vec4<f32>(1.0, 0.0425, 1.04, -0.04);
+    let r = roughness * c0 + c1;
+    let a004 = min(r.x * r.x, exp2(-9.28 * n_dot_v)) * r.x + r.y;
+    let ab = vec2<f32>(-1.04, 1.04) * a004 + r.zw;
+    return f0 * ab.x + vec3<f32>(ab.y);
+}
+
 // Narkowicz ACES approximation.
 fn tonemap_aces(x: vec3<f32>) -> vec3<f32> {
     let a = 2.51;
@@ -176,7 +204,14 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
         radiance += shade(n, v, to_light * inverseSqrt(distance_squared), light.color.rgb * attenuation, diffuse_color, f0, alpha);
     }
 
-    let ambient = lights.ambient.rgb * (diffuse_color + f0 * 0.2);
+    var ambient = lights.ambient.rgb * (diffuse_color + f0 * 0.2);
+    if (lights.ambient.w > 0.0) {
+        // The reflected sky replaces the flat specular ambient, so metal shows the studio around it.
+        let n_dot_v = max(dot(n, v), 0.0001);
+        let facing_up = clamp(n.y * 0.5 + 0.5, 0.6, 1.0);
+        let sky = environment(reflect(-v, n), roughness) * env_brdf(f0, roughness, n_dot_v);
+        ambient = lights.ambient.rgb * diffuse_color + sky * facing_up * lights.ambient.w;
+    }
     let color = radiance + ambient + input.emissive.rgb;
     return vec4<f32>(tonemap_aces(color * view.exposure.x), input.base_color.a);
 }
