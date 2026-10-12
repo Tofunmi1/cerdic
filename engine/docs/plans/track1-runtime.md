@@ -174,7 +174,7 @@ set). Boot time: <= 3 s on desktop. Memory: flat over 30 minutes.
 | M12 Hardening | pending | |
 
 ## 9. Parking lot (ideas not acted on; triage with the owner)
-- Language growth: attach/socket snapping, skeleton/creature nodes, grammar nodes, procedural materials, critique loop.
+- Language growth: moved to `track2-modeling.md` (draft, awaiting owner approval): attach/socket snapping, creature and grammar nodes, procedural materials, critique loop.
 - Extension registry beyond `ve-core`: pack format, schema DSL, tool-schema generation.
 - Command/transaction/undo system; scene solver; logic/NPC/memory; in-world UI; audio; physics.
 - Register the geom-lang MCP server in Claude Code (owner approval needed).
