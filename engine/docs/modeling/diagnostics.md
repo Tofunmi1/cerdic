@@ -62,6 +62,11 @@ string. Severity: `error` blocks a commit, `warning` does not, `info` is progres
 | `provider.invalid_patch` | error | Provider output did not validate | Counts toward the repair cap |
 | `provider.budget` | error | Calls, tokens or time cap reached | |
 
+Logic codes (`logic.*`, defined with the logic track; see `logic.md` section 11): `unknown_event`,
+`event_args`, `unknown_state`, `state_type`, `flow_cycle`, `flow_fan_in`, `unreachable_rule`,
+`unreachable_objective`, `cascade_depth`, `step_budget`, `queue_overflow`, `target_missing`,
+`rebuild_hot`, `write_conflict`, `retrigger`.
+
 Rules: a diagnostic always names the smallest responsible node, port or feature it can; a failure
 that cannot be located says so rather than guessing; adding a code is additive, changing a meaning is
 a contract version bump.

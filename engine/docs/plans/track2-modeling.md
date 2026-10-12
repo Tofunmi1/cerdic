@@ -17,9 +17,11 @@ check the current checkout before treating an old finding as an outstanding bug.
 | Language and first editor | G3, V1, V2 | "Make a hollow vase" end to end; node graph with typed sockets; outliner and inspector; gallery of vase, twisted extrusion, offset plate |
 | Reuse | G4, V3, V4 | Four-wheel assembly; viewport gizmos and parameter handles; group authoring and library |
 | Surfaces and polygons | G5, G6, G7 | Lofts, sweeps, bends; inset, bridge, restricted bevel; subdivision with creases |
+| Embedded logic | L0-L4 | Flow ports and rules in the same graph; a door that opens when the key is inserted, in Play mode; replayable sessions |
+| Logic editor and AI | L5-L7 | Blueprint-style flow wires and a debugger that steps backward; validator and simulated playthrough; AI writes rules |
 | Organic and AI | G8, G9 | Creature from fields; 60-task AI evaluation |
 | Appearance and release | G10, G13 | Materials everywhere; release report |
-| Optional | G11, G12, V5-V7 | Stylized rendering and strokes; sketches; tool-specific edit modes, XR editing, polish |
+| Optional | G11, G12, V5-V7, L8, L9 | Stylized rendering and strokes; sketches; tool-specific edit modes, XR editing, polish; state machines; interaction packs |
 
 Every gate adds something to the gallery (`?scene=gallery&viewer=1`) or to the editor, so each is
 checked by looking at it as well as by tests.
@@ -34,14 +36,17 @@ established algorithms. Bevy stays the runtime/rendering consumer.
 **Core release:** document, history and persistence; bounded worker evaluation; typed node language;
 groups, instances and attachment frames; profiles, curves, sweeps and lofts; polygon operations and
 subdivision; organic fields; procedural appearance; selection, inspector and AI repair loop; **the
-visual editor (section 4B): node graph, outliner, inspector and a viewport with gizmos.**
+visual editor (section 4B): node graph, outliner, inspector and a viewport with gizmos; and embedded
+logic (L0-L7): Blueprint-style behaviour in the same language, document and editor, with a Play mode,
+a replayable debugger, a validator and AI authoring (contracts in `docs/modeling/logic.md`, ADR 0008).**
 
 **Optional extensions:** stylized rendering, Grease-Pencil-style strokes, constrained sketches, tool
-edit modes inside the editor, XR editing. They have contracts below but do not delay the core release.
+edit modes inside the editor, XR editing, state machines and interaction packs (L8, L9). They have
+contracts below but do not delay the core release.
 
 **Deferred:** rigging/skinning, simulation, sculpt brushes, automatic retopology, exact B-rep CAD,
-collaboration, unrestricted code execution, imported models, external generation services, game
-logic and Play mode. Deferred but wanted, each needing a fixture before it gets a gate: Minkowski
+collaboration, unrestricted code execution (logic has no user code at all), imported models, external
+generation services, networking, physics events, NPC dialogue beyond the host-effect hook. Deferred but wanted, each needing a fixture before it gets a gate: Minkowski
 rounding and shelling, convex hull, SVG/DXF drawing export (E1, after G12).
 The goal is broad, editable modeling coverage; arbitrary production-ready assets, good topology,
 rigging and animation cannot be promised by adding nodes.
@@ -218,7 +223,7 @@ Panels are docked with simple resizable splits; the layout is UI state.
 | Inspector | Selected object or node: parameters, transform, material slot, semantic labels, diagnostics, "edit definition vs edit this instance" for groups |
 | Library | Our own groups, templates and materials; no imported assets; shows version and dependencies |
 | Viewport (scene view) | Orbit and fly camera (the existing viewer), shaded/wire/normals/bounds/diagnostic overlays, translate/rotate/scale gizmos with local/world, snapping and pivot choice, parameter handles (drag a profile point, loft section, revolve axis or radius), frame selected |
-| Preview mode | The existing desktop viewer (mock headset, fisheye and headset lens) and Enter VR for the same document; Play mode with game logic is out of scope |
+| Preview mode | The existing desktop viewer (mock headset, fisheye and headset lens) and Enter VR for the same document; Play mode (L3) runs the embedded logic on a clone |
 | History and status | Transaction list with undo/redo, worker queue, last revision, failure and recovery |
 
 **Rules.**
@@ -255,8 +260,18 @@ things in parallel. Each gate needs recorded evidence, not just a passing build.
 | V1 | Outliner, inspector, history panel, generated widgets | G3, V0 |
 | V2 | Node graph editor v1 and text view | G3, V0, X7 |
 | G4 | Groups, instances, semantic parts and sockets | G3 |
+| L0 | Logic contracts in code: port kinds, output ports, variables, schema 2 | G4 |
+| L1 | Logic IR, flow validation and the text `rule` form | L0 |
+| L2 | Play runtime: pure interpreter, tick, timers, replay log | L1, X8, X9 |
+| L3 | Interaction bridge, Play and Edit worlds, live parameter drivers | L2, G2 |
+| L4 | Rebuild-class actions through the worker | L3 |
 | V3 | Viewport editing: selection sync, gizmos, parameter handles | G4, V1 |
 | V4 | Group authoring, enter/exit, library panel | G4, V2 |
+| L5 | Flow editor view and the replay debugger | L1, V2, L3 |
+| L6 | Scenario validator and simulated playthrough | L2 |
+| L7 | AI authoring of logic and its evaluation | L5, L6, G9 |
+| L8 | Optional state machines | L7 |
+| L9 | Optional declarative interaction packs | L7 |
 | G5 | Surface construction and deformers | G4, X2 |
 | G6 | Polygon topology and restricted editing | G5, X3 |
 | G7 | Subdivision surfaces | G6, X3 |
@@ -268,7 +283,7 @@ things in parallel. Each gate needs recorded evidence, not just a passing build.
 | V5 | Optional tool edit modes: polygon edit, stroke draw, sketch edit | V3 and the matching G gate |
 | V6 | Optional XR editing: grab and scale produce coalesced commands | V3 |
 | V7 | Optional editor polish: shortcuts, themes, onboarding, large-graph performance | V4 |
-| G13 | Release hardening and compatibility report | G0-G10, V0-V4, included extensions |
+| G13 | Release hardening and compatibility report | G0-G10, V0-V4, L0-L7, included extensions |
 
 **G0 — Baseline and decisions.** Record checkout, toolchain and library versions, existing gates and
 skips, native and browser release sizes, a named desktop benchmark environment. Define command and
@@ -431,6 +446,67 @@ produce coalesced transform commands; selection and handles usable in headset; o
 **V7 — Editor polish (optional).** Shortcut map, themes, onboarding example, 500-node graph
 performance, panel layouts saved. *Accept:* measured large-graph interaction, keyboard-only walkthrough.
 
+**L0 — Logic contracts in code.** `PortSpec` gains a kind (`Data` or `Flow`), `OperatorSpec` gains
+named output ports, the document gains typed `variables` (initial values), flow links are stored in the
+same `inputs` map, and the schema becomes 2 with a real migration step 1 to 2 (adds empty variables)
+tested against a frozen schema-1 fixture. `event.*`, `flow.*`, `act.*` and `state.*` operator families
+are reserved as draft. *Accept:* old documents load and migrate; a flow link into a data port and the
+reverse are refused with `graph.port_type`; commands for variables and flow links follow the G1a case
+style; nothing evaluates yet.
+
+**L1 — Logic IR and validation.** Event, flow, action and state operators registered with typed payloads;
+flow validation in `ve-graph` (acyclic flow, no fan-in without a merge, bounded `repeat`, typed event
+payloads, variable types); the text `rule` form compiles to nodes and links and prints back
+identically; effect class and param class (live or rebuild) on every action. *Accept:* the door and the
+vending-machine fixtures round-trip text, graph and commands; every `logic.*` diagnostic has a failing
+case; the parser fuzzes clean.
+
+**L2 — Play runtime.** A pure `ve-logic` crate: world clone, 60 Hz tick, event queue, rule matching in
+authored order, chains with yield points, `wait` and timers, cascade depth 16, 10,000 steps per tick,
+re-trigger policy, seeded random streams, input log with per-tick state hash. *Accept:* the same
+document, seed and log give the same hash on every tick (property tests, native and wasm); chains
+always terminate within the budgets (adversarial cases: emit loops, huge repeats, event floods);
+overflow and budget diagnostics fire as specified; one tick of the door fixture costs under 1 ms.
+
+**L3 — Interaction bridge.** Engine interaction (hover, select, grab, insert, enter) becomes typed
+events targeted by part and socket names; a Play and Edit toggle in the viewer and editor; Play runs
+on a clone and stopping discards it; `act.animate`, visibility and material actions drive live
+parameters directly; host effects queue to the page. *Accept:* in the browser the escape-room door
+fixture opens when the key is inserted, by mouse and by emulated controller; Edit mode is unchanged
+afterwards (document equality); no kernel call happens per frame during animation (instrumented).
+
+**L4 — Rebuild actions.** Actions on rebuild parameters start worker jobs through the G2 path, coalesced
+to 4 per second per node, old geometry kept until the swap; `animate` on a rebuild parameter is
+refused. *Accept:* a rebuild action changes the geometry in Play without a frame stall; stale results
+never swap in; the play world's picking stays consistent across the swap.
+
+**L5 — Flow editor and debugger.** The V2 canvas shows flow ports and white wires, event hats and
+rule groupings; the text and graph views stay in sync; the debugger offers breakpoints, pin watches,
+live highlighting of fired wires, per-rule counts and step costs, an event log, a variable watcher
+and stepping backward by replay. *Accept:* a session recorded in Play replays tick for tick in the
+debugger; stepping back one tick restores the exact state hash; a breakpoint pauses at the right node;
+graphs stay readable (auto layout of the fixtures reviewed by eye).
+
+**L6 — Scenario validator and playthrough.** Always-on static analysis (section 9 of `logic.md`) and a
+bounded simulated playthrough using reversible actions only. *Accept:* seeded defect fixtures (a key
+sealed behind its own lock, an unreachable objective, an emit cycle, conflicting writers) are each
+reported with the right code and nodes; the door fixture's objective is reached; the validator cost on
+200 rules stays under the editor's frame budget.
+
+**L7 — AI authoring of logic.** Tools generated from the registry (`describe_events`,
+`describe_conditions`, `describe_actions`, `draft_rules`, `validate`, `simulate_playthrough`); output
+as typed commands shown as a reviewable pending change. *Accept:* a frozen corpus of at least 40 logic
+tasks (create, edit, impossible, ambiguous) judged by a clean validator and a playthrough that solves
+the stated objective; first-try, repaired and unsupported rates reported separately; thresholds frozen
+before evaluating.
+
+**L8 — State machines (optional).** `state_machine.*` for modes, compiled to rules. *Accept:* the door
+as closed, opening, open and locked matches the rule version tick for tick.
+
+**L9 — Interaction packs (optional).** A declarative pack format (data only) for events, conditions
+and actions the AI can create and save as a template. *Accept:* a vending machine pack made by the
+mock provider validates, runs in Play and survives save and reload.
+
 **G13 — Release hardening.** Parser and loader fuzzing, adversarial budgets, native sanitiser and
 browser parity gates, release size and memory review, long-session recovery including the editor,
 migrations, dependency notices. *Accept:* documented release commands, core fixture rubric satisfied,
@@ -453,6 +529,8 @@ cancellation behaviour, maintenance risk.
 | X5 | neoscad sketch-solver (primary) against a frozen 40-sketch corpus, WASM build | Defer constraints; keep dimensioned procedural profiles |
 | X6 | Engine canvas inside a React shell: wasm instance lifecycle, resize, focus, pointer lock, two instances | Keep the engine page in an iframe with a message bridge |
 | X7 | `@xyflow/react` for the node graph: typed sockets, frames, reroutes, groups, 200 and 500 node performance, custom edge validation | A custom canvas node graph behind the same adapter |
+| X8 | A throwaway flow interpreter (events, branch, wait, animate, emit) on the door fixture: cost per tick native and wasm with 200 rules, hash stability over 100k ticks, behaviour under event floods and emit loops | Lower the budgets in `limits.md`; if one tick cannot stay under 1 ms at 200 rules, move the interpreter to its own worker and accept the extra latency (record in ADR 0008) |
+| X9 | Deterministic math: the same expression and animation values (trigonometry, interpolation) native versus wasm with a pure `libm`, over a seeded sweep of inputs | Restrict expressions to arithmetic and table-driven easing; document the difference |
 
 Choose on required semantics and measured integration cost, not headline features. An experiment that
 narrows a core capability revises that fixture and acceptance contract explicitly; report the
@@ -507,6 +585,10 @@ frame-budget claims need real measurements.
 | D9 | **Node canvas:** `@xyflow/react` behind an adapter, validated by X7; own canvas if it fails. |
 | D10 | **Document owner:** the Rust engine; the editor mirrors it through generated types. |
 | D11 | **Package manager:** Bun everywhere (the engine's npm use moves to Bun in G0). |
+| D12 | **Logic lives in the node language** (ADR 0008): rules are the canonical form; flow ports and a text `rule` block are two views of the same nodes; no user code, ever. |
+| D13 | **Tick and runtime:** fixed 60 Hz, integer ticks, no wall clock; the interpreter runs inside the engine module on the window thread under a per-tick step budget; the geometry worker only does rebuild jobs. |
+| D14 | **Re-trigger default:** `ignore` while a rule's chain is running; `restart` and `queue` (at most 8) are explicit per rule. |
+| D15 | **Per-frame writes** are live parameters only (transforms, visibility, material parameters); geometry parameters are discrete, coalesced rebuild requests. |
 
 Primary references (checked 2026-10-12; pin a commit during adoption):
 [vendored Manifold API](../../third_party/manifold/include/manifold/manifold.h) and
@@ -518,6 +600,25 @@ upstream assumptions; the safe wrapper exposes only a subset); [Curvo](https://g
 [neoscad sketch-solver](https://github.com/neoscad/sketch-solver) (young, two commits);
 [React Flow on npm](https://www.npmjs.com/package/@xyflow/react) (performance at 500 nodes unverified).
 Other candidates and Blender field and group principles are sourced in the research handoff.
+
+Logic research (read 2026-10-12): the Godot team's
+[account of removing VisualScript](https://godotengine.org/article/godot-4-will-discontinue-visual-scripting);
+Unity's [graph types](https://docs.unity3d.com/Packages/com.unity.visualscripting@1.9/manual/vs-graph-types.html)
+and [custom events](https://docs.unity3d.com/Packages/com.unity.visualscripting@1.9/manual/vs-custom-events.html);
+how [Blueprint evaluation works](https://zomgmoz.tv/unreal/Blueprints/How-blueprint-evaluation-works)
+(community guide) and Epic's
+[Blueprint debugger](https://dev.epicgames.com/documentation/en-us/unreal-engine/blueprint-debugger-in-unreal-engine);
+Wasmtime [fuel and epoch interruption](https://docs.wasmtime.dev/api/wasmtime/struct.Store.html)
+(only relevant if user code were ever allowed, which it is not); Blender's
+[simulation zone](https://docs.blender.org/manual/en/dev/modeling/geometry_nodes/simulation/simulation_zone.html);
+Scratch's scheduler described in [SchedCheck](https://arxiv.org/pdf/2607.00623); behaviour trees versus
+state machines ([Opsive](https://opsive.com/support/documentation/state-designer/concepts/finite-state-machines-vs-behavior-trees/));
+a study of when [visual programs are harder to read](https://core.ac.uk/works/16724972);
+A-Frame's [event-driven interaction model](https://aframe.io/docs/1.7.0/components/cursor.html). Verse's
+effect annotations come from secondary pages only (Epic's own reference did not load). **Not found:**
+a benchmark of LLMs writing Blueprint-style graphs, Blueprint VM performance figures, and event-
+condition-action rule literature; the logic evaluation (L7) and the interpreter budgets (X8) are
+therefore ours to measure.
 
 **Progress:** **G0 documents written 2026-10-12** in `docs/modeling/` (`baseline.md`, `commands.md`,
 `diagnostics.md`, `limits.md`, `fixtures.md`, `cases.md`) and ADRs 0004-0007. G0 is **not closed**:
@@ -539,7 +640,9 @@ natively (`crates/ve-graph/tests/g1b.rs`), G1b-10 to G1b-12 and the read-only ca
 `web/tests/document.mjs`. Release wasm +118 KB brotli (3.24 to 3.36 MB stripped). Decisions made:
 the undo history is not saved; two tabs are not merged (last save wins); `serde_json` now parses
 floats exactly (`float_roundtrip`) because the default parser failed bit-exact reload.
-V0, G2-G13 and V1-V7 pending; X1-X7 not performed. No gate has passed merely because this
+**Embedded logic planned 2026-10-12** (`docs/modeling/logic.md`, ADR 0008, gates L0-L9, experiments X8
+and X9, decisions D12-D15, an escape-room door fixture); no logic code exists yet.
+V0, G2-G13, V1-V7 and L0-L9 pending; X1-X9 not performed. No gate has passed merely because this
 document was revised. Replace this line with per-milestone evidence as work lands:
 commit, contract version, cases and commands run, pass, fail and skips, benchmark artifact, known
 limitations, next dependency. Run `cargo xtask check --strict` from `engine/`, the separate
