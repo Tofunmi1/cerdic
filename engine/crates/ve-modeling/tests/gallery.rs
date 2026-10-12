@@ -48,6 +48,44 @@ fn the_ceramic_vase_is_a_smooth_hollow_solid_with_a_surface() {
 }
 
 #[test]
+fn the_table_is_a_slab_on_four_mirrored_legs() {
+    // Slab 1.2 x 0.04 x 0.7 plus four 0.05 x 0.05 legs of 0.70 m below it.
+    let analytic = 1.2 * 0.04 * 0.7 + 4.0 * 0.05 * 0.05 * 0.70;
+    assert!(
+        near(volume("table"), analytic, 1.0e-4),
+        "{} against {analytic}",
+        volume("table")
+    );
+}
+
+#[test]
+fn the_gear_has_its_disc_teeth_and_bore() {
+    // Disc (a 128-gon), sixteen teeth of which half sticks out, minus the 64-gon bore.
+    let disc = 0.5 * 128.0 * 0.01 * (std::f64::consts::TAU / 128.0).sin() * 0.02;
+    let teeth = 16.0 * 0.01 * 0.016 * 0.02;
+    let bore = 0.5 * 64.0 * 0.0004 * (std::f64::consts::TAU / 64.0).sin() * 0.02;
+    let analytic = disc + teeth - bore;
+    assert!(
+        near(volume("gear"), analytic, 0.02),
+        "{} against {analytic}",
+        volume("gear")
+    );
+}
+
+#[test]
+fn the_spiral_stair_has_twelve_treads_around_a_column() {
+    // Column plus twelve treads, each sharing a half disc of the column with it.
+    let column = 0.5 * 48.0 * 0.0064 * (std::f64::consts::TAU / 48.0).sin() * 2.2;
+    let overlap = 12.0 * 0.5 * std::f64::consts::PI * 0.0064 * 0.05;
+    let analytic = column + 12.0 * 0.4 * 0.05 * 0.2 - overlap;
+    assert!(
+        near(volume("spiral_stair"), analytic, 0.02),
+        "{} against {analytic}",
+        volume("spiral_stair")
+    );
+}
+
+#[test]
 fn the_twisted_tower_has_the_tapered_prism_volume() {
     let star_area = 5.0 * 0.1 * 0.045 * (std::f64::consts::PI / 5.0).sin();
     let analytic = star_area * 0.5 * (1.0 + 0.6 + 0.36) / 3.0;

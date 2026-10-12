@@ -211,7 +211,8 @@ fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usize, Fail>
                 matches!(node.params.get("join"), Some(ve_graph::Value::Str(j)) if j == "round");
             Ok(inputs.sum::<usize>().saturating_mul(2) + if round { 256 } else { 0 })
         }
-        "profile.difference" => Ok(inputs.sum::<usize>().saturating_mul(2)),
+        // A mirror doubles its input, like a profile difference doubles its inputs.
+        "profile.difference" | "xform.mirror" => Ok(inputs.sum::<usize>().saturating_mul(2)),
         "profile.smooth" => {
             let rounds = match node.params.get("iterations") {
                 Some(ve_graph::Value::Int(n)) => (*n).clamp(0, 5),
@@ -220,6 +221,20 @@ fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usize, Fail>
             Ok(inputs.sum::<usize>().saturating_mul(1_usize << rounds))
         }
         "check.min_wall" => Ok(0),
+        "profile.rect" => Ok(4),
+        "profile.circle" => Ok(segments),
+        "solid.torus" => Ok(segments
+            .saturating_mul(count(node, "tube_segments"))
+            .saturating_mul(2)),
+        // Copies are counted before any is built, so a pattern over the budget is refused cheaply.
+        "xform.array" => Ok(inputs.sum::<usize>().saturating_mul(
+            count(node, "count_x")
+                .saturating_mul(count(node, "count_y"))
+                .saturating_mul(count(node, "count_z")),
+        )),
+        "xform.radial" | "xform.repeat" => {
+            Ok(inputs.sum::<usize>().saturating_mul(count(node, "count")))
+        }
         "solid.extrude" => Ok(inputs
             .sum::<usize>()
             .saturating_mul(divisions.saturating_mul(4).saturating_add(2))),
@@ -228,8 +243,8 @@ fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usize, Fail>
             .saturating_mul(segments)
             .saturating_mul(2)),
         "solid.box" => Ok(12),
-        "solid.sphere" => Ok(segments.saturating_mul(segments).saturating_mul(2)),
-        "solid.cylinder" => Ok(segments.saturating_mul(4)),
+        "solid.sphere" | "solid.capsule" => Ok(segments.saturating_mul(segments).saturating_mul(2)),
+        "solid.cylinder" | "solid.cone" => Ok(segments.saturating_mul(4)),
         "solid.union" | "solid.difference" | "solid.intersect" => {
             Ok(inputs.sum::<usize>().saturating_mul(4))
         }
@@ -238,6 +253,14 @@ fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usize, Fail>
             "geometry.unsupported_case",
             format!("{} has no evaluator yet", node.op),
         )),
+    }
+}
+
+/// A whole-number parameter as a size; the registry has already bounded it, a missing one counts as 1.
+fn count(node: &Node, name: &str) -> usize {
+    match node.params.get(name) {
+        Some(ve_graph::Value::Int(n)) => usize::try_from(*n).unwrap_or(1),
+        _ => 1,
     }
 }
 

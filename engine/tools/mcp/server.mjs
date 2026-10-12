@@ -77,6 +77,24 @@ profile.smooth@1(profile, iterations=3, keep_axis=true), which turns the corners
 an outer and an inner profile and subtract; let the inner profile rise above the outer rim to open
 the top, and add check.min_wall@1 to keep the wall thick enough. Lay out real dimensions in metres.
 
+Furniture and machines: solid.box, solid.cylinder, solid.cone, solid.torus and solid.capsule are
+centred on the origin (cone, cylinder and capsule stand along Y); profile.rect and profile.circle
+make profiles to extrude. Place a part with xform.move, then repeat it: xform.mirror@1(solid,
+axis="x") adds the mirror image across the plane through the origin (put the part off-centre first),
+xform.array@1(solid, count_x=3, count_y=1, count_z=2, spacing=[0.2, 0, 0.2]) makes a grid,
+xform.radial@1(solid, count=16, radius=0.1) places copies evenly around the Y axis (each moved out
+along X first), and xform.repeat@1(solid, count=12, step=[0, 0.18, 0], rotate_step=[0, 15, 0]) makes a
+staircase or spiral (copy i is turned i times rotate_step, then moved i times step). Copies are
+fused into one solid, so make neighbours overlap a little where they must join. A table:
+  leg = solid.box@1(size=[0.05, 0.72, 0.05])
+  leg_corner = xform.move@1(leg, by=[0.55, 0.36, 0.30])
+  legs_pair = xform.mirror@1(leg_corner, axis="x")
+  legs = xform.mirror@1(legs_pair, axis="z")
+  top = solid.box@1(size=[1.2, 0.04, 0.7])
+  top_raised = xform.move@1(top, by=[0, 0.72, 0])
+  table = solid.union@1(legs, top_raised)
+  output table
+
 Colour and finish: solid.material@1(solid, color=[r,g,b], metallic=0, roughness=0.5, emissive=[0,0,0])
 gives a solid a surface (colour is sRGB 0..1 as in a colour picker, metallic 0 plastic/paint/wood to 1
 bare metal, roughness 0 mirror to 1 matte, emissive glows above 1). The shape is unchanged. Put it on

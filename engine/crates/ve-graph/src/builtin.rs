@@ -9,6 +9,7 @@ use crate::spec::{
 use crate::value::{ParamType, Unit, Value};
 
 mod modeling;
+mod shapes;
 
 /// The largest size or offset accepted, in metres (the kernel's own extent limit).
 const EXTENT: f64 = 1.0e6;
@@ -90,6 +91,7 @@ fn all_specs() -> Vec<Option<OperatorSpec>> {
     all.extend(transforms());
     all.extend(profiles());
     all.extend(modeling::from_profiles());
+    all.extend(shapes::all());
     for spec in all.iter_mut().flatten() {
         if READY.contains(&spec.id.to_string().as_str()) {
             spec.readiness = Readiness::Ready;
@@ -117,6 +119,15 @@ const READY: &[&str] = &[
     "solid.revolve@1",
     "solid.material@1",
     "check.min_wall@1",
+    "profile.rect@1",
+    "profile.circle@1",
+    "solid.cone@1",
+    "solid.torus@1",
+    "solid.capsule@1",
+    "xform.mirror@1",
+    "xform.array@1",
+    "xform.radial@1",
+    "xform.repeat@1",
 ];
 
 fn primitives() -> Vec<Option<OperatorSpec>> {
