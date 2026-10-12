@@ -39,6 +39,21 @@ diagnostic naming the limit and the observed value; the document stays unchanged
 | Worker restarts | 3 in 60 s, then the editor reports a persistent failure |
 | Editor graph | 5,000 nodes loaded; interaction goal measured at 200 and 500 |
 
+## Logic limits (draft for L2; X8 measures them)
+| Limit | Value |
+|---|---|
+| Tick | fixed 60 Hz, integer ticks, no wall clock |
+| Node steps per tick | 10,000 (excess chains resume next tick) |
+| Cascade depth (`emit` chains) | 16 |
+| Event queue | 1,024, newest dropped on overflow |
+| Timers | 256 |
+| State variables | 1,024 |
+| `repeat` iterations | 64 |
+| Queued re-triggers per rule | 8 |
+| Rebuild requests per node | 4 per second, coalesced |
+| One tick of the door fixture | under 1 ms (target, window thread) |
+| Rules in a document | 1,000 (counts toward the node limits) |
+
 ## Performance goals (targets until measured, on the baseline machine)
 | Goal | Value |
 |---|---|

@@ -167,5 +167,29 @@ refused; creature silhouette review from six views.
 **G9:** 60 frozen tasks with rubrics and thresholds; deterministic mock corpus; stale revision and
 impossible request cases; pending AI transaction reviewable before acceptance.
 **G10:** material boundaries and seams on all fixtures; mirrored cases; save, reload, undo.
+**L0:** schema-1 fixture migrates to schema 2 with empty variables; a flow link into a data port and a
+data link into a flow port are each `graph.port_type`; variable commands (define, set initial value,
+remove) are atomic and undoable; an old build opening a schema-2 file reports `store.newer_version`.
+**L1:** the door fixture round-trips text, graph and commands; every `logic.*` code has a failing
+document (unknown event, wrong payload type, unknown or mistyped state, flow cycle, flow fan-in
+without merge, `repeat` over 64); `rule` text prints back identically; an action on a rebuild
+parameter inside `animate` is `logic.rebuild_hot`.
+**L2:** same document, seed and log give the same per-tick hash (property test, native and wasm);
+emit loop stops at depth 16 with `logic.cascade_depth`; a 5,000-event flood is bounded by the queue
+with `logic.queue_overflow`; `wait` resumes on the right tick; `ignore`, `restart` and `queue(8)` each
+behave as specified; two writers in one tick follow queue and authored order; missing target aborts only
+its chain with `logic.target_missing`; one tick of the door fixture under 1 ms.
+**L3:** door fixture opens on key insert by mouse and by emulated controller; Play does not change the
+authored document; stopping Play discards state; no kernel call per frame while animating; host effect
+queued to the page and its result event returns.
+**L4:** a rebuild action swaps geometry without a stall; coalescing at 4 per second; stale results
+never swap in; picking stays consistent across the swap.
+**L5:** a recorded session replays tick for tick; step back restores the exact hash; breakpoint pauses at
+the node; watches show "no data" before first run; fired wires highlight; auto layout reviewed.
+**L6:** seeded defects (sealed key, unreachable objective, emit cycle, write conflict) are each reported
+with the right code and nodes; the door objective is reached; validator cost bounded on 200 rules.
+**L7:** at least 40 frozen logic tasks with a clean validator and a solving playthrough as the rubric;
+impossible and ambiguous requests included; first-try, repaired and unsupported rates separate.
+**L8, L9:** per the plan; lists due before those gates are started.
 **G11, G12, V5-V7:** per the plan; lists due before those gates are started.
 **G13:** fuzz time, soak results, parity run, size report, migration fixtures, limitations matrix.
