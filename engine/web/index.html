@@ -24,9 +24,11 @@
     import init, {
       start, status, set_quality, set_governor, set_window_hz, xr_supported, enter_xr, exit_xr,
       viewer_configure, viewer_look, viewer_move, viewer_set_locked, viewer_reset, viewer_set_lens,
+      doc_open, doc_reset, doc_state, doc_apply, doc_undo, doc_redo, doc_save, doc_operators,
     } from "./ve_runtime.js";
     import { bindMemory } from "./wasi_snapshot_preview1.js";
     import { watchBenchSession } from "./bench.js";
+    import { createDocApi } from "./document-api.js";
 
     const params = new URLSearchParams(location.search);
     const began = performance.now();
@@ -47,6 +49,14 @@
       if (params.get("governor") === "1") set_governor(true);
       if (params.has("hz")) set_window_hz(Number(params.get("hz")));
       start("ve", params.get("scene") ?? "");
+      // The authoring document (typed commands, history, local storage). The panel is opt in.
+      state.doc = createDocApi({ doc_open, doc_reset, doc_state, doc_apply, doc_undo, doc_redo, doc_save, doc_operators });
+      if (params.get("doc") === "1" || params.get("viewer") === "1") {
+        const { startDocPanel } = await import("./docpanel.js");
+        const name = params.get("docname") ?? "default";
+        state.doc.open(name);
+        state.docPanel = startDocPanel({ api: state.doc, name });
+      }
       // Desktop viewer (mouse look, wide field of view, split screen): opt in with ?viewer=1.
       if (params.get("viewer") === "1") {
         const { startViewer } = await import("./viewer.js");
