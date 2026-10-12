@@ -23,7 +23,7 @@
   <script type="module">
     import init, {
       start, status, set_quality, set_governor, set_window_hz, xr_supported, enter_xr, exit_xr,
-      viewer_configure, viewer_look, viewer_move, viewer_set_locked, viewer_reset,
+      viewer_configure, viewer_look, viewer_move, viewer_set_locked, viewer_reset, viewer_set_lens,
     } from "./ve_runtime.js";
     import { bindMemory } from "./wasi_snapshot_preview1.js";
     import { watchBenchSession } from "./bench.js";
@@ -50,7 +50,7 @@
       // Desktop viewer (mouse look, wide field of view, split screen): opt in with ?viewer=1.
       if (params.get("viewer") === "1") {
         const { startViewer } = await import("./viewer.js");
-        const api = { viewer_configure, viewer_look, viewer_move, viewer_set_locked, viewer_reset, set_quality };
+        const api = { viewer_configure, viewer_look, viewer_move, viewer_set_locked, viewer_reset, viewer_set_lens, set_quality };
         state.viewer = startViewer({ canvas: document.getElementById("ve"), api, params });
       }
       const poll = setInterval(() => {

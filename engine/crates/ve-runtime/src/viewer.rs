@@ -16,7 +16,7 @@ use bevy_math::{EulerRot, Quat, Vec2, Vec3};
 use bevy_time::{Real, Time};
 use bevy_transform::components::Transform;
 use bevy_window::{PrimaryWindow, Window};
-use ve_render::StereoViews;
+use ve_render::{LensMode, LensWarp, StereoViews};
 use ve_xr_math::{FovTangents, MockHmd, Pose};
 use ve_xr_web::{SessionState, XrCamera, session_state};
 
@@ -57,6 +57,8 @@ struct Input {
     motion: Vec3,
     sprint: bool,
     reset: bool,
+    /// The lens the page asked for; it only applies where it makes sense (see `wanted_lens`).
+    lens: LensMode,
 }
 
 impl Default for Input {
@@ -71,6 +73,7 @@ impl Default for Input {
             motion: Vec3::ZERO,
             sprint: false,
             reset: false,
+            lens: LensMode::Off,
         }
     }
 }
@@ -129,6 +132,32 @@ pub(crate) fn set_locked(locked: bool) {
     with_input(|input| input.locked = locked);
 }
 
+/// Chooses the lens by name: "off", "fisheye" (the whole frame, wants a wide field of view) or
+/// "headset" (barrel distortion for the split-screen view). Returns false for any other name.
+pub(crate) fn set_lens(name: &str) -> bool {
+    let lens = match name {
+        "off" => LensMode::Off,
+        "fisheye" => LensMode::Fisheye,
+        "headset" => LensMode::Headset,
+        _ => return false,
+    };
+    with_input(|input| input.lens = lens);
+    true
+}
+
+/// The lens that applies: the page's choice where it fits the view, otherwise none. A headset lens
+/// needs two eyes to bend and a fisheye needs one wide view, and neither belongs in a real session,
+/// where the headset's own optics do the work.
+fn wanted_lens(input: &Input, split: bool, presenting: bool) -> LensMode {
+    if !input.enabled || presenting {
+        return LensMode::Off;
+    }
+    match (input.lens, split) {
+        (LensMode::Headset, true) | (LensMode::Fisheye, false) => input.lens,
+        _ => LensMode::Off,
+    }
+}
+
 /// Puts the view back where the scene started.
 pub(crate) fn request_reset() {
     with_input(|input| input.reset = true);
@@ -172,6 +201,7 @@ impl ViewerRig {
             "locked": self.locked,
             "started": self.home.is_some(),
             "split_screen": self.native_stereo || with_input(|input| input.stereo),
+            "lens": format!("{:?}", with_input(|input| input.lens)).to_lowercase(),
         })
     }
 
@@ -238,6 +268,7 @@ pub(crate) fn update_viewer(
     mut commands: Commands,
     time: Res<Time<Real>>,
     mut rig: ResMut<ViewerRig>,
+    mut lens: ResMut<LensWarp>,
     windows: Query<&Window, With<PrimaryWindow>>,
     mut cameras: Query<
         (
@@ -256,7 +287,15 @@ pub(crate) fn update_viewer(
         snapshot
     });
     rig.locked = input.enabled && input.locked;
-    if !input.enabled || session_state() == SessionState::Presenting {
+    let presenting = session_state() == SessionState::Presenting;
+    let warp = LensWarp {
+        mode: wanted_lens(&input, input.stereo || rig.native_stereo, presenting),
+        source_half_fov_tan: (vertical_fov(&input) * 0.5).tan(),
+    };
+    if *lens != warp {
+        *lens = warp;
+    }
+    if !input.enabled || presenting {
         return;
     }
     let Some((entity, mut transform, head, projection)) = cameras.iter_mut().next() else {

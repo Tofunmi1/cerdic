@@ -100,6 +100,13 @@ pub fn viewer_set_locked(locked: bool) {
     viewer::set_locked(locked);
 }
 
+/// Chooses the viewer's lens: "off", "fisheye" or "headset". Returns false for any other name.
+#[wasm_bindgen]
+#[must_use]
+pub fn viewer_set_lens(name: &str) -> bool {
+    viewer::set_lens(name)
+}
+
 /// Puts the viewer back where the scene started.
 #[wasm_bindgen]
 pub fn viewer_reset() {

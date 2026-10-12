@@ -10,6 +10,8 @@ use bevy_render::renderer::RenderDevice;
 use bevy_render::texture::{CachedTexture, TextureCache};
 use bevy_render::view::{Msaa, ViewDepthStencilTexture, ViewTarget};
 
+use crate::lens::LensWarp;
+
 /// Depth format of the forward pass. Bevy projections are reverse-z, so depth clears to 0.
 pub(crate) const DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 
@@ -23,9 +25,15 @@ pub(crate) fn needs_blit(output_format: TextureFormat) -> bool {
     !output_format.is_srgb()
 }
 
+/// Whether a view with this output format renders offscreen: its output needs the present pass, or
+/// the lens warp is on and the present pass resamples every view.
+pub(crate) fn blits(output_format: TextureFormat, lens: LensWarp) -> bool {
+    needs_blit(output_format) || lens.active()
+}
+
 /// The format the forward pass renders in for a view with this output format.
-pub(crate) fn render_format(output_format: TextureFormat) -> TextureFormat {
-    if needs_blit(output_format) {
+pub(crate) fn render_format(output_format: TextureFormat, lens: LensWarp) -> TextureFormat {
+    if blits(output_format, lens) {
         OFFSCREEN_FORMAT
     } else {
         output_format
@@ -87,6 +95,7 @@ pub(crate) fn prepare_msaa_targets(
     mut commands: Commands,
     mut texture_cache: ResMut<TextureCache>,
     device: Res<RenderDevice>,
+    lens: Res<LensWarp>,
     views: Query<(Entity, &ExtractedCamera, &ViewTarget, &Msaa)>,
 ) {
     for (entity, camera, target, msaa) in &views {
@@ -94,7 +103,7 @@ pub(crate) fn prepare_msaa_targets(
         else {
             continue;
         };
-        let format = render_format(format);
+        let format = render_format(format, *lens);
         if msaa.samples() <= 1 {
             commands.entity(entity).remove::<ViewMsaaColor>();
             continue;
@@ -122,6 +131,7 @@ pub(crate) fn prepare_offscreen_targets(
     mut commands: Commands,
     mut texture_cache: ResMut<TextureCache>,
     device: Res<RenderDevice>,
+    lens: Res<LensWarp>,
     views: Query<(Entity, &ExtractedCamera, &ViewTarget)>,
 ) {
     for (entity, camera, target) in &views {
@@ -129,7 +139,7 @@ pub(crate) fn prepare_offscreen_targets(
         else {
             continue;
         };
-        if !needs_blit(format) {
+        if !blits(format, *lens) {
             commands.entity(entity).remove::<ViewOffscreen>();
             continue;
         }
