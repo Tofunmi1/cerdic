@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Browser harness for the engine: page, build output and end-to-end tests.",
   "scripts": {
-    "test": "bun tests/engine.mjs && bun tests/xr.mjs && bun tests/xr-layer.mjs && bun tests/xr-lifecycle.mjs && bun tests/xr-resolution.mjs && bun tests/interact.mjs && bun tests/xr-interact.mjs && bun tests/viewer.mjs && bun tests/document.mjs && bun tests/resize.mjs && bun tests/quality.mjs && bun tests/perf.mjs && bun tests/bench-session.mjs",
+    "test": "bun tests/engine.mjs && bun tests/xr.mjs && bun tests/xr-layer.mjs && bun tests/xr-lifecycle.mjs && bun tests/xr-resolution.mjs && bun tests/interact.mjs && bun tests/xr-interact.mjs && bun tests/viewer.mjs && bun tests/document.mjs && bun tests/resize.mjs && bun tests/quality.mjs && bun tests/perf.mjs && bun tests/bench-session.mjs && bun tests/normals.mjs",
     "test:editor": "bun ../../scripts/build-engine.ts --copy-only && bun tests/editor.mjs"
   },
   "devDependencies": {

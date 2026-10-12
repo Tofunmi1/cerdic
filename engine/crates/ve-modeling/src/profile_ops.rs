@@ -15,6 +15,7 @@ pub(crate) fn run(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
         "profile.polygon" => polygon(node),
         "profile.offset" => offset(node, inputs),
         "profile.difference" => difference(inputs),
+        "profile.smooth" => smooth(node, inputs),
         _ => return min_wall(node, inputs),
     };
     result
@@ -61,6 +62,43 @@ fn offset(node: &Node, inputs: &[Rc<Value>]) -> Result<Vec<Vec<[f64; 2]>>, Kerne
         _ => Err(KernelError::InvalidArgument("join is miter or round")),
     }?
     .loops()
+}
+
+/// Corner cutting (Chaikin): every edge is replaced by the points a quarter and three quarters of
+/// the way along it, which rounds every corner and converges on a smooth curve. Points on a straight
+/// line stay on it. With `keep_axis`, points on the revolve axis (x = 0) are not cut, so a profile
+/// made to be revolved keeps its edge on the axis and its flat base instead of being trimmed back.
+fn smooth(node: &Node, inputs: &[Rc<Value>]) -> Result<Vec<Vec<[f64; 2]>>, KernelError> {
+    let input = inputs
+        .first()
+        .ok_or(KernelError::InvalidArgument("missing profile"))?;
+    let pin_axis = matches!(node.params.get("keep_axis"), Some(Param::Bool(true)));
+    let pinned = |p: [f64; 2]| pin_axis && p[0].abs() < 1.0e-9;
+    let mut loops = input.loops.clone();
+    for _ in 0..whole(node, "iterations")? {
+        loops = loops
+            .iter()
+            .map(|points| {
+                let mut out = Vec::with_capacity(points.len() * 2);
+                for i in 0..points.len() {
+                    let (p, q) = (points[i], points[(i + 1) % points.len()]);
+                    // A point on the axis stays exactly where it is (it appears once, as the start
+                    // of its outgoing edge); every other corner is cut a quarter of the way in.
+                    out.push(if pinned(p) {
+                        p
+                    } else {
+                        [0.75 * p[0] + 0.25 * q[0], 0.75 * p[1] + 0.25 * q[1]]
+                    });
+                    if !pinned(q) {
+                        out.push([0.25 * p[0] + 0.75 * q[0], 0.25 * p[1] + 0.75 * q[1]]);
+                    }
+                }
+                out
+            })
+            .collect();
+    }
+    // Validates the result (no self-intersection, within the size caps) like any other profile.
+    Profile::from_loops(&loops)?.loops()
 }
 
 fn difference(inputs: &[Rc<Value>]) -> Result<Vec<Vec<[f64; 2]>>, KernelError> {

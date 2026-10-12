@@ -123,15 +123,18 @@ fn spawn_room(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     stats: &mut SceneStats,
+    wall_height: f32,
 ) -> Result<(), KernelError> {
+    let (h, mid) = (wall_height, wall_height / 2.0);
     let room = [
         ([14.0, 0.1, 14.0], Vec3::new(0.0, -0.05, 0.0)),
-        ([14.0, 3.0, 0.1], Vec3::new(0.0, 1.5, -7.0)),
-        ([14.0, 3.0, 0.1], Vec3::new(0.0, 1.5, 7.0)),
-        ([0.1, 3.0, 14.0], Vec3::new(-7.0, 1.5, 0.0)),
-        ([0.1, 3.0, 14.0], Vec3::new(7.0, 1.5, 0.0)),
+        ([14.0, h, 0.1], Vec3::new(0.0, mid, -7.0)),
+        ([14.0, h, 0.1], Vec3::new(0.0, mid, 7.0)),
+        ([0.1, h, 14.0], Vec3::new(-7.0, mid, 0.0)),
+        ([0.1, h, 14.0], Vec3::new(7.0, mid, 0.0)),
     ];
     for (size, position) in room {
+        let size = size.map(f64::from);
         let mesh = render_mesh(&Solid::cube(size, true)?, false)?;
         stats.count(&mesh);
         commands.spawn((
@@ -185,8 +188,8 @@ fn spawn_props(
     Ok(())
 }
 
-/// A sun, four warm point lights and a headset camera standing at the room's edge.
-fn spawn_lights_and_camera(commands: &mut Commands, rig: &mut XrRig) {
+/// A sun and four warm point lights.
+fn spawn_lights(commands: &mut Commands) {
     commands.spawn((
         VeDirectionalLight {
             color: Color::WHITE,
@@ -204,12 +207,38 @@ fn spawn_lights_and_camera(commands: &mut Commands, rig: &mut XrRig) {
             Transform::from_xyz(x, 2.4, z),
         ));
     }
+}
+
+/// The lights and a headset camera standing at the room's edge.
+fn spawn_lights_and_camera(commands: &mut Commands, rig: &mut XrRig) {
+    spawn_lights(commands);
     rig.0 = Mat4::from_translation(Vec3::new(0.0, 0.0, 4.5));
     commands.spawn((
         Camera3d::default(),
         XrCamera,
         Transform::from_xyz(0.0, 1.6, 4.5).looking_at(Vec3::new(0.0, 1.0, 0.0), Vec3::Y),
     ));
+}
+
+/// An empty lit room for looking at authored models: the benchmark's floor, walls, sun (which casts
+/// shadows onto the floor) and warm lights, with an ordinary camera a little way back.
+///
+/// # Errors
+/// Fails if the kernel cannot build the room.
+pub(crate) fn stage_scene(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    ambient: &mut VeAmbientLight,
+) -> Result<(), KernelError> {
+    ambient.intensity = 0.25;
+    // Taller walls than the benchmark's, so little sky shows above the model.
+    spawn_room(commands, meshes, &mut SceneStats::default(), 9.0)?;
+    spawn_lights(commands);
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(0.0, 1.0, 2.2).looking_at(Vec3::new(0.0, 0.3, 0.0), Vec3::Y),
+    ));
+    Ok(())
 }
 
 /// Builds the room, the props, the lights and a headset camera, and records what the scene contains.
@@ -225,7 +254,7 @@ pub(crate) fn bench_scene(
 ) -> Result<(), KernelError> {
     ambient.intensity = 0.25;
     let mut stats = SceneStats::default();
-    spawn_room(commands, meshes, &mut stats)?;
+    spawn_room(commands, meshes, &mut stats, 3.0)?;
     spawn_props(commands, meshes, &mut stats, spec)?;
     spawn_lights_and_camera(commands, rig);
     commands.insert_resource(stats);

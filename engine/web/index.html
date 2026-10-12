@@ -49,10 +49,10 @@
       if (params.has("quality")) set_quality(params.get("quality"));
       if (params.get("governor") === "1") set_governor(true);
       if (params.has("hz")) set_window_hz(Number(params.get("hz")));
-      // ?eval=1 (or ?mcp=1) evaluates the document into geometry; it starts from an empty stage.
+      // ?eval=1 (or ?mcp=1) evaluates the document into geometry, in an empty lit studio room.
       const mcpParam = params.get("mcp");
       const evalOn = params.get("eval") === "1" || mcpParam !== null;
-      start("ve", params.get("scene") ?? (evalOn ? "gallery" : ""));
+      start("ve", params.get("scene") ?? (evalOn ? "stage" : ""));
       // The authoring document (typed commands, history, local storage). The panel is opt in.
       state.doc = createDocApi({ doc_open, doc_reset, doc_state, doc_apply, doc_undo, doc_redo, doc_save, doc_operators });
       if (evalOn) {

@@ -7,7 +7,8 @@
 // the runtime exposes: viewer_configure, viewer_look, viewer_move, viewer_set_locked, viewer_reset.
 
 const SCENES = [
-  ["gallery", "Authored document (your model)"],
+  ["stage", "Studio: your model in a lit room"],
+  ["gallery", "Editor comparison scene"],
   ["xr", "Room: bitten cube, floor, lights"],
   ["shadows", "Shadows: box, ball, pillar"],
   ["kernel", "Kernel: cube minus sphere"],
@@ -183,7 +184,7 @@ export function startViewer({ canvas, api, params, frameBounds = () => null }) {
 
   const sceneSelect = hud.querySelector("#v-scene");
   for (const [id, label] of SCENES) sceneSelect.add(new Option(label, id));
-  sceneSelect.value = params.get("scene") || (evalOn ? "gallery" : "xr");
+  sceneSelect.value = params.get("scene") || (evalOn ? "stage" : "xr");
   sceneSelect.addEventListener("change", () => {
     const next = new URLSearchParams(location.search);
     next.set("scene", sceneSelect.value);

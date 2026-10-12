@@ -66,6 +66,26 @@ fn profile_edits() -> Vec<Option<OperatorSpec>> {
             ],
         ),
         spec(
+            "profile.smooth@1",
+            "Rounds every corner of a profile into a smooth curve by repeated corner cutting.",
+            vec![single("in", PROFILE)],
+            profile,
+            vec![
+                ParamSpec {
+                    name: "iterations",
+                    ty: ParamType::Int { min: 1, max: 5 },
+                    default: Some(Value::Int(2)),
+                    doc: "Each round doubles the points and halves the sharpness: 2 is gentle, 4 is very smooth. The shape shrinks slightly inward at the corners.",
+                },
+                ParamSpec {
+                    name: "keep_axis",
+                    ty: ParamType::Bool,
+                    default: Some(Value::Bool(false)),
+                    doc: "Set true for a profile you will revolve: points on the axis (x = 0) stay put, so the base stays flat and the axis edge is not trimmed.",
+                },
+            ],
+        ),
+        spec(
             "profile.difference@1",
             "The first profile minus all the others.",
             vec![variadic("in", PROFILE)],

@@ -212,6 +212,13 @@ fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usize, Fail>
             Ok(inputs.sum::<usize>().saturating_mul(2) + if round { 256 } else { 0 })
         }
         "profile.difference" => Ok(inputs.sum::<usize>().saturating_mul(2)),
+        "profile.smooth" => {
+            let rounds = match node.params.get("iterations") {
+                Some(ve_graph::Value::Int(n)) => (*n).clamp(0, 5),
+                _ => 2,
+            };
+            Ok(inputs.sum::<usize>().saturating_mul(1_usize << rounds))
+        }
         "check.min_wall" => Ok(0),
         "solid.extrude" => Ok(inputs
             .sum::<usize>()
