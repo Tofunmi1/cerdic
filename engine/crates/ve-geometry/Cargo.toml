@@ -1,0 +1,18 @@
+[package]
+name = "ve-geometry"
+version = "0.0.0"
+description = "Typed geometry values: attributes with domains, polygon meshes and adapters to the kernel. Engine-agnostic."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+ve-kernel = { path = "../ve-kernel" }
+thiserror.workspace = true
+
+# Property tests run natively only; proptest does not build for wasm targets.
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

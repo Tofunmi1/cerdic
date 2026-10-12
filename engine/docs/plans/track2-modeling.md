@@ -523,7 +523,14 @@ Other candidates and Blender field and group principles are sourced in the resea
 `diagnostics.md`, `limits.md`, `fixtures.md`, `cases.md`) and ADRs 0004-0007. G0 is **not closed**:
 case lists for G4 onward are drafts to expand before each gate starts, the Bun move for
 `xtask/src/web.rs` is not done, and X1 and X6 have not run (they gate G2 and V0, not G1a).
-G1a, G1b, V0, G2-G13 and V1-V7 pending; X1-X7 not performed. No gate has passed merely because this
+**G1a done 2026-10-12** (`ve-graph`, `ve-geometry`): document, 13 typed commands with batch-local
+aliases, atomic batches, undo and redo, conflict and idempotency handling, evaluation hash that
+ignores layout and labels, attribute domains, polygon mesh, kernel adapters that reject or report
+attribute loss; every G1a case has a test named after it (`crates/ve-graph/tests`,
+`crates/ve-geometry/tests`); `cargo xtask check --strict` green; wasm clippy clean. Known limits:
+operators are `Draft` (nothing evaluates yet), history keeps full snapshots capped at 200 entries or
+16 MiB, frames and reroutes arrive with V2.
+G1b, V0, G2-G13 and V1-V7 pending; X1-X7 not performed. No gate has passed merely because this
 document was revised. Replace this line with per-milestone evidence as work lands:
 commit, contract version, cases and commands run, pass, fail and skips, benchmark artifact, known
 limitations, next dependency. Run `cargo xtask check --strict` from `engine/`, the separate

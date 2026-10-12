@@ -1,7 +1,9 @@
 # Diagnostic codes (contract v1, draft for G1a)
 
 One shape everywhere (commands, parser, planner, evaluator, store, worker, editor):
-`{ code, severity, message, node?, port?, feature?, span?, limit?, observed?, suggestion? }`.
+`{ code, severity, message, command?, node?, port?, param?, related?, feature?, span?, limit?, observed?, suggestion? }`.
+`command` is the index of the failing command in its batch; `related` lists other nodes that took
+part (the members of a cycle, the source of a mistyped link).
 `code` is a stable dotted string (generated into a TS union); `message` is for people and may change;
 `span` is `{ line, col, len }` into the text source; `limit` and `observed` are numbers with a unit
 string. Severity: `error` blocks a commit, `warning` does not, `info` is progress or a no-op.
@@ -23,9 +25,13 @@ string. Severity: `error` blocks a commit, `warning` does not, `info` is progres
 | `graph.cycle` | error | Link would create a cycle | The nodes on the cycle |
 | `graph.group_recursion` | error | Group contains itself, directly or not | |
 | `graph.group_version` | error | Group version missing or incompatible | Available versions |
+| `graph.unknown_port` | error | The operator has no such input or output port | Valid ports |
+| `graph.in_use` | error | Removing a node that other nodes or outputs still use | The readers; or use cascade |
+| `graph.unknown_material` | error | Reference to a missing material | |
 | `graph.unused` | warning | Node not reachable from any output | |
 | `budget.source` | error | Source text over the byte limit | `limit`, `observed` |
-| `budget.nodes` | error | Node count over limit (parsed or expanded) | |
+| `budget.nodes` | error | Node count over limit (parsed or expanded); also output, material and ID limits | |
+| `budget.commands` | error | More than 200 commands in a batch | Split the batch |
 | `budget.expansion` | error | Predicted geometry or instance expansion over limit | Predicted size |
 | `budget.geometry` | error | Vertex, face, grid-cell or point count over limit | |
 | `budget.memory` | error | Predicted temporary or cached bytes over limit | |
@@ -43,6 +49,7 @@ string. Severity: `error` blocks a commit, `warning` does not, `info` is progres
 | `eval.stale_result` | info | Result for an older revision was discarded | |
 | `revision.conflict` | error | `base_revision` is not current | `current_revision` and changed nodes |
 | `revision.already_applied` | info | Transaction key seen before | The original revision |
+| `revision.document` | error | The batch is for another document | |
 | `selection.lost` | warning | Authored feature no longer exists | |
 | `selection.ambiguous` | warning | Several candidates; none chosen | The candidates |
 | `store.corrupt` | error | Saved data failed validation | Previous save kept |

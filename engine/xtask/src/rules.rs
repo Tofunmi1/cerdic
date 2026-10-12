@@ -15,6 +15,8 @@ const MAX_FILE_LINES: usize = 400;
 /// Crates that must stay independent of the rendering engine and platform layers.
 const ENGINE_AGNOSTIC: &[&str] = &[
     "ve-core",
+    "ve-geometry",
+    "ve-graph",
     "ve-interact",
     "ve-kernel",
     "ve-kernel-sys",
