@@ -21,7 +21,7 @@ use bevy_time::{Real, Time};
 use bevy_transform::components::{GlobalTransform, Transform};
 use bevy_window::{CursorLeft, CursorMoved};
 use ve_interact::{
-    Hit, Interaction, Placement3, PointerFrame, PointerId, Ray, Shape, TargetId, World,
+    Event, Hit, Interaction, Placement3, PointerFrame, PointerId, Ray, Shape, TargetId, World,
 };
 use ve_kernel::Bounds;
 use ve_render::StereoViews;
@@ -108,6 +108,8 @@ pub(crate) struct SnapHook(
 pub(crate) struct InteractionState {
     machine: Interaction,
     hovered: BTreeSet<Entity>,
+    /// Objects clicked since the selection last looked.
+    clicked: Vec<Entity>,
     log: Vec<String>,
 }
 
@@ -116,8 +118,14 @@ impl InteractionState {
         Self {
             machine: Interaction::new(PICK_DISTANCE),
             hovered: BTreeSet::new(),
+            clicked: Vec::new(),
             log: Vec::new(),
         }
+    }
+
+    /// The objects clicked since the last call.
+    pub(crate) fn take_clicked(&mut self) -> Vec<Entity> {
+        std::mem::take(&mut self.clicked)
     }
 
     fn note(&mut self, line: String) {
@@ -196,7 +204,13 @@ pub(crate) fn plugin(app: &mut App) {
         .insert_resource(InteractionState::new())
         .add_systems(
             Update,
-            (update_viewer, track_mouse, run_interaction, highlight_hover)
+            (
+                update_viewer,
+                track_mouse,
+                run_interaction,
+                crate::selection::select_on_click,
+                highlight_hover,
+            )
                 .chain()
                 .after(apply_xr_frame),
         );
@@ -311,6 +325,15 @@ pub(crate) fn run_interaction(
     for event in &output.events {
         let line = describe(event, &labels);
         state.note(line);
+        if let Event::SelectEnd {
+            target,
+            click: true,
+            ..
+        } = event
+            && let Some(entity) = entity_of(*target)
+        {
+            state.clicked.push(entity);
+        }
     }
     state.hovered = (0..=3_u32)
         .filter_map(|id| state.machine.hover_of(PointerId(id)))

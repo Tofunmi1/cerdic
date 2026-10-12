@@ -30,6 +30,13 @@ pub(crate) struct Authored {
     revision: u64,
 }
 
+impl Authored {
+    /// The document node whose output this part shows.
+    pub(crate) fn node(&self) -> &str {
+        &self.node
+    }
+}
+
 /// The initial comparison props disappear on the first evaluated document swap.
 #[derive(Component)]
 pub(crate) struct GalleryObject;

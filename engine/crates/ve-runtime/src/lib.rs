@@ -15,6 +15,7 @@ mod perf;
 mod projection;
 mod quality;
 mod scene;
+mod selection;
 mod status;
 mod viewer;
 mod viewer_nav;
@@ -151,6 +152,42 @@ pub fn viewer_frame(
         bevy_math::Vec3::new(max_x, max_y, max_z),
     );
     viewer_nav::frame((lo + hi) * 0.5, ((hi - lo).length() * 0.5).max(0.02))
+}
+
+/// Selects `node` and lights up the viewport parts named in `parts_json` (a JSON array of node
+/// ids: the outputs the node builds). Returns false, changing nothing, for input that is not a
+/// short list of short ids.
+#[wasm_bindgen]
+#[must_use]
+pub fn selection_set(node: &str, parts_json: &str) -> bool {
+    const LONGEST_ID: usize = 128;
+    const MOST_PARTS: usize = 1024;
+    let Ok(parts) = serde_json::from_str::<Vec<String>>(parts_json) else {
+        return false;
+    };
+    if node.is_empty()
+        || node.len() > LONGEST_ID
+        || parts.len() > MOST_PARTS
+        || parts.iter().any(|part| part.len() > LONGEST_ID)
+    {
+        return false;
+    }
+    selection::set(Some(node.to_owned()), parts.into_iter().collect());
+    true
+}
+
+/// Clears the selection.
+#[wasm_bindgen]
+pub fn selection_clear() {
+    selection::set(None, std::collections::BTreeSet::new());
+}
+
+/// The selection as JSON: `{ node, parts, generation }`; `generation` changes whenever it does, so
+/// the page can notice a click in the viewport.
+#[wasm_bindgen]
+#[must_use]
+pub fn selection_get() -> String {
+    selection::to_json()
 }
 
 /// Puts the viewer back where the scene started.

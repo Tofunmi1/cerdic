@@ -71,7 +71,7 @@
         const { startDocPanel } = await import("./docpanel.js");
         const name = params.get("docname") ?? "default";
         state.doc.open(name);
-        state.docPanel = startDocPanel({ api: state.doc, name, evaluation: state.evaluation });
+        state.docPanel = startDocPanel({ api: state.doc, name, evaluation: state.evaluation, runtime: runtimeApi });
       } else if (evalOn) {
         state.doc.open(params.get("docname") ?? "default");
       }

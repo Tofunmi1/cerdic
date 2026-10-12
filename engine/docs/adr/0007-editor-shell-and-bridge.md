@@ -1,5 +1,6 @@
 # 0007: The editor is a React/TypeScript shell over a typed bridge; Bun everywhere
-- Status: accepted (owner, 2026-10-12); X6 and X7 may adjust the details
+- Status: accepted (owner, 2026-10-12); X6 and X7 may adjust the details. Its first decision (the editor
+  is a React shell) is superseded by [ADR 0012](0012-viewer-page-is-the-editing-surface.md); the rest stands.
 - Date: 2026-10-12
 
 ## Context

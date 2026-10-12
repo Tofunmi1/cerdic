@@ -86,6 +86,14 @@ pub(crate) fn build(profile: Profile) -> Result<(), Failure> {
     ] {
         fs::copy(format!("web/{page_file}"), format!("{DIST}/{page_file}"))?;
     }
+    // The editing panels are a folder of small modules; every file in it ships.
+    fs::create_dir_all(format!("{DIST}/panels"))?;
+    for entry in fs::read_dir("web/panels")? {
+        let path = entry?.path();
+        if let Some(name) = path.file_name() {
+            fs::copy(&path, Path::new(DIST).join("panels").join(name))?;
+        }
+    }
     let size = fs::metadata(format!("{DIST}/ve_runtime_bg.wasm"))?.len();
     println!("   wasm: {size} bytes");
     build_evaluator(profile, &bindgen)?;
@@ -164,7 +172,9 @@ pub(crate) fn test(profile: Profile) -> Result<(), Failure> {
     run("bun", &["web/tests/evaluation.mjs"])?;
     run("bun", &["web/tests/gallery.mjs"])?;
     run("bun", &["web/tests/mcp.mjs"])?;
-    run("bun", &["web/tests/reflection.mjs"])
+    run("bun", &["web/tests/reflection.mjs"])?;
+    run("bun", &["web/tests/panels-graph.mjs"])?;
+    run("bun", &["web/tests/panels.mjs"])
 }
 
 /// The wasm-bindgen CLI must match the library version in `Cargo.lock` exactly.
