@@ -40,7 +40,11 @@ capped at 256 per axis.
   G4 proper (instances).
 - Mirror is across planes through the origin only; place the part off-centre first. Mirroring about
   a part's own frame needs the attachment frames of G4.
-- Metallic materials look almost black in the studio stage because there is no environment to
-  reflect; a gear in `metallic=1` reads as a dark disc. Needs image-based lighting or a procedural sky
-  (renderer work, not modelling).
+- Metallic materials used to look almost black because there was nothing to reflect. The renderer now
+  has a procedural studio sky (`VeAmbientLight::reflection`, `environment()` in `forward.wgsl`: a
+  gradient, a soft light box and a cool strip light, blurred by roughness, with Karis's split-sum
+  fit for the Fresnel term). It is on in the studio stage and off elsewhere, so existing golden
+  scenes are unchanged. `web/tests/reflection.mjs` checks that the steel gear is lit and shows a
+  gradient and that the red vase has a white highlight. It is an analytic stand-in: no real
+  environment map, no reflections of the room or the model itself, no occlusion.
 - Cone, torus and capsule are faceted by `segments`; pair them with smooth shading for a round look.

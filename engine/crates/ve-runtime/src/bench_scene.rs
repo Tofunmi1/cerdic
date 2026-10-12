@@ -231,6 +231,7 @@ pub(crate) fn stage_scene(
     ambient: &mut VeAmbientLight,
 ) -> Result<(), KernelError> {
     ambient.intensity = 0.25;
+    ambient.reflection = 1.0;
     // Taller walls than the benchmark's, so little sky shows above the model.
     spawn_room(commands, meshes, &mut SceneStats::default(), 9.0)?;
     spawn_lights(commands);

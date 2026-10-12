@@ -59,6 +59,9 @@ pub struct VeAmbientLight {
     pub color: Color,
     /// Brightness.
     pub intensity: f32,
+    /// How strongly surfaces reflect a procedural studio sky (a gradient with two soft light boxes),
+    /// so metals and glossy paint have something to reflect. 0 turns it off.
+    pub reflection: f32,
 }
 
 impl Default for VeAmbientLight {
@@ -66,6 +69,7 @@ impl Default for VeAmbientLight {
         Self {
             color: Color::WHITE,
             intensity: 0.15,
+            reflection: 0.0,
         }
     }
 }
@@ -82,7 +86,7 @@ pub(crate) struct PointLightUniform {
 /// Every light in the scene, as one uniform block.
 #[derive(Clone, Copy, Debug, Default, PartialEq, ShaderType)]
 pub(crate) struct LightsUniform {
-    /// rgb: ambient colour times intensity.
+    /// rgb: ambient colour times intensity, w: strength of the reflected studio sky.
     pub(crate) ambient: Vec4,
     /// xyz: unit vector pointing from the surface toward the sun.
     pub(crate) sun_direction: Vec4,
@@ -160,6 +164,7 @@ pub(crate) fn pack_lights(
     let mut uniform = LightsUniform::default();
     if let Some(ambient) = lights.ambient {
         uniform.ambient = scaled(LinearRgba::from(ambient.color), ambient.intensity);
+        uniform.ambient.w = ambient.reflection.max(0.0);
     }
     if let Some((forward, sun)) = &lights.sun {
         // The shader wants the direction toward the light, the opposite of where it points.
@@ -215,6 +220,34 @@ mod tests {
         texel_uv: 0.0,
         normal_bias: 0.0,
     };
+
+    #[test]
+    fn the_sky_reflection_strength_travels_in_the_ambient_alpha() {
+        let pack = |reflection: Option<f32>| {
+            let ambient =
+                reflection.map_or_else(VeAmbientLight::default, |reflection| VeAmbientLight {
+                    reflection,
+                    ..VeAmbientLight::default()
+                });
+            let lights = ExtractedLights {
+                ambient: Some(ambient),
+                ..ExtractedLights::default()
+            };
+            pack_lights(&lights, Vec3::ZERO, MAX_POINT_LIGHTS, &NO_SHADOW)
+        };
+        let off = pack(None);
+        assert!(
+            off.ambient.w.abs() < f32::EPSILON,
+            "off by default, so old scenes keep their look"
+        );
+        let on = pack(Some(1.5));
+        assert!((on.ambient.w - 1.5).abs() < f32::EPSILON);
+        let negative = pack(Some(-3.0));
+        assert!(
+            negative.ambient.w.abs() < f32::EPSILON,
+            "negative strength is clamped to off"
+        );
+    }
 
     #[test]
     fn no_lights_pack_to_zero() {
