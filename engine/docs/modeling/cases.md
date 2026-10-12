@@ -24,11 +24,14 @@ unless a case says otherwise. "Mock" means the labelled deterministic mock provi
 | G1a-13 | `base_revision` behind current | `revision.conflict` with changed nodes; nothing applied |
 | G1a-14 | `editor_set_position` | Revision advances, evaluation hash unchanged |
 | G1a-15 | Rename a label | ID unchanged; evaluation hash unchanged |
-| G1a-16 | 200-command batch, then 201 | 200 accepted; 201 rejected with `budget.nodes` style limit message |
+| G1a-16 | 200-command batch, then 201 | 200 accepted; 201 rejected with `budget.commands`, `limit` 200, `observed` 201 |
 | G1a-17 | Delete then add: new node | New ID never equals a deleted ID |
 | G1a-18 | Kernel round trip of a solid with unsupported attributes | Explicit rejection or reported loss, never silent |
 | G1a-19 | Property test: random valid command sequences, undo all | Equals the empty document |
 | G1a-20 | Property test: replay a recorded history | Equals the live document at every revision |
+| G1a-21 | One batch adds a profile and a revolve by alias, links them and names an output | Committed; the revolve reads the profile; the output names the revolve |
+| G1a-22 | Alias used before its definition, defined twice, or used in a later batch | `graph.unknown_node` (first and third) and `graph.duplicate_id` (second); nothing applied |
+| G1a-23 | Property test: undo everything then redo everything | Equals the final document |
 
 ## G1b: persistence and bridge
 | ID | Input | Expected |

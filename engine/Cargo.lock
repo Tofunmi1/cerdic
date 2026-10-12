@@ -3034,6 +3034,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "ve-geometry"
+version = "0.0.0"
+dependencies = [
+ "proptest",
+ "thiserror 2.0.21",
+ "ve-kernel",
+]
+
+[[package]]
+name = "ve-graph"
+version = "0.0.0"
+dependencies = [
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "ve-core",
+]
+
+[[package]]
 name = "ve-interact"
 version = "0.0.0"
 dependencies = [

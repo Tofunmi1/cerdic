@@ -1,0 +1,20 @@
+[package]
+name = "ve-graph"
+version = "0.0.0"
+description = "Authored document, typed commands, transactions and history. Engine-agnostic: no Bevy, no platform code."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+ve-core = { path = "../ve-core" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+# Property tests run natively only; proptest does not build for wasm targets.
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true
