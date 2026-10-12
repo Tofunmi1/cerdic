@@ -57,8 +57,9 @@ the tower show faint banding from 64 flat slabs. The detail view of the plate cr
 - **Spike coverage**: 32 of 53 programs are deferred because they use mirror, arrays, sweeps, SDFs or
   other operators that belong to later gates; G3 does not claim them.
 - **Fuzzing** is property testing, not coverage-guided; 500,000 cases per target found no failure.
-- **Provider**: only the offline mock exists; `server/adapters.ts` is not connected. The key search is a
-  static scan of browser sources, not proof about a deployed server.
+- **Provider**: the offline mock and a test route through MCP exist (`mcp-test-provider.md`): a real
+  model drove the engine that way without a key. A hosted provider (`server/adapters.ts`) is not
+  connected. The key search is a static scan of browser sources, not proof about a deployed server.
 - **Round holes** come from growing a 0.2 mm square by the radius, since there is no circle operator
   yet; the arcs are 64-gons.
 - **Wall check**: the opening test uses mitred offsets and a small area tolerance (1 percent of the

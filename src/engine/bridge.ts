@@ -16,6 +16,7 @@ export interface Runtime {
   doc_undo(): string;
   doc_redo(): string;
   doc_save(): string;
+  doc_operators(): string;
   doc_candidate_state(): string;
   doc_parse_text(text: string): string;
   doc_text(): string;
