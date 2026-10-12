@@ -27,6 +27,7 @@ export interface Runtime {
   eval_bind(token: string): boolean;
   eval_reject(token: string, code: string, message: string): boolean;
   eval_projection_begin(token: string): boolean;
+  eval_projection_material(token: string, node: string, material: string): boolean;
   eval_projection_chunk(token: string, node: string, name: string, vertices: Float32Array): boolean;
   eval_projection_finish(token: string): boolean;
   eval_projection_status(): string;

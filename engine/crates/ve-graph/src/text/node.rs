@@ -7,6 +7,7 @@ use super::lex::error;
 use super::parse::{Arg, Lit};
 use crate::command::{Alias, Command, InputRef, NodeRef, OutRef};
 use crate::diag::{Diagnostic, Span};
+use crate::id::NodeId;
 use crate::spec::{Arity, OperatorSpec};
 use crate::value::Value;
 
@@ -118,12 +119,23 @@ pub(super) fn node_commands(
     (commands, read.errors)
 }
 
-fn connect(to: &str, port: &str, from: &str, span: Span) -> Option<(Command, Span)> {
+/// Nodes already in the document that the text may read, by label.
+pub(super) type Known = BTreeMap<String, NodeId>;
+
+/// A node the text refers to: one already in the document, or one this text defines.
+pub(super) fn node_ref(name: &str, known: &Known) -> Option<NodeRef> {
+    match known.get(name) {
+        Some(id) => Some(NodeRef::Id(id.clone())),
+        None => Alias::parse(&format!("${name}")).ok().map(NodeRef::Alias),
+    }
+}
+
+fn connect(to: &str, port: &str, from: &str, known: &Known, span: Span) -> Option<(Command, Span)> {
     let to = Alias::parse(&format!("${to}")).ok()?;
-    let from = Alias::parse(&format!("${from}")).ok()?;
+    let from = node_ref(from, known)?;
     Some((
         Command::Connect {
-            from: OutRef::out(NodeRef::Alias(from)),
+            from: OutRef::out(from),
             to: InputRef {
                 node: NodeRef::Alias(to),
                 port: port.to_owned(),
@@ -136,7 +148,7 @@ fn connect(to: &str, port: &str, from: &str, span: Span) -> Option<(Command, Spa
 
 /// `connect` commands for a statement's inputs: positional ones fill the ports in order (a
 /// variadic port takes the rest), `port=name` ones go where they say.
-pub(super) fn links(spec: &OperatorSpec, name: &str, args: &[Arg]) -> Built {
+pub(super) fn links(spec: &OperatorSpec, name: &str, args: &[Arg], known: &Known) -> Built {
     let mut errors = Vec::new();
     let mut commands = Vec::new();
     let positional: Vec<_> = args
@@ -160,7 +172,7 @@ pub(super) fn links(spec: &OperatorSpec, name: &str, args: &[Arg]) -> Built {
             continue;
         };
         if spec.input(port).is_some() {
-            commands.extend(connect(name, port, source, *span));
+            commands.extend(connect(name, port, source, known, *span));
         } else {
             errors.push(error(
                 "graph.unknown_port",
@@ -176,7 +188,7 @@ pub(super) fn links(spec: &OperatorSpec, name: &str, args: &[Arg]) -> Built {
             Arity::Variadic { .. } => positional.len().saturating_sub(next),
         };
         for (source, span) in positional.iter().skip(next).take(take) {
-            commands.extend(connect(name, port.name, source, *span));
+            commands.extend(connect(name, port.name, source, known, *span));
         }
         next += take;
     }

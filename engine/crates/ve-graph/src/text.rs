@@ -16,5 +16,5 @@ mod node;
 mod parse;
 mod print;
 
-pub use build::{TextBatch, parse_text};
+pub use build::{TextBatch, parse_text, parse_text_in};
 pub use print::to_text;

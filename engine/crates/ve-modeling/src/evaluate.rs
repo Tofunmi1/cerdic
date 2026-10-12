@@ -214,6 +214,7 @@ fn finish(job: &Job) -> Result<Evaluation, Fail> {
             positions: value.mesh.positions.clone(),
             indices: value.mesh.indices.clone(),
             volume: value.volume,
+            material: value.material.clone(),
         });
     }
     Ok(Evaluation {

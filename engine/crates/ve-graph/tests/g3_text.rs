@@ -151,6 +151,96 @@ fn choice_parameters_read_print_and_refuse_other_words() {
     );
 }
 
+/// Applies `text` on top of `session`'s document through `parse_text_in`.
+fn extend(session: &mut Session, text: &str) -> Result<(), Vec<ve_graph::Diagnostic>> {
+    let batch = ve_graph::parse_text_in(&builtin_registry(), session.document(), text)?;
+    let outcome = session.apply(&CommandBatch {
+        doc: session.document().id.clone(),
+        base_revision: session.document().revision,
+        transaction: TransactionId::parse(&format!("t_more{}", session.document().revision))
+            .unwrap(),
+        label: None,
+        commands: batch.commands.clone(),
+    });
+    match outcome {
+        Outcome::Committed { .. } => Ok(()),
+        Outcome::Rejected { diagnostics } => {
+            Err(diagnostics.into_iter().map(|d| batch.locate(d)).collect())
+        }
+        other => panic!("{other:?}"),
+    }
+}
+
+fn vase_session() -> Session {
+    let registry = builtin_registry();
+    let mut session = Session::with_builtin(5);
+    let batch = parse_text(&registry, VASE).unwrap();
+    session.apply(&CommandBatch {
+        doc: session.document().id.clone(),
+        base_revision: 0,
+        transaction: TransactionId::parse("t_vase").unwrap(),
+        label: None,
+        commands: batch.commands,
+    });
+    session
+}
+
+#[test]
+fn text_can_build_on_nodes_already_in_the_document() {
+    let registry = builtin_registry();
+    let mut session = vase_session();
+    let old_ids: Vec<_> = session
+        .document()
+        .nodes
+        .iter()
+        .map(|n| n.id.clone())
+        .collect();
+    extend(&mut session, "red = solid.material@1(vase_solid, color=[0.85, 0.08, 0.08], roughness=0.3)\noutput vase = red\n").unwrap();
+    let doc = session.document();
+    assert_eq!(doc.nodes.len(), 7);
+    assert_eq!(
+        &doc.nodes
+            .iter()
+            .map(|n| n.id.clone())
+            .take(6)
+            .collect::<Vec<_>>(),
+        &old_ids,
+        "existing IDs are kept"
+    );
+    assert_eq!(
+        doc.outputs.len(),
+        1,
+        "the output is redirected, not duplicated"
+    );
+    assert_eq!(doc.outputs[0].from.node, doc.nodes[6].id);
+    let printed = to_text(&registry, doc).unwrap();
+    assert!(
+        printed.contains(
+            "red = solid.material@1(vase_solid, color=[0.85, 0.08, 0.08], roughness=0.3)"
+        ),
+        "{printed}"
+    );
+    assert!(printed.contains("output vase = red"), "{printed}");
+    assert!(
+        apply(&printed).unwrap().same_content(doc),
+        "and it still reads back as one program"
+    );
+}
+
+#[test]
+fn text_on_a_document_refuses_reused_and_unknown_names() {
+    let mut session = vase_session();
+    let error = extend(&mut session, "outer = solid.box@1(size=[1, 1, 1])\n")
+        .unwrap_err()
+        .remove(0);
+    assert_eq!(error.code, "parse.duplicate_name");
+    let error = extend(&mut session, "x = solid.material@1(nothing_here)\n")
+        .unwrap_err()
+        .remove(0);
+    assert_eq!(error.code, "parse.unknown_name");
+    assert_eq!(session.document().nodes.len(), 6, "nothing was added");
+}
+
 #[test]
 fn g3_03_unknown_operator_suggests_the_closest_name() {
     let error = first_error("a = solid.revolv@1(x)\n");

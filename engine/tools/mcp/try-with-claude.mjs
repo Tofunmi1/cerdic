@@ -43,6 +43,9 @@ try {
     failure: window.__ve.evaluation.state.lastFailure }));
   console.log(`\ndocument at revision ${result.revision}:\n${result.text}`);
   if (result.failure) console.log('last evaluation failure:', result.failure);
+  const shot = path.join(dir, 'result.png');
+  await page.screenshot({ path: shot });
+  console.log(`screenshot: ${shot}`);
   if (headed) { console.log('\nleaving the browser open for 60 s: scroll to zoom, Alt + drag to orbit'); await Bun.sleep(60000); }
 } finally {
   await browser.close(); pageServer.close();

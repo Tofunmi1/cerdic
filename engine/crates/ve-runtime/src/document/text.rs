@@ -1,10 +1,23 @@
 //! The text form of the document for the page: read text into commands, print the document.
 use super::with_host;
 use serde_json::json;
-use ve_graph::{builtin_registry, parse_text, to_text};
+use ve_graph::{builtin_registry, parse_text, parse_text_in, to_text};
 
 /// Text to `{ commands, spans }` (the page wraps them in a batch), or `{ diagnostics }`.
 pub(crate) fn parse(text: &str) -> String {
+    with_host(|host| {
+        // Names the text does not define may be nodes already in the working document.
+        let doc = host.pending.as_ref().unwrap_or(&host.session).document();
+        match parse_text_in(&builtin_registry(), doc, text) {
+            Ok(batch) => json!({"commands": batch.commands, "spans": batch.spans}),
+            Err(diagnostics) => json!({"diagnostics": diagnostics}),
+        }
+        .to_string()
+    })
+}
+
+/// Text read on its own, as for a new document: names resolve only within the text itself.
+pub(crate) fn parse_standalone(text: &str) -> String {
     match parse_text(&builtin_registry(), text) {
         Ok(batch) => json!({"commands": batch.commands, "spans": batch.spans}),
         Err(diagnostics) => json!({"diagnostics": diagnostics}),

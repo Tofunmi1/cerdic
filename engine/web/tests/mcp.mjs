@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { readFile } from 'node:fs/promises';
+import { PNG } from 'pngjs';
 import { driverAdvisory, serve } from './support.mjs';
 
 const server = new URL('../../tools/mcp/server.mjs', import.meta.url).pathname;
@@ -148,6 +149,27 @@ try {
   assert(Math.hypot(orbitTo[0] - orbitFrom[0], orbitTo[2] - orbitFrom[2]) > 0.05, 'Alt + drag orbits sideways');
   assert(Math.abs(away(orbitTo) - away(orbitFrom)) < 0.02 * away(orbitFrom), 'orbiting keeps the distance');
   console.log('viewer zoom, orbit and frame');
+
+  // Colour: a material node on the vase, made the output, turns the rendered part red.
+  const share = async (test) => {
+    const png = PNG.sync.read(await page.locator('canvas#ve').screenshot());
+    let hits = 0;
+    for (let p = 0; p < png.data.length; p += 4) if (test(png.data[p], png.data[p + 1], png.data[p + 2])) hits++;
+    return hits / (png.width * png.height);
+  };
+  const reddish = (r, g, b) => r > 90 && r > g * 1.7 && r > b * 1.7;
+  assert.equal((await mcp.tool('frame_view')).data.ok, true);
+  await frames();
+  assert((await share(reddish)) < 0.002, 'the vase is not red before it is given a material');
+  const painted = await mcp.tool('apply_text', { text: 'red = solid.material@1(vase, color=[0.85, 0.08, 0.08], roughness=0.3)\noutput vase = red\n', label: 'make it red' });
+  assert.equal(painted.data.applied, true, JSON.stringify(painted.data).slice(0, 300));
+  assert.match(painted.data.text, /solid\.material@1\(vase, color=\[0\.85, 0\.08, 0\.08\], roughness=0\.3\)/);
+  await frames(8);
+  assert((await share(reddish)) > 0.02, 'the vase renders red after the material');
+  const tooBright = await mcp.tool('apply_text', { text: 'x = solid.material@1(vase, color=[2, 0, 0])\n' });
+  assert.equal(tooBright.data.applied, false);
+  assert.equal(tooBright.data.diagnostics[0].code, 'param.range');
+  console.log('MCP colour: the vase renders red');
   assert.deepEqual(logs, [], 'no page errors');
   console.log('MCP acceptance passed');
 } finally {

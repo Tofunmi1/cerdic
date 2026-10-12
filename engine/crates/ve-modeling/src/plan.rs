@@ -226,7 +226,7 @@ fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usize, Fail>
         "solid.union" | "solid.difference" | "solid.intersect" => {
             Ok(inputs.sum::<usize>().saturating_mul(4))
         }
-        "xform.move" | "xform.rotate" | "xform.scale" => Ok(inputs.sum()),
+        "xform.move" | "xform.rotate" | "xform.scale" | "solid.material" => Ok(inputs.sum()),
         _ => Err(fail(
             "geometry.unsupported_case",
             format!("{} has no evaluator yet", node.op),

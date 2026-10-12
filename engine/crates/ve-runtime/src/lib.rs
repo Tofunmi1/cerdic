@@ -228,6 +228,14 @@ pub fn doc_parse_text(text: &str) -> String {
     document::text::parse(text)
 }
 
+/// Reads text on its own, as for a new document (names resolve only within the text): `{ commands,
+/// spans }` or `{ diagnostics }`. `doc_parse_text` is the one for adding to the open document.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_parse_text_standalone(text: &str) -> String {
+    document::text::parse_standalone(text)
+}
+
 /// The working document as canonical text: `{ text }` or `{ error }`.
 #[wasm_bindgen]
 #[must_use]
@@ -282,6 +290,14 @@ pub fn eval_reject(token: &str, code: &str, message: &str) -> bool {
 #[must_use]
 pub fn eval_projection_begin(token: &str) -> bool {
     projection::begin(token)
+}
+
+/// Sets the surface (`{ color, metallic, roughness, emissive }` as JSON) of the part made by `node`
+/// in the scene being staged. Refused when a value is out of range or the token is not current.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_projection_material(token: &str, node: &str, material: &str) -> bool {
+    projection::material(token, node, material)
 }
 
 /// Queues a small triangle chunk containing interleaved positions and normals.
