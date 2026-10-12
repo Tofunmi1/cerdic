@@ -7,7 +7,7 @@ use bevy_app::{App, AppExit, PluginsState};
 use bevy_ecs::entity::Entity;
 use bevy_ecs::query::With;
 use bevy_math::Vec2;
-use bevy_window::{PrimaryWindow, Window};
+use bevy_window::{PrimaryWindow, Window, WindowResized, WindowScaleFactorChanged};
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::Closure;
 
@@ -134,6 +134,12 @@ impl Runner {
     }
 
     /// Keeps the drawing buffer and the Bevy `Window` in step with the canvas' CSS size.
+    ///
+    /// Bevy's camera system only recomputes a camera's target size when it receives a
+    /// `WindowResized` (or scale factor) message, so changing the resolution alone leaves the
+    /// camera, and the render targets sized from it, at the old size while the surface has the new
+    /// one. That mismatch is a validation error, and Bevy quits the application on it. Every size
+    /// change therefore sends the message, in the same frame.
     fn sync_size(&mut self, window: Entity) {
         let (width, height, ratio) = self.canvas.physical_size();
         if (width, height) == self.last_size {
@@ -141,13 +147,32 @@ impl Runner {
         }
         self.last_size = (width, height);
         self.canvas.set_buffer_size(width, height);
+        let mut logical = None;
+        let mut scale_changed = false;
         if let Some(mut component) = self.app.world_mut().get_mut::<Window>(window) {
             component.resolution.set_physical_resolution(width, height);
             #[expect(
                 clippy::cast_possible_truncation,
                 reason = "device pixel ratios fit f32"
             )]
-            component.resolution.set_scale_factor(ratio as f32);
+            let factor = ratio as f32;
+            scale_changed = (component.resolution.scale_factor() - factor).abs() > f32::EPSILON;
+            component.resolution.set_scale_factor(factor);
+            logical = Some((component.resolution.width(), component.resolution.height()));
+        }
+        if let Some((logical_width, logical_height)) = logical {
+            let world = self.app.world_mut();
+            if scale_changed {
+                world.write_message(WindowScaleFactorChanged {
+                    window,
+                    scale_factor: ratio,
+                });
+            }
+            world.write_message(WindowResized {
+                window,
+                width: logical_width,
+                height: logical_height,
+            });
         }
     }
 }

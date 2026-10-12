@@ -14,8 +14,10 @@ outliner, inspector and a viewport with gizmos, and must never own document stat
   change breaks the TS build.
 - The node canvas starts on `@xyflow/react` behind a thin adapter; if experiment X7 fails, a custom
   canvas replaces it behind the same adapter. Docking uses a small own split-pane component.
-- The engine canvas replaces the three.js viewport after V0 (X6 decides embedding versus an iframe
-  with a message bridge).
+- The engine canvas replaces the three.js viewport after V0. X6 (2026-10-12) settled it: embed, no
+  iframe. The canvas is created once outside React and moved into the panel, the engine boots once per
+  page load behind a guard, and a panel is hidden rather than destroyed (the engine has no `stop()`).
+  A canvas that React owns and re-creates cannot be followed by the engine and must not be used.
 - Bun is the package manager and script runner everywhere; `xtask/src/web.rs` moves from npm to Bun in
   G0 follow-up work, with the lockfile and test chain updated together.
 

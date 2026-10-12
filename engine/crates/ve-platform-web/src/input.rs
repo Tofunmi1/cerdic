@@ -9,7 +9,7 @@ use bevy_input::ButtonState;
 use bevy_input::mouse::{MouseButton, MouseButtonInput, MouseScrollUnit, MouseWheel};
 use bevy_input::touch::TouchPhase;
 use bevy_math::Vec2;
-use bevy_window::CursorMoved;
+use bevy_window::{CursorLeft, CursorMoved};
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::Closure;
 use web_sys::{Event, EventTarget, MouseEvent, PointerEvent, WheelEvent};
@@ -17,9 +17,21 @@ use web_sys::{Event, EventTarget, MouseEvent, PointerEvent, WheelEvent};
 /// A DOM event reduced to what the engine needs, in CSS (logical) pixels.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum RawInput {
-    PointerMoved { x: f32, y: f32 },
-    Button { button: i16, pressed: bool },
-    Wheel { x: f32, y: f32, lines: bool },
+    PointerMoved {
+        x: f32,
+        y: f32,
+    },
+    /// The pointer left the canvas (and is not captured), so there is no cursor over the scene.
+    PointerLeft,
+    Button {
+        button: i16,
+        pressed: bool,
+    },
+    Wheel {
+        x: f32,
+        y: f32,
+        lines: bool,
+    },
 }
 
 /// Events waiting to be delivered on the next frame.
@@ -78,10 +90,26 @@ impl Listeners {
             }
         });
 
+        // Inside an editor the canvas is one panel among others: without this the hover from the
+        // last position over the canvas would stay lit while the pointer is on another panel.
+        let q = Rc::clone(queue);
+        add(&mut items, target, "pointerleave", move |_| {
+            q.borrow_mut().push(RawInput::PointerLeft);
+        });
+
         for (name, pressed) in [("pointerdown", true), ("pointerup", false)] {
             let q = Rc::clone(queue);
             add(&mut items, target, name, move |event| {
                 if let Some(e) = event.dyn_ref::<PointerEvent>() {
+                    if pressed
+                        && let Some(element) = e
+                            .target()
+                            .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
+                    {
+                        // Keep receiving moves and the release if a drag ends outside the canvas,
+                        // so a grab can never be left held. Refusal (no such pointer) is harmless.
+                        let _ = element.set_pointer_capture(e.pointer_id());
+                    }
                     q.borrow_mut().push(RawInput::Button {
                         button: e.button(),
                         pressed,
@@ -141,6 +169,10 @@ pub(crate) fn drain(world: &mut World, window: Entity, queue: &Queue, last: &mut
                     position,
                     delta,
                 });
+            }
+            RawInput::PointerLeft => {
+                *last = None;
+                world.write_message(CursorLeft { window });
             }
             RawInput::Button { button, pressed } => {
                 if let Some(button) = mouse_button(button) {
