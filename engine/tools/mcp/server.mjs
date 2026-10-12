@@ -1,0 +1,130 @@
+// A test MCP server for the engine: lets any MCP client (Claude Code, for one) build and edit a
+// document through the page that is running the engine. No model, no API key: the client's model is
+// the provider. It speaks MCP over stdio and relays each tool call to the editor page over a local
+// WebSocket; the page runs it through the normal commands (text in, typed commands underneath).
+//
+//   claude mcp add spatial-engine -- bun engine/tools/mcp/server.mjs
+//   open http://127.0.0.1:5173/?mcp=1     (the page connects to ws://127.0.0.1:8765)
+//
+// For local testing only: it binds to 127.0.0.1, takes one page at a time and has no authentication.
+// stdout carries only MCP messages; everything else goes to stderr.
+
+const PORT = Number(process.env.VE_MCP_PORT ?? 8765);
+const TIMEOUT_MS = 90000;
+let page = null;
+let counter = 0;
+const pending = new Map();
+
+const log = (...args) => console.error('[spatial-engine mcp]', ...args);
+
+Bun.serve({
+  hostname: '127.0.0.1',
+  port: PORT,
+  fetch(request, server) {
+    return server.upgrade(request) ? undefined : new Response('spatial-engine MCP bridge', { status: 426 });
+  },
+  websocket: {
+    open(ws) { page?.close(); page = ws; log('editor page connected'); },
+    close(ws) { if (page === ws) { page = null; log('editor page disconnected'); } },
+    message(_, raw) {
+      let message;
+      try { message = JSON.parse(String(raw)); } catch { return; }
+      const waiting = pending.get(message.id);
+      if (!waiting) return;
+      pending.delete(message.id);
+      clearTimeout(waiting.timer);
+      waiting.resolve(message);
+    },
+  },
+});
+log(`bridge listening on ws://127.0.0.1:${PORT}`);
+
+function callPage(method, params) {
+  if (!page) {
+    return Promise.resolve({ error: `No editor page is connected. Open the engine editor with ?mcp=1 (for example http://127.0.0.1:5173/?mcp=1) and try again.` });
+  }
+  const id = ++counter;
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => { pending.delete(id); resolve({ error: `The page did not answer ${method} within ${TIMEOUT_MS / 1000} s.` }); }, TIMEOUT_MS);
+    pending.set(id, { resolve, timer });
+    page.send(JSON.stringify({ id, method, params }));
+  });
+}
+
+const GUIDE = `The document is a graph of operators, written one node per line:
+
+  name = family.op@1(input_node, ..., key=value, ...)
+  output part_name = node_name        (or: output node_name)
+
+Inputs are earlier node names, positional in port order (or port=name). Parameters are key=value.
+Lengths are metres (suffixes mm and cm work); angles are degrees unless you write rad (for example
+angle=90deg or 1.57rad). Numbers, "text", true/false and [lists] are the only values. Lines starting
+with # are comments. Only operators from list_operators can be used. Y is up. Profiles live in the XY
+plane: solid.revolve spins one (x >= 0) about Y, solid.extrude stands one up from y=0.
+
+Example (a vase, with a 3 mm minimum wall that the engine enforces):
+  outer = profile.polygon@1(points=[[0,0],[0.06,0],[0.11,0.12],[0.07,0.26],[0.05,0.3],[0,0.3]])
+  inner = profile.polygon@1(points=[[0,0.01],[0.056,0.01],[0.104,0.12],[0.064,0.26],[0.04,0.31],[0,0.31]])
+  wall = check.min_wall@1(outer, inner, min=3mm)
+  body = solid.revolve@1(outer, angle=360deg, segments=64)
+  cavity = solid.revolve@1(inner, angle=360deg, segments=64)
+  vase = solid.difference@1(body, cavity)
+  output vase
+
+How to work: call get_text to see the current document. apply_text ADDS the nodes of a program to
+the document (it never replaces existing ones); to change something that already exists use
+apply_commands, which addresses nodes by ID (get_nodes lists each node's id, label, operator,
+parameters and inputs; set_param is the usual command). Read the result after each call. A refused edit leaves the
+document unchanged and says why (for example constraint.min_wall with the measured thickness).`;
+
+const object = (properties, required = []) => ({ type: 'object', properties, required });
+const TOOLS = [
+  { name: 'get_guide', description: 'How the text language works, with an example. Read this first.', inputSchema: object({}) },
+  { name: 'list_operators', description: 'The operators you may use: ports, parameters with units and ranges, one-line help.', inputSchema: object({}) },
+  { name: 'get_text', description: 'The current document as canonical text, and its revision.', inputSchema: object({}) },
+  { name: 'get_nodes', description: 'Every node with its id, label, operator, parameters, inputs and flags, plus the outputs. Use the ids in apply_commands.', inputSchema: object({}) },
+  { name: 'get_status', description: 'Revision, node count, evaluation state (last failure, timings) and the last projected geometry.', inputSchema: object({}) },
+  { name: 'apply_text', description: 'Adds the nodes described by a program in the text language to the document, evaluates it, and reports the outcome or the diagnostics (each with a line and column). Atomic: nothing changes unless all of it is valid.', inputSchema: object({ text: { type: 'string' }, label: { type: 'string' } }, ['text']) },
+  { name: 'apply_commands', description: 'Applies typed commands, for example [{"set_param":{"node":"n_abc12345","param":"segments","value":96}}]. Commands: add_node, remove_node, connect, disconnect, set_param, set_label, set_flags, set_output. Atomic.', inputSchema: object({ commands: { type: 'array', items: { type: 'object' } }, label: { type: 'string' } }, ['commands']) },
+  { name: 'undo', description: 'Undoes the last committed edit.', inputSchema: object({}) },
+  { name: 'redo', description: 'Redoes the last undone edit.', inputSchema: object({}) },
+  { name: 'set_view', description: 'Moves the editor camera: position and target as [x, y, z] metres, so the person watching can see the result.', inputSchema: object({ position: { type: 'array', items: { type: 'number' } }, target: { type: 'array', items: { type: 'number' } } }, ['position', 'target']) },
+];
+
+const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\n');
+const content = (value, isError = false) => ({ content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }], isError });
+
+async function callTool(name, args) {
+  if (name === 'get_guide') return content(GUIDE);
+  if (!TOOLS.some((t) => t.name === name)) return content(`unknown tool ${name}`, true);
+  const reply = await callPage(name, args ?? {});
+  if (reply.error) return content(reply.error, true);
+  return content(reply.result ?? {});
+}
+
+let buffer = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', async (chunk) => {
+  buffer += chunk;
+  let newline;
+  while ((newline = buffer.indexOf('\n')) >= 0) {
+    const line = buffer.slice(0, newline).trim();
+    buffer = buffer.slice(newline + 1);
+    if (!line) continue;
+    let message;
+    try { message = JSON.parse(line); } catch { continue; }
+    const { id, method, params } = message;
+    if (method === 'initialize') {
+      send({ id, result: { protocolVersion: params?.protocolVersion ?? '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'spatial-engine', version: '0.1.0' } } });
+    } else if (method === 'tools/list') {
+      send({ id, result: { tools: TOOLS } });
+    } else if (method === 'tools/call') {
+      send({ id, result: await callTool(params?.name, params?.arguments) });
+    } else if (method === 'ping') {
+      send({ id, result: {} });
+    } else if (id !== undefined) {
+      send({ id, error: { code: -32601, message: `method not found: ${method}` } });
+    }
+  }
+});
+process.stdin.on('end', () => process.exit(0));

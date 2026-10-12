@@ -23,6 +23,8 @@ tests, licence policy (`cargo deny`), file size cap, crate boundaries. Fix the c
 - `tools/`           small helper scripts (for example the Node WASI runner used by `parity`, and
                      `serve-lan.mjs`: LAN test server for a headset, receives benchmark reports into
                      `target/reports/`; its usage is in the file header and printed when it starts).
+                     `mcp/server.mjs`: test MCP server so a model (Claude Code) can drive the editor
+                     page; see `docs/modeling/mcp-test-provider.md`.
 
 Build prerequisites: Rust via `rust-toolchain.toml`, CMake, Ninja, and a wasi-sdk (set `WASI_SDK`,
 default `~/.local/share/toolchains/wasi-sdk-34.0-arm64-macos`). `cargo-deny` and `cargo-nextest`

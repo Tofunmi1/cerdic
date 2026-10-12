@@ -2,6 +2,7 @@ import { documentBridge } from './bridge';
 import type { Runtime } from './bridge';
 import { bindInput } from './input';
 import { EvaluationHost } from './evaluation';
+import { connectMcpBridge } from './mcp-bridge';
 
 // React moves this element. It must never create or replace the engine's canvas.
 const canvas = document.createElement('canvas');
@@ -35,6 +36,8 @@ async function start() {
     host.boots++; host.runtime = runtime;
     runtime.viewer_configure(true, 40, false, 3);
     host.evaluation = new EvaluationHost(runtime, notify, host.resources);
+    const mcp = params.get('mcp');
+    if (mcp) window.addEventListener('pagehide', connectMcpBridge(host, Number(mcp) > 1 ? Number(mcp) : 8765), { once: true });
     host.doc = documentBridge(runtime, notify, () => host.evaluation?.request());
     runtime.doc_open(params.get('docname') ?? 'spatial-lab', 1);
     host.evaluation.request();
