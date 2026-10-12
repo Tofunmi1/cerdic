@@ -204,8 +204,14 @@ fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usize, Fail>
             Some(ve_graph::Value::List(points)) => points.len(),
             _ => 0,
         }),
-        "profile.offset" => Ok(inputs.sum::<usize>().saturating_mul(2)),
-        "profile.difference" => Ok(inputs.sum::<usize>().saturating_mul(4)),
+        "profile.offset" => {
+            // The arcs of a round join turn through 2 pi per loop in total, so they add at most 64
+            // points per loop (64 segments per circle); a few loops are covered by the constant.
+            let round =
+                matches!(node.params.get("join"), Some(ve_graph::Value::Str(j)) if j == "round");
+            Ok(inputs.sum::<usize>().saturating_mul(2) + if round { 256 } else { 0 })
+        }
+        "profile.difference" => Ok(inputs.sum::<usize>().saturating_mul(2)),
         "check.min_wall" => Ok(0),
         "solid.extrude" => Ok(inputs
             .sum::<usize>()

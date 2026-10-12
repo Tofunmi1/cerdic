@@ -53,9 +53,14 @@ fn offset(node: &Node, inputs: &[Rc<Value>]) -> Result<Vec<Vec<[f64; 2]>>, Kerne
     let input = inputs
         .first()
         .ok_or(KernelError::InvalidArgument("missing profile"))?;
-    Profile::from_loops(&input.loops)?
-        .offset(number(node, "delta")?)?
-        .loops()
+    let profile = Profile::from_loops(&input.loops)?;
+    let delta = number(node, "delta")?;
+    match node.params.get("join") {
+        Some(Param::Str(join)) if join == "miter" => profile.offset(delta),
+        Some(Param::Str(join)) if join == "round" => profile.offset_round(delta),
+        _ => Err(KernelError::InvalidArgument("join is miter or round")),
+    }?
+    .loops()
 }
 
 fn difference(inputs: &[Rc<Value>]) -> Result<Vec<Vec<[f64; 2]>>, KernelError> {
@@ -85,11 +90,6 @@ fn source(node: &Node, port: &str) -> Option<NodeId> {
     node.inputs.get(port)?.first().map(|r| r.node.clone())
 }
 
-/// Axisymmetric profiles only: every loop lies on the non-negative side of the revolve axis.
-fn revolvable(loops: &[Vec<[f64; 2]>]) -> bool {
-    loops.len() == 1 && loops.iter().flatten().all(|p| p[0] >= -1.0e-12)
-}
-
 /// Largest wall for which opening the cross-section loses (almost) nothing. Opening by a disc of
 /// diameter `w` removes every part of the wall thinner than `w`.
 fn survives(wall: &Profile, w: f64) -> Result<bool, KernelError> {
@@ -108,29 +108,24 @@ fn min_wall(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
             "check.min_wall needs an outer and an inner profile",
         )));
     };
-    if !revolvable(&outer.loops) || !revolvable(&inner.loops) {
-        return Err(Box::new(
-            Diagnostic::error(
-                "geometry.unsupported_case",
-                "check.min_wall supports one-loop profiles on the non-negative side of the revolve axis",
-            )
-            .at_node(&node.id),
-        ));
-    }
     let min = number(node, "min").map_err(|e| kernel_fail(node, &e))?;
     let wall = Profile::from_loops(&outer.loops)
         .and_then(|o| Profile::from_loops(&inner.loops).and_then(|i| o.difference(&i)))
         .map_err(|e| kernel_fail(node, &e))?;
-    if survives(&wall, min).map_err(|e| kernel_fail(node, &e))? {
-        return Ok(Value::nothing());
-    }
-    let (mut lo, mut hi) = (0.0, min);
-    for _ in 0..12 {
-        let mid = f64::midpoint(lo, hi);
-        if survives(&wall, mid).map_err(|e| kernel_fail(node, &e))? {
-            lo = mid;
-        } else {
-            hi = mid;
+    let mut lo = 0.0;
+    // An empty wall (the inner profile covers the outer) is a wall of no thickness.
+    if !wall.is_empty() {
+        if survives(&wall, min).map_err(|e| kernel_fail(node, &e))? {
+            return Ok(Value::nothing());
+        }
+        let mut hi = min;
+        for _ in 0..12 {
+            let mid = f64::midpoint(lo, hi);
+            if survives(&wall, mid).map_err(|e| kernel_fail(node, &e))? {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
         }
     }
     let related = [source(node, "outer"), source(node, "inner")]

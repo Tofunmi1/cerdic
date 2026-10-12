@@ -123,6 +123,35 @@ fn g3_02b_flags_named_inputs_and_blank_lines_survive_the_round_trip() {
 }
 
 #[test]
+fn choice_parameters_read_print_and_refuse_other_words() {
+    let registry = builtin_registry();
+    let doc = apply("p = profile.polygon@1(points=[[0,0],[1,0],[0,1]])\no = profile.offset@1(p, delta=1cm, join=\"round\")\nm = profile.offset@1(p, delta=1cm)\n").unwrap();
+    let printed = to_text(&registry, &doc).unwrap();
+    assert!(printed.contains("join=\"round\""), "{printed}");
+    assert_eq!(
+        printed.matches("join=").count(),
+        1,
+        "the default miter is left out:\n{printed}"
+    );
+    assert_eq!(
+        apply(&printed).unwrap().canonical_json(),
+        doc.canonical_json()
+    );
+    let error = first_error(
+        "p = profile.polygon@1(points=[[0,0],[1,0],[0,1]])\no = profile.offset@1(p, delta=1cm, join=\"bevel\")\n",
+    );
+    assert_eq!(error.code, "param.range");
+    assert!(error.message.contains("miter"), "{}", error.message);
+    assert_eq!(
+        first_error(
+            "p = profile.polygon@1(points=[[0,0],[1,0],[0,1]])\no = profile.offset@1(p, delta=1cm, join=3)\n"
+        )
+        .code,
+        "param.type"
+    );
+}
+
+#[test]
 fn g3_03_unknown_operator_suggests_the_closest_name() {
     let error = first_error("a = solid.revolv@1(x)\n");
     assert_eq!(error.code, "parse.unknown_op");

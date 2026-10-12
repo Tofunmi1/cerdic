@@ -21,7 +21,7 @@ const logs = [];
 const pieces = {
   vase: { centre: [0, 0.15, 0], size: 0.3, detail: [0, 0.3, 0] },
   twisted_tower: { centre: [0, 0.25, 0], size: 0.5, detail: [0, 0.5, 0] },
-  offset_plate: { centre: [0, 0.0035, 0], size: 0.16, detail: [0.07, 0.007, 0.04] },
+  offset_plate: { centre: [0, 0.0035, 0], size: 0.16, detail: [0.05, 0.006, 0.03], detailScale: 0.6 },
 };
 
 const eye = (centre, distance, azimuth, elevation) => {
@@ -35,7 +35,7 @@ const views = (piece) => {
     right: [eye(piece.centre, d, 90, 0), piece.centre],
     top: [eye(piece.centre, d, 0, 89), piece.centre],
     'three-quarter': [eye(piece.centre, d, 35, 20), piece.centre],
-    detail: [eye(piece.detail, d * 0.35, 35, 25), piece.detail],
+    detail: [eye(piece.detail, d * (piece.detailScale ?? 0.35), 35, 25), piece.detail],
     underside: [eye(piece.centre, d, 0, -60), piece.centre],
   };
 };

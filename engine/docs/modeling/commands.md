@@ -94,11 +94,11 @@ cavity  = solid.revolve(inner, angle=360, segments=64)
 vase    = solid.difference(body, cavity)
 output vase
 ```
-`inner` rises above the rim, which opens the vase. The first wall-check domain is monotone-height
-axisymmetric profiles: physical side and bottom clearances below the open rim must be at least
-3 mm. The open cap and rotation axis are not walls. Full eroded-profile containment would reject
-this deliberate rim opening. [ADR 0010](../adr/0010-first-language-numeric-contracts.md) records the
-correction to the original inner radius and the supported constraint domain.
+`inner` rises above the rim, which opens the vase. `check.min_wall` measures the cross-section
+`outer` minus `inner` (any two profiles) and requires every part of it to be at least 3 mm thick.
+The open cap and rotation axis are not walls. Full eroded-profile containment would reject this
+deliberate rim opening. [ADR 0010](../adr/0010-first-language-numeric-contracts.md) records the
+correction to the original inner radius and how the check works.
 
 "Widen its opening" is one batch with two `set_param` commands (the last off-axis point of `outer`
 moves 0.05 to 0.07 and of `inner` 0.040 to 0.064), keeping both node IDs, and `wall` still passes.

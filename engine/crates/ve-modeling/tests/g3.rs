@@ -297,21 +297,66 @@ fn g3_14c_a_thinner_requirement_is_enforced_with_measured_values() {
     assert_eq!(error.limit, Some(0.02));
 }
 
+/// A hollow rectangular tube: outer 100 x 60 mm, inner 90 x 50 mm (a 5 mm wall), extruded.
+fn tube(min: f64) -> Lab {
+    let mut lab = Lab::new();
+    lab.commit(&[
+        add(
+            "$outer",
+            "profile.polygon@1",
+            &json!({"points": rect(0.1, 0.06)}),
+        ),
+        add(
+            "$inner",
+            "profile.polygon@1",
+            &json!({"points": rect(0.09, 0.05)}),
+        ),
+        add("$wall", "check.min_wall@1", &json!({ "min": min })),
+        connect("$outer", "$wall", "outer"),
+        connect("$inner", "$wall", "inner"),
+        add("$ring", "profile.difference@1", &json!({})),
+        connect("$outer", "$ring", "in"),
+        connect("$inner", "$ring", "in"),
+        add("$tube", "solid.extrude@1", &json!({"height": 0.05})),
+        connect("$ring", "$tube", "in"),
+        output("tube", "$tube"),
+    ])
+    .unwrap();
+    lab
+}
+
 #[test]
-fn g3_14d_non_axisymmetric_profiles_are_an_unsupported_case() {
-    let (mut lab, _) = vase();
-    let across = json!([
-        [-0.01, 0.01],
-        [0.056, 0.01],
-        [0.104, 0.12],
-        [0.064, 0.26],
-        [0.040, 0.31],
-        [-0.01, 0.31]
+fn g3_14d_the_wall_check_works_on_any_pair_of_profiles() {
+    let mut lab = tube(0.003);
+    // A 5 mm wall passes a 3 mm minimum and fails a 6 mm one, reporting the measured thickness.
+    let error = lab
+        .commit(&[set(&lab, "wall", "min", &json!(0.006))])
+        .unwrap_err();
+    assert_eq!(error.code, "constraint.min_wall");
+    let measured = error.observed.unwrap();
+    assert!((measured - 0.005).abs() < 2.0e-4, "measured {measured}");
+    // Sliding the cavity sideways leaves a 1 mm wall on one side.
+    let shifted = json!([
+        [-0.041, -0.025],
+        [0.049, -0.025],
+        [0.049, 0.025],
+        [-0.041, 0.025]
     ]);
     let error = lab
-        .commit(&[set(&lab, "inner", "points", &across)])
+        .commit(&[set(&lab, "inner", "points", &shifted)])
         .unwrap_err();
-    assert_eq!(error.code, "geometry.unsupported_case");
+    assert!(
+        (error.observed.unwrap() - 0.001).abs() < 2.0e-4,
+        "{:?}",
+        error.observed
+    );
+    // A cavity that swallows the outline leaves no wall at all.
+    let huge = json!(rect(0.2, 0.2));
+    let error = lab
+        .commit(&[set(&lab, "inner", "points", &huge)])
+        .unwrap_err();
+    assert_eq!(error.code, "constraint.min_wall");
+    assert_eq!(error.observed, Some(0.0));
 }
 
 #[test]

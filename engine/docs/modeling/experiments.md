@@ -4,6 +4,68 @@ One section per experiment (X1 to X9 in the plan). Spike code is throwaway and l
 (never imported by the engine); the findings live here. Machine for every number: Apple M1, 16 GB,
 macOS 26.1, headless Chromium from Playwright 1.64, release builds, warm HTTP cache.
 
+## X10: which control surface should a model use? (2026-10-12) — answered: no difference worth a third surface
+
+**Question.** Does a model build and edit geometry more reliably through the line-per-node text
+language, schema-constrained typed commands, or a JavaScript builder with loops and variables?
+
+**Build.** Spike `spikes/x10-surfaces` (throwaway). One evaluator and one operator vocabulary; three
+surfaces lowered to the same graph, each with the same conventions text and the same two worked
+examples (generated from one graph so they cannot differ). 16 creation tasks and 8 follow-up edits,
+chosen to be harder than the earlier spike: dimensioned mechanical parts (a 14-tooth gear, a bolt and
+nut, a 14-tread spiral stair), architecture (a pointed-arch window in a wall, a three-arch bridge), a
+vase with a 3 mm minimum wall, a twisted tapered tower, a rounded plate, organic parts (a mushroom
+with 12 spots), assemblies with 12 repeated gondolas, a bookcase with books standing on the second of
+five shelves, and every output carrying a named part and a PBR material (steel, brass, copper, glass,
+porcelain, emissive flame, matte black, walnut, stone). Each task has 7 to 11 automatic checks
+(sizes, tooth count, genus, wall thickness by section opening, material class, spacing, containment,
+and so on); edits are checked against the model's own earlier result (unchanged parts must stay
+unchanged). One repair attempt with the error text. Models: Claude Sonnet and Claude Haiku through
+the Claude Code CLI as a plain completion endpoint, one run per cell.
+
+**Checks were wrong three times and were corrected before reading results**, which changed the
+numbers: a bridge's arches open onto the ground (genus 0, not 3), "rim 140 mm" can mean the outside or
+the opening, and two crude lamp and wheel checks. The stored programs were re-scored with the
+corrected checks without calling the models again.
+
+| Model, phase | Surface | Valid first try | Valid after repair | All checks pass | Mean checks passed |
+|---|---|---:|---:|---:|---:|
+| Sonnet, create (16) | text | 100% | 100% | 94% | 98% |
+| | typed commands | 94% | 100% | 94% | 99% |
+| | JS builder | 94% | 100% | 94% | 99% |
+| Sonnet, edit (8) | text | 100% | 100% | 100% | 100% |
+| | typed commands | 100% | 100% | 100% | 100% |
+| | JS builder | 100% | 100% | 100% | 100% |
+| Haiku, create (16) | text | 94% | 94% | 75% | 90% |
+| | typed commands | 88% | 88% | 63% | 82% |
+| | JS builder | 88% | 94% | 75% | 90% |
+| Haiku, edit (7 or 8) | text | 100% | 100% | 75% | 92% |
+| | typed commands | 100% | 100% | 86% | 94% |
+| | JS builder | 86% | 100% | 71% | 91% |
+
+Cost and size (Sonnet, create): text 1,536 output tokens and $0.019 per task, JS builder 1,504 and
+$0.019, typed commands 2,105 and $0.026 (the JSON is wordier). Edits: typed commands 920 output tokens,
+text 1,185, JS builder 1,049, because commands carry only the change. Edit drift: about 80% of node
+content unchanged and 100% of node names kept on every surface (JS builder 85% for Haiku). Whole
+experiment: 142 results, 150 model calls, $1.60.
+
+**What failed was the same on every surface.** Sonnet's only creation miss on each surface was one
+task (mushroom for text, bookcase for commands, a frame that does not reach the axle for the JS
+builder), and Haiku's misses were the gear (all three surfaces), the lantern's four panes, a thin
+vase wall and similar modeling errors. Four Haiku runs (bookcase, Ferris wheel) produced no reply
+within 240 s twice; they are model time-outs spread over all three surfaces, not parse failures.
+
+**Reading.** With 16 tasks per cell one task is six points, so every difference between surfaces
+above is inside the noise; the model and the task decide the outcome, not the surface. Sonnet is near
+the ceiling on these tasks, so the experiment cannot rank surfaces for strong models; it does rule out
+a large gap for either model. The JS builder gives loops, but nothing here needed them badly enough to
+win, and it costs the properties the plan relies on (no code, bounded evaluation, stable addressing).
+
+**Decision.** Keep text for authoring and typed commands, addressed by node ID, for edits (ADR 0011);
+do not build a code surface. Not measured: a vision-model critique loop, query tools, multi-turn
+conversations, long documents, other providers, repeated runs for variance. Spike code and raw
+results are under `spikes/x10-surfaces/` (`results/`, `results-rescored/`).
+
 ## X6: the engine canvas inside a React shell (2026-10-12) — answered, adopt with two engine fixes
 
 **Question.** Can the engine canvas live as one panel of a React 19 editor (lifecycle, resizing, pointer

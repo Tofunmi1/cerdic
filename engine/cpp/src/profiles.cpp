@@ -117,12 +117,16 @@ ve_status ve_profile_copy(const ve_profile* profile, double* points, size_t poin
   }
   return VE_OK;
 }
-ve_profile* ve_profile_offset(const ve_profile* profile, double delta, ve_status* status) {
-  if (profile == nullptr || !std::isfinite(delta) || std::abs(delta) > validation::kExtent) {
+ve_profile* ve_profile_offset(const ve_profile* profile, double delta, int32_t join,
+                              ve_status* status) {
+  if (profile == nullptr || !std::isfinite(delta) || std::abs(delta) > validation::kExtent ||
+      (join != VE_JOIN_MITER && join != VE_JOIN_ROUND)) {
     status_out(status, VE_ERR_INVALID_ARG);
     return nullptr;
   }
-  return wrap_profile(profile->value.Offset(delta, CrossSection::JoinType::Miter, 2.0), status);
+  const auto type =
+      join == VE_JOIN_ROUND ? CrossSection::JoinType::Round : CrossSection::JoinType::Miter;
+  return wrap_profile(profile->value.Offset(delta, type, 2.0, 64), status);
 }
 ve_profile* ve_profile_difference(const ve_profile* a, const ve_profile* b, ve_status* status) {
   if (a == nullptr || b == nullptr) {

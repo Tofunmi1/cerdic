@@ -84,10 +84,16 @@ pub(crate) fn loops(profile: &ProfileHandle) -> Result<Vec<Vec<[f64; 2]>>, Kerne
         .collect()
 }
 
-pub(crate) fn offset(profile: &ProfileHandle, delta: f64) -> Result<ProfileHandle, KernelError> {
+pub(crate) fn offset(
+    profile: &ProfileHandle,
+    delta: f64,
+    round: bool,
+) -> Result<ProfileHandle, KernelError> {
     let mut status = sys::VE_OK;
     // SAFETY: live borrowed handle and valid output pointer; scalar input is checked in C++.
-    let ptr = unsafe { sys::ve_profile_offset(profile.0.as_ptr(), delta, &raw mut status) };
+    let ptr = unsafe {
+        sys::ve_profile_offset(profile.0.as_ptr(), delta, i32::from(round), &raw mut status)
+    };
     ProfileHandle::from_raw(ptr, status)
 }
 

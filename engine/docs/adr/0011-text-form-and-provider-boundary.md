@@ -10,7 +10,8 @@ control surface. Research (CAD-Coder and CADCodeVerify on code as a modeling med
 LL3M on render-and-critique loops; Aider's edit-format results on how much the edit mechanism
 matters) argues for several surfaces over one authority, not for a single one. No independent
 benchmark compares a custom language, a restricted code surface and typed tool calls on the same
-tasks; that experiment is not run (a spike exists under `spikes/x10-surfaces`, unexecuted).
+tasks, so experiment X10 (`experiments.md`) ran one: text, typed commands and a JavaScript builder
+gave the same results within noise for Sonnet and Haiku, so no code surface is built.
 
 ## Decision
 - The typed `CommandBatch` stays the only way to change a document. Text is a projection of it:
@@ -28,8 +29,8 @@ tasks; that experiment is not run (a spike exists under `spikes/x10-surfaces`, u
   back once; the second failure is reported and the document stays as it was. An invalid patch is
   never repaired. Providers see the document and request, never a handle to either.
 - Edits by an assistant are typed commands addressed by node ID, as with the mock's "widen its
-  opening". Query tools, render critique keyed by node ID and a restricted code surface are later
-  work, decided by an experiment rather than by this ADR.
+  opening". Query tools and render critique keyed by node ID are later work. A restricted code
+  surface is not planned (X10 found no gain).
 
 ## Consequences
 Any later surface (node graph, inspector, a model's tool calls, a code-like syntax) lowers to the

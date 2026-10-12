@@ -8,10 +8,13 @@ are mathematical requirements, recorded explicitly rather than preserving the ex
   0.044 gave only 2 mm radial clearance at the 0.30 m rim, below the requested 3 mm wall.
 - Widening only the **inner** opening is the failing edit. Widening only the outer opening thickens
   the wall. The passing paired edit changes outer 0.050→0.070 and inner 0.040→0.064 m.
-- The wall check's first supported domain is monotone-height axisymmetric vase profiles. It checks
-  physical side and bottom boundaries below the open rim. Full eroded-profile containment would
-  wrongly reject the cavity's deliberate extension above the rim and its contact with the axis.
-  Other profile families must return a defined unsupported-case diagnostic, not pass unchecked.
+- The wall check measures the cross-section `outer` minus `inner` (any two profiles, not only
+  axisymmetric ones): it opens that region with a disc of the required diameter and fails when
+  anything is lost, reporting the largest thickness that passes. The region is the physical wall, so
+  the open rim of a vase and its contact with the axis are not walls and are not judged. Full
+  eroded-profile containment would wrongly reject the cavity's deliberate extension above the rim.
+  An inner profile that covers the outer one leaves no wall and fails with thickness 0. (G3 first
+  limited the check to one-loop axisymmetric profiles; the opening test never needed that.)
 - A 64-facet circle has relative volume deficit `1 - sin(2π/64)/(2π/64) = 0.0016056`, which cannot
   meet the example's 0.001 circular-volume tolerance. Keep exactly 64 requested facets; compare
   against the closed-form faceted volume within 1e-6 and the circle within 0.002. A 128-facet case

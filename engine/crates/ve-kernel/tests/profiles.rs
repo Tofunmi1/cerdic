@@ -11,6 +11,29 @@ fn g3_07_rectangle_offset_area_and_empty_erosion() {
 }
 
 #[test]
+fn g3_07b_round_offset_rounds_convex_corners_and_mitre_keeps_them() {
+    let square = Profile::polygon(&[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]).unwrap();
+    let r = 0.1;
+    let round = square.offset_round(r).unwrap();
+    let faceted_circle = 64.0 / 2.0 * (std::f64::consts::TAU / 64.0).sin() * r * r;
+    assert!(
+        (round.area() - (1.0 + 4.0 * r + faceted_circle)).abs() < 2e-3,
+        "round growth area {}",
+        round.area()
+    );
+    let mitre = square.offset(r).unwrap();
+    assert!(
+        (mitre.area() - 1.44).abs() < 1e-9,
+        "mitre keeps square corners"
+    );
+    assert!(round.area() < mitre.area());
+    // Shrinking a square keeps its corners square either way; growing a hole rounds its corners.
+    let frame = square.difference(&square.offset(-0.2).unwrap()).unwrap();
+    let softer = frame.offset_round(-0.05).unwrap();
+    assert!(softer.area() < frame.area());
+}
+
+#[test]
 fn g3_08_twisted_extrusion_volume_and_y_up_bounds() {
     let profile = Profile::polygon(&[[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]]).unwrap();
     let solid = profile
