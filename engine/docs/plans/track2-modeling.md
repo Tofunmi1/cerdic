@@ -671,7 +671,17 @@ the spike classification and the three-piece gallery. All 15 shipped operators a
 `cargo xtask check --strict` passed (277 native tests and every browser suite). Evidence, cases,
 sizes and limits are in [`g3-report.md`](../modeling/g3-report.md); decisions in ADRs 0010 and 0011.
 Not claimed: headset behaviour, a real provider, 32 of the 53 spike programs (later gates), and the
-comparison of control surfaces for a model (not run). Next: V1 or G4, then the logic gates.
+comparison of control surfaces for a model (now run: X10). Next: V1 or G4, then the logic gates.
+
+**Amendments after G3 (2026-10-12), not in the original plan.** (1) A test route for models through
+MCP and a viewer mode that evaluates documents (`mcp-test-provider.md`), a lit studio scene, smooth
+shading across shallow edges, an eased hover glow. (2) `solid.material` (colour, metal, roughness,
+glow) pulled forward from G10, and `profile.smooth` (corner cutting) as a cheap stand-in until G5
+curves and G7 subdivision. (3) **Order:** G4a, the small operators a model needs to build furniture
+and machines (rect, circle, cone, torus, capsule, mirror, array, radial, repeat), is done before V1,
+because what a model can build limits everything else; G4 proper (groups, instances, sockets) and
+V1 follow. (4) Open decision, not taken: whether the viewer page or the React shell is the editor
+surface (ADR 0007 says the shell; the viewer is the preview).
 
 G4-G13, V1-V7 and L0-L9 incomplete; X2-X5 and X7-X9 not performed. No gate has passed merely because this
 document was revised. Replace this line with per-milestone evidence as work lands:

@@ -22,6 +22,10 @@ const pieces = {
   vase: { centre: [0, 0.15, 0], size: 0.3, detail: [0, 0.3, 0] },
   twisted_tower: { centre: [0, 0.25, 0], size: 0.5, detail: [0, 0.5, 0] },
   offset_plate: { centre: [0, 0.0035, 0], size: 0.16, detail: [0.05, 0.006, 0.03], detailScale: 0.6 },
+  ceramic_vase: { centre: [0, 0.16, 0], size: 0.32, detail: [0, 0.3, 0] },
+  table: { centre: [0, 0.38, 0], size: 1.3, detail: [0.55, 0.72, 0.3], detailScale: 0.3 },
+  gear: { centre: [0, 0.01, 0], size: 0.22, detail: [0.1, 0.01, 0], detailScale: 0.5 },
+  spiral_stair: { centre: [0, 1.1, 0], size: 1.6, detail: [0.3, 1.0, 0], detailScale: 0.4 },
 };
 
 const eye = (centre, distance, azimuth, elevation) => {

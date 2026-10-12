@@ -1,0 +1,10 @@
+# A spiral staircase: one tread repeated twelve times, each a little higher and turned 15 degrees
+# further around, with a centre column.
+tread = solid.box@1(size=[0.4, 0.05, 0.2])
+tread_out = xform.move@1(tread, by=[0.2, 0.025, 0])
+treads = xform.repeat@1(tread_out, count=12, step=[0, 0.18, 0], rotate_step=[0, 15, 0])
+column = solid.cylinder@1(height=2.2, radius=0.08, segments=48)
+column_raised = xform.move@1(column, by=[0, 1.1, 0])
+stair = solid.union@1(column_raised, treads)
+oak = solid.material@1(stair, color=[0.5, 0.33, 0.18], metallic=0, roughness=0.55)
+output stair = oak

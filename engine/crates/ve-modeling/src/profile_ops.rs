@@ -2,7 +2,7 @@
 //!
 //! Profiles travel between nodes as canonical f64 loops (never kernel handles); each operator
 //! rebuilds a short-lived native profile, applies one kernel call and exports the loops again.
-use crate::{Fail, cache::Value, operations::kernel_fail};
+use crate::{Fail, cache::Value, operations::kernel_fail, shapes};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use ve_graph::{Diagnostic, Node, NodeId, Value as Param};
@@ -16,6 +16,7 @@ pub(crate) fn run(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
         "profile.offset" => offset(node, inputs),
         "profile.difference" => difference(inputs),
         "profile.smooth" => smooth(node, inputs),
+        "profile.rect" | "profile.circle" => shapes::profile(node),
         _ => return min_wall(node, inputs),
     };
     result
@@ -186,14 +187,14 @@ fn min_wall(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
     ))
 }
 
-fn number(node: &Node, name: &str) -> Result<f64, KernelError> {
+pub(crate) fn number(node: &Node, name: &str) -> Result<f64, KernelError> {
     node.params
         .get(name)
         .and_then(Param::as_f64)
         .ok_or(KernelError::InvalidArgument("missing number"))
 }
 
-fn whole(node: &Node, name: &str) -> Result<u32, KernelError> {
+pub(crate) fn whole(node: &Node, name: &str) -> Result<u32, KernelError> {
     let value = number(node, name)?;
     if value < 0.0 || value.fract() != 0.0 || value > f64::from(u32::MAX) {
         return Err(KernelError::InvalidArgument("whole number"));
@@ -206,7 +207,7 @@ fn whole(node: &Node, name: &str) -> Result<u32, KernelError> {
     Ok(value as u32)
 }
 
-fn pair(node: &Node, name: &str) -> Result<[f64; 2], KernelError> {
+pub(crate) fn pair(node: &Node, name: &str) -> Result<[f64; 2], KernelError> {
     let Some(Param::List(items)) = node.params.get(name) else {
         return Err(KernelError::InvalidArgument("missing pair"));
     };

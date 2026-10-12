@@ -8,6 +8,7 @@ mod operations;
 mod plan;
 mod profile_ops;
 mod result;
+mod shapes;
 
 pub use evaluate::Evaluator;
 pub use job::{JobToken, hash};

@@ -1,0 +1,11 @@
+# A wooden table: one leg mirrored across both horizontal planes gives four, joined to a slab top.
+# The legs run 2 cm into the top so the parts fuse.
+leg = solid.box@1(size=[0.05, 0.72, 0.05])
+leg_corner = xform.move@1(leg, by=[0.55, 0.36, 0.30])
+legs_pair = xform.mirror@1(leg_corner, axis="x")
+legs = xform.mirror@1(legs_pair, axis="z")
+top = solid.box@1(size=[1.2, 0.04, 0.7])
+top_raised = xform.move@1(top, by=[0, 0.72, 0])
+table = solid.union@1(legs, top_raised)
+wood = solid.material@1(table, color=[0.55, 0.36, 0.2], metallic=0, roughness=0.6)
+output table = wood

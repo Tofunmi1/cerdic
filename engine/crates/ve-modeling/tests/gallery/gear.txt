@@ -1,0 +1,12 @@
+# A spur gear: a disc with sixteen teeth placed around the axis by one radial pattern, and a bore.
+disc_profile = profile.circle@1(radius=0.10, segments=128)
+disc = solid.extrude@1(disc_profile, height=0.02)
+tooth = solid.box@1(size=[0.02, 0.02, 0.016])
+tooth_raised = xform.move@1(tooth, by=[0, 0.01, 0])
+teeth = xform.radial@1(tooth_raised, count=16, radius=0.10)
+bore = solid.cylinder@1(height=0.04, radius=0.02, segments=64)
+bore_raised = xform.move@1(bore, by=[0, 0.01, 0])
+toothed = solid.union@1(disc, teeth)
+gear = solid.difference@1(toothed, bore_raised)
+steel = solid.material@1(gear, color=[0.6, 0.62, 0.66], metallic=1, roughness=0.35)
+output gear = steel

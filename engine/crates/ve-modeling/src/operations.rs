@@ -1,5 +1,5 @@
 //! Operators consume immutable mesh values. Native solids exist only while one node executes.
-use crate::{Fail, appearance, cache::Value, fail, profile_ops};
+use crate::{Fail, appearance, cache::Value, fail, profile_ops, shapes};
 use std::rc::Rc;
 use ve_graph::{Node, Value as Param};
 use ve_kernel::{ExecutionContext, KernelError, Mesh, Solid};
@@ -120,6 +120,13 @@ fn solid(
             segments()?,
             true,
         ),
+        "solid.cone" | "solid.torus" | "solid.capsule" => shapes::primitive(node),
+        "xform.mirror" | "xform.array" | "xform.radial" | "xform.repeat" => {
+            let input = inputs
+                .first()
+                .ok_or(KernelError::InvalidArgument("missing input"))?;
+            shapes::pattern(node, input, context)
+        }
         _ => {
             if kind == "solid.union" && inputs.len() >= 2 {
                 let solids: Vec<_> = inputs
@@ -154,7 +161,7 @@ fn solid(
     }
 }
 
-fn vector(node: &Node, name: &str) -> Result<[f64; 3], KernelError> {
+pub(crate) fn vector(node: &Node, name: &str) -> Result<[f64; 3], KernelError> {
     let Some(Param::List(values)) = node.params.get(name) else {
         return Err(KernelError::InvalidArgument("missing vector"));
     };
