@@ -36,5 +36,5 @@ pub use spec::{
     PortType, Readiness,
 };
 pub use store::{Backend, BackendError, DocStore, Loaded, MemoryBackend, MigrationStep, Migrator};
-pub use text::{TextBatch, parse_text, to_text};
+pub use text::{TextBatch, parse_text, parse_text_in, to_text};
 pub use value::{ParamIssue, ParamType, Unit, Value};

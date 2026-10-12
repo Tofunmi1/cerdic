@@ -114,6 +114,7 @@ const READY: &[&str] = &[
     "profile.difference@1",
     "solid.extrude@1",
     "solid.revolve@1",
+    "solid.material@1",
     "check.min_wall@1",
 ];
 

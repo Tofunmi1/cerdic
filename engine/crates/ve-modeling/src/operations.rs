@@ -1,5 +1,5 @@
 //! Operators consume immutable mesh values. Native solids exist only while one node executes.
-use crate::{Fail, cache::Value, fail, profile_ops};
+use crate::{Fail, appearance, cache::Value, fail, profile_ops};
 use std::rc::Rc;
 use ve_graph::{Node, Value as Param};
 use ve_kernel::{ExecutionContext, KernelError, Mesh, Solid};
@@ -23,9 +23,13 @@ pub(crate) fn execute(
             mesh: input.mesh.clone(),
             volume: input.volume,
             loops: input.loops.clone(),
+            material: input.material.clone(),
         });
     }
     let family = node.op.family().as_str();
+    if family == "solid.material" {
+        return appearance::material(node, inputs);
+    }
     if family.starts_with("profile.") || family == "check.min_wall" {
         return profile_ops::run(node, inputs);
     }
@@ -57,7 +61,17 @@ pub(crate) fn execute(
             .to_mesh()
             .map_err(|e| fail("kernel.failed", e.to_string()))?
     };
-    Ok(Value::solid(mesh, result.volume()))
+    let mut value = Value::solid(mesh, result.volume());
+    // Moving, turning, scaling or combining keeps the first input's surface.
+    if family.starts_with("xform.")
+        || matches!(
+            family,
+            "solid.union" | "solid.difference" | "solid.intersect"
+        )
+    {
+        value.material = inputs.first().and_then(|input| input.material.clone());
+    }
+    Ok(value)
 }
 
 /// A kernel refusal as a diagnostic naming the node; cancellation keeps its own code.

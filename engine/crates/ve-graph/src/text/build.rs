@@ -3,10 +3,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::lex::{Fail, error, fail};
-use super::node::{links, node_commands};
+use super::node::{Known, links, node_commands, node_ref};
 use super::parse::{Arg, Stmt, parse};
-use crate::command::{Alias, Command, NodeRef, OutRef};
+use crate::command::{Command, OutRef};
 use crate::diag::{Diagnostic, Span};
+use crate::doc::Document;
+use crate::id::NodeId;
 use crate::spec::{OpId, OperatorRegistry, OperatorSpec, Readiness};
 
 /// Commands read from text, with the source span each one came from.
@@ -102,7 +104,7 @@ fn reaches(
         .any(|d| *d == target || reaches(deps, d, target, seen))
 }
 
-fn input_errors(statements: &[Stmt], names: &Names<'_>, out: &mut Vec<Diagnostic>) {
+fn input_errors(statements: &[Stmt], names: &Names<'_>, known: &Known, out: &mut Vec<Diagnostic>) {
     for (index, statement) in statements.iter().enumerate() {
         let Stmt::Node { name, args, .. } = statement else {
             continue;
@@ -133,6 +135,7 @@ fn input_errors(statements: &[Stmt], names: &Names<'_>, out: &mut Vec<Diagnostic
                         format!("{name} reads {source}, which is {why}"),
                     ));
                 }
+                None if known.contains_key(source.as_str()) => {}
                 None => out.push(error(
                     "parse.unknown_name",
                     *span,
@@ -144,7 +147,11 @@ fn input_errors(statements: &[Stmt], names: &Names<'_>, out: &mut Vec<Diagnostic
 }
 
 /// Collects the node names and what each reads, reporting bad and duplicate names.
-fn collect_names<'a>(statements: &'a [Stmt], errors: &mut Vec<Diagnostic>) -> Names<'a> {
+fn collect_names<'a>(
+    statements: &'a [Stmt],
+    known: &Known,
+    errors: &mut Vec<Diagnostic>,
+) -> Names<'a> {
     let mut names = Names {
         defined: BTreeMap::new(),
         deps: BTreeMap::new(),
@@ -165,11 +172,11 @@ fn collect_names<'a>(statements: &'a [Stmt], errors: &mut Vec<Diagnostic>) -> Na
                 *name_span,
                 format!("{name:?} is not a usable node name (letters, digits, _; at most 32)"),
             ));
-        } else if names.defined.insert(name, index).is_some() {
+        } else if names.defined.insert(name, index).is_some() || known.contains_key(name.as_str()) {
             errors.push(error(
                 "parse.duplicate_name",
                 *name_span,
-                format!("{name} is defined twice"),
+                format!("{name} is already the name of a node"),
             ));
         }
         let reads = args.iter().filter_map(|a| match a {
@@ -181,16 +188,86 @@ fn collect_names<'a>(statements: &'a [Stmt], errors: &mut Vec<Diagnostic>) -> Na
     names
 }
 
+/// `output name` or `output name = node`: declares (or, for an existing name, redirects) an output.
+fn output_command(
+    name: &str,
+    name_span: Span,
+    node: Option<&(String, Span)>,
+    names: &Names<'_>,
+    known: &Known,
+) -> Result<(Command, Span), Fail> {
+    let (source, span) = node.map_or((name, name_span), |(n, s)| (n.as_str(), *s));
+    let from = if names.defined.contains_key(source) || known.contains_key(source) {
+        node_ref(source, known)
+    } else {
+        None
+    };
+    from.map(|from| {
+        (
+            Command::SetOutput {
+                name: name.to_owned(),
+                from: Some(OutRef::out(from)),
+            },
+            span,
+        )
+    })
+    .ok_or_else(|| {
+        fail(
+            "parse.unknown_name",
+            span,
+            format!("no node is named {source}"),
+        )
+    })
+}
+
+/// Labels in `doc` that text can refer to: plain names that exactly one node carries.
+fn known_labels(doc: &Document) -> Known {
+    let mut seen: BTreeMap<String, Option<NodeId>> = BTreeMap::new();
+    for node in &doc.nodes {
+        let Some(label) = node.label.as_deref().filter(|l| valid_name(l)) else {
+            continue;
+        };
+        seen.entry(label.to_owned())
+            .and_modify(|slot| *slot = None)
+            .or_insert_with(|| Some(node.id.clone()));
+    }
+    seen.into_iter()
+        .filter_map(|(label, id)| id.map(|id| (label, id)))
+        .collect()
+}
+
 /// Reads text into commands that create the described nodes, links and outputs.
 ///
 /// # Errors
 /// Every problem found, each with a source span: syntax, unknown operators (with suggestions),
 /// parameters, names, forward references and cycles.
 pub fn parse_text(registry: &OperatorRegistry, source: &str) -> Result<TextBatch, Vec<Diagnostic>> {
+    parse_with(registry, &Known::new(), source)
+}
+
+/// Like [`parse_text`], for adding to `doc`: a name the text does not define may be the label of one
+/// of the document's nodes, which the new nodes then read; `output name = node` can redirect an
+/// existing output; a new node may not reuse an existing label.
+///
+/// # Errors
+/// The same problems as [`parse_text`], plus `parse.duplicate_name` for a reused label.
+pub fn parse_text_in(
+    registry: &OperatorRegistry,
+    doc: &Document,
+    source: &str,
+) -> Result<TextBatch, Vec<Diagnostic>> {
+    parse_with(registry, &known_labels(doc), source)
+}
+
+fn parse_with(
+    registry: &OperatorRegistry,
+    known: &Known,
+    source: &str,
+) -> Result<TextBatch, Vec<Diagnostic>> {
     let statements = parse(source).map_err(|e| vec![*e])?;
     let mut errors = Vec::new();
-    let names = collect_names(&statements, &mut errors);
-    input_errors(&statements, &names, &mut errors);
+    let names = collect_names(&statements, known, &mut errors);
+    input_errors(&statements, &names, known, &mut errors);
     let mut batch = TextBatch {
         commands: Vec::new(),
         spans: Vec::new(),
@@ -212,7 +289,7 @@ pub fn parse_text(registry: &OperatorRegistry, source: &str) -> Result<TextBatch
             } => match resolve(registry, op, *op_span) {
                 Ok(spec) => {
                     let (added, mut e1) = node_commands(spec, name, args, *name_span);
-                    let (linked, e2) = links(spec, name, args);
+                    let (linked, e2) = links(spec, name, args, known);
                     errors.append(&mut e1);
                     errors.extend(e2);
                     push(added);
@@ -224,25 +301,10 @@ pub fn parse_text(registry: &OperatorRegistry, source: &str) -> Result<TextBatch
                 name,
                 name_span,
                 node,
-            } => {
-                let (source, span) = node
-                    .as_ref()
-                    .map_or((name.as_str(), *name_span), |(n, s)| (n.as_str(), *s));
-                match Alias::parse(&format!("${source}")) {
-                    Ok(alias) if names.defined.contains_key(source) => push(vec![(
-                        Command::SetOutput {
-                            name: name.clone(),
-                            from: Some(OutRef::out(NodeRef::Alias(alias))),
-                        },
-                        span,
-                    )]),
-                    _ => errors.push(error(
-                        "parse.unknown_name",
-                        span,
-                        format!("no node is named {source}"),
-                    )),
-                }
-            }
+            } => match output_command(name, *name_span, node.as_ref(), &names, known) {
+                Ok(item) => push(vec![item]),
+                Err(e) => errors.push(*e),
+            },
         }
     }
     errors.sort_by_key(|e| e.span.map(|s| (s.line, s.col)));

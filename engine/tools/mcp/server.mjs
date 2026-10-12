@@ -71,9 +71,19 @@ Example (a vase, with a 3 mm minimum wall that the engine enforces):
   vase = solid.difference@1(body, cavity)
   output vase
 
+Colour and finish: solid.material@1(solid, color=[r,g,b], metallic=0, roughness=0.5, emissive=[0,0,0])
+gives a solid a surface (colour is sRGB 0..1 as in a colour picker, metallic 0 plastic/paint/wood to 1
+bare metal, roughness 0 mirror to 1 matte, emissive glows above 1). The shape is unchanged. Put it on
+the solid you output, for example:
+  red = solid.material@1(vase, color=[0.85, 0.08, 0.08], roughness=0.3)
+  output vase = red
+Transforms and booleans keep the first input's surface.
+
 How to work: call get_text to see the current document. apply_text ADDS the nodes of a program to
-the document (it never replaces existing ones); to change something that already exists use
-apply_commands, which addresses nodes by ID (get_nodes lists each node's id, label, operator,
+the document (it never replaces existing ones) and may read nodes already there by their label (see
+get_nodes), as the example above reads vase; a new node cannot reuse an existing label, and
+"output name = node" points an existing output at a different node. To change something that
+already exists use apply_commands, which addresses nodes by ID (get_nodes lists each node's id, label, operator,
 parameters and inputs; set_param is the usual command). Read the result after each call. A refused edit leaves the
 document unchanged and says why (for example constraint.min_wall with the measured thickness).`;
 

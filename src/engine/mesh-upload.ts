@@ -9,6 +9,7 @@ export async function uploadResult(runtime: Runtime, token: Token, parts: MeshPa
   const text = JSON.stringify(token);
   if (!current() || !runtime.eval_projection_begin(text)) return false;
   for (const part of parts) {
+    if (part.material && !runtime.eval_projection_material(text, part.node, JSON.stringify(part.material))) return false;
     for (let offset = 0; offset < part.indices.length; offset += TRIANGLES_PER_CHUNK * 3) {
       if (!current()) return false;
       const end = Math.min(offset + TRIANGLES_PER_CHUNK * 3, part.indices.length);

@@ -76,7 +76,7 @@ try {
     assert(state.projection.live_meshes >= 1, `${name}: geometry projected`);
     const printed = await page.evaluate(() => window.__spatial.doc.text());
     assert(printed.text?.includes('output'), `${name}: the document prints back as text`);
-    const reread = await page.evaluate(t => window.__spatial.runtime.doc_parse_text(t), printed.text);
+    const reread = await page.evaluate(t => window.__spatial.runtime.doc_parse_text_standalone(t), printed.text);
     assert(JSON.parse(reread).commands?.length > 0, `${name}: printed text reads again`);
     await page.evaluate(() => window.__spatial.runtime.viewer_configure(true, 40, false, 2));
     for (const [view, [position, target]] of Object.entries(views(piece))) {

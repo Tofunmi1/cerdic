@@ -25,6 +25,17 @@ program's nodes; diagnostics carry line and column), `apply_commands` (typed edi
 `undo`, `redo`, `frame_view` (the whole model fills the view), `set_view`. A refused edit (for example
 `constraint.min_wall`, with the measured thickness) leaves the document unchanged and says so.
 
+## Colour
+`solid.material@1(solid, color=[r,g,b], metallic, roughness, emissive)` gives a solid a surface
+(sRGB colour, metal 0 to 1, roughness 0 to 1, emissive glow); the shape is unchanged. Transforms and
+booleans keep their first input's surface, so it can sit anywhere on the way to the output. A part's
+surface travels with its mesh from the evaluator to the renderer (`eval_projection_material`). Opacity
+(glass) is not supported by the renderer yet. This is the first slice of the appearance work planned
+for G10 (procedural materials), pulled forward because a request for a "red vase" has to be possible.
+
+Text added to an existing document may read its nodes by label (`red = solid.material@1(vase, ...)`
+then `output vase = red`), so a model can extend what is there instead of rewriting it.
+
 ## Looking at the model
 The first model that appears is framed automatically. With the mouse not held: the wheel (or a
 trackpad scroll or pinch) zooms toward the model, Alt + drag (or the "Drag to orbit" box, or O, then
@@ -47,7 +58,9 @@ and then zoom and orbit yourself):
 `web/tests/mcp.mjs` (part of the strict gate) plays the MCP client with a script against the viewer
 page: protocol basics, a clear message when no page is connected, building the vase, a diagnostic with
 a span, a wall violation refused with the document unchanged, an edit by ID that keeps every ID, undo,
-then frame, wheel zoom in and out, and Alt + drag orbit with the distance kept.
+then frame, wheel zoom in and out, and Alt + drag orbit with the distance kept, then a material added
+to the existing vase turns the rendered canvas red (pixels counted before and after) and an
+out-of-range colour is refused.
 `try-with-claude.mjs` was run with Sonnet: it built the vase and widened its opening, and built a
 twisted tower from a prose description (it worked out the star's ten points itself); the wall check
 held and the model was framed.

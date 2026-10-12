@@ -15,7 +15,7 @@ use bevy_mesh::{Mesh, Mesh3d, PrimitiveTopology};
 use bevy_transform::components::Transform;
 use serde_json::json;
 use std::cell::RefCell;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use ve_kernel::Bounds;
 use ve_modeling::JobToken;
 use ve_render::{VeMaterial, mesh_ready};
@@ -47,6 +47,8 @@ struct Uploaded {
 }
 struct Candidate {
     token: JobToken,
+    /// Surfaces by authored node; a part without one is drawn in the default blue-grey.
+    materials: HashMap<String, VeMaterial>,
     queue: VecDeque<Chunk>,
     uploaded: Vec<Uploaded>,
     queued_bytes: usize,
@@ -78,6 +80,7 @@ pub(crate) fn begin(text: &str) -> bool {
         discard(&mut state);
         state.candidate = Some(Candidate {
             token,
+            materials: HashMap::new(),
             queue: VecDeque::new(),
             uploaded: Vec::new(),
             queued_bytes: 0,
@@ -86,6 +89,64 @@ pub(crate) fn begin(text: &str) -> bool {
         });
     });
     true
+}
+
+/// Reads `{ color, metallic, roughness, emissive }`, refusing anything out of range.
+fn parse_material(text: &str) -> Option<VeMaterial> {
+    let value: serde_json::Value = serde_json::from_str(text).ok()?;
+    let triple = |name: &str, max: f64| -> Option<[f32; 3]> {
+        let items = value.get(name)?.as_array()?;
+        let mut out = [0.0_f32; 3];
+        if items.len() != 3 {
+            return None;
+        }
+        for (slot, item) in out.iter_mut().zip(items) {
+            let channel = item.as_f64().filter(|v| (0.0..=max).contains(v))?;
+            #[expect(clippy::cast_possible_truncation, reason = "bounded channel value")]
+            {
+                *slot = channel as f32;
+            }
+        }
+        Some(out)
+    };
+    let factor = |name: &str| -> Option<f32> {
+        let v = value
+            .get(name)?
+            .as_f64()
+            .filter(|v| (0.0..=1.0).contains(v))?;
+        #[expect(clippy::cast_possible_truncation, reason = "bounded factor")]
+        Some(v as f32)
+    };
+    let color = triple("color", 1.0)?;
+    let emissive = triple("emissive", 100.0)?;
+    Some(VeMaterial {
+        base_color: Color::srgb(color[0], color[1], color[2]),
+        metallic: factor("metallic")?,
+        roughness: factor("roughness")?,
+        emissive: Color::linear_rgb(emissive[0], emissive[1], emissive[2]),
+    })
+}
+
+/// Sets the surface of the part made by `node` in the scene being staged.
+pub(crate) fn material(text: &str, node: &str, json: &str) -> bool {
+    let (Some(parsed), true) = (parse_material(json), ve_graph::NodeId::parse(node).is_ok()) else {
+        return false;
+    };
+    STATE.with(|cell| {
+        let mut state = cell.borrow_mut();
+        let Some(candidate) = state.candidate.as_mut() else {
+            return false;
+        };
+        if serde_json::to_string(&candidate.token).ok().as_deref() != Some(text)
+            || !staging::current(&candidate.token)
+            || candidate.finished
+            || candidate.materials.len() >= 4096
+        {
+            return false;
+        }
+        candidate.materials.insert(node.to_owned(), parsed);
+        true
+    })
 }
 
 pub(crate) fn chunk(text: &str, node: &str, name: &str, data: &[f32]) -> bool {
@@ -195,17 +256,19 @@ pub(crate) fn update(
                 meshes.remove(mesh.0.id());
             }
             state.parts.clear();
+            let materials = candidate.materials;
             for item in candidate.uploaded {
                 state
                     .parts
                     .push((item.node.clone(), candidate.token.revision));
+                let surface = materials.get(&item.node).copied().unwrap_or(VeMaterial {
+                    base_color: Color::srgb(0.68, 0.73, 0.87),
+                    roughness: 0.5,
+                    ..VeMaterial::default()
+                });
                 commands.spawn((
                     Mesh3d(item.handle),
-                    VeMaterial {
-                        base_color: Color::srgb(0.68, 0.73, 0.87),
-                        roughness: 0.5,
-                        ..VeMaterial::default()
-                    },
+                    surface,
                     Transform::IDENTITY,
                     Interactable::selection_only(&item.bounds),
                     Label(item.name),

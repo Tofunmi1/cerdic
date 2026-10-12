@@ -21,6 +21,19 @@ impl Quality {
     }
 }
 
+/// A solid's surface, as set by a `solid.material` node. Colour is sRGB, emissive is linear.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Material {
+    /// Base colour, each 0 to 1.
+    pub color: [f32; 3],
+    /// 0 dielectric, 1 metal.
+    pub metallic: f32,
+    /// 0 mirror, 1 matte.
+    pub roughness: f32,
+    /// Light given off; above 1 glows.
+    pub emissive: [f32; 3],
+}
+
 /// One named output with its stable authored identity. Mesh data is transferred separately on web.
 #[derive(Clone, Debug, Serialize)]
 pub struct Part {
@@ -36,6 +49,8 @@ pub struct Part {
     pub indices: Vec<u32>,
     /// Volume of the evaluated solid.
     pub volume: f64,
+    /// The surface given by the nearest `solid.material`, if any.
+    pub material: Option<Material>,
 }
 
 /// A successful complete evaluation. Failures never yield a partial scene.

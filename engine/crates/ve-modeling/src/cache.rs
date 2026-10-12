@@ -1,4 +1,5 @@
 //! LRU of exported immutable meshes. No native kernel objects survive in the cache.
+use crate::Material;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use ve_kernel::Mesh;
@@ -8,6 +9,9 @@ pub(crate) struct Value {
     pub(crate) mesh: Mesh,
     pub(crate) volume: f64,
     pub(crate) loops: Vec<Vec<[f64; 2]>>,
+    /// The surface a `solid.material` gave this solid; transforms and booleans keep their first
+    /// input's, everything else starts without one.
+    pub(crate) material: Option<Material>,
 }
 
 impl Value {
@@ -16,6 +20,7 @@ impl Value {
             mesh,
             volume,
             loops: Vec::new(),
+            material: None,
         }
     }
 
@@ -24,6 +29,7 @@ impl Value {
             mesh: Mesh::default(),
             volume: 0.0,
             loops,
+            material: None,
         }
     }
 

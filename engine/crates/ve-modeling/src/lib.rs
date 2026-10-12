@@ -1,4 +1,5 @@
 //! Bounded geometry evaluation shared by native tools and the renderer-free browser worker.
+mod appearance;
 mod budget;
 mod cache;
 mod evaluate;
@@ -10,7 +11,7 @@ mod result;
 
 pub use evaluate::Evaluator;
 pub use job::{JobToken, hash};
-pub use result::{Evaluation, Part, Quality};
+pub use result::{Evaluation, Material, Part, Quality};
 
 pub(crate) type Fail = Box<ve_graph::Diagnostic>;
 
