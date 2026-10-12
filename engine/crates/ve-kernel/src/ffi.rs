@@ -13,6 +13,8 @@ use ve_kernel_sys as sys;
 
 use crate::KernelError;
 
+pub(crate) mod context;
+
 /// Runs the C++ static constructors once on `wasm32-unknown-unknown`, where nothing else does.
 /// A no-op on every other target (native and WASI start the C++ runtime themselves).
 fn ensure_initialized() {

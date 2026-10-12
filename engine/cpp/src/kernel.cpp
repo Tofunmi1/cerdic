@@ -14,6 +14,10 @@ struct ve_solid {
   manifold::Manifold m;
 };
 
+struct ve_context {
+  manifold::ExecutionContext value;
+};
+
 namespace {
 
 using manifold::Manifold;
@@ -41,6 +45,8 @@ ve_status map_error(Manifold::Error e) {
       return VE_ERR_OUT_OF_BOUNDS;
     case Manifold::Error::ResultTooLarge:
       return VE_ERR_TOO_LARGE;
+    case Manifold::Error::Cancelled:
+      return VE_ERR_CANCELLED;
     default:
       return VE_ERR_INVALID_ARG;
   }
@@ -243,5 +249,56 @@ ve_status ve_simplify(const float* positions, size_t vertex_count, const uint32_
 }
 
 void ve_solid_free(ve_solid* s) { const std::unique_ptr<ve_solid> owner(s); }
+
+ve_context* ve_context_new(void) {
+  auto context = std::make_unique<ve_context>();
+  return context.release();
+}
+
+ve_solid* ve_solid_batch_union_context(const ve_solid* const* solids, size_t count,
+                                       const ve_context* context, ve_status* status) {
+  if (solids == nullptr || context == nullptr || count < 2 || count > 64) {
+    set_status(status, VE_ERR_INVALID_ARG);
+    return nullptr;
+  }
+  std::vector<Manifold> values;
+  values.reserve(count);
+  for (size_t i = 0; i < count; ++i) {
+    const auto* solid = *(solids + i);
+    if (solid == nullptr) {
+      set_status(status, VE_ERR_INVALID_ARG);
+      return nullptr;
+    }
+    values.push_back(solid->m);
+  }
+  return wrap(Manifold::BatchBoolean(values, manifold::OpType::Add).WithContext(context->value),
+              status);
+}
+
+void ve_context_free(ve_context* context) { const std::unique_ptr<ve_context> owner(context); }
+void ve_context_cancel(ve_context* context) {
+  if (context != nullptr) {
+    context->value.Cancel();
+  }
+}
+int32_t ve_context_cancelled(const ve_context* context) {
+  return context != nullptr && context->value.Cancelled() ? 1 : 0;
+}
+
+ve_solid* ve_solid_boolean_context(const ve_solid* a, const ve_solid* b, int32_t operation,
+                                   const ve_context* context, ve_status* status) {
+  if (a == nullptr || b == nullptr || context == nullptr || operation < 0 || operation > 2) {
+    set_status(status, VE_ERR_INVALID_ARG);
+    return nullptr;
+  }
+  auto op = manifold::OpType::Intersect;
+  if (operation == 0) {
+    op = manifold::OpType::Add;
+  } else if (operation == 1) {
+    op = manifold::OpType::Subtract;
+  }
+  auto result = a->m.Boolean(b->m, op).WithContext(context->value);
+  return wrap(std::move(result), status);
+}
 
 }  // extern "C"

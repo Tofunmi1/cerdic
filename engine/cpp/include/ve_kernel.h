@@ -15,6 +15,7 @@ extern "C" {
 #endif
 
 typedef struct ve_solid ve_solid;
+typedef struct ve_context ve_context;
 
 typedef int32_t ve_status;
 enum {
@@ -25,7 +26,8 @@ enum {
   VE_ERR_OUT_OF_BOUNDS = 4,
   VE_ERR_TOO_LARGE = 5,
   VE_ERR_BUFFER_TOO_SMALL = 6,
-  VE_ERR_INTERNAL = 7
+  VE_ERR_INTERNAL = 7,
+  VE_ERR_CANCELLED = 8
 };
 
 /* Upper bound on circular segments, so parameters cannot request unbounded work. */
@@ -71,6 +73,18 @@ ve_status ve_simplify(const float* positions, size_t vertex_count, const uint32_
                       uint32_t* out_indices, size_t out_capacity, size_t* out_count);
 
 void ve_solid_free(ve_solid* s);
+
+/* Cancellation is permanent; use a fresh context to retry. Status evaluation observes it;
+ * mesh extraction and unrelated queries do not. Operations are 0 union, 1 difference, 2 intersect.
+ */
+ve_context* ve_context_new(void);
+ve_solid* ve_solid_batch_union_context(const ve_solid* const* solids, size_t count,
+                                       const ve_context* context, ve_status* status);
+void ve_context_free(ve_context* context);
+void ve_context_cancel(ve_context* context);
+int32_t ve_context_cancelled(const ve_context* context);
+ve_solid* ve_solid_boolean_context(const ve_solid* a, const ve_solid* b, int32_t operation,
+                                   const ve_context* context, ve_status* status);
 
 #ifdef __cplusplus
 }

@@ -12,6 +12,7 @@ use ve_graph::{
     builtin_registry,
 };
 use wasm_bindgen::JsCast;
+pub(crate) mod staging;
 
 /// The browser's `localStorage` as a [`Backend`].
 struct LocalBackend;
@@ -57,6 +58,8 @@ struct Host {
     read_only: bool,
     issues: Vec<Diagnostic>,
     saved_generation: Option<u64>,
+    pending: Option<Session>,
+    expected: Option<ve_modeling::JobToken>,
 }
 
 thread_local! {
@@ -70,6 +73,8 @@ fn fresh(name: &str, seed: u64) -> Host {
         read_only: false,
         issues: Vec::new(),
         saved_generation: None,
+        pending: None,
+        expected: None,
     }
 }
 
@@ -99,6 +104,8 @@ fn state_of(host: &Host) -> Value {
         "saved_generation": host.saved_generation,
         "issues": host.issues,
         "document": doc,
+        "pending_document": host.pending.as_ref().map(Session::document),
+        "evaluation_hash": ve_modeling::hash(doc),
     })
 }
 
@@ -148,6 +155,10 @@ pub(crate) fn apply(batch_json: &str) -> String {
         } else {
             host.session.apply_json(batch_json)
         };
+        if matches!(outcome, Outcome::Committed { .. }) {
+            host.pending = None;
+            host.expected = None;
+        }
         serde_json::to_string(&outcome).unwrap_or_default()
     })
 }
@@ -162,6 +173,10 @@ pub(crate) fn step(undo: bool) -> String {
         } else {
             host.session.redo()
         };
+        if moved.is_some() {
+            host.pending = None;
+            host.expected = None;
+        }
         moved.map_or_else(
             || "null".to_owned(),
             |m| json!({ "revision": m.revision, "changed": m.changed }).to_string(),
@@ -172,6 +187,9 @@ pub(crate) fn step(undo: bool) -> String {
 /// Saves the document; returns `{ "generation" }` or `{ "error": <diagnostic> }`.
 pub(crate) fn save() -> String {
     with_host(|host| {
+        if host.pending.is_some() {
+            return json!({"error":Diagnostic::error("eval.pending", "finish evaluation before saving the candidate")}).to_string();
+        }
         if host.read_only {
             return json!({ "error": read_only_error() }).to_string();
         }

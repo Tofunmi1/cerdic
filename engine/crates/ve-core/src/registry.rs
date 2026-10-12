@@ -8,7 +8,7 @@ use crate::Name;
 ///
 /// Iteration order is by name, so anything generated from a registry (LLM tool schemas, docs,
 /// snapshots) is deterministic and diff-friendly.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Registry<T> {
     entries: BTreeMap<Name, T>,
 }

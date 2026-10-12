@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -24,6 +25,33 @@ void check(bool ok, const char* what) {
 }
 
 bool near(double a, double b, double tol) { return std::fabs(a - b) <= tol; }
+
+void cancellation_test(const ve_solid* cube, const ve_solid* sphere) {
+  ve_status status = VE_OK;
+  const std::unique_ptr<ve_context, decltype(&ve_context_free)> context(ve_context_new(),
+                                                                        ve_context_free);
+  check(context != nullptr && ve_context_cancelled(context.get()) == 0,
+        "fresh cancellation context");
+  ve_context_cancel(context.get());
+  check(ve_context_cancelled(context.get()) == 1, "cancellation signal observed");
+  check(ve_solid_boolean_context(cube, sphere, 0, context.get(), &status) == nullptr &&
+            status == VE_ERR_CANCELLED,
+        "cancelled boolean returns no owned result");
+  const std::array<const ve_solid*, 2> solids = {cube, sphere};
+  check(ve_solid_batch_union_context(solids.data(), solids.size(), context.get(), &status) ==
+                nullptr &&
+            status == VE_ERR_CANCELLED,
+        "cancelled batch tree returns no result");
+  const std::unique_ptr<ve_context, decltype(&ve_context_free)> fresh(ve_context_new(),
+                                                                      ve_context_free);
+  const std::unique_ptr<ve_solid, decltype(&ve_solid_free)> result(
+      ve_solid_batch_union_context(solids.data(), solids.size(), fresh.get(), &status),
+      ve_solid_free);
+  check(result != nullptr && status == VE_OK, "fresh context can retry batch union");
+  check(ve_solid_batch_union_context(solids.data(), 1, fresh.get(), &status) == nullptr &&
+            status == VE_ERR_INVALID_ARG,
+        "invalid batch count rejected");
+}
 
 }  // namespace
 
@@ -80,6 +108,7 @@ int main() {
   check(ve_solid_from_mesh(tri.data(), 3, open_idx.data(), 3, &st) == nullptr,
         "open mesh rejected");
 
+  cancellation_test(cube, sphere);
   for (ve_solid* s : {cube, sphere, diff, rebuilt}) {
     ve_solid_free(s);
   }

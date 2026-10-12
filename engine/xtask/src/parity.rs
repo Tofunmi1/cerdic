@@ -18,9 +18,14 @@ pub(crate) fn run() -> Result<(), Failure> {
         println!("-- parity: skipped (node not found)");
         return Ok(());
     }
+    compare("ve-kernel")?;
+    compare("ve-modeling")
+}
+
+fn compare(crate_name: &str) -> Result<(), Failure> {
     let native = capture(
         "cargo",
-        &["run", "-q", "-p", "ve-kernel", "--example", "corpus"],
+        &["run", "-q", "-p", crate_name, "--example", "corpus"],
     )?;
     run_quiet(
         "cargo",
@@ -28,7 +33,7 @@ pub(crate) fn run() -> Result<(), Failure> {
             "build",
             "-q",
             "-p",
-            "ve-kernel",
+            crate_name,
             "--example",
             "corpus",
             "--target",
@@ -37,7 +42,10 @@ pub(crate) fn run() -> Result<(), Failure> {
     )?;
     let wasm = capture("node", &["tools/run-wasi.mjs", WASM_PATH])?;
     if native == wasm {
-        println!("   identical ({} lines)", native.lines().count());
+        println!(
+            "   {crate_name}: identical ({} lines)",
+            native.lines().count()
+        );
         return Ok(());
     }
     let mut report = String::from("native and wasm corpus output differ:\n");

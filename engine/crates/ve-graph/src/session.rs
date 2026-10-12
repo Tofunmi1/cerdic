@@ -18,12 +18,14 @@ use crate::limits::{
 };
 use crate::spec::OperatorRegistry;
 
+#[derive(Clone)]
 struct UndoEntry {
     before: Document,
     changed: Vec<NodeId>,
     bytes: usize,
 }
 
+#[derive(Clone)]
 struct RedoEntry {
     after: Document,
     changed: Vec<NodeId>,
@@ -39,6 +41,7 @@ pub struct Moved {
 }
 
 /// A document under edit.
+#[derive(Clone)]
 pub struct Session {
     registry: OperatorRegistry,
     doc: Document,

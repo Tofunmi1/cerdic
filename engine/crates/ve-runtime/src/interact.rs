@@ -64,6 +64,13 @@ pub(crate) struct Interactable {
 }
 
 impl Interactable {
+    /// Authored geometry is selectable; editing its pose requires a document command.
+    pub(crate) fn selection_only(bounds: &Bounds) -> Self {
+        Self {
+            grabbable: false,
+            ..Self::from_bounds(bounds)
+        }
+    }
     /// An interactable object whose shape is the bounding box of `bounds`.
     pub(crate) fn from_bounds(bounds: &Bounds) -> Self {
         #[expect(clippy::cast_possible_truncation, reason = "metres fit f32")]
@@ -77,8 +84,8 @@ impl Interactable {
 }
 
 /// A short name for an object, for the status report and the event log.
-#[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct Label(pub(crate) &'static str);
+#[derive(Component, Clone, Debug)]
+pub(crate) struct Label(pub(crate) String);
 
 /// Marks an object whose emissive colour is currently raised for hover, remembering the original.
 #[derive(Component, Clone, Copy, Debug)]
@@ -255,7 +262,7 @@ fn mouse_frame(
 }
 
 /// One frame of interaction: gather pointers, run the machine, apply what it decided.
-fn run_interaction(
+pub(crate) fn run_interaction(
     time: Res<Time<Real>>,
     rig: Res<XrRig>,
     xr_input: Res<XrInput>,

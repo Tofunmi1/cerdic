@@ -3065,6 +3065,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ve-evaluator"
+version = "0.0.0"
+dependencies = [
+ "serde_json",
+ "ve-graph",
+ "ve-modeling",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "ve-geometry"
 version = "0.0.0"
 dependencies = [
@@ -3105,6 +3115,16 @@ dependencies = [
 [[package]]
 name = "ve-kernel-sys"
 version = "0.0.0"
+
+[[package]]
+name = "ve-modeling"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "ve-graph",
+ "ve-kernel",
+]
 
 [[package]]
 name = "ve-platform-web"
@@ -3165,6 +3185,7 @@ dependencies = [
  "ve-graph",
  "ve-interact",
  "ve-kernel",
+ "ve-modeling",
  "ve-platform-web",
  "ve-render",
  "ve-xr-math",

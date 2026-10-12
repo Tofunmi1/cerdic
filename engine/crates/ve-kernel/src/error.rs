@@ -7,6 +7,9 @@ use ve_kernel_sys::{
 /// Why a kernel operation failed. Messages are written to be useful to an LLM repair loop.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum KernelError {
+    /// Cooperative evaluation was cancelled; retry with fresh objects and context.
+    #[error("evaluation cancelled")]
+    Cancelled,
     /// A parameter was invalid (non-finite, non-positive, out of range, or inconsistent).
     #[error("invalid argument: {0}")]
     InvalidArgument(&'static str),
@@ -32,6 +35,7 @@ impl KernelError {
     /// [`KernelError::InvalidArgument`] with a generic description.
     pub(crate) fn from_status(code: VeStatus) -> Self {
         match code {
+            ve_kernel_sys::VE_ERR_CANCELLED => Self::Cancelled,
             VE_ERR_NOT_MANIFOLD => Self::NotManifold,
             VE_ERR_NON_FINITE => Self::NonFinite,
             VE_ERR_OUT_OF_BOUNDS => Self::OutOfBounds,

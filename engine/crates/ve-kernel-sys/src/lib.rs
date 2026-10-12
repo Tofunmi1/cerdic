@@ -12,6 +12,15 @@ pub struct VeSolid {
     _private: [u8; 0],
 }
 
+/// Opaque cancellation context, owned by the caller.
+#[repr(C)]
+pub struct VeContext {
+    _private: [u8; 0],
+}
+
+/// Evaluation was cancelled; the result is not reusable.
+pub const VE_ERR_CANCELLED: VeStatus = 8;
+
 /// Status code returned through `ve_status*` out-parameters (see the `VE_*` constants).
 pub type VeStatus = i32;
 
@@ -38,6 +47,29 @@ pub const VE_MAX_SEGMENTS: u32 = 4096;
 // SAFETY (all declarations): signatures match `cpp/include/ve_kernel.h`; the library is linked by
 // this crate's build script.
 unsafe extern "C" {
+    /// Deferred batch union evaluated with one context, 2..64 borrowed handles.
+    pub fn ve_solid_batch_union_context(
+        solids: *const *const VeSolid,
+        count: usize,
+        context: *const VeContext,
+        status: *mut VeStatus,
+    ) -> *mut VeSolid;
+    /// Creates a fresh context.
+    pub fn ve_context_new() -> *mut VeContext;
+    /// Releases a context after its last borrowed use.
+    pub fn ve_context_free(context: *mut VeContext);
+    /// Permanently requests cancellation; thread-safe in Manifold.
+    pub fn ve_context_cancel(context: *mut VeContext);
+    /// Whether cancellation has been requested.
+    pub fn ve_context_cancelled(context: *const VeContext) -> i32;
+    /// Boolean evaluated with cooperative cancellation (0 union, 1 difference, 2 intersection).
+    pub fn ve_solid_boolean_context(
+        a: *const VeSolid,
+        b: *const VeSolid,
+        operation: i32,
+        context: *const VeContext,
+        status: *mut VeStatus,
+    ) -> *mut VeSolid;
     /// Axis-aligned box, optionally centred on the origin.
     pub fn ve_solid_cube(
         x: f64,

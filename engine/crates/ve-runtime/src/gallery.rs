@@ -44,6 +44,7 @@ pub(crate) fn spawn(commands: &mut Commands, meshes: &mut Assets<Mesh>) -> Resul
     ];
     for (solid, name, position, angle, rgb) in objects {
         commands.spawn((
+            crate::projection::GalleryObject,
             Mesh3d(meshes.add(render_mesh(&solid, false)?)),
             VeMaterial {
                 base_color: Color::srgb_u8(rgb[0], rgb[1], rgb[2]),

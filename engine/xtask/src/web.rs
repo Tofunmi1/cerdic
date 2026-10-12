@@ -88,6 +88,49 @@ pub(crate) fn build(profile: Profile) -> Result<(), Failure> {
     }
     let size = fs::metadata(format!("{DIST}/ve_runtime_bg.wasm"))?.len();
     println!("   wasm: {size} bytes");
+    build_evaluator(profile, &bindgen)?;
+    Ok(())
+}
+
+fn build_evaluator(profile: Profile, bindgen: &str) -> Result<(), Failure> {
+    run(
+        "bun",
+        &[
+            "-e",
+            "new Bun.Transpiler({loader:'js'}).transformSync(await Bun.file('web/eval-worker.js').text());",
+        ],
+    )?;
+    let name = profile.cargo_name();
+    run(
+        "cargo",
+        &[
+            "build",
+            "-p",
+            "ve-evaluator",
+            "--target",
+            "wasm32-unknown-unknown",
+            "--profile",
+            name,
+        ],
+    )?;
+    run(
+        bindgen,
+        &[
+            "--target",
+            "web",
+            "--out-dir",
+            DIST,
+            "--no-typescript",
+            &format!("target/wasm32-unknown-unknown/{name}/ve_evaluator.wasm"),
+        ],
+    )?;
+    let glue = format!("{DIST}/ve_evaluator.js");
+    let patched = fs::read_to_string(&glue)?.replace(
+        "from \"wasi_snapshot_preview1\"",
+        "from \"./wasi_snapshot_preview1.js\"",
+    );
+    fs::write(glue, patched)?;
+    fs::copy("web/eval-worker.js", format!("{DIST}/eval-worker.js"))?;
     Ok(())
 }
 
@@ -101,7 +144,8 @@ pub(crate) fn test(profile: Profile) -> Result<(), Failure> {
     run_in("web", "bun", &["run", "test"])?;
     run_in("..", "bun", &["run", "typecheck"])?;
     run_in("..", "bun", &["scripts/build-engine.ts", "--copy-only"])?;
-    run("bun", &["web/tests/editor.mjs"])
+    run("bun", &["web/tests/editor.mjs"])?;
+    run("bun", &["web/tests/evaluation.mjs"])
 }
 
 /// The wasm-bindgen CLI must match the library version in `Cargo.lock` exactly.

@@ -72,9 +72,16 @@ headset behavior remain untested; browser checks use SwiftShader.
 | V0-X | Experiment X6 report | Lifecycle, focus, pointer lock and two-instance results recorded; iframe fallback decided if any fail |
 
 ## G2: worker, limits, status panel
+
+Implemented and strict-gated 2026-10-12: [G2 evidence](g2-report.md). Native/WASI evaluator parity,
+real worker/browser checks and native cancellation cover the cases below. G2-01's former F1
+dependency is corrected to the primitive/boolean fixture; F1 requires G3. Cache eviction uses the
+production algorithm with a reduced test cap. Upload CPU time and window frame gaps are measured;
+headset GPU/frame time is untested, and the software-browser run is not a 60 fps result.
+
 | ID | Input | Expected |
 |---|---|---|
-| G2-01 | Evaluate F1 in the worker | Same geometry as the in-window result (tolerance above) |
+| G2-01 | Evaluate the primitive/boolean fixture in the worker | Same geometry as native evaluation/direct kernel (tolerance above); F1 needs G3 profile operators and is checked there |
 | G2-02 | Forced 15-second job | Terminated at the hard limit; `eval.worker_timeout`; last scene kept; restart succeeds |
 | G2-03 | Worker killed mid-job | `eval.worker_crash`; restart; scene kept |
 | G2-04 | Ten edits within 100 ms | Latest result shown; independent earlier edits are all present in the final document |

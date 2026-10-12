@@ -9,10 +9,10 @@ use ve_interact::{Event, PointerId, TargetId};
 
 use super::{Interactable, InteractionState, Label, entity_of, target_of};
 
-fn label_of(target: TargetId, labels: &Query<&Label>) -> &'static str {
+fn label_of(target: TargetId, labels: &Query<&Label>) -> String {
     entity_of(target)
         .and_then(|entity| labels.get(entity).ok())
-        .map_or("?", |label| label.0)
+        .map_or_else(|| "?".to_owned(), |label| label.0.clone())
 }
 
 /// One line describing an event, with objects by label.
@@ -52,7 +52,11 @@ pub(crate) fn report(
     state: &InteractionState,
     objects: &Query<(Entity, &Label, &Transform), With<Interactable>>,
 ) -> serde_json::Value {
-    let name = |entity: Entity| objects.get(entity).map_or("?", |(_, label, _)| label.0);
+    let name = |entity: Entity| {
+        objects
+            .get(entity)
+            .map_or_else(|_| "?".to_owned(), |(_, label, _)| label.0.clone())
+    };
     let hover: Vec<_> = (0..=3_u32)
         .filter_map(|id| {
             let target = state.machine.hover_of(PointerId(id))?;

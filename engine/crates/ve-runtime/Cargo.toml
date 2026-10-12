@@ -31,6 +31,7 @@ ve-core = { path = "../ve-core" }
 ve-graph = { path = "../ve-graph" }
 ve-interact = { path = "../ve-interact" }
 ve-kernel = { path = "../ve-kernel" }
+ve-modeling = { path = "../ve-modeling" }
 ve-xr-math = { path = "../ve-xr-math" }
 ve-xr-web = { path = "../ve-xr-web" }
 ve-platform-web = { path = "../ve-platform-web" }
@@ -38,7 +39,7 @@ ve-render = { path = "../ve-render" }
 serde_json.workspace = true
 wasm-bindgen.workspace = true
 wasm-bindgen-futures = "0.4"
-web-sys = { workspace = true, features = ["console", "DomException", "Storage", "Window"] }
+web-sys = { workspace = true, features = ["console", "DomException", "Storage", "Window", "Performance"] }
 
 [lints]
 workspace = true

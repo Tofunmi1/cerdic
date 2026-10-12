@@ -1,0 +1,16 @@
+[package]
+name = "ve-modeling"
+version = "0.0.0"
+description = "Bounded procedural geometry evaluation, independent of rendering and browser APIs."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+ve-graph = { path = "../ve-graph" }
+ve-kernel = { path = "../ve-kernel" }
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

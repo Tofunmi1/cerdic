@@ -21,7 +21,10 @@ pub(crate) fn tag(
     solid: &Solid,
     label: &'static str,
 ) -> Result<(Interactable, Label), KernelError> {
-    Ok((Interactable::from_bounds(&solid.bounds()?), Label(label)))
+    Ok((
+        Interactable::from_bounds(&solid.bounds()?),
+        Label(label.to_owned()),
+    ))
 }
 
 /// Spawns one thin laser bar per hand, hidden until a controller points somewhere.
