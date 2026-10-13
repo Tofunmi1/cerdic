@@ -38,6 +38,7 @@ fn polygon(n: usize) -> Command {
         params: [("points".to_owned(), points(n))].into(),
         label: None,
         alias: None,
+        group: None,
     }
 }
 
@@ -54,12 +55,14 @@ fn sample() -> Session {
                 params: [("points".to_owned(), points(5))].into(),
                 label: Some("outline".into()),
                 alias: Some(Alias::parse("$p").unwrap()),
+                group: None,
             },
             Command::AddNode {
                 op: "solid.revolve@1".into(),
                 params: BTreeMap::new(),
                 label: None,
                 alias: Some(Alias::parse("$r").unwrap()),
+                group: None,
             },
             Command::Connect {
                 from: OutRef {
@@ -249,6 +252,7 @@ fn g1b_05_unknown_operators_keep_the_file_and_the_other_nodes_viewable() {
         params: BTreeMap::new(),
         label: None,
         alias: None,
+        group: None,
     };
     let b = batch(
         &s,
@@ -306,6 +310,7 @@ fn g1b_06_an_old_format_file_migrates_and_stays_editable() {
             params: [("size".to_owned(), Value::List(vec![Value::Num(1.0); 3]))].into(),
             label: None,
             alias: None,
+            group: None,
         }],
     );
     assert!(matches!(s.apply(&b), Outcome::Committed { .. }));

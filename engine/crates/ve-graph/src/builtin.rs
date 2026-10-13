@@ -8,6 +8,7 @@ use crate::spec::{
 };
 use crate::value::{ParamType, Unit, Value};
 
+mod group_ops;
 mod modeling;
 mod shapes;
 
@@ -92,6 +93,7 @@ fn all_specs() -> Vec<Option<OperatorSpec>> {
     all.extend(profiles());
     all.extend(modeling::from_profiles());
     all.extend(shapes::all());
+    all.extend(group_ops::all());
     for spec in all.iter_mut().flatten() {
         if READY.contains(&spec.id.to_string().as_str()) {
             spec.readiness = Readiness::Ready;
@@ -128,6 +130,8 @@ const READY: &[&str] = &[
     "xform.array@1",
     "xform.radial@1",
     "xform.repeat@1",
+    "group.use@1",
+    "group.input@1",
 ];
 
 fn primitives() -> Vec<Option<OperatorSpec>> {

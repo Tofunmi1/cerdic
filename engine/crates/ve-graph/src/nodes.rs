@@ -7,6 +7,8 @@ use ve_core::Name;
 use crate::apply::{Ctx, Fail, fail};
 use crate::diag::Diagnostic;
 use crate::doc::{Flags, Material, Node, OUT_PORT, Output, PortRef};
+use crate::group::INSTANCE_OP;
+use crate::groups;
 use crate::id::{MaterialId, NodeId};
 use crate::limits::{
     MAX_EDITOR_COORD, MAX_LIST_VALUES, MAX_MATERIAL_ENTRIES, MAX_MATERIALS, MAX_NODES, MAX_OUTPUTS,
@@ -96,6 +98,12 @@ pub(crate) fn add_node(
     label: Option<&str>,
 ) -> Result<NodeId, Fail> {
     let id = OpId::parse(op).map_err(|_| unknown_op(ctx, op))?;
+    if id.family().as_str() == INSTANCE_OP {
+        return Err(fail(
+            "group.instance_mismatch",
+            "instances are made with add_instance, not add_node",
+        ));
+    }
     let spec = spec_of(ctx, &id)?;
     if ctx.doc.nodes.len() >= MAX_NODES {
         return Err(Box::new(
@@ -118,6 +126,8 @@ pub(crate) fn add_node(
         params,
         inputs: BTreeMap::new(),
         flags: Flags::default(),
+        group: None,
+        instance: None,
     });
     ctx.changed.insert(node_id.clone());
     Ok(node_id)
@@ -165,6 +175,7 @@ pub(crate) fn remove_node(ctx: &mut Ctx<'_>, node: &NodeId, cascade: bool) -> Re
                 .suggest("remove the output first, or remove with cascade"),
         ));
     }
+    groups::guard_removal(ctx, &doomed)?;
     ctx.doc.nodes.retain(|n| !doomed.contains(&n.id));
     ctx.doc.outputs.retain(|o| !doomed.contains(&o.from.node));
     ctx.doc

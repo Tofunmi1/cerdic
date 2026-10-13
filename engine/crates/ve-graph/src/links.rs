@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::apply::{Ctx, Fail, Target};
 use crate::diag::Diagnostic;
-use crate::doc::{Document, OUT_PORT, PortRef};
+use crate::doc::{Document, Node, OUT_PORT, PortRef};
 use crate::id::NodeId;
 use crate::limits::{MAX_VARIADIC, count};
 use crate::nodes::unknown_node;
@@ -31,14 +31,14 @@ pub(crate) fn connect(ctx: &mut Ctx<'_>, from: &PortRef, to: &Target) -> Result<
         .node(&to.node)
         .ok_or_else(|| unknown_node(&to.node))?;
     let reg = ctx.reg;
-    let spec = reg.get(&consumer.op).ok_or_else(|| {
+    reg.get(&consumer.op).ok_or_else(|| {
         Box::new(Diagnostic::error(
             "parse.unknown_op",
             format!("unknown operator {}", consumer.op),
         ))
     })?;
-    let port = spec.input(&to.port).ok_or_else(|| {
-        let valid: Vec<&str> = spec.inputs.iter().map(|p| p.name).collect();
+    let port = port_rule(&ctx.doc, reg, consumer, &to.port).ok_or_else(|| {
+        let valid = port_names(&ctx.doc, reg, consumer);
         Box::new(
             Diagnostic::error(
                 "graph.unknown_port",
@@ -125,9 +125,59 @@ pub(crate) fn disconnect(ctx: &mut Ctx<'_>, to: &Target) -> Result<(), Fail> {
     Ok(())
 }
 
+/// What one input port accepts and how many links it takes.
+pub(crate) struct PortRule {
+    pub(crate) accepts: &'static [PortType],
+    pub(crate) arity: Arity,
+}
+
+const SOLID_ONLY: &[PortType] = &[PortType::Solid];
+
+/// The rule for the named input of `node`. An instance's inputs are its group's `group.input`
+/// members, bound by name; each takes one solid.
+pub(crate) fn port_rule(
+    doc: &Document,
+    reg: &OperatorRegistry,
+    node: &Node,
+    port: &str,
+) -> Option<PortRule> {
+    if let Some(instance) = &node.instance {
+        return doc
+            .group_inputs(&instance.group)
+            .iter()
+            .any(|input| input.name == port)
+            .then_some(PortRule {
+                accepts: SOLID_ONLY,
+                arity: Arity::One,
+            });
+    }
+    reg.get(&node.op)?.input(port).map(|spec| PortRule {
+        accepts: spec.accepts,
+        arity: spec.arity,
+    })
+}
+
+/// The input port names of `node`, for suggestions.
+fn port_names(doc: &Document, reg: &OperatorRegistry, node: &Node) -> Vec<String> {
+    if let Some(instance) = &node.instance {
+        return doc
+            .group_inputs(&instance.group)
+            .into_iter()
+            .map(|input| input.name)
+            .collect();
+    }
+    reg.get(&node.op)
+        .map(|spec| spec.inputs.iter().map(|p| p.name.to_owned()).collect())
+        .unwrap_or_default()
+}
+
 /// The type a node produces, following pass-through operators upstream; `None` when it depends on
 /// an unconnected input. The graph must be acyclic.
-fn output_type(doc: &Document, reg: &OperatorRegistry, start: &NodeId) -> Option<PortType> {
+pub(crate) fn output_type(
+    doc: &Document,
+    reg: &OperatorRegistry,
+    start: &NodeId,
+) -> Option<PortType> {
     let mut current = doc.node(start)?;
     for _ in 0..=doc.nodes.len() {
         match reg.get(&current.op)?.output {
@@ -214,11 +264,19 @@ pub(crate) fn check_graph(ctx: &Ctx<'_>) -> Result<(), Fail> {
         return Err(Box::new(d));
     }
     for node in &doc.nodes {
-        let Some(spec) = reg.get(&node.op) else {
+        if reg.get(&node.op).is_none() {
             continue;
-        };
+        }
+        // An instance that is behind its group may still link to inputs the group has since lost; it
+        // stays editable so it can be upgraded.
+        if node.instance.as_ref().is_some_and(|i| {
+            doc.group(&i.group)
+                .is_none_or(|group| group.version != i.version)
+        }) {
+            continue;
+        }
         for (port, refs) in &node.inputs {
-            let Some(port_spec) = spec.input(port) else {
+            let Some(port_spec) = port_rule(doc, reg, node, port) else {
                 return Err(port_error(
                     "graph.unknown_port",
                     format!("{} has no input port {port:?}", node.op),

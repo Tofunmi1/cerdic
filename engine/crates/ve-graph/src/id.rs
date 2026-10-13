@@ -120,6 +120,10 @@ generated_id!(
     /// Identifies a material definition.
     MaterialId, "m_", "material"
 );
+generated_id!(
+    /// Identifies a group definition.
+    GroupId, "g_", "group"
+);
 
 /// The idempotency key of a command batch: `t_` plus 1 to 64 characters from `[A-Za-z0-9_-]`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

@@ -45,6 +45,18 @@ pub(crate) const MAX_MATERIAL_ENTRIES: usize = 64;
 /// Largest editor-layer coordinate magnitude.
 pub(crate) const MAX_EDITOR_COORD: f64 = 1.0e6;
 
+/// Group definitions in one document.
+pub(crate) const MAX_GROUPS: usize = 256;
+
+/// Exposed parameters of one group.
+pub(crate) const MAX_GROUP_PARAMS: usize = 64;
+
+/// How deep groups may nest (an instance inside a group inside a group...).
+pub const MAX_GROUP_DEPTH: usize = 8;
+
+/// Nodes one evaluation may expand to once groups are unfolded.
+pub const MAX_EXPANDED_NODES: usize = 20_000;
+
 /// A count as a real number for a diagnostic's `limit` and `observed` fields.
 #[expect(clippy::cast_precision_loss, reason = "counts are far below 2^53")]
 pub(crate) fn count(n: usize) -> f64 {

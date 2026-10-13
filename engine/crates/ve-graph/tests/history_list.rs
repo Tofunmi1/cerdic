@@ -21,6 +21,7 @@ fn commit_labelled(session: &mut Session, label: Option<&str>) {
             params: [("size".to_owned(), size)].into(),
             label: None,
             alias: None,
+            group: None,
         }],
     };
     assert!(matches!(session.apply(&batch), Outcome::Committed { .. }));

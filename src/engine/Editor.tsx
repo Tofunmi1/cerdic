@@ -20,7 +20,7 @@ export default function Editor() {
     catch (error) { setNotice(String(error)); }
   };
   const addBox = () => host.doc?.send([{ add_node: { op: 'solid.box@1', params: { size: [1, 1, 1] },
-    label: 'Box', alias: '$box' } }], 'Add box');
+    label: 'Box', alias: '$box', group: null } }], 'Add box');
   return <main className="engine-editor" style={{ gridTemplateColumns: `${width}px minmax(0,1fr)` }}>
     <header><strong>Spatial Lab</strong><span>Procedural workspace</span>
       <button disabled={!host.xr} onClick={() => action(() => host.runtime?.enter_xr('ve').catch(e => setNotice(String(e))))}>

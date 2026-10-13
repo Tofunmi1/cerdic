@@ -159,11 +159,75 @@ headset GPU/frame time is untested, and the software-browser run is not a 60 fps
 | V2-X | Experiment X7 report | 200 and 500 node results, typed socket and frame support; adopt or replace |
 | V2-15 | Editor screenshots | Reviewed and stored as goldens |
 
-## Draft lists (expand before each gate starts)
-**G4:** wheel group instanced four times evaluates the prototype once; one instance override leaves
-the others; explicit group upgrade preserves unrelated IDs; recursive group rejected; realization of
-10,000 cheap instances refused or accepted by predicted size; mirror and attach honour pivot and
-handedness; socket attachment moves with its parent.
+## G4: reuse and assembly
+G4 is built in slices; the gate passes when all four lists pass. **G4a** (small operators, mirror and
+pattern operators) is done and has its own report. Design: ADR 0013. The wheel is the fixture: a
+`group.input`-free group of a tyre (torus), a hub (cylinder) and four spokes (box, radial), exposing
+`radius` (the tyre's major radius) and `width` (the hub's height); its output is the union.
+
+### G4b: groups and instances
+| ID | Input | Expected |
+|---|---|---|
+| G4b-01 | `create_group` from the wheel nodes with an output member | One group `g_`, version 1; the members carry the group; no member is a top-level part |
+| G4b-02 | `create_group` where a member reads a node outside the group | Rejected `group.leaks` naming the member and the outside node; document unchanged |
+| G4b-03 | `create_group` where a node outside the group reads a member | Rejected `group.leaks`; document unchanged |
+| G4b-04 | `add_instance` of the wheel four times, each followed by `xform.move` | Four instance nodes with distinct IDs, each pinned to version 1, output type solid |
+| G4b-05 | `expose_param` on a member's parameter, then `set_instance_param` on one instance | The override is stored on that instance only; the others and the definition are unchanged |
+| G4b-06 | `set_instance_param` with a value outside the member's range, or an unexposed name | Rejected with the member parameter's own diagnostic (`param.range`) or `group.unknown_param`; unchanged |
+| G4b-07 | `clear_instance_param` | The override is gone; the instance follows the definition again |
+| G4b-08 | `set_param` on a member (a definition edit) | Every instance reflects it; no instance data and no ID changes |
+| G4b-09 | Instance inside a group of the group it sits in, directly or through a second group | Rejected `group.recursive` naming the groups in the loop; unchanged |
+| G4b-10 | Interface change (`expose_param`, `unexpose_param`, `set_group_output`, add or remove a `group.input`) | `group.version` increases by one; instances keep their pinned version |
+| G4b-11 | Evaluating a document with an instance pinned behind its group | Refused `group.outdated` naming the instance; other nodes untouched |
+| G4b-12 | `upgrade_group` on an outdated instance | Pinned version moves up; overrides for parameters that are still exposed stay, the others are dropped and reported; every other node, group and ID is byte-for-byte unchanged |
+| G4b-13 | `remove_node` of an exposed member or of the output member | Rejected `group.in_use` unless the interface command removing it came first |
+| G4b-13b | `remove_node` of a `group.input` (after disconnecting what reads it) | Allowed, and an interface change: the version increases by one |
+| G4b-14 | `remove_group` with instances, then without | `group.in_use` naming the instances; then removed with its members |
+| G4b-15 | Undo and redo of every group command | The document returns exactly, IDs and version included (G1a rules) |
+| G4b-16 | Save, reload, migrate | Groups, membership, instances and overrides survive; a document without groups loads unchanged |
+| G4b-17 | A group with `group.input` members, an instance with links to them | Links by position, type checked on connect (`graph.port_type`); a missing link is `graph.missing_input` at evaluation |
+| G4b-18 | Nested groups: a rack group of two wheel instances, instanced twice | Evaluates; expansion depth 2 is reported |
+| G4b-19 | `MAX_GROUP_DEPTH` exceeded; expanded nodes over the budget | Refused before any kernel call with `budget.group_depth` or `budget.expanded_nodes`, limit and observed value |
+| G4b-20 | `to_text` of a document that has groups | `text.unsupported` stating groups are not yet printable, never a text that reads back wrongly (lifted by G4e) |
+
+### G4b evaluation
+| ID | Input | Expected |
+|---|---|---|
+| G4b-E1 | Wheel x4 with equal parameters | Four solids with equal volume; the prototype's operators run once (`evaluated_nodes` counts one wheel plus four moves, not four wheels) |
+| G4b-E2 | Wheel x4, one with `radius` overridden | That instance's volume differs by the analytic amount; the other three are unchanged and still share one evaluation |
+| G4b-E3 | Definition edit (`set_param` on a spoke) | All four volumes change; operators re-run for the changed definition only once |
+| G4b-E4 | Edit one instance's `xform.move` | Only that instance's move re-runs; the prototype and the other instances come from cache |
+| G4b-E5 | Output of an instance under `solid.material` | The material reaches the part; the part's node is the material node |
+| G4b-E6 | A kernel or constraint failure inside a member | Diagnostic names the instance, with the member as `related` |
+| G4b-E7 | Muted and bypassed instance | Same as any node: empty result, or input passed through |
+| G4b-E8 | Evaluation hash | Changes when a member, an override, a version or the group output changes; unchanged by layout and by renaming a group |
+
+### G4c: instance sets and explicit realization
+| ID | Input | Expected |
+|---|---|---|
+| G4c-01 | `inst.array`, `inst.radial` and `inst.repeat` of a solid or an instance | An instance set that shares one prototype; no geometry is unioned |
+| G4c-02 | 10,000 cheap instances (a 12-triangle box) | Valid as a set; shown with shared geometry |
+| G4c-03 | `inst.realize` of the 10,000 | Accepted or refused by predicted triangles and bytes (`budget.triangles` / `budget.memory`) before any union |
+| G4c-04 | `inst.realize` of a few instances | One solid equal to the union of the placed copies |
+| G4c-05 | Instance set with a mirrored transform | Supported by flipping winding, with positive volume; never an unchecked negative scale |
+| G4c-06 | Render and pick of a 10,000-instance set | One mesh upload, many placements; picking returns the instance index |
+| G4c-07 | Count products near overflow | Refused with the limit, no wraparound |
+
+### G4d: named parts, sockets and attachment
+| ID | Input | Expected |
+|---|---|---|
+| G4d-01 | Socket (named frame on a member or part) with position and orientation | Exposed by name through the group; selectable |
+| G4d-02 | `xform.attach` of a part's socket to another socket | The part moves so the frames coincide; pivot is the socket; handedness preserved |
+| G4d-03 | Move the parent | Attached parts follow; the unrelated ones do not |
+| G4d-04 | `xform.align` of a face normal or axis | Defined pivot and result for parallel and anti-parallel inputs |
+| G4d-05 | Attach with a missing socket or a type mismatch | Refused with the socket named |
+
+### G4e: text form for groups
+| ID | Input | Expected |
+|---|---|---|
+| G4e-01 | `group wheel(radius, width) { ... }` and `wheel@1(radius=0.4)` | Reads to the same commands the editor sends; prints back identically |
+| G4e-02 | A model builds the wheel group and four instances through MCP | Evaluates; matches the G4b-E1 volumes |
+
 **V3:** a gizmo drag is one coalesced command; a handle edits the inspector's parameter; preview during
 a drag, commit on release; lost and ambiguous selections shown.
 **V4:** making the wheel group by UI equals the G4 fixture; edit definition versus edit instance;

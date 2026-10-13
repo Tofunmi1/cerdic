@@ -126,9 +126,24 @@ fn statement(node: &Node, spec: &OperatorSpec, names: &BTreeMap<String, String>)
 /// Prints the document as text, nodes in dependency order (document order among equals).
 ///
 /// # Errors
-/// `parse.unknown_op` if a node uses an operator the registry does not know, and `graph.cycle` if
-/// the links loop.
+/// `parse.unknown_op` if a node uses an operator the registry does not know, `graph.cycle` if the
+/// links loop, and `text.unsupported` if the document has groups (the text form cannot yet say
+/// them, and printing something that does not read back would be worse than refusing).
 pub fn to_text(registry: &OperatorRegistry, doc: &Document) -> Result<String, Box<Diagnostic>> {
+    if !doc.groups.is_empty()
+        || doc
+            .nodes
+            .iter()
+            .any(|n| n.group.is_some() || n.instance.is_some())
+    {
+        return Err(Box::new(
+            Diagnostic::error(
+                "text.unsupported",
+                "this document has groups, which the text form cannot print yet",
+            )
+            .suggest("edit it in the panels, or with commands"),
+        ));
+    }
     let names = names(doc);
     let mut lines = Vec::new();
     let mut done: BTreeSet<&str> = BTreeSet::new();
