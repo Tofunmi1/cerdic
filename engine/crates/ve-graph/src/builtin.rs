@@ -107,7 +107,7 @@ fn all_specs() -> Vec<Option<OperatorSpec>> {
     all
 }
 
-/// Operators whose conformance cases pass (`crates/ve-modeling/tests/g3.rs` and `g3_ready.rs`).
+/// Operators whose declared conformance cases pass in the modeling tests.
 const READY: &[&str] = &[
     "solid.box@1",
     "solid.sphere@1",
@@ -143,6 +143,8 @@ const READY: &[&str] = &[
     "inst.mirror@1",
     "inst.realize@1",
     "xform.align@1",
+    "frame.add@1",
+    "xform.attach@1",
 ];
 
 fn primitives() -> Vec<Option<OperatorSpec>> {
@@ -313,7 +315,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn every_builtin_registers_and_only_the_g3_operators_are_ready() {
+    fn every_builtin_registers_and_ready_operators_have_conformance_cases() {
         let specs = all_specs();
         assert!(specs.iter().all(Option::is_some));
         let registry = builtin_registry();

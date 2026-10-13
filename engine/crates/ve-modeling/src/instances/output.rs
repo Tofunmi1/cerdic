@@ -36,6 +36,7 @@ pub(crate) fn parts(output: &Output, value: &Value) -> Result<Vec<Part>, Fail> {
         let mut prototype = (*set.prototype).clone();
         if mirrored {
             prototype.mesh = moved_mesh(&prototype.mesh, reflection)?;
+            prototype.frames = crate::frames::reflected(&prototype.frames, reflection)?;
         }
         let mut result = part(output, &prototype, Some(transforms), indices);
         result.volume = volume;
@@ -56,6 +57,7 @@ fn part(
         indices: value.mesh.indices.clone(),
         volume: value.volume,
         material: value.material.clone(),
+        frames: value.frames.clone(),
         transforms,
         instance_indices,
     }

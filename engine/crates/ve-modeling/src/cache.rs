@@ -14,6 +14,7 @@ pub(crate) struct Value {
     /// input's, everything else starts without one.
     pub(crate) material: Option<Material>,
     pub(crate) instances: Option<crate::instances::InstanceSet>,
+    pub(crate) frames: crate::frames::Frames,
 }
 
 impl Value {
@@ -24,6 +25,7 @@ impl Value {
             loops: Vec::new(),
             material: None,
             instances: None,
+            frames: BTreeMap::new(),
         }
     }
 
@@ -34,6 +36,7 @@ impl Value {
             loops,
             material: None,
             instances: None,
+            frames: BTreeMap::new(),
         }
     }
 
@@ -50,6 +53,11 @@ impl Value {
                 .map(|l| l.capacity() * size_of::<[f64; 2]>() + size_of::<Vec<[f64; 2]>>())
                 .sum::<usize>()
             + size_of::<Self>()
+            + self
+                .frames
+                .keys()
+                .map(|name| name.capacity() + size_of::<crate::Frame>() + 128)
+                .sum::<usize>()
             + self.instances.as_ref().map_or(0, |set| {
                 set.transforms.capacity() * size_of::<glam::DMat4>() + set.prototype.bytes()
             })

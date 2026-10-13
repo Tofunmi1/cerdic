@@ -51,6 +51,8 @@ pub struct Part {
     pub volume: f64,
     /// The surface given by the nearest `solid.material`, if any.
     pub material: Option<Material>,
+    /// Named proper rigid sockets; prototype coordinates when placements are present.
+    pub frames: std::collections::BTreeMap<String, crate::Frame>,
     /// Column-major positive-determinant render placements; None means an ordinary solid.
     #[serde(skip)]
     pub transforms: Option<Vec<[f32; 16]>>,

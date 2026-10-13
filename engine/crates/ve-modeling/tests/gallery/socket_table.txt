@@ -1,0 +1,18 @@
+# The four legs find the named frames on the tabletop and match their orientation.
+top = solid.box@1(size=[1.2, 0.12, 1.2])
+top_a = frame.add@1(top, name="leg_a", position=[-0.48, -0.06, -0.48])
+top_b = frame.add@1(top_a, name="leg_b", position=[0.48, -0.06, -0.48])
+top_c = frame.add@1(top_b, name="leg_c", position=[-0.48, -0.06, 0.48])
+top_d = frame.add@1(top_c, name="leg_d", position=[0.48, -0.06, 0.48])
+leg = solid.box@1(size=[0.12, 0.7, 0.12])
+foot = frame.add@1(leg, name="foot", position=[0, 0.35, 0])
+leg_a = xform.attach@1(foot, to=top_d, socket="foot", to_socket="leg_a")
+leg_b = xform.attach@1(foot, to=top_d, socket="foot", to_socket="leg_b")
+leg_c = xform.attach@1(foot, to=top_d, socket="foot", to_socket="leg_c")
+leg_d = xform.attach@1(foot, to=top_d, socket="foot", to_socket="leg_d")
+wood = solid.material@1(top_d, color=[0.55, 0.36, 0.2], roughness=0.6)
+output tabletop = wood
+output leg_a
+output leg_b
+output leg_c
+output leg_d
