@@ -219,8 +219,10 @@ See [G4c report](g4c-report.md) and [ADR 0014](../adr/0014-instance-sets.md).
 
 ### G4d: named parts, sockets and attachment
 
-Not implemented yet. Checked rigid kernel transformation and native/WASI parity are in place;
-socket ownership and default attachment rotation await the owner decisions required by the handoff.
+Partially implemented: G4d-04 alignment and checked rigid kernel transformation are in place.
+Strict validation passed: 364 native tests, native/WASI parity and every browser suite.
+Socket ownership and default
+attachment rotation await the owner decisions required by the handoff. See [G4d report](g4d-report.md).
 | ID | Input | Expected |
 |---|---|---|
 | G4d-01 | Socket (named frame on a member or part) with position and orientation | Exposed by name through the group; selectable |
