@@ -145,7 +145,7 @@ before implementing. It is shared engine source with a worker entry, not a secon
 | `Solid` | G1a | Valid closed solid through Manifold; explicit empty result and status |
 | `PolyMesh` | G1a, editing G6 | Polygon faces plus corner attributes; derived adjacency; boundaries allowed |
 | `Profile2`, `Curve3` | G3 basic, G5 advanced | Oriented profiles and holes; curves with domains, sampling tolerance, frame convention |
-| `Instances` | G4 | Shared prototype, stable instance ID, transform, overrides; no automatic realization |
+| `Instances` | G4 | Shared prototype and ordered affine placements; stable node plus deterministic index within a pattern; no automatic realization. Individual overrides/IDs across pattern layout changes remain future work (ADR 0014) |
 | `Surface` | G5 | Parametric surface or control data plus tessellation policy; openness is valid |
 | `Field3<T>` | G8 | Bounded pure expression representation; scalar fields are not distance guarantees |
 | `Strokes` | G11 | Layers, drawings, strokes, points with width, opacity, colour, depth policy |
@@ -698,7 +698,13 @@ unfolding before evaluation, sharing of equal prototypes). `cargo xtask check --
 [`g4b-report.md`](../modeling/g4b-report.md); design: [ADR 0013](../adr/0013-groups-are-subgraphs-expanded-before-evaluation.md).
 **G4e implemented (2026-10-13):** the text form for groups, so a model can build and edit groups
 through text and MCP (`group` blocks, instances, canonical printing; `get_nodes` reports membership).
-G4 is not complete: instance sets and realization (G4c) and sockets and attachment (G4d) remain.
+**G4c implemented (2026-10-13):** shared instance sets, explicit bounded realization, positive
+reflection batches, exact affine rendering/picking and instance selection in viewer panels.
+Strict gate passed with 360 native tests and all browser suites; separate advisories passed.
+Report: [g4c-report.md](../modeling/g4c-report.md); design: [ADR 0014](../adr/0014-instance-sets.md).
+G4 is not complete: sockets and attachment (G4d) remain. The checked rigid kernel transform
+prerequisite passes native/C++/WASI checks. Socket interface and attachment-default decisions
+requested from the owner remain pending; ADR 0015 is not final.
 
 G4-G13, V1-V7 and L0-L9 incomplete; X2-X5 and X7-X9 not performed. No gate has passed merely because this
 document was revised. Replace this line with per-milestone evidence as work lands:

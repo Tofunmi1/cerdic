@@ -203,6 +203,10 @@ pattern operators) is done and has its own report. Design: ADR 0013. The wheel i
 | G4b-E8 | Evaluation hash | Changes when a member, an override, a version or the group output changes; unchanged by layout and by renaming a group |
 
 ### G4c: instance sets and explicit realization
+
+Implemented 2026-10-13. All seven cases pass in `ve-modeling/tests/g4c_sets.rs` and
+`web/tests/instances.mjs`; strict gate passed with 360 native tests and all browser suites.
+See [G4c report](g4c-report.md) and [ADR 0014](../adr/0014-instance-sets.md).
 | ID | Input | Expected |
 |---|---|---|
 | G4c-01 | `inst.array`, `inst.radial` and `inst.repeat` of a solid or an instance | An instance set that shares one prototype; no geometry is unioned |
@@ -214,6 +218,9 @@ pattern operators) is done and has its own report. Design: ADR 0013. The wheel i
 | G4c-07 | Count products near overflow | Refused with the limit, no wraparound |
 
 ### G4d: named parts, sockets and attachment
+
+Not implemented yet. Checked rigid kernel transformation and native/WASI parity are in place;
+socket ownership and default attachment rotation await the owner decisions required by the handoff.
 | ID | Input | Expected |
 |---|---|---|
 | G4d-01 | Socket (named frame on a member or part) with position and orientation | Exposed by name through the group; selectable |

@@ -118,6 +118,16 @@ output like any solid. A group may take solids as inputs: inside it write
 and bind it on an instance with mount=post. Changing a node inside a group changes every instance;
 equal instances are computed once. Group names are plain words (letters, digits, underscore).
 
+Shared placements (no union): inst.array@1(solid_or_set, count_x=1, count_y=1, count_z=1, spacing=[x,y,z]),
+inst.radial@1(solid_or_set, count, radius=0), inst.repeat@1(solid_or_set, count, step=[x,y,z], rotate_step=[x,y,z]),
+inst.mirror@1(solid_or_set, axis="x"). Sets share one prototype and allow at most 16384 placements.
+Move/rotate/scale also work on sets. A set is a valid output. Use inst.realize@1(set) only when one
+boolean solid is needed; triangle and memory limits apply before union. Example fence:
+  post = solid.box@1(size=[0.05,1,0.05])
+  posts = inst.array@1(post, count_x=20, spacing=[0.2,0,0])
+  output fence = posts
+For a later boolean operation, write fused = inst.realize@1(posts) and feed fused to the boolean.
+
 Colour and finish: solid.material@1(solid, color=[r,g,b], metallic=0, roughness=0.5, emissive=[0,0,0])
 gives a solid a surface (colour is sRGB 0..1 as in a colour picker, metallic 0 plastic/paint/wood to 1
 bare metal, roughness 0 mirror to 1 matte, emissive glows above 1). The shape is unchanged. Put it on
