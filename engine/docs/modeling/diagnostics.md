@@ -43,6 +43,11 @@ string. Severity: `error` blocks a commit, `warning` does not, `info` is progres
 | `budget.memory` | error | Predicted temporary or cached bytes over limit | |
 | `budget.time` | error | Job exceeded its time budget | Preview vs final policy |
 | `kernel.invalid_input` | error | Kernel rejected an argument | |
+| `socket.name` | error | Socket name is empty or contains unsupported characters | Use letters, numbers, `_`, `-` or `.` |
+| `socket.duplicate` | error | Socket name already exists, or a mirrored copy would collide | Choose a unique name |
+| `socket.invalid_frame` | error | Socket matrix cannot form a bounded proper rigid frame | Use a finite, noncollapsed transform |
+| `socket.unknown` | error | Requested socket is absent from a value | The diagnostic lists available sockets on the named input |
+| `budget.sockets` | error | Predicted socket metadata exceeds the per-value cap | Reduce copied sockets below the reported limit |
 | `kernel.not_manifold` | error | Input mesh is not a valid closed solid | Which node produced it |
 | `kernel.too_large` | error | Result too large for the kernel | |
 | `result.empty` | info | Valid but empty (for example a difference that removes everything) | Not an error; distinct from failure |

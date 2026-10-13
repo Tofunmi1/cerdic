@@ -120,7 +120,13 @@ equal instances are computed once. Group names are plain words (letters, digits,
 
 Rigid alignment: xform.align@1(solid, from=[x,y,z], to=[x,y,z], pivot=[0,0,0]). Directions must be
 nonzero; their magnitude is ignored. The pivot stays fixed. Opposite directions use a deterministic
-half-turn. Named sockets and attachment are not available yet.
+half-turn.
+Assembly sockets: frame.add@1(solid, name="mount", position=[x,y,z], rotation=[x,y,z]) attaches a
+named rigid frame (angles in degrees in text) to a solid. xform.attach@1(source, to=parent,
+socket="base", to_socket="mount") matches position and orientation; names travel with evaluated
+results through groups and do not change group interface versions. Missing sockets return a named
+diagnostic listing available sockets. xform.mirror namespaces reflected sockets as mirror.name.
+frame.add and xform.attach accept solids only; realize an instance set before attaching it.
 Shared placements (no union): inst.array@1(solid_or_set, count_x=1, count_y=1, count_z=1, spacing=[x,y,z]),
 inst.radial@1(solid_or_set, count, radius=0), inst.repeat@1(solid_or_set, count, step=[x,y,z], rotate_step=[x,y,z]),
 inst.mirror@1(solid_or_set, axis="x"). Sets share one prototype and allow at most 16384 placements.

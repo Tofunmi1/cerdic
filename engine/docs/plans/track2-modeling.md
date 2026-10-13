@@ -702,11 +702,13 @@ through text and MCP (`group` blocks, instances, canonical printing; `get_nodes`
 reflection batches, exact affine rendering/picking and instance selection in viewer panels.
 Strict gate passed with 360 native tests and all browser suites; separate advisories passed.
 Report: [g4c-report.md](../modeling/g4c-report.md); design: [ADR 0014](../adr/0014-instance-sets.md).
-G4 is not complete: sockets and attachment (G4d) remain. The checked rigid kernel transform
-prerequisite passes native/C++/WASI checks. G4d-04 alignment is implemented with a fixed pivot and
-defined parallel/opposite behavior; strict gate passed (364 native tests and all browser suites).
-See [G4d report](../modeling/g4d-report.md). Socket interface and attachment-default decisions
-requested from the owner remain pending; ADR 0015 is not final.
+**G4d implemented (2026-10-13):** named result-carried frames, group propagation without interface
+version changes, frame-preserving transforms/mirrors/patterns, rigid attach matching position and
+orientation, fixed-pivot align, typed missing-socket diagnostics, and inspector socket selection.
+The strict gate passed with 377 native tests and all browser suites; separate advisories and the
+release build passed. See [G4d report](../modeling/g4d-report.md); design:
+[ADR 0015](../adr/0015-assembly-frames.md). G4 is complete. V3 frame gizmos and V4 group authoring
+UI remain separate milestones.
 
 G4-G13, V1-V7 and L0-L9 incomplete; X2-X5 and X7-X9 not performed. No gate has passed merely because this
 document was revised. Replace this line with per-milestone evidence as work lands:

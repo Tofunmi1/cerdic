@@ -26,6 +26,8 @@ function boundsOf(parts: MeshPart[]) {
 }
 
 export class EvaluationHost {
+  /** Named sockets on the last accepted outputs, including placement data for selected instances. */
+  socketParts: Pick<MeshPart,'node'|'name'|'frames'|'transforms'|'instance_indices'>[] = [];
   readonly state = {
     worker: 'booting', generation: 0, queue: 0, revision: null as number | null,
     lastFailure: null as { code: string; message: string } | null,
@@ -131,6 +133,8 @@ export class EvaluationHost {
     if (accepted) {
       this.state.revision = message.token.revision;
       this.bounds = boundsOf(message.parts);
+      this.socketParts=message.parts.filter(part=>Object.keys(part.frames ?? {}).length>0)
+        .map(({node,name,frames,transforms,instance_indices})=>({node,name,frames,transforms,instance_indices}));
       if (this.bounds) this.options.onProjected?.(this.bounds);
       if (this.recoveryStarted !== null) { this.state.recoveryMs = performance.now() - this.recoveryStarted; this.recoveryStarted = null; }
     }
@@ -162,6 +166,6 @@ export class EvaluationHost {
 
   dispose() {
     this.disposed = true; this.clearTimers(); this.worker?.terminate(); this.worker = null;
-    this.active = null; this.queued = null; this.resources.workers = 0; this.state.worker = 'disposed';
+    this.active = null; this.queued = null; this.resources.workers = 0; this.state.worker = 'disposed';this.socketParts=[];
   }
 }

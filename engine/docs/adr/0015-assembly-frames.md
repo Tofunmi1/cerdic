@@ -1,19 +1,36 @@
-# 0015: Rigid assembly alignment; socket decisions pending
+# 0015: Named rigid assembly frames and attachment
 
 - Date: 2026-10-13
-- Status: draft; socket ownership and default attachment rotation require owner decisions.
+- Status: accepted by the owner for implementation and implemented.
 
-`xform.align@1` takes a Solid plus nonzero `from` and `to` directions and a `pivot` (metres,
-default origin). Direction magnitude does not affect the rotation. The rotation is a proper rigid
-transform and keeps the pivot fixed. Parallel directions produce identity. For opposite directions,
-choose the coordinate axis with the smallest absolute source component (ties X, then Y, then Z),
-and rotate by pi about the source crossed with that axis. Other directions use their normalized
-cross product and `atan2(cross length, dot)`; this preserves small angles near parallel inputs.
-Zero directions are refused during preflight, naming the node. The checked kernel rigid transform
-performs geometry movement; material is retained. Instance inputs remain outside this operator's
-contract. This independent alignment contract does not settle the pending socket decisions.
+Named sockets are carried by evaluated values, like material. They do not belong to a group's
+versioned interface: the group's result carries its value frames through each use. A new socket
+therefore does not force a group upgrade.
 
-Proposed next contract from the handoff: named proper rigid frames carried on evaluated values;
-attachment uses `F_target * inverse(F_source)` so both position and orientation coincide. Neither
-socket ownership nor this default is accepted until the owner answers. Frame propagation, mirroring,
-group exposure, attachment diagnostics and inspector socket selection remain to implement.
+`frame.add@1(in: Solid, name, position, rotation)` adds one unique named rigid frame. Positions
+are in metres and rotations are Euler angles X then Y then Z (radians in document values; degrees
+in text without a suffix). Frames contain a finite position and a unit proper quaternion. Names
+are 1 to 64 ASCII letters, numbers, `_`, `-` or `.`. One value can carry at most 128 frames.
+
+`xform.attach@1(in: Solid, to: Solid, socket, to_socket)` moves the source so **both** named
+frames coincide: `T = F_target * inverse(F_source)`. This matches position and orientation by
+default. The operation is a checked proper rigid transform, keeps the source material and frames,
+and leaves the target value unchanged. Missing names produce `socket.unknown` at the attach node,
+name both input ports, list the related nodes, and suggest the frames available on the input.
+Input kinds are checked by the graph before evaluation.
+
+Transforming values transforms socket position and extracts the nearest proper orientation, so
+nonuniform positive scale never puts scale into a frame. Mirrors use `M * F * M`; names on the
+reflected copy receive the `mirror.` prefix, while originals keep their names. Array, repeat and
+radial patterns keep the first copy's names and prefix later copies with `copyN.`. A generated-name
+collision is an explicit refusal. Predicted frame growth is capped at 128 before geometry runs.
+`inst.realize` expands prototype frames with the same `copyN.` rule; un-realized sets retain their
+shared prototype frames and per-placement transform matrices.
+
+`xform.align@1` aligns nonzero directions about a fixed pivot. Parallel inputs are identity;
+opposite directions use a deterministic half turn about the source crossed with the least-aligned
+coordinate axis (ties X, Y, Z). Other angles use cross-product `atan2`, which preserves small turns.
+Its rigid transform also propagates frames and material.
+
+Sockets appear by name and position in the viewer inspector and can be selected there. The
+selection is view state. Drawing frame gizmos and freehand socket picking remain V3 work.

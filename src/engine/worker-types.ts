@@ -10,6 +10,7 @@ export type PartMaterial = { color: [number, number, number]; metallic: number; 
 export type MeshPart = {
   node: string; name: string; volume: number; positions: Float32Array; indices: Uint32Array; material?: PartMaterial | null;
   transforms?: Float32Array; instance_indices?: Uint32Array;
+  frames?: Record<string,{position:[number,number,number];rotation:[number,number,number,number]}>;
 };
 export type EvaluationStats = {
   evaluated_nodes: number; cache_hits: number; cache_bytes: number; elapsed_ms: number; memory_bytes: number;
