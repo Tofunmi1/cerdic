@@ -8,14 +8,23 @@ const frame = () => new Promise<void>(resolve => requestAnimationFrame(() => res
 export async function uploadResult(runtime: Runtime, token: Token, parts: MeshPart[], current: () => boolean) {
   const text = JSON.stringify(token);
   if (!current() || !runtime.eval_projection_begin(text)) return false;
-  for (const part of parts) {
+  for (const [partIndex,part] of parts.entries()) {
+    const group=part.transforms?.length ? partIndex+1 : 0;
+    if (group && part.transforms && part.instance_indices) {
+      for (let offset=0; offset<part.instance_indices.length; offset+=512) {
+        if (!current() || !runtime.eval_projection_instances(text,group,part.node,
+          part.transforms.subarray(offset*16,(offset+512)*16),part.instance_indices.subarray(offset,offset+512))) return false;
+        await frame();
+      }
+    }
     if (part.material && !runtime.eval_projection_material(text, part.node, JSON.stringify(part.material))) return false;
     const normals = part.indices.length / 3 <= SMOOTH_TRIANGLE_LIMIT ? cornerNormals(part.positions, part.indices) : null;
     for (let offset = 0; offset < part.indices.length; offset += TRIANGLES_PER_CHUNK * 3) {
       if (!current()) return false;
       const end = Math.min(offset + TRIANGLES_PER_CHUNK * 3, part.indices.length);
       const data = pack(part, offset, end, normals);
-      if (!runtime.eval_projection_chunk(text, part.node, part.name, data)) return false;
+      if (group ? !runtime.eval_projection_chunk_group(text,group,part.node,part.name,data) :
+          !runtime.eval_projection_chunk(text, part.node, part.name, data)) return false;
       await frame();
     }
   }

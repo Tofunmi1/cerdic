@@ -146,7 +146,16 @@ fn entity_of(target: TargetId) -> Option<Entity> {
 
 /// The interaction machine's view of the scene: every [`Interactable`] and its transform.
 struct SceneWorld<'a, 'w, 's> {
-    objects: &'a Query<'w, 's, (Entity, &'static Interactable, &'static Transform)>,
+    objects: &'a Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static Interactable,
+            &'static Transform,
+            Option<&'static ve_render::VeInstanceTransform>,
+        ),
+    >,
     hook: &'a SnapHook,
 }
 
@@ -162,15 +171,25 @@ impl World for SceneWorld<'_, '_, '_> {
     fn pick(&self, ray: &Ray, max_distance: f32) -> Option<Hit> {
         self.objects
             .iter()
-            .filter_map(|(entity, interactable, transform)| {
+            .filter_map(|(entity, interactable, transform, placement)| {
                 // An object whose transform a box cannot represent (collapsed, mirrored, sheared)
                 // is not pickable until it is placed validly again.
-                let shape = Shape::from_local_bounds(
-                    interactable.min,
-                    interactable.max,
-                    transform.to_matrix(),
-                )?;
-                let distance = shape.raycast(ray).filter(|d| *d <= max_distance)?;
+                let distance = if let Some(placement) = placement {
+                    ve_interact::ray_affine_box(
+                        ray,
+                        interactable.min,
+                        interactable.max,
+                        placement.0,
+                    )
+                } else {
+                    Shape::from_local_bounds(
+                        interactable.min,
+                        interactable.max,
+                        transform.to_matrix(),
+                    )?
+                    .raycast(ray)
+                }
+                .filter(|d| *d <= max_distance)?;
                 Some(Hit {
                     target: target_of(entity),
                     distance,
@@ -181,14 +200,14 @@ impl World for SceneWorld<'_, '_, '_> {
     }
 
     fn placement(&self, target: TargetId) -> Option<Placement3> {
-        let (_, _, transform) = self.objects.get(entity_of(target)?).ok()?;
+        let (_, _, transform, _) = self.objects.get(entity_of(target)?).ok()?;
         Some(placement_of(transform))
     }
 
     fn grabbable(&self, target: TargetId) -> bool {
         entity_of(target)
             .and_then(|entity| self.objects.get(entity).ok())
-            .is_some_and(|(_, interactable, _)| interactable.grabbable)
+            .is_some_and(|(_, interactable, _, _)| interactable.grabbable)
     }
 
     fn snap(&self, target: TargetId, released: Placement3) -> Option<Placement3> {
@@ -281,7 +300,12 @@ pub(crate) fn run_interaction(
     mut state: ResMut<InteractionState>,
     cameras: Query<(&Camera, &GlobalTransform, Option<&StereoViews>), With<Camera3d>>,
     labels: Query<&Label>,
-    mut objects: Query<(Entity, &'static Interactable, &'static mut Transform)>,
+    mut objects: Query<(
+        Entity,
+        &'static Interactable,
+        &'static mut Transform,
+        Option<&'static ve_render::VeInstanceTransform>,
+    )>,
     mut lasers: Query<(&Laser, &mut Transform), Without<Interactable>>,
 ) {
     let dt = time.delta_secs();
@@ -342,7 +366,7 @@ pub(crate) fn run_interaction(
 
     for (target, placement) in &output.placements {
         if let Some(entity) = entity_of(*target)
-            && let Ok((_, _, mut transform)) = objects.get_mut(entity)
+            && let Ok((_, _, mut transform, _)) = objects.get_mut(entity)
         {
             // Keep any non-uniform scale: only the uniform factor changes.
             let old = transform.scale.x;

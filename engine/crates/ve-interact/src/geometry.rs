@@ -1,6 +1,8 @@
 //! Rays and the shapes they pick.
 
 use glam::{Mat4, Quat, Vec3};
+mod affine;
+pub use affine::ray_affine_box;
 
 use crate::pose::{Decomposed, decompose};
 

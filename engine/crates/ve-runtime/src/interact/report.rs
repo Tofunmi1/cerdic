@@ -80,6 +80,7 @@ pub(crate) fn report(
         .collect();
     let items: Vec<_> = objects
         .iter()
+        .take(128)
         .map(|(_, label, transform)| {
             json!({
                 "label": label.0,
@@ -89,5 +90,5 @@ pub(crate) fn report(
             })
         })
         .collect();
-    json!({ "hover": hover, "held": held, "objects": items, "events": state.log })
+    json!({ "hover": hover, "held": held, "objects": items, "objects_total":objects.iter().len(),"objects_sample_limit":128, "events": state.log })
 }

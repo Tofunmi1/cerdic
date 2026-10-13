@@ -49,6 +49,7 @@ pub(crate) fn extract_meshes(
             &GlobalTransform,
             Option<&VeMaterial>,
             Option<&InheritedVisibility>,
+            Option<&crate::VeInstanceTransform>,
         )>,
     >,
 ) {
@@ -56,10 +57,10 @@ pub(crate) fn extract_meshes(
     out.0.extend(
         meshes
             .iter()
-            .filter(|(_, _, _, visibility)| visibility.is_none_or(|v| v.get()))
-            .map(|(mesh, transform, material, _)| ExtractedMesh {
+            .filter(|(_, _, _, visibility, _)| visibility.is_none_or(|v| v.get()))
+            .map(|(mesh, transform, material, _, placement)| ExtractedMesh {
                 mesh: mesh.id(),
-                world_from_local: transform.to_matrix(),
+                world_from_local: placement.map_or_else(|| transform.to_matrix(), |m| m.0),
                 material: material.copied().unwrap_or_default().pack(),
             })
             .filter(|mesh| drawable(&mesh.world_from_local)),

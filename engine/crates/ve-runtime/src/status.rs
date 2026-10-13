@@ -93,6 +93,8 @@ pub(crate) fn publish(
     let mut value = json!({
         "frames": *frames,
         "authored": crate::projection::selections(&authored),
+        "authored_count":authored.iter().len(),
+        "authored_sample_limit":128,
         "errors": errors,
         "perf": perf.report(),
         "scene": scene_stats.as_deref().map(|s| json!({

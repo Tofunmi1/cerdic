@@ -44,13 +44,15 @@ pub(crate) fn highlight_hover(
         &mut VeMaterial,
         &Interactable,
         Option<&Authored>,
+        Option<&crate::projection::InstanceIndex>,
         Option<&mut HoverTint>,
     )>,
 ) {
     let ease = 1.0 - (-HOVER_FADE_RATE * time.delta_secs()).exp();
-    for (entity, mut material, interactable, authored, tint) in &mut objects {
+    for (entity, mut material, interactable, authored, instance, tint) in &mut objects {
         let hovered = state.hovered.contains(&entity);
-        let selected = authored.is_some_and(|part| selection::is_part(part.node()));
+        let selected =
+            authored.is_some_and(|part| selection::is_part(part.node(), instance.map(|i| i.0)));
         let Some(mut tint) = tint else {
             if hovered || selected {
                 commands.entity(entity).insert(HoverTint {

@@ -22,6 +22,9 @@ use ve_render::{VeMaterial, mesh_ready};
 
 const MAX_CHUNK_BYTES: usize = 64 * 1024;
 const MAX_QUEUED_BYTES: usize = 8 * 1024 * 1024;
+mod placements;
+mod surfaces;
+pub(crate) use placements::{InstanceIndex, append as instances};
 
 /// Generated chunks are removed together when the authored revision changes.
 #[derive(Component)]
@@ -42,11 +45,13 @@ impl Authored {
 pub(crate) struct GalleryObject;
 
 struct Chunk {
+    group: u32,
     node: String,
     name: String,
     data: Vec<f32>,
 }
 struct Uploaded {
+    group: u32,
     node: String,
     name: String,
     handle: Handle<Mesh>,
@@ -56,6 +61,8 @@ struct Candidate {
     token: JobToken,
     /// Surfaces by authored node; a part without one is drawn in the default blue-grey.
     materials: HashMap<String, VeMaterial>,
+    placements: HashMap<u32, placements::Placements>,
+    placement_count: usize,
     queue: VecDeque<Chunk>,
     uploaded: Vec<Uploaded>,
     queued_bytes: usize,
@@ -72,6 +79,7 @@ struct State {
     last_ms: f64,
     max_ms: f64,
     parts: Vec<(String, u64)>,
+    instance_sets: std::collections::BTreeMap<String, usize>,
 }
 thread_local! { static STATE: RefCell<State> = RefCell::new(State::default()); }
 
@@ -88,6 +96,8 @@ pub(crate) fn begin(text: &str) -> bool {
         state.candidate = Some(Candidate {
             token,
             materials: HashMap::new(),
+            placements: HashMap::new(),
+            placement_count: 0,
             queue: VecDeque::new(),
             uploaded: Vec::new(),
             queued_bytes: 0,
@@ -98,45 +108,10 @@ pub(crate) fn begin(text: &str) -> bool {
     true
 }
 
-/// Reads `{ color, metallic, roughness, emissive }`, refusing anything out of range.
-fn parse_material(text: &str) -> Option<VeMaterial> {
-    let value: serde_json::Value = serde_json::from_str(text).ok()?;
-    let triple = |name: &str, max: f64| -> Option<[f32; 3]> {
-        let items = value.get(name)?.as_array()?;
-        let mut out = [0.0_f32; 3];
-        if items.len() != 3 {
-            return None;
-        }
-        for (slot, item) in out.iter_mut().zip(items) {
-            let channel = item.as_f64().filter(|v| (0.0..=max).contains(v))?;
-            #[expect(clippy::cast_possible_truncation, reason = "bounded channel value")]
-            {
-                *slot = channel as f32;
-            }
-        }
-        Some(out)
-    };
-    let factor = |name: &str| -> Option<f32> {
-        let v = value
-            .get(name)?
-            .as_f64()
-            .filter(|v| (0.0..=1.0).contains(v))?;
-        #[expect(clippy::cast_possible_truncation, reason = "bounded factor")]
-        Some(v as f32)
-    };
-    let color = triple("color", 1.0)?;
-    let emissive = triple("emissive", 100.0)?;
-    Some(VeMaterial {
-        base_color: Color::srgb(color[0], color[1], color[2]),
-        metallic: factor("metallic")?,
-        roughness: factor("roughness")?,
-        emissive: Color::linear_rgb(emissive[0], emissive[1], emissive[2]),
-    })
-}
-
 /// Sets the surface of the part made by `node` in the scene being staged.
 pub(crate) fn material(text: &str, node: &str, json: &str) -> bool {
-    let (Some(parsed), true) = (parse_material(json), ve_graph::NodeId::parse(node).is_ok()) else {
+    let (Some(parsed), true) = (surfaces::parse(json), ve_graph::NodeId::parse(node).is_ok())
+    else {
         return false;
     };
     STATE.with(|cell| {
@@ -157,6 +132,10 @@ pub(crate) fn material(text: &str, node: &str, json: &str) -> bool {
 }
 
 pub(crate) fn chunk(text: &str, node: &str, name: &str, data: &[f32]) -> bool {
+    chunk_group(text, 0, node, name, data)
+}
+
+pub(crate) fn chunk_group(text: &str, group: u32, node: &str, name: &str, data: &[f32]) -> bool {
     if !data.len().is_multiple_of(18)
         || data.is_empty()
         || size_of_val(data) > MAX_CHUNK_BYTES
@@ -176,12 +155,18 @@ pub(crate) fn chunk(text: &str, node: &str, name: &str, data: &[f32]) -> bool {
             || candidate.finished
             || candidate.queued_bytes + size_of_val(data) > MAX_QUEUED_BYTES
             || candidate.total_bytes + size_of_val(data) > 144 * 1024 * 1024
+            || (group != 0
+                && candidate
+                    .placements
+                    .get(&group)
+                    .is_none_or(|p| p.node != node))
         {
             return false;
         }
         candidate.queued_bytes += size_of_val(data);
         candidate.total_bytes += size_of_val(data);
         candidate.queue.push_back(Chunk {
+            group,
             node: node.to_owned(),
             name: name.to_owned(),
             data: data.to_vec(),
@@ -263,6 +248,14 @@ pub(crate) fn update(
                 meshes.remove(mesh.0.id());
             }
             state.parts.clear();
+            state.instance_sets.clear();
+            for placements in candidate.placements.values() {
+                *state
+                    .instance_sets
+                    .entry(placements.node.clone())
+                    .or_default() += placements.indices.len();
+            }
+            crate::selection::validate_instances(&state.instance_sets);
             let materials = candidate.materials;
             for item in candidate.uploaded {
                 state
@@ -273,17 +266,8 @@ pub(crate) fn update(
                     roughness: 0.5,
                     ..VeMaterial::default()
                 });
-                commands.spawn((
-                    Mesh3d(item.handle),
-                    surface,
-                    Transform::IDENTITY,
-                    Interactable::selection_only(&item.bounds),
-                    Label(item.name),
-                    Authored {
-                        node: item.node,
-                        revision: candidate.token.revision,
-                    },
-                ));
+                let placements = candidate.placements.get(&item.group);
+                placements::spawn(&mut commands, item, &candidate.token, surface, placements);
             }
             state.committed = Some(candidate.token);
             return;
@@ -314,6 +298,7 @@ fn upload(chunk: Chunk, meshes: &mut Assets<Mesh>) -> Uploaded {
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     Uploaded {
+        group: chunk.group,
         node: chunk.node,
         name: chunk.name,
         handle: meshes.add(mesh),
@@ -328,6 +313,7 @@ pub(crate) fn status() -> String {
         "queued_bytes":state.candidate.as_ref().map_or(0, |c| c.queued_bytes),
         "staging_meshes":state.candidate.as_ref().map_or(0, |c| c.uploaded.len()),
         "live_meshes":state.parts.len(), "selection_map":state.parts,
+        "instance_sets":state.instance_sets,
         "upload_frames":state.upload_frames,"max_frame_bytes":state.max_frame_bytes,
         "last_upload_ms":state.last_ms,"max_upload_ms":state.max_ms})
         .to_string()
@@ -335,5 +321,5 @@ pub(crate) fn status() -> String {
 }
 
 pub(crate) fn selections(query: &Query<(Entity, &Authored)>) -> serde_json::Value {
-    query.iter().map(|(entity, item)| json!({"entity":entity.to_bits(),"node":item.node,"revision":item.revision})).collect()
+    query.iter().take(128).map(|(entity, item)| json!({"entity":entity.to_bits(),"node":item.node,"revision":item.revision})).collect()
 }

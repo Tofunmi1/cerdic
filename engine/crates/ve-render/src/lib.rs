@@ -7,6 +7,8 @@
 
 mod counters;
 mod extract;
+mod placement;
+pub use placement::VeInstanceTransform;
 mod frame;
 mod geometry;
 mod lens;
