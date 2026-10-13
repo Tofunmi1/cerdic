@@ -9,6 +9,7 @@ use crate::spec::{
 use crate::value::{ParamType, Unit, Value};
 
 mod group_ops;
+mod instances;
 mod modeling;
 mod shapes;
 
@@ -21,6 +22,7 @@ const PROFILE: &[PortType] = &[PortType::Profile];
 /// instances join the list when their transforms exist, so a draft graph cannot silently evaluate
 /// to nothing.
 const XFORMABLE: &[PortType] = &[PortType::Solid];
+const PLACED: &[PortType] = &[PortType::Solid, PortType::Inst];
 
 fn length(name: &'static str, doc: &'static str) -> ParamSpec {
     ParamSpec {
@@ -94,6 +96,7 @@ fn all_specs() -> Vec<Option<OperatorSpec>> {
     all.extend(modeling::from_profiles());
     all.extend(shapes::all());
     all.extend(group_ops::all());
+    all.extend(instances::all());
     for spec in all.iter_mut().flatten() {
         if READY.contains(&spec.id.to_string().as_str()) {
             spec.readiness = Readiness::Ready;
@@ -132,6 +135,11 @@ const READY: &[&str] = &[
     "xform.repeat@1",
     "group.use@1",
     "group.input@1",
+    "inst.array@1",
+    "inst.repeat@1",
+    "inst.radial@1",
+    "inst.mirror@1",
+    "inst.realize@1",
 ];
 
 fn primitives() -> Vec<Option<OperatorSpec>> {
@@ -204,7 +212,7 @@ fn transforms() -> Vec<Option<OperatorSpec>> {
         spec(
             "xform.move@1",
             "Moves its input.",
-            vec![single("in", XFORMABLE)],
+            vec![single("in", PLACED)],
             same,
             vec![vec3(
                 "by",
@@ -217,7 +225,7 @@ fn transforms() -> Vec<Option<OperatorSpec>> {
         spec(
             "xform.rotate@1",
             "Rotates its input about the origin (X, then Y, then Z).",
-            vec![single("in", XFORMABLE)],
+            vec![single("in", PLACED)],
             same,
             vec![vec3(
                 "angles",
@@ -230,7 +238,7 @@ fn transforms() -> Vec<Option<OperatorSpec>> {
         spec(
             "xform.scale@1",
             "Scales its input about the origin.",
-            vec![single("in", XFORMABLE)],
+            vec![single("in", PLACED)],
             same,
             vec![vec3(
                 "by",

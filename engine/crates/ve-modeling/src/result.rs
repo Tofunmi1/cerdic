@@ -51,6 +51,12 @@ pub struct Part {
     pub volume: f64,
     /// The surface given by the nearest `solid.material`, if any.
     pub material: Option<Material>,
+    /// Column-major positive-determinant render placements; None means an ordinary solid.
+    #[serde(skip)]
+    pub transforms: Option<Vec<[f32; 16]>>,
+    /// Original placement indices, retained when reflected prototypes are separated.
+    #[serde(skip)]
+    pub instance_indices: Vec<u32>,
 }
 
 /// A successful complete evaluation. Failures never yield a partial scene.

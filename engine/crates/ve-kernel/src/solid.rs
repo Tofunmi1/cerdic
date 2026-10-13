@@ -77,6 +77,13 @@ fn segments_arg(segments: u32) -> Result<i32, KernelError> {
 }
 
 impl Solid {
+    /// Applies a proper rigid row-major 3x4 matrix (translation at indices 3, 7 and 11).
+    ///
+    /// # Errors
+    /// Non-finite/non-rigid matrices, reflection, scale or kernel failure.
+    pub fn transform(&self, matrix: [f64; 12]) -> Result<Self, KernelError> {
+        ffi::rigid::transform(&self.0, &matrix).map(Self)
+    }
     pub(crate) fn from_handle(handle: Handle) -> Self {
         Self(handle)
     }

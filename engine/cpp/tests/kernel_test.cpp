@@ -87,6 +87,22 @@ void profile_test() {
         "nonfinite offset rejected");
 }
 
+void rigid_test(const ve_solid* solid) {
+  ve_status status = VE_OK;
+  std::array<double, 12> matrix = {0, -1, 0, 1, 1, 0, 0, 2, 0, 0, 1, 3};
+  const std::unique_ptr<ve_solid, decltype(&ve_solid_free)> moved(
+      ve_solid_transform(solid, matrix.data(), matrix.size(), &status), ve_solid_free);
+  check(moved != nullptr && status == VE_OK &&
+            near(ve_solid_volume(moved.get()), ve_solid_volume(solid), 1e-9),
+        "rigid transform volume");
+  check(ve_solid_transform(solid, nullptr, 12, &status) == nullptr, "null rigid matrix rejected");
+  check(ve_solid_transform(solid, matrix.data(), 11, &status) == nullptr,
+        "short rigid matrix rejected");
+  matrix.at(0) = 2;
+  check(ve_solid_transform(solid, matrix.data(), 12, &status) == nullptr,
+        "scaled rigid matrix rejected");
+}
+
 void cancellation_test(const ve_solid* cube, const ve_solid* sphere) {
   ve_status status = VE_OK;
   const std::unique_ptr<ve_context, decltype(&ve_context_free)> context(ve_context_new(),
@@ -171,6 +187,7 @@ int main() {
 
   cancellation_test(cube, sphere);
   profile_test();
+  rigid_test(cube);
   for (ve_solid* s : {cube, sphere, diff, rebuilt}) {
     ve_solid_free(s);
   }

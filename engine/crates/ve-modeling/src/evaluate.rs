@@ -1,6 +1,6 @@
 //! Incremental evaluator. One step executes one node, allowing the worker to yield between calls.
 use crate::{
-    Evaluation, Fail, Part, Quality, budget,
+    Evaluation, Fail, Quality, budget,
     cache::{Cache, Value},
     fail, operations, plan,
 };
@@ -234,7 +234,12 @@ fn finish(job: &Job) -> Result<Evaluation, Fail> {
             .values
             .get(&output.from.node)
             .ok_or_else(|| fail("graph.unknown_node", output.from.node.to_string()))?;
-        triangles = triangles.saturating_add(value.mesh.triangle_count());
+        let generated = crate::instances::parts(output, value)?;
+        let drawn = generated
+            .iter()
+            .map(|part| (part.indices.len() / 3) * part.transforms.as_ref().map_or(1, Vec::len))
+            .sum::<usize>();
+        triangles = triangles.saturating_add(drawn);
         if triangles > job.quality.triangles() {
             return Err(budget::exceeded(
                 "budget.triangles",
@@ -242,14 +247,7 @@ fn finish(job: &Job) -> Result<Evaluation, Fail> {
                 triangles,
             ));
         }
-        parts.push(Part {
-            node: output.from.node.clone(),
-            name: output.name.clone(),
-            positions: value.mesh.positions.clone(),
-            indices: value.mesh.indices.clone(),
-            volume: value.volume,
-            material: value.material.clone(),
-        });
+        parts.extend(generated);
     }
     Ok(Evaluation {
         parts,

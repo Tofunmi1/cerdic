@@ -56,6 +56,11 @@ fn report(name: &str, solid: &Solid) -> Result<(), KernelError> {
 }
 
 fn run() -> Result<(), KernelError> {
+    report(
+        "rigid-transform",
+        &Solid::cube([2.0, 1.0, 3.0], true)?
+            .transform([0.0, -1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 2.0, 0.0, 0.0, 1.0, 3.0])?,
+    )?;
     profiles()?;
     let cube = Solid::cube([1.0, 1.0, 1.0], true)?;
     let sphere = Solid::sphere(0.65, 48)?;

@@ -1,0 +1,9 @@
+post = solid.box(size=[0.05,1,0.05])
+post_up = xform.move(post, by=[0,0.5,0])
+wood = solid.material(post_up, color=[0.5,0.27,0.12], roughness=0.65)
+posts = inst.array(wood, count_x=20, spacing=[0.2,0,0])
+rail = solid.box(size=[3.85,0.06,0.035])
+rail_at = xform.move(rail, by=[1.9,0.3,0.03])
+rails = inst.repeat(rail_at, count=2, step=[0,0.45,0])
+output posts = posts
+output rails = rails
