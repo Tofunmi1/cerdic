@@ -95,6 +95,29 @@ fused into one solid, so make neighbours overlap a little where they must join. 
   table = solid.union@1(legs, top_raised)
   output table
 
+Groups (build once, use many times): a group is an assembly with its own nodes, a result and the
+parameters you choose to expose; an instance is one use of it. Write the group first, then instances:
+  group wheel
+    tyre = solid.torus@1(major=0.3, minor=0.06, segments=48, tube_segments=16)
+    hub = solid.cylinder@1(height=0.2, radius=0.08, segments=32)
+    spoke = solid.box@1(size=[0.22, 0.03, 0.03])
+    spokes = xform.radial@1(spoke, count=4, radius=0.14)
+    rim = solid.union@1(tyre, hub, spokes)
+    expose radius = tyre.major
+    result rim
+  end
+  front = wheel()
+  big = wheel(radius=0.4)
+  moved = xform.move@1(big, by=[1, 0, 0])
+Rules: the nodes inside a group read only each other; "result" names the member that is the group's
+result (it must be a solid); "expose name = member.param" lets an instance override that parameter
+with name=value (the member's own limits apply). An instance is written like a node whose operator is
+the group's name (no dot, no @version), and it can be moved, combined, given a material or made an
+output like any solid. A group may take solids as inputs: inside it write
+  mount = group.input@1(name="mount")
+and bind it on an instance with mount=post. Changing a node inside a group changes every instance;
+equal instances are computed once. Group names are plain words (letters, digits, underscore).
+
 Colour and finish: solid.material@1(solid, color=[r,g,b], metallic=0, roughness=0.5, emissive=[0,0,0])
 gives a solid a surface (colour is sRGB 0..1 as in a colour picker, metallic 0 plastic/paint/wood to 1
 bare metal, roughness 0 mirror to 1 matte, emissive glows above 1). The shape is unchanged. Put it on
@@ -116,10 +139,10 @@ const TOOLS = [
   { name: 'get_guide', description: 'How the text language works, with an example. Read this first.', inputSchema: object({}) },
   { name: 'list_operators', description: 'The operators you may use: ports, parameters with units and ranges, one-line help.', inputSchema: object({}) },
   { name: 'get_text', description: 'The current document as canonical text, and its revision.', inputSchema: object({}) },
-  { name: 'get_nodes', description: 'Every node with its id, label, operator, parameters, inputs and flags, plus the outputs. Use the ids in apply_commands.', inputSchema: object({}) },
+  { name: 'get_nodes', description: 'Every node with its id, label, operator, parameters, inputs, flags, the group it belongs to (nodes inside a group definition) or its instance data, plus the outputs and the groups. Use the ids in apply_commands.', inputSchema: object({}) },
   { name: 'get_status', description: 'Revision, node count, evaluation state (last failure, timings) and the last projected geometry.', inputSchema: object({}) },
   { name: 'apply_text', description: 'Adds the nodes described by a program in the text language to the document, evaluates it, and reports the outcome or the diagnostics (each with a line and column). Atomic: nothing changes unless all of it is valid.', inputSchema: object({ text: { type: 'string' }, label: { type: 'string' } }, ['text']) },
-  { name: 'apply_commands', description: 'Applies typed commands, for example [{"set_param":{"node":"n_abc12345","param":"segments","value":96}}]. Commands: add_node, remove_node, connect, disconnect, set_param, set_label, set_flags, set_output. Atomic.', inputSchema: object({ commands: { type: 'array', items: { type: 'object' } }, label: { type: 'string' } }, ['commands']) },
+  { name: 'apply_commands', description: 'Applies typed commands, for example [{"set_param":{"node":"n_abc12345","param":"segments","value":96}}]. Commands: add_node, remove_node, connect, disconnect, set_param, set_label, set_flags, set_output, and for groups set_instance_param, clear_instance_param, upgrade_group, expose_param, unexpose_param, set_group_output. Atomic.', inputSchema: object({ commands: { type: 'array', items: { type: 'object' } }, label: { type: 'string' } }, ['commands']) },
   { name: 'undo', description: 'Undoes the last committed edit.', inputSchema: object({}) },
   { name: 'redo', description: 'Redoes the last undone edit.', inputSchema: object({}) },
   { name: 'frame_view', description: 'Moves the editor camera so the whole model fills the view, from a three-quarter angle. Call it after building something so the person watching sees it.', inputSchema: object({}) },

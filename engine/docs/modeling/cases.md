@@ -188,7 +188,7 @@ pattern operators) is done and has its own report. Design: ADR 0013. The wheel i
 | G4b-17 | A group with `group.input` members, an instance with links to them | Links by position, type checked on connect (`graph.port_type`); a missing link is `graph.missing_input` at evaluation |
 | G4b-18 | Nested groups: a rack group of two wheel instances, instanced twice | Evaluates; expansion depth 2 is reported |
 | G4b-19 | `MAX_GROUP_DEPTH` exceeded; expanded nodes over the budget | Refused before any kernel call with `budget.group_depth` or `budget.expanded_nodes`, limit and observed value |
-| G4b-20 | `to_text` of a document that has groups | `text.unsupported` stating groups are not yet printable, never a text that reads back wrongly (lifted by G4e) |
+| G4b-20 | `to_text` of a document with groups | Prints (G4e); an instance behind its group has no text form and is `text.unsupported` until upgraded: never a text that reads back wrongly |
 
 ### G4b evaluation
 | ID | Input | Expected |

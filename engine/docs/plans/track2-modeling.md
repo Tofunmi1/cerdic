@@ -696,8 +696,9 @@ document yet).
 **G4b implemented (2026-10-13):** groups and instances (document, commands, versions and upgrades,
 unfolding before evaluation, sharing of equal prototypes). `cargo xtask check --strict` passed. Report:
 [`g4b-report.md`](../modeling/g4b-report.md); design: [ADR 0013](../adr/0013-groups-are-subgraphs-expanded-before-evaluation.md).
-G4 is not complete: instance sets and realization (G4c), sockets and attachment (G4d) and the text
-form for groups (G4e) remain.
+**G4e implemented (2026-10-13):** the text form for groups, so a model can build and edit groups
+through text and MCP (`group` blocks, instances, canonical printing; `get_nodes` reports membership).
+G4 is not complete: instance sets and realization (G4c) and sockets and attachment (G4d) remain.
 
 G4-G13, V1-V7 and L0-L9 incomplete; X2-X5 and X7-X9 not performed. No gate has passed merely because this
 document was revised. Replace this line with per-milestone evidence as work lands:

@@ -4,9 +4,11 @@
 #[path = "support/groups.rs"]
 mod support;
 
+use std::fmt::Write;
+
 use serde_json::json;
 use support::{commit, evaluate, named, volumes, wheels};
-use ve_graph::{Instance, Node, OpId, Session};
+use ve_graph::{Instance, Node, OpId, Session, builtin_registry, parse_text};
 use ve_modeling::{Evaluator, Quality};
 
 fn near(a: f64, b: f64, tolerance: f64) -> bool {
@@ -168,6 +170,34 @@ fn g4b_19_unfolding_too_much_is_refused_before_any_kernel_call() {
     assert_eq!(error.limit, Some(20_000.0));
     assert!(error.observed.unwrap() > 20_000.0);
     assert_eq!(ev.evaluated_nodes(), 0, "no kernel call was made");
+}
+
+#[test]
+fn g4e_02_a_group_written_as_text_evaluates_like_the_one_the_editor_makes() {
+    let mut text = String::from(
+        "group wheel\n  tyre = solid.torus@1(major=0.3, minor=0.06, segments=48, tube_segments=16)\n  hub = solid.cylinder@1(height=0.2, radius=0.08, segments=32)\n  spoke = solid.box@1(size=[0.22, 0.03, 0.03])\n  spokes = xform.radial@1(spoke, count=4, radius=0.14)\n  wheel = solid.union@1(tyre, hub, spokes)\n  expose radius = tyre.major\n  expose width = hub.height\n  result wheel\nend\n",
+    );
+    for i in 0..4 {
+        writeln!(
+            text,
+            "w{i} = wheel()\nm{i} = xform.move@1(w{i}, by=[{i}, 0, 0])"
+        )
+        .unwrap();
+    }
+    let batch = parse_text(&builtin_registry(), &text).unwrap();
+    let mut s = Session::with_builtin(4);
+    commit(&mut s, serde_json::to_value(&batch.commands).unwrap());
+    let from_text = evaluate(&mut Evaluator::default(), &s);
+    let (editor, _) = wheels(4);
+    let from_editor = evaluate(&mut Evaluator::default(), &editor);
+    assert_eq!(from_text.parts.len(), 4);
+    for (a, b) in volumes(&from_text).iter().zip(volumes(&from_editor)) {
+        assert!(near(*a, b, 1e-9), "{a} against {b}");
+    }
+    assert_eq!(
+        from_text.evaluated_nodes, 9,
+        "the prototype runs once here too"
+    );
 }
 
 #[test]

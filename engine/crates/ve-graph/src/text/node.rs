@@ -131,7 +131,13 @@ pub(super) fn node_ref(name: &str, known: &Known) -> Option<NodeRef> {
     }
 }
 
-fn connect(to: &str, port: &str, from: &str, known: &Known, span: Span) -> Option<(Command, Span)> {
+pub(super) fn connect(
+    to: &str,
+    port: &str,
+    from: &str,
+    known: &Known,
+    span: Span,
+) -> Option<(Command, Span)> {
     let to = Alias::parse(&format!("${to}")).ok()?;
     let from = node_ref(from, known)?;
     Some((

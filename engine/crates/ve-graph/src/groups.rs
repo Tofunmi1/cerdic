@@ -7,7 +7,7 @@ use crate::diag::Diagnostic;
 use crate::doc::Node;
 use crate::group::{Group, GroupParam, INPUT_OP};
 use crate::id::{GroupId, NodeId};
-use crate::limits::{MAX_GROUP_PARAMS, MAX_GROUPS, MAX_STRING_BYTES, count};
+use crate::limits::{MAX_GROUP_PARAMS, MAX_GROUPS, count};
 use crate::links;
 use crate::nodes::unknown_node;
 use crate::spec::PortType;
@@ -38,6 +38,35 @@ fn name_ok(name: &str, what: &str, longest: usize) -> Result<(), Fail> {
                 format!("{what} must be between 1 and {longest} bytes"),
             )
             .with_limit(count(longest), count(name.len())),
+        ));
+    }
+    Ok(())
+}
+
+/// A group's name is how the text form refers to it, so it is a plain name (letters, digits and `_`,
+/// not starting with a digit, at most 32 characters) that no other group has.
+fn group_name_ok(ctx: &Ctx<'_>, name: &str, this: Option<&GroupId>) -> Result<(), Fail> {
+    let mut chars = name.chars();
+    let plain = chars
+        .next()
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && name.len() <= 32
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_');
+    if !plain {
+        return Err(fail(
+            "group.name",
+            format!("{name:?} is not a usable group name (letters, digits, _; at most 32)"),
+        ));
+    }
+    if ctx
+        .doc
+        .groups
+        .iter()
+        .any(|g| g.name == name && Some(&g.id) != this)
+    {
+        return Err(fail(
+            "group.name",
+            format!("another group is already called {name}"),
         ));
     }
     Ok(())
@@ -96,7 +125,7 @@ pub(crate) fn create_group(
     members: &[NodeId],
     output: &NodeId,
 ) -> Result<GroupId, Fail> {
-    name_ok(name, "the group name", MAX_STRING_BYTES)?;
+    group_name_ok(ctx, name, None)?;
     if ctx.doc.groups.len() >= MAX_GROUPS {
         return Err(Box::new(
             Diagnostic::error("budget.groups", "the document has too many groups")
@@ -167,8 +196,8 @@ pub(crate) fn remove_group(ctx: &mut Ctx<'_>, id: &GroupId) -> Result<(), Fail> 
 }
 
 pub(crate) fn set_group_name(ctx: &mut Ctx<'_>, id: &GroupId, name: &str) -> Result<(), Fail> {
-    name_ok(name, "the group name", MAX_STRING_BYTES)?;
     group_of(ctx, id)?;
+    group_name_ok(ctx, name, Some(id))?;
     if let Some(group) = ctx.doc.group_mut(id) {
         name.clone_into(&mut group.name);
     }
