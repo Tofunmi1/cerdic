@@ -174,7 +174,8 @@ pub(crate) fn test(profile: Profile) -> Result<(), Failure> {
     run("bun", &["web/tests/mcp.mjs"])?;
     run("bun", &["web/tests/reflection.mjs"])?;
     run("bun", &["web/tests/panels-graph.mjs"])?;
-    run("bun", &["web/tests/panels.mjs"])
+    run("bun", &["web/tests/panels.mjs"])?;
+    run("bun", &["web/tests/panels-groups.mjs"])
 }
 
 /// The wasm-bindgen CLI must match the library version in `Cargo.lock` exactly.
