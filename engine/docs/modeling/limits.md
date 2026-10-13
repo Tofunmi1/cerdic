@@ -10,7 +10,8 @@ diagnostic naming the limit and the observed value; the document stays unchanged
 | Source text | 256 KiB |
 | Document JSON | 2 MiB |
 | Nodes per document (authored) | 5,000 |
-| Expanded nodes after groups | 50,000 |
+| Expanded nodes after groups | 20,000 (the existing enforced expansion cap) |
+| Instance placements per set / result | 16,384 / 16,384 (G4c measured entity representation) |
 | Group nesting depth | 8 |
 | Inputs on a variadic port | 64 |
 | List parameter length | 4,096 values |
