@@ -66,7 +66,14 @@ counter; the undone batch's key stays remembered, so re-sending it does nothing:
 | `editor_set_position` | `node`, `x`, `y` | Editor layer only |
 | `editor_set_collapsed` | `node`, `collapsed` | Editor layer only |
 | `editor_set_frame`, `editor_add_reroute` | defined with V2 | Editor layer only |
-| Group commands (G4) | `create_group`, `expose_port`, `set_group_param`, `upgrade_group` | Defined in the G4 case list before G4 starts |
+| `create_group` | `name`, `members`, `output`, `alias?` | Existing nodes become the definition (version 1); members read only each other and nothing outside reads them (`group.leaks`); the result must be a solid |
+| `remove_group`, `set_group_name` | `group`, `name?` | Removal refused while instances exist (`group.in_use`); it takes the members with it |
+| `expose_param`, `unexpose_param` | `group`, `name`, `node?`, `param?` | Interface changes: the group's version increases by one |
+| `set_group_output` | `group`, `node` | Interface change unless it names the current result |
+| `add_instance` | `group`, `label?`, `alias?`, `into?` | An instance pinned to the current version; `into` nests it in another group (recursion is `group.recursive`, depth over 8 is `budget.group_depth`) |
+| `set_instance_param`, `clear_instance_param` | `node`, `param`, `value?` | Overrides one exposed parameter on one instance, checked against the member parameter's own type and range; `group.outdated` while the instance is behind |
+| `upgrade_group` | `node` | Moves one instance to the group's version; keeps overrides that still match, drops the rest (`upgrade_preview` says which); `group.up_to_date` if there is nothing to do |
+| `add_node` with `group` | as `add_node` | Adds a member of a group's definition; `group.input@1` is only valid this way and changes the interface |
 
 Transforms are nodes (`xform.move`, `xform.rotate`, `xform.scale`), so the inspector and gizmos edit
 those nodes' parameters with `set_param`. Undo and redo are session requests (`undo`, `redo`), not
