@@ -20,6 +20,7 @@ const logs = [];
 // name, centre, size (metres) and the feature the detail view looks at
 const pieces = {
   aligned_beam: {centre:[-0.18,0.42,0],size:1.3,detail:[-0.6,0,0],detailScale:0.15},
+  socket_table: {centre:[0,-0.25,0],size:1.5,detail:[0,-0.25,0],detailScale:0.35},
   instance_fence: {centre:[1.9,0.5,0],size:4,detail:[0.4,0.6,0],detailScale:0.15},
   instance_bookshelf: {centre:[0.285,1.12,0],size:2.3,detail:[0.28,1.1,0.05],detailScale:0.25},
   vase: { centre: [0, 0.15, 0], size: 0.3, detail: [0, 0.3, 0] },

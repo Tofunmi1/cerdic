@@ -11,6 +11,7 @@ diagnostic naming the limit and the observed value; the document stays unchanged
 | Document JSON | 2 MiB |
 | Nodes per document (authored) | 5,000 |
 | Expanded nodes after groups | 20,000 (the existing enforced expansion cap) |
+| Named frames on each evaluated solid/prototype | 128 (frame-pattern copy products preflighted before geometry) |
 | Instance placements per set / result | 16,384 / 16,384 (G4c measured entity representation) |
 | Group nesting depth | 8 |
 | Inputs on a variadic port | 64 |

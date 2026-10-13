@@ -39,7 +39,8 @@ self.onmessage = async ({ data }) => {
       const transforms = api.eval_transforms(index), instance_indices = api.eval_instance_indices(index);
       return { ...part, positions, indices, transforms, instance_indices };
     });
-    const bytes = parts.reduce((sum, part) => sum + part.positions.byteLength + part.indices.byteLength + part.transforms.byteLength + part.instance_indices.byteLength, 0);
+    const bytes = parts.reduce((sum, part) => sum + part.positions.byteLength + part.indices.byteLength + part.transforms.byteLength + part.instance_indices.byteLength
+      + new TextEncoder().encode(JSON.stringify(part.frames ?? {})).byteLength, 0);
     const transfer = parts.flatMap(part => [part.positions.buffer, part.indices.buffer, part.transforms.buffer, part.instance_indices.buffer]);
     postMessage({ kind: 'result', token: data.token, parts, bytes, sent_ms: performance.timeOrigin + performance.now(),
       stats: { ...state.done, parts: undefined, elapsed_ms: performance.now() - began,

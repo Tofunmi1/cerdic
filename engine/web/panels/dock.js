@@ -43,6 +43,8 @@ export const PANEL_CSS = `
   .dock .none { opacity: .5; }
   .dock button.link { margin: 0; padding: 0 6px; }
   .dock .issue { color: #ffb4a8; font-size: 11px; margin: 0 0 2px 84px; }
+  .dock button.socket { width:100%;text-align:left;white-space:normal;font-size:10px; }
+  .dock button.socket.selected { background:rgba(100,190,255,.35);border-color:rgba(150,210,255,.8); }
   .dock .danger { margin-left: auto; }
   .dock .hrow, .dock .prow { display: block; width: 100%; margin: 1px 0; text-align: left; background: transparent; border-color: transparent; }
   .dock .hrow:hover, .dock .prow:hover { background: rgba(255,255,255,.1); }
@@ -83,7 +85,7 @@ export function mountPanels({ root, api, runtime, evaluation, onOutcome }) {
 
   const selection = createSelection({ runtime, state: () => ({ document: document_() }) });
   const outliner = createOutliner({ root: part("dock-outliner"), selection, document: document_, problems });
-  const inspector = createInspector({ root: part("dock-inspector"), api, selection, document: document_, problems, onOutcome });
+  const inspector = createInspector({ root: part("dock-inspector"), api, selection, document: document_, problems, onOutcome, evaluation });
   const history = createHistory({ root: part("dock-history"), api, onStep: () => onOutcome(null) });
   const issues = createProblems({
     root: dock.querySelector("#dock-problems .body"), details: part("dock-problems"), selection, list: problems,
