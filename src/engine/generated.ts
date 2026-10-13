@@ -16,7 +16,11 @@ label: string | null,
 /**
  * A name later commands in this batch can use for the new node.
  */
-alias: Alias | null, } } | { "remove_node": { 
+alias: Alias | null, 
+/**
+ * Makes the node a member of this group's definition instead of a top-level node.
+ */
+group: GroupRef | null, } } | { "remove_node": { 
 /**
  * The node.
  */
@@ -112,7 +116,108 @@ node: NodeRef,
 /**
  * Whether it is drawn collapsed.
  */
-collapsed: boolean, } };
+collapsed: boolean, } } | { "create_group": { 
+/**
+ * Display name.
+ */
+name: string, 
+/**
+ * The nodes that become members.
+ */
+members: Array<NodeRef>, 
+/**
+ * The member whose result is the group's result (a solid).
+ */
+output: NodeRef, 
+/**
+ * A name later commands in this batch can use for the new group.
+ */
+alias: Alias | null, } } | { "remove_group": { 
+/**
+ * The group.
+ */
+group: GroupRef, } } | { "set_group_name": { 
+/**
+ * The group.
+ */
+group: GroupRef, 
+/**
+ * The new name.
+ */
+name: string, } } | { "expose_param": { 
+/**
+ * The group.
+ */
+group: GroupRef, 
+/**
+ * The name instances use.
+ */
+name: string, 
+/**
+ * The member holding the parameter.
+ */
+node: NodeRef, 
+/**
+ * The member's parameter.
+ */
+param: string, } } | { "unexpose_param": { 
+/**
+ * The group.
+ */
+group: GroupRef, 
+/**
+ * The exposed name.
+ */
+name: string, } } | { "set_group_output": { 
+/**
+ * The group.
+ */
+group: GroupRef, 
+/**
+ * The member.
+ */
+node: NodeRef, } } | { "add_instance": { 
+/**
+ * The group.
+ */
+group: GroupRef, 
+/**
+ * Display name.
+ */
+label: string | null, 
+/**
+ * A name later commands in this batch can use for the new node.
+ */
+alias: Alias | null, 
+/**
+ * Makes the instance a member of this group's definition (a nested group) instead of a
+ * top-level node.
+ */
+into: GroupRef | null, } } | { "set_instance_param": { 
+/**
+ * The instance.
+ */
+node: NodeRef, 
+/**
+ * The exposed name.
+ */
+param: string, 
+/**
+ * The value, checked against the member parameter's type and range.
+ */
+value: Value, } } | { "clear_instance_param": { 
+/**
+ * The instance.
+ */
+node: NodeRef, 
+/**
+ * The exposed name.
+ */
+param: string, } } | { "upgrade_group": { 
+/**
+ * The instance.
+ */
+node: NodeRef, } };
 export type CommandBatch = { 
 /**
  * The document this batch is for.
@@ -222,6 +327,10 @@ outputs: Array<Output>,
  */
 materials: Array<Material>, 
 /**
+ * Group definitions; their members are nodes above that carry the group's ID.
+ */
+groups?: Array<Group>, 
+/**
  * Editor layer.
  */
 editor: EditorLayer, };
@@ -243,6 +352,42 @@ muted: boolean,
  * Pass the first input through unchanged where the types allow.
  */
 bypass: boolean, };
+export type Group = { 
+/**
+ * Stable identity.
+ */
+id: GroupId, 
+/**
+ * A display name; never part of identity or evaluation.
+ */
+name: string, 
+/**
+ * Increases whenever the interface changes; instances pin the version they were made against.
+ */
+version: number, 
+/**
+ * The member whose result is the group's result.
+ */
+output: NodeId, 
+/**
+ * What instances may override.
+ */
+params: Array<GroupParam>, };
+export type GroupId = string;
+export type GroupParam = { 
+/**
+ * The name instances use.
+ */
+name: string, 
+/**
+ * The member holding the parameter.
+ */
+node: NodeId, 
+/**
+ * The member's parameter.
+ */
+param: string, };
+export type GroupRef = string;
 export type IdState = { 
 /**
  * The next value to encode.
@@ -266,6 +411,19 @@ port: string,
  * disconnect of a single-link port.
  */
 index?: number | null, };
+export type Instance = { 
+/**
+ * The group.
+ */
+group: GroupId, 
+/**
+ * The version of the interface this instance was made against.
+ */
+version: number, 
+/**
+ * Overridden parameter values by exposed name.
+ */
+overrides: { [key in string]: Value }, };
 export type Material = { 
 /**
  * Stable identity.
@@ -300,7 +458,15 @@ inputs: { [key in string]: Array<PortRef> },
 /**
  * Mute and bypass.
  */
-flags: Flags, };
+flags: Flags, 
+/**
+ * The group whose definition this node belongs to; such nodes are not top-level.
+ */
+group?: GroupId | null, 
+/**
+ * Set on `group.use@1` nodes: the group, pinned version and overrides.
+ */
+instance?: Instance | null, };
 export type NodeId = string;
 export type NodeRef = string;
 export type OpId = string;

@@ -9,6 +9,10 @@ mod builtin;
 mod command;
 mod diag;
 mod doc;
+mod expand;
+mod group;
+mod group_check;
+mod groups;
 mod id;
 mod limits;
 mod links;
@@ -20,15 +24,19 @@ mod text;
 mod value;
 
 pub use builtin::builtin_registry;
-pub use command::{Alias, Command, CommandBatch, InputRef, NodeRef, OutRef, Outcome};
+pub use command::{Alias, Command, CommandBatch, GroupRef, InputRef, NodeRef, OutRef, Outcome};
 pub use diag::{Diagnostic, Severity, Span};
 pub use doc::{
     Document, EditorLayer, EvalHash, Flags, IdState, Material, Node, OUT_PORT, Output, PortRef,
     SCHEMA,
 };
-pub use id::{DocId, IdError, MaterialId, NodeId, TransactionId};
+pub use expand::{Expanded, Origin, expand};
+pub use group::{Group, GroupInput, GroupParam, INPUT_OP, INSTANCE_OP, Instance};
+pub use groups::{UpgradePreview, upgrade_preview};
+pub use id::{DocId, GroupId, IdError, MaterialId, NodeId, TransactionId};
 pub use limits::{
-    MAX_BATCH_BYTES, MAX_COMMANDS, MAX_DOCUMENT_BYTES, MAX_HISTORY, MAX_HISTORY_BYTES, MAX_NODES,
+    MAX_BATCH_BYTES, MAX_COMMANDS, MAX_DOCUMENT_BYTES, MAX_EXPANDED_NODES, MAX_GROUP_DEPTH,
+    MAX_HISTORY, MAX_HISTORY_BYTES, MAX_NODES,
 };
 pub use session::{History, HistoryItem, Moved, Session};
 pub use spec::{

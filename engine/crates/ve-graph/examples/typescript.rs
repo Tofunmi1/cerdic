@@ -2,9 +2,9 @@
 use std::io::Write;
 use ts_rs::{Config, TS};
 use ve_graph::{
-    Alias, Command, CommandBatch, Diagnostic, DocId, Document, EditorLayer, Flags, IdState,
-    InputRef, Material, MaterialId, Node, NodeId, NodeRef, OpId, OutRef, Outcome, Output, PortRef,
-    Severity, Span, TransactionId, Value,
+    Alias, Command, CommandBatch, Diagnostic, DocId, Document, EditorLayer, Flags, Group, GroupId,
+    GroupParam, GroupRef, IdState, InputRef, Instance, Material, MaterialId, Node, NodeId, NodeRef,
+    OpId, OutRef, Outcome, Output, PortRef, Severity, Span, TransactionId, Value,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,8 +18,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Document::decl(&cfg),
         EditorLayer::decl(&cfg),
         Flags::decl(&cfg),
+        Group::decl(&cfg),
+        GroupId::decl(&cfg),
+        GroupParam::decl(&cfg),
+        GroupRef::decl(&cfg),
         IdState::decl(&cfg),
         InputRef::decl(&cfg),
+        Instance::decl(&cfg),
         Material::decl(&cfg),
         MaterialId::decl(&cfg),
         Node::decl(&cfg),

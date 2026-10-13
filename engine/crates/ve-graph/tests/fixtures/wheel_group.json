@@ -1,0 +1,14 @@
+[
+  {"add_node": {"op": "solid.torus@1", "params": {"major": 0.3, "minor": 0.06, "segments": 48, "tube_segments": 16}, "label": "tyre", "alias": "$tyre"}},
+  {"add_node": {"op": "solid.cylinder@1", "params": {"height": 0.2, "radius": 0.08, "segments": 32}, "label": "hub", "alias": "$hub"}},
+  {"add_node": {"op": "solid.box@1", "params": {"size": [0.22, 0.03, 0.03]}, "label": "spoke", "alias": "$spoke"}},
+  {"add_node": {"op": "xform.radial@1", "params": {"count": 4, "radius": 0.14}, "label": "spokes", "alias": "$spokes"}},
+  {"add_node": {"op": "solid.union@1", "label": "wheel", "alias": "$wheel"}},
+  {"connect": {"from": {"node": "$spoke", "port": "out"}, "to": {"node": "$spokes", "port": "in"}}},
+  {"connect": {"from": {"node": "$tyre", "port": "out"}, "to": {"node": "$wheel", "port": "in"}}},
+  {"connect": {"from": {"node": "$hub", "port": "out"}, "to": {"node": "$wheel", "port": "in"}}},
+  {"connect": {"from": {"node": "$spokes", "port": "out"}, "to": {"node": "$wheel", "port": "in"}}},
+  {"create_group": {"name": "wheel", "members": ["$tyre", "$hub", "$spoke", "$spokes", "$wheel"], "output": "$wheel", "alias": "$g"}},
+  {"expose_param": {"group": "$g", "name": "radius", "node": "$tyre", "param": "major"}},
+  {"expose_param": {"group": "$g", "name": "width", "node": "$hub", "param": "height"}}
+]

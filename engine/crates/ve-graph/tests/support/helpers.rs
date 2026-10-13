@@ -61,6 +61,7 @@ pub(crate) fn add_as(op: &str, params: &[(&str, Value)], alias: Option<&str>) ->
             .collect(),
         label: None,
         alias: alias.map(|a| Alias::parse(a).unwrap()),
+        group: None,
     }
 }
 

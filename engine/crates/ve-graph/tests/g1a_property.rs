@@ -49,6 +49,7 @@ fn command(doc: &Document, kind: u8, a: u8, b: u8, x: f64) -> Command {
                 params: params_for(op, x),
                 label: None,
                 alias: None,
+                group: None,
             }
         }
         2 => Command::RemoveNode {

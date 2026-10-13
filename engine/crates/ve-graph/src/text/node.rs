@@ -103,6 +103,7 @@ pub(super) fn node_commands(
             params: read.values,
             label: Some(name.to_owned()),
             alias: alias.clone(),
+            group: None,
         },
         name_span,
     )];

@@ -6,17 +6,23 @@ use crate::{
 };
 use std::collections::BTreeMap;
 use std::rc::Rc;
-use ve_graph::{Document, NodeId};
+use ve_graph::{Document, NodeId, Origin};
 use ve_kernel::ExecutionContext;
 
 struct Job {
+    /// The document with its groups unfolded; what is planned and executed.
     doc: Document,
+    /// Which instance and member each unfolded node came from, for diagnostics.
+    origins: BTreeMap<NodeId, Origin>,
     plan: plan::Plan,
     quality: Quality,
     next: usize,
     context: ExecutionContext,
     values: BTreeMap<NodeId, (String, Rc<Value>)>,
     staged: Vec<(String, Rc<Value>)>,
+    /// Results computed in this job by cache key, so equal nodes (copies of a group's members in
+    /// several instances) are computed once even before the cache sees them.
+    shared: BTreeMap<String, Rc<Value>>,
     executed: usize,
     hits: usize,
     bytes: usize,
@@ -62,16 +68,19 @@ impl Evaluator {
     pub fn begin(&mut self, doc: &Document, quality: Quality) -> Result<(), Fail> {
         self.cancel();
         self.last_executed = 0;
-        let plan = plan::build(doc, quality)?;
+        let expanded = ve_graph::expand(doc)?;
+        let plan = plan::build(&expanded.doc, quality).map_err(|e| remap(e, &expanded.origins))?;
         let context = ExecutionContext::new().map_err(|e| fail("kernel.failed", e.to_string()))?;
         self.job = Some(Job {
-            doc: doc.clone(),
+            doc: expanded.doc,
+            origins: expanded.origins,
             plan,
             quality,
             next: 0,
             context,
             values: BTreeMap::new(),
             staged: Vec::new(),
+            shared: BTreeMap::new(),
             executed: 0,
             hits: 0,
             bytes: 0,
@@ -96,7 +105,7 @@ impl Evaluator {
         if job.next < job.plan.order.len() {
             let result = self.node(&mut job);
             self.last_executed = job.executed;
-            result?;
+            result.map_err(|e| remap(e, &job.origins))?;
             self.job = Some(job);
             return Ok(None);
         }
@@ -158,7 +167,10 @@ impl Evaluator {
             .to_string()
             .as_bytes(),
         );
-        let value = if let Some(value) = self.cache.get(&key) {
+        let value = if let Some(value) = job.shared.get(&key).cloned() {
+            job.hits += 1;
+            value
+        } else if let Some(value) = self.cache.get(&key) {
             job.hits += 1;
             value
         } else {
@@ -186,10 +198,32 @@ impl Evaluator {
                 job.bytes,
             ));
         }
+        job.shared.insert(key.clone(), Rc::clone(&value));
         job.values.insert(node.id.clone(), (key, value));
         job.next += 1;
         Ok(())
     }
+}
+
+/// A failure inside an unfolded group, reported against the instance: the diagnostic names the
+/// instance and lists the member (and any member it relates to) so an editor can select them.
+fn remap(mut failure: Fail, origins: &BTreeMap<NodeId, Origin>) -> Fail {
+    let member_of = |id: &NodeId| {
+        origins
+            .get(id)
+            .map_or_else(|| id.clone(), |o| o.member.clone())
+    };
+    if let Some(node) = failure.node.clone()
+        && let Some(origin) = origins.get(&node)
+    {
+        failure.node = Some(origin.instance.clone());
+        failure.related.insert(0, origin.member.clone());
+    }
+    for related in &mut failure.related {
+        *related = member_of(related);
+    }
+    failure.related.dedup();
+    failure
 }
 
 fn finish(job: &Job) -> Result<Evaluation, Fail> {

@@ -8,7 +8,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::id::{DocId, MaterialId, NodeId};
+use crate::group::{Group, GroupParam, Instance};
+use crate::id::{DocId, GroupId, MaterialId, NodeId};
 use crate::spec::OpId;
 use crate::value::Value;
 
@@ -58,6 +59,12 @@ pub struct Node {
     /// Mute and bypass.
     #[serde(default)]
     pub flags: Flags,
+    /// The group whose definition this node belongs to; such nodes are not top-level.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<GroupId>,
+    /// Set on `group.use@1` nodes: the group, pinned version and overrides.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instance: Option<Instance>,
 }
 
 /// A named result of the document.
@@ -124,6 +131,9 @@ pub struct Document {
     pub outputs: Vec<Output>,
     /// Material definitions.
     pub materials: Vec<Material>,
+    /// Group definitions; their members are nodes above that carry the group's ID.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<Group>,
     /// Editor layer.
     pub editor: EditorLayer,
 }
@@ -156,6 +166,7 @@ impl Document {
             nodes: Vec::new(),
             outputs: Vec::new(),
             materials: Vec::new(),
+            groups: Vec::new(),
             editor: EditorLayer::default(),
         }
     }
@@ -232,9 +243,13 @@ impl Document {
                 &'a BTreeMap<String, Value>,
                 &'a BTreeMap<String, Vec<PortRef>>,
                 Flags,
+                Option<&'a GroupId>,
+                Option<&'a Instance>,
             )>,
             outputs: &'a [Output],
             materials: &'a [Material],
+            // A group's name is a label; its interface is not.
+            groups: Vec<(&'a GroupId, u32, &'a NodeId, &'a [GroupParam])>,
         }
         let view = Evaluated {
             schema: self.schema,
@@ -243,10 +258,25 @@ impl Document {
             nodes: self
                 .nodes
                 .iter()
-                .map(|n| (&n.id, &n.op, &n.params, &n.inputs, n.flags))
+                .map(|n| {
+                    (
+                        &n.id,
+                        &n.op,
+                        &n.params,
+                        &n.inputs,
+                        n.flags,
+                        n.group.as_ref(),
+                        n.instance.as_ref(),
+                    )
+                })
                 .collect(),
             outputs: &self.outputs,
             materials: &self.materials,
+            groups: self
+                .groups
+                .iter()
+                .map(|g| (&g.id, g.version, &g.output, g.params.as_slice()))
+                .collect(),
         };
         let bytes = serde_json::to_vec(&view).unwrap_or_default();
         EvalHash([
@@ -277,6 +307,8 @@ mod tests {
             params: BTreeMap::from([("size".to_owned(), Value::List(vec![Value::Num(1.0); 3]))]),
             inputs: BTreeMap::new(),
             flags: Flags::default(),
+            group: None,
+            instance: None,
         });
         doc.editor.positions.insert(id, [1.0, 2.0]);
         let json = doc.canonical_json();

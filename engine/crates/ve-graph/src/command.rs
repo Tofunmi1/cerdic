@@ -5,129 +5,13 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::diag::Diagnostic;
-use crate::id::{DocId, IdError, MaterialId, NodeId, TransactionId};
+use crate::id::{DocId, MaterialId, NodeId, TransactionId};
 use crate::limits::MAX_BATCH_BYTES;
 use crate::value::Value;
 
-/// A name valid only inside one batch for a node the batch adds: `$` plus 1 to 32 characters from
-/// `[A-Za-z0-9_]`. It lets later commands in the same batch refer to a node whose ID is issued when
-/// the batch is applied.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(try_from = "String", into = "String")]
-#[cfg_attr(feature = "typescript", derive(ts_rs::TS), ts(type = "string"))]
-pub struct Alias(String);
+mod refs;
 
-impl Alias {
-    /// Validates and wraps `s`.
-    ///
-    /// # Errors
-    /// [`IdError`] if `s` is not `$` followed by 1 to 32 allowed characters.
-    pub fn parse(s: &str) -> Result<Self, IdError> {
-        let ok = s.strip_prefix('$').is_some_and(|body| {
-            (1..=32).contains(&body.len())
-                && body.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
-        });
-        if ok {
-            Ok(Self(s.to_owned()))
-        } else {
-            Err(IdError {
-                kind: "alias",
-                value: s.chars().take(80).collect(),
-            })
-        }
-    }
-
-    /// The alias as text, including the `$`.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl TryFrom<String> for Alias {
-    type Error = IdError;
-    fn try_from(s: String) -> Result<Self, IdError> {
-        Self::parse(&s)
-    }
-}
-
-impl From<Alias> for String {
-    fn from(a: Alias) -> String {
-        a.0
-    }
-}
-
-/// A node named in a command: by its real ID, or by an alias the same batch defined.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(try_from = "String", into = "String")]
-#[cfg_attr(feature = "typescript", derive(ts_rs::TS), ts(type = "string"))]
-pub enum NodeRef {
-    /// An existing node.
-    Id(NodeId),
-    /// A node added earlier in this batch.
-    Alias(Alias),
-}
-
-impl TryFrom<String> for NodeRef {
-    type Error = IdError;
-    fn try_from(s: String) -> Result<Self, IdError> {
-        if s.starts_with('$') {
-            Alias::parse(&s).map(Self::Alias)
-        } else {
-            NodeId::parse(&s).map(Self::Id)
-        }
-    }
-}
-
-impl From<NodeRef> for String {
-    fn from(r: NodeRef) -> String {
-        match r {
-            NodeRef::Id(id) => id.into(),
-            NodeRef::Alias(alias) => alias.into(),
-        }
-    }
-}
-
-impl From<NodeId> for NodeRef {
-    fn from(id: NodeId) -> Self {
-        Self::Id(id)
-    }
-}
-
-/// An output port named in a command.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
-pub struct OutRef {
-    /// The producing node.
-    pub node: NodeRef,
-    /// Its output port (always `out` for now).
-    pub port: String,
-}
-
-impl OutRef {
-    /// The `out` port of `node`.
-    #[must_use]
-    pub fn out(node: impl Into<NodeRef>) -> Self {
-        Self {
-            node: node.into(),
-            port: crate::doc::OUT_PORT.to_owned(),
-        }
-    }
-}
-
-/// An input port of a node, optionally at a position in a variadic list.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
-pub struct InputRef {
-    /// The consuming node.
-    pub node: NodeRef,
-    /// Its input port.
-    pub port: String,
-    /// Position in a variadic port; `None` appends on connect and removes the only link on
-    /// disconnect of a single-link port.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub index: Option<usize>,
-}
+pub use refs::{Alias, GroupRef, InputRef, NodeRef, OutRef};
 
 /// One edit. Batches apply all of their commands or none.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -147,6 +31,9 @@ pub enum Command {
         /// A name later commands in this batch can use for the new node.
         #[serde(default)]
         alias: Option<Alias>,
+        /// Makes the node a member of this group's definition instead of a top-level node.
+        #[serde(default)]
+        group: Option<GroupRef>,
     },
     /// Removes a node.
     RemoveNode {
@@ -234,6 +121,93 @@ pub enum Command {
         node: NodeRef,
         /// Whether it is drawn collapsed.
         collapsed: bool,
+    },
+    /// Turns existing nodes into the definition of a new group (version 1). The members must read
+    /// only each other, and nothing outside may read them.
+    CreateGroup {
+        /// Display name.
+        name: String,
+        /// The nodes that become members.
+        members: Vec<NodeRef>,
+        /// The member whose result is the group's result (a solid).
+        output: NodeRef,
+        /// A name later commands in this batch can use for the new group.
+        #[serde(default)]
+        alias: Option<Alias>,
+    },
+    /// Removes a group and its members; refused while instances exist.
+    RemoveGroup {
+        /// The group.
+        group: GroupRef,
+    },
+    /// Renames a group.
+    SetGroupName {
+        /// The group.
+        group: GroupRef,
+        /// The new name.
+        name: String,
+    },
+    /// Lets instances override a member's parameter under `name`. Changes the interface.
+    ExposeParam {
+        /// The group.
+        group: GroupRef,
+        /// The name instances use.
+        name: String,
+        /// The member holding the parameter.
+        node: NodeRef,
+        /// The member's parameter.
+        param: String,
+    },
+    /// Stops exposing a parameter. Changes the interface.
+    UnexposeParam {
+        /// The group.
+        group: GroupRef,
+        /// The exposed name.
+        name: String,
+    },
+    /// Picks another member as the group's result. Changes the interface.
+    SetGroupOutput {
+        /// The group.
+        group: GroupRef,
+        /// The member.
+        node: NodeRef,
+    },
+    /// Adds an instance of a group at its current version.
+    AddInstance {
+        /// The group.
+        group: GroupRef,
+        /// Display name.
+        #[serde(default)]
+        label: Option<String>,
+        /// A name later commands in this batch can use for the new node.
+        #[serde(default)]
+        alias: Option<Alias>,
+        /// Makes the instance a member of this group's definition (a nested group) instead of a
+        /// top-level node.
+        #[serde(default)]
+        into: Option<GroupRef>,
+    },
+    /// Overrides an exposed parameter on one instance.
+    SetInstanceParam {
+        /// The instance.
+        node: NodeRef,
+        /// The exposed name.
+        param: String,
+        /// The value, checked against the member parameter's type and range.
+        value: Value,
+    },
+    /// Removes an override, so the instance follows the definition again.
+    ClearInstanceParam {
+        /// The instance.
+        node: NodeRef,
+        /// The exposed name.
+        param: String,
+    },
+    /// Moves an instance to its group's current version, keeping the overrides that still match an
+    /// exposed parameter and dropping the rest.
+    UpgradeGroup {
+        /// The instance.
+        node: NodeRef,
     },
 }
 
@@ -343,6 +317,11 @@ mod tests {
             NodeRef::try_from("n_0123abcd".to_owned()),
             Ok(NodeRef::Id(_))
         ));
+        assert!(matches!(
+            GroupRef::try_from("g_0123abcd".to_owned()),
+            Ok(GroupRef::Id(_))
+        ));
+        assert!(GroupRef::try_from("n_0123abcd".to_owned()).is_err());
         for bad in [
             "$",
             "$has space",
