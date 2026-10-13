@@ -11,6 +11,7 @@ ve-graph = { path = "../ve-graph" }
 ve-kernel = { path = "../ve-kernel" }
 serde.workspace = true
 serde_json.workspace = true
+glam = "0.33"
 
 [lints]
 workspace = true

@@ -11,6 +11,11 @@ pub(crate) struct Plan {
 }
 
 pub(crate) fn build(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
+    header(doc)?;
+    plan_nodes(doc, quality)
+}
+
+fn header(doc: &Document) -> Result<(), Fail> {
     if doc.schema != ve_graph::SCHEMA {
         return Err(fail("store.newer_version", "unsupported document schema"));
     }
@@ -28,10 +33,15 @@ pub(crate) fn build(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
             "document exceeds the node or byte limit",
         ));
     }
+    Ok(())
+}
+
+fn plan_nodes(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
     let registry = builtin_registry();
     let mut done = BTreeSet::new();
     let mut types = BTreeMap::new();
     let mut sizes = BTreeMap::new();
+    let mut placements = BTreeMap::new();
     let mut order = Vec::new();
     let mut live_bytes = 0_usize;
     while order.len() < doc.nodes.len() {
@@ -52,22 +62,32 @@ pub(crate) fn build(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
                 .get(&node.op)
                 .ok_or_else(|| fail("parse.unknown_op", node.op.to_string()))?;
             validate(node, spec, &types)?;
-            let kind = match spec.output {
-                OutputSpec::Fixed(kind) => kind,
-                OutputSpec::SameAsInput(port) => node
-                    .inputs
-                    .get(port)
-                    .and_then(|r| r.first())
-                    .and_then(|r| types.get(&r.node))
-                    .copied()
-                    .ok_or_else(|| fail("graph.missing_input", port))?,
+            let kind = output_kind(node, spec, &types)?;
+            let instances = if kind == PortType::Inst {
+                crate::instances::estimate(node, &placements)?
+            } else {
+                0
             };
-            let triangles = estimate(node, &sizes)?;
+            let triangles = if node.op.family().as_str() == "inst.realize" {
+                let input = node
+                    .inputs
+                    .values()
+                    .flatten()
+                    .next()
+                    .ok_or_else(|| fail("graph.missing_input", "instance set"))?;
+                crate::instances::realization(
+                    *sizes.get(&input.node).unwrap_or(&0),
+                    *placements.get(&input.node).unwrap_or(&0),
+                )?
+            } else {
+                estimate(node, &sizes)?
+            };
             if triangles > quality.triangles() {
                 let issue = budget::exceeded("budget.triangles", quality.triangles(), triangles);
                 return Err(Box::new((*issue).at_node(&node.id)));
             }
             live_bytes = live_bytes.saturating_add(triangles.saturating_mul(96));
+            live_bytes = live_bytes.saturating_add(instances.saturating_mul(128));
             if live_bytes > 256 * 1024 * 1024 {
                 return Err(budget::exceeded(
                     "budget.memory",
@@ -77,6 +97,7 @@ pub(crate) fn build(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
             }
             types.insert(node.id.clone(), kind);
             sizes.insert(node.id.clone(), triangles);
+            placements.insert(node.id.clone(), instances);
             done.insert(node.id.clone());
             order.push(index);
         }
@@ -88,25 +109,71 @@ pub(crate) fn build(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
         }
     }
     let outputs = outputs(doc, &types);
-    validate_outputs(&outputs, &types, &sizes, quality)?;
+    validate_outputs(&outputs, &types, &sizes, &placements, quality)?;
     Ok(Plan { order, outputs })
+}
+
+fn output_kind(
+    node: &Node,
+    spec: &ve_graph::OperatorSpec,
+    types: &BTreeMap<NodeId, PortType>,
+) -> Result<PortType, Fail> {
+    match spec.output {
+        OutputSpec::Fixed(kind) => Ok(kind),
+        OutputSpec::SameAsInput(port) => node
+            .inputs
+            .get(port)
+            .and_then(|r| r.first())
+            .and_then(|r| types.get(&r.node))
+            .copied()
+            .ok_or_else(|| fail("graph.missing_input", port)),
+    }
 }
 
 fn validate_outputs(
     outputs: &[Output],
     types: &BTreeMap<NodeId, PortType>,
     sizes: &BTreeMap<NodeId, usize>,
+    placements: &BTreeMap<NodeId, usize>,
     quality: Quality,
 ) -> Result<(), Fail> {
     let mut total = 0_usize;
+    let mut instances = 0_usize;
     for output in outputs {
-        if types.get(&output.from.node) != Some(&PortType::Solid) || output.from.port != "out" {
+        if !matches!(
+            types.get(&output.from.node),
+            Some(PortType::Solid | PortType::Inst)
+        ) || output.from.port != "out"
+        {
             return Err(fail(
                 "graph.port_type",
                 "render outputs must name a solid output",
             ));
         }
-        total = total.saturating_add(*sizes.get(&output.from.node).unwrap_or(&0));
+        let count = placements
+            .get(&output.from.node)
+            .copied()
+            .unwrap_or(0)
+            .max(1);
+        let drawn = sizes
+            .get(&output.from.node)
+            .copied()
+            .unwrap_or(0)
+            .checked_mul(count)
+            .ok_or_else(|| fail("budget.triangles", "draw triangle product overflow"))?;
+        total = total
+            .checked_add(drawn)
+            .ok_or_else(|| fail("budget.triangles", "result triangle sum overflow"))?;
+        instances = instances
+            .checked_add(*placements.get(&output.from.node).unwrap_or(&0))
+            .ok_or_else(|| fail("budget.instances", "result placement sum overflow"))?;
+    }
+    if instances > crate::instances::MAX_INSTANCES {
+        return Err(budget::exceeded(
+            "budget.instances",
+            crate::instances::MAX_INSTANCES,
+            instances,
+        ));
     }
     if total > quality.triangles() {
         return Err(budget::exceeded(
@@ -248,7 +315,8 @@ fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usize, Fail>
         "solid.union" | "solid.difference" | "solid.intersect" => {
             Ok(inputs.sum::<usize>().saturating_mul(4))
         }
-        "xform.move" | "xform.rotate" | "xform.scale" | "solid.material" => Ok(inputs.sum()),
+        "xform.move" | "xform.rotate" | "xform.scale" | "solid.material" | "inst.array"
+        | "inst.radial" | "inst.repeat" | "inst.mirror" => Ok(inputs.sum()),
         _ => Err(fail(
             "geometry.unsupported_case",
             format!("{} has no evaluator yet", node.op),
@@ -276,7 +344,8 @@ fn outputs(doc: &Document, types: &BTreeMap<NodeId, PortType>) -> Vec<Output> {
     doc.nodes
         .iter()
         .filter(|node| {
-            !consumed.contains(&node.id) && types.get(&node.id) == Some(&PortType::Solid)
+            !consumed.contains(&node.id)
+                && matches!(types.get(&node.id), Some(PortType::Solid | PortType::Inst))
         })
         .map(|node| Output {
             name: node.label.clone().unwrap_or_else(|| node.id.to_string()),

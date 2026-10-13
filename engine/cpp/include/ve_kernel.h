@@ -51,6 +51,9 @@ ve_solid* ve_solid_translate(const ve_solid* s, double x, double y, double z, ve
 ve_solid* ve_solid_rotate(const ve_solid* s, double x_deg, double y_deg, double z_deg,
                           ve_status* status);
 ve_solid* ve_solid_scale(const ve_solid* s, double x, double y, double z, ve_status* status);
+/* Proper rigid transform, row-major 3x4 (translation in entries 3,7,11); count must be 12. */
+ve_solid* ve_solid_transform(const ve_solid* s, const double* matrix, size_t count,
+                             ve_status* status);
 
 /* Queries (NULL handle yields 0). */
 double ve_solid_volume(const ve_solid* s);

@@ -4,7 +4,33 @@
 use ve_graph::{Outcome, Session};
 use ve_modeling::{Evaluator, Quality};
 
+fn instances() -> Result<(), Box<dyn std::error::Error>> {
+    let source = "b = solid.box(size=[1,1,1])\ns = inst.repeat(b, count=3, step=[2,0,0])\nm = inst.mirror(s, axis=\"x\")\noutput m";
+    let parsed = ve_graph::parse_text(&ve_graph::builtin_registry(), source)
+        .map_err(|error| format!("{error:?}"))?;
+    let mut session = Session::with_builtin(1);
+    let batch = serde_json::json!({"doc":session.document().id,"base_revision":0,"transaction":"t_instances","commands":parsed.commands});
+    if !matches!(
+        session.apply_json(&batch.to_string()),
+        Outcome::Committed { .. }
+    ) {
+        return Err("instance parity fixture rejected".into());
+    }
+    let result = Evaluator::default()
+        .evaluate(session.document(), Quality::Preview)
+        .map_err(|error| error.message)?;
+    for part in result.parts {
+        println!(
+            "{}",
+            serde_json::json!({"node":part.node,"volume":part.volume,
+            "positions":part.positions,"indices":part.indices,"transforms":part.transforms,"instance_indices":part.instance_indices})
+        );
+    }
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    instances()?;
     let mut session = Session::with_builtin(1);
     let batch = serde_json::json!({"doc":session.document().id,"base_revision":0,
         "transaction":"t_parity","commands":[

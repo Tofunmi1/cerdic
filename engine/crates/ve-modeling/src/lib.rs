@@ -3,6 +3,7 @@ mod appearance;
 mod budget;
 mod cache;
 mod evaluate;
+mod instances;
 mod job;
 mod operations;
 mod plan;

@@ -50,5 +50,6 @@ pub(crate) fn material(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail>
             roughness,
             emissive,
         }),
+        instances: None,
     })
 }

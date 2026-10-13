@@ -88,6 +88,29 @@ bool valid_triangles(const uint32_t* indices, size_t index_count, size_t vertex_
 
 extern "C" {
 
+ve_solid* ve_solid_transform(const ve_solid* solid, const double* matrix, size_t count,
+                             ve_status* status) {
+  if (solid == nullptr || matrix == nullptr || count != 12) {
+    set_status(status, VE_ERR_INVALID_ARG);
+    return nullptr;
+  }
+  const manifold::vec3 x = {matrix[0], matrix[4], matrix[8]};
+  const manifold::vec3 y = {matrix[1], matrix[5], matrix[9]};
+  const manifold::vec3 z = {matrix[2], matrix[6], matrix[10]};
+  if (!std::all_of(matrix, matrix + 12,
+                   [](double v) { return std::isfinite(v) && std::abs(v) <= 1.0e6; }) ||
+      std::abs(manifold::la::dot(x, x) - 1.0) > 1e-9 ||
+      std::abs(manifold::la::dot(y, y) - 1.0) > 1e-9 ||
+      std::abs(manifold::la::dot(z, z) - 1.0) > 1e-9 || std::abs(manifold::la::dot(x, y)) > 1e-9 ||
+      std::abs(manifold::la::dot(x, z)) > 1e-9 || std::abs(manifold::la::dot(y, z)) > 1e-9 ||
+      std::abs(manifold::la::dot(x, manifold::la::cross(y, z)) - 1.0) > 1e-9) {
+    set_status(status, VE_ERR_INVALID_ARG);
+    return nullptr;
+  }
+  const manifold::mat3x4 transform(x, y, z, {matrix[3], matrix[7], matrix[11]});
+  return wrap(solid->m.Transform(transform), status);
+}
+
 ve_solid* ve_solid_cube(double x, double y, double z, int32_t center, ve_status* status) {
   if (!finite_positive(x) || !finite_positive(y) || !finite_positive(z)) {
     set_status(status, VE_ERR_INVALID_ARG);

@@ -5,6 +5,7 @@ use std::rc::Rc;
 use ve_kernel::Mesh;
 
 /// What one node produced: a solid's mesh, a profile's canonical f64 loops, or neither (a check).
+#[derive(Clone)]
 pub(crate) struct Value {
     pub(crate) mesh: Mesh,
     pub(crate) volume: f64,
@@ -12,6 +13,7 @@ pub(crate) struct Value {
     /// The surface a `solid.material` gave this solid; transforms and booleans keep their first
     /// input's, everything else starts without one.
     pub(crate) material: Option<Material>,
+    pub(crate) instances: Option<crate::instances::InstanceSet>,
 }
 
 impl Value {
@@ -21,6 +23,7 @@ impl Value {
             volume,
             loops: Vec::new(),
             material: None,
+            instances: None,
         }
     }
 
@@ -30,6 +33,7 @@ impl Value {
             volume: 0.0,
             loops,
             material: None,
+            instances: None,
         }
     }
 
@@ -46,6 +50,9 @@ impl Value {
                 .map(|l| l.capacity() * size_of::<[f64; 2]>() + size_of::<Vec<[f64; 2]>>())
                 .sum::<usize>()
             + size_of::<Self>()
+            + self.instances.as_ref().map_or(0, |set| {
+                set.transforms.capacity() * size_of::<glam::DMat4>() + set.prototype.bytes()
+            })
     }
 }
 

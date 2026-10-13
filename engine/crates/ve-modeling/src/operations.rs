@@ -1,5 +1,5 @@
 //! Operators consume immutable mesh values. Native solids exist only while one node executes.
-use crate::{Fail, appearance, cache::Value, fail, profile_ops, shapes};
+use crate::{Fail, appearance, cache::Value, fail, instances, profile_ops, shapes};
 use std::rc::Rc;
 use ve_graph::{Node, Value as Param};
 use ve_kernel::{ExecutionContext, KernelError, Mesh, Solid};
@@ -24,9 +24,18 @@ pub(crate) fn execute(
             volume: input.volume,
             loops: input.loops.clone(),
             material: input.material.clone(),
+            instances: input.instances.clone(),
         });
     }
     let family = node.op.family().as_str();
+    if family.starts_with("inst.") || inputs.first().is_some_and(|v| v.instances.is_some()) {
+        return instances::execute(node, inputs, context).map_err(|mut error| {
+            if error.node.is_none() {
+                error.node = Some(node.id.clone());
+            }
+            error
+        });
+    }
     if family == "solid.material" {
         return appearance::material(node, inputs);
     }

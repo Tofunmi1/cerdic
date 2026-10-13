@@ -92,6 +92,33 @@ pub fn eval_indices(part: u32) -> Vec<u32> {
     })
 }
 
+/// Copies instance placements for transferable transport; empty for an ordinary solid.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_transforms(part: u32) -> Vec<f32> {
+    HOST.with(|cell| {
+        cell.borrow()
+            .result
+            .as_ref()
+            .and_then(|r| r.parts.get(part as usize))
+            .and_then(|p| p.transforms.as_ref())
+            .map_or_else(Vec::new, |m| m.iter().flatten().copied().collect())
+    })
+}
+
+/// Original per-placement indices; reflection batches keep the same authored selection identity.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_instance_indices(part: u32) -> Vec<u32> {
+    HOST.with(|cell| {
+        cell.borrow()
+            .result
+            .as_ref()
+            .and_then(|r| r.parts.get(part as usize))
+            .map_or_else(Vec::new, |p| p.instance_indices.clone())
+    })
+}
+
 /// Drops pending work/results. Cancellation signals never become cached kernel handles.
 #[wasm_bindgen]
 pub fn eval_cancel() {

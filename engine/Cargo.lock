@@ -3120,6 +3120,7 @@ version = "0.0.0"
 name = "ve-modeling"
 version = "0.0.0"
 dependencies = [
+ "glam",
  "serde",
  "serde_json",
  "ve-graph",

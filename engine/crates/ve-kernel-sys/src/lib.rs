@@ -49,6 +49,13 @@ pub const VE_MAX_SEGMENTS: u32 = 4096;
 // SAFETY (all declarations): signatures match `cpp/include/ve_kernel.h`; the library is linked by
 // this crate's build script.
 unsafe extern "C" {
+    /// Row-major proper rigid 3x4 transform, checked in C++.
+    pub fn ve_solid_transform(
+        s: *const VeSolid,
+        matrix: *const f64,
+        count: usize,
+        status: *mut VeStatus,
+    ) -> *mut VeSolid;
     /// Deferred batch union evaluated with one context, 2..64 borrowed handles.
     pub fn ve_solid_batch_union_context(
         solids: *const *const VeSolid,
