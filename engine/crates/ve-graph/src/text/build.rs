@@ -2,6 +2,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::group::{Block, lower_group};
+use super::instance::{Groups, known_groups, lower_instance};
 use super::lex::{Fail, error, fail};
 use super::node::{Known, links, node_commands, node_ref};
 use super::parse::{Arg, Stmt, parse};
@@ -31,7 +33,7 @@ impl TextBatch {
     }
 }
 
-fn valid_name(name: &str) -> bool {
+pub(super) fn valid_name(name: &str) -> bool {
     let mut chars = name.chars();
     chars
         .next()
@@ -48,7 +50,7 @@ fn latest(registry: &OperatorRegistry, family: &str) -> Option<OpId> {
         .max_by_key(OpId::version)
 }
 
-fn resolve<'r>(
+pub(super) fn resolve<'r>(
     registry: &'r OperatorRegistry,
     text: &str,
     span: Span,
@@ -84,7 +86,7 @@ fn resolve<'r>(
     }
 }
 
-struct Names<'a> {
+pub(super) struct Names<'a> {
     defined: BTreeMap<&'a str, usize>,
     deps: BTreeMap<&'a str, Vec<&'a str>>,
 }
@@ -104,7 +106,12 @@ fn reaches(
         .any(|d| *d == target || reaches(deps, d, target, seen))
 }
 
-fn input_errors(statements: &[Stmt], names: &Names<'_>, known: &Known, out: &mut Vec<Diagnostic>) {
+pub(super) fn input_errors(
+    statements: &[Stmt],
+    names: &Names<'_>,
+    known: &Known,
+    out: &mut Vec<Diagnostic>,
+) {
     for (index, statement) in statements.iter().enumerate() {
         let Stmt::Node { name, args, .. } = statement else {
             continue;
@@ -147,7 +154,7 @@ fn input_errors(statements: &[Stmt], names: &Names<'_>, known: &Known, out: &mut
 }
 
 /// Collects the node names and what each reads, reporting bad and duplicate names.
-fn collect_names<'a>(
+pub(super) fn collect_names<'a>(
     statements: &'a [Stmt],
     known: &Known,
     errors: &mut Vec<Diagnostic>,
@@ -223,7 +230,8 @@ fn output_command(
 /// Labels in `doc` that text can refer to: plain names that exactly one node carries.
 fn known_labels(doc: &Document) -> Known {
     let mut seen: BTreeMap<String, Option<NodeId>> = BTreeMap::new();
-    for node in &doc.nodes {
+    // The members of a group are not top-level nodes; text cannot read them.
+    for node in doc.nodes.iter().filter(|n| n.group.is_none()) {
         let Some(label) = node.label.as_deref().filter(|l| valid_name(l)) else {
             continue;
         };
@@ -242,7 +250,7 @@ fn known_labels(doc: &Document) -> Known {
 /// Every problem found, each with a source span: syntax, unknown operators (with suggestions),
 /// parameters, names, forward references and cycles.
 pub fn parse_text(registry: &OperatorRegistry, source: &str) -> Result<TextBatch, Vec<Diagnostic>> {
-    parse_with(registry, &Known::new(), source)
+    parse_with(registry, &Known::new(), Groups::new(), source)
 }
 
 /// Like [`parse_text`], for adding to `doc`: a name the text does not define may be the label of one
@@ -256,12 +264,18 @@ pub fn parse_text_in(
     doc: &Document,
     source: &str,
 ) -> Result<TextBatch, Vec<Diagnostic>> {
-    parse_with(registry, &known_labels(doc), source)
+    parse_with(
+        registry,
+        &known_labels(doc),
+        known_groups(registry, doc),
+        source,
+    )
 }
 
 fn parse_with(
     registry: &OperatorRegistry,
     known: &Known,
+    mut groups: Groups,
     source: &str,
 ) -> Result<TextBatch, Vec<Diagnostic>> {
     let statements = parse(source).map_err(|e| vec![*e])?;
@@ -278,8 +292,22 @@ fn parse_with(
             batch.spans.push(span);
         }
     };
+    let mut serial = 0;
     for statement in &statements {
         match statement {
+            // An operator is `family.name`; a name without a dot is a group being instanced.
+            Stmt::Node {
+                name,
+                name_span,
+                op,
+                op_span,
+                args,
+            } if !op.contains('.') => {
+                let (added, mut found) =
+                    lower_instance(name, *name_span, op, *op_span, args, &groups, known);
+                errors.append(&mut found);
+                push(added);
+            }
             Stmt::Node {
                 name,
                 name_span,
@@ -297,6 +325,24 @@ fn parse_with(
                 }
                 Err(e) => errors.push(*e),
             },
+            Stmt::Group {
+                name,
+                name_span,
+                body,
+                exposes,
+                result,
+            } => {
+                let block = Block {
+                    name,
+                    name_span: *name_span,
+                    body,
+                    exposes,
+                    result: result.as_ref(),
+                };
+                let (added, mut found) = lower_group(registry, &block, &mut groups, &mut serial);
+                errors.append(&mut found);
+                push(added);
+            }
             Stmt::Output {
                 name,
                 name_span,

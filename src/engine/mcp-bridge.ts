@@ -75,7 +75,9 @@ async function run(host: Host, method: string, params: Record<string, unknown>) 
     case 'get_text': return { revision: doc.state().revision, ...doc.text() };
     case 'get_nodes': {
       const { document } = doc.state();
-      return { revision: doc.state().revision, nodes: document.nodes.map(n => ({ id: n.id, label: n.label, op: n.op, params: n.params, inputs: n.inputs, flags: n.flags })), outputs: document.outputs };
+      // `group` is the group a node is a member of (a definition node), `instance` the group, version
+      // and overrides of an instance; `groups` lists each group's version, result and exposed parameters.
+      return { revision: doc.state().revision, nodes: document.nodes.map(n => ({ id: n.id, label: n.label, op: n.op, params: n.params, inputs: n.inputs, flags: n.flags, group: n.group ?? null, instance: n.instance ?? null })), outputs: document.outputs, groups: document.groups ?? [] };
     }
     case 'list_operators': {
       const all = JSON.parse(runtime.doc_operators()) as Array<{ readiness: string }>;

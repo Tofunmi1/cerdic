@@ -170,6 +170,32 @@ try {
   assert.equal(tooBright.data.applied, false);
   assert.equal(tooBright.data.diagnostics[0].code, 'param.range');
   console.log('MCP colour: the vase renders red');
+
+  // Groups: a model defines a wheel once and uses it four times; the document evaluates, prints
+  // back as the same text, and a change to the definition is one edit for all four.
+  const wheel = ['group wheel',
+    '  tyre = solid.torus@1(major=0.3, minor=0.06, segments=48, tube_segments=16)',
+    '  hub = solid.cylinder@1(height=0.2, radius=0.08, segments=32)',
+    '  spoke = solid.box@1(size=[0.22, 0.03, 0.03])',
+    '  spokes = xform.radial@1(spoke, count=4, radius=0.14)',
+    '  rim = solid.union@1(tyre, hub, spokes)',
+    '  expose radius = tyre.major', '  result rim', 'end',
+    ...[0, 1, 2, 3].flatMap(i => [`w${i} = wheel(${i === 2 ? 'radius=0.35' : ''})`, `m${i} = xform.move@1(w${i}, by=[${i}, 0, 0])`, `output m${i}`])].join('\n') + '\n';
+  const grouped = await mcp.tool('apply_text', { text: wheel, label: 'a wheel, used four times' });
+  assert.equal(grouped.data.applied, true, JSON.stringify(grouped.data).slice(0, 400));
+  assert.match(grouped.data.text, /group wheel\n/);
+  assert.match(grouped.data.text, /w2 = wheel\(radius=0\.35\)/);
+  const shown = (await mcp.tool('get_text')).data.text;
+  assert.match(shown, /expose radius = tyre\.major/);
+  const members = (await mcp.tool('get_nodes')).data.nodes.filter(n => n.group);
+  assert.equal(members.length, 5, 'the wheel has five members');
+  const spokeNode = members.find(n => n.label === 'spoke');
+  const thicker = await mcp.tool('apply_commands', { commands: [{ set_param: { node: spokeNode.id, param: 'size', value: [0.22, 0.03, 0.05] } }], label: 'thicker spokes' });
+  assert.equal(thicker.data.applied, true, JSON.stringify(thicker.data).slice(0, 300));
+  const empty2 = await mcp.tool('apply_text', { text: 'x = nowhere()\n' });
+  assert.equal(empty2.data.applied, false);
+  assert.equal(empty2.data.diagnostics[0].code, 'parse.unknown_group');
+  console.log('MCP groups: a wheel used four times');
   assert.deepEqual(logs, [], 'no page errors');
   console.log('MCP acceptance passed');
 } finally {

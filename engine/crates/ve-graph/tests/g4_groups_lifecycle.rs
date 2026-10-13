@@ -308,10 +308,20 @@ fn g4b_19_nesting_is_bounded() {
 }
 
 #[test]
-fn g4b_20_the_text_form_refuses_groups_rather_than_misprint_them() {
-    let (s, _) = wheel();
-    let error = to_text(s.registry(), s.document()).unwrap_err();
-    assert_eq!(error.code, "text.unsupported");
-    let plain = Session::with_builtin(4);
-    assert!(to_text(plain.registry(), plain.document()).is_ok());
+fn g4b_20_the_text_form_prints_groups_and_refuses_a_document_it_cannot_say() {
+    // G4e lifted the first version of this case, which refused every document with groups. What stays
+    // is that text never prints something that would read back wrongly: an instance behind its group
+    // has no text form until it is upgraded.
+    let (mut s, id) = wheel();
+    add_instances(&mut s, &id, &["a"]);
+    let text = to_text(s.registry(), s.document()).unwrap();
+    assert!(text.starts_with("group wheel\n"), "{text}");
+    commit(
+        &mut s,
+        json!([{"unexpose_param": {"group": id.as_str(), "name": "width"}}]),
+    );
+    assert_eq!(
+        to_text(s.registry(), s.document()).unwrap_err().code,
+        "text.unsupported"
+    );
 }

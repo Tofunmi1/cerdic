@@ -57,7 +57,27 @@ pub(super) enum Stmt {
         name_span: Span,
         node: Option<(String, Span)>,
     },
+    /// `group name ... end`: node statements, `expose` lines and one `result`.
+    Group {
+        name: String,
+        name_span: Span,
+        body: Vec<Stmt>,
+        exposes: Vec<Expose>,
+        result: Option<(String, Span)>,
+    },
 }
+
+/// `expose name = node.param`: lets an instance override a member's parameter.
+#[derive(Clone, Debug)]
+pub(super) struct Expose {
+    pub(super) name: String,
+    pub(super) name_span: Span,
+    pub(super) node: String,
+    pub(super) param: String,
+    pub(super) span: Span,
+}
+
+mod group;
 
 struct Parser {
     tokens: Vec<Token>,
@@ -222,7 +242,19 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Stmt, Fail> {
-        let (first, first_span) = self.word("a node name or `output`")?;
+        let (first, first_span) = self.word("a node name, `group` or `output`")?;
+        // A node may be called `group`; the keyword is `group` followed by a name, not by `=`.
+        if first == "group"
+            && !matches!(
+                self.peek(),
+                Some(Token {
+                    tok: Tok::Equals,
+                    ..
+                })
+            )
+        {
+            return self.group();
+        }
         if first == "output" {
             let (name, name_span) = self.word("the output's name")?;
             let node = if matches!(

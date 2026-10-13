@@ -185,7 +185,7 @@ fn e8_the_evaluation_hash_follows_what_evaluation_depends_on() {
     );
     commit(
         &mut s,
-        json!([{"set_group_name": {"group": id.as_str(), "name": "tyre and hub"}}]),
+        json!([{"set_group_name": {"group": id.as_str(), "name": "tyre_and_hub"}}]),
     );
     commit(
         &mut s,

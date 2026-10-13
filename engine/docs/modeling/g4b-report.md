@@ -37,8 +37,10 @@ used many times; ADR 0013 has the design. Instance sets and realization (G4c), s
 - Fixture: `ve-graph/tests/fixtures/wheel_group.json` (tyre, hub, spokes, exposing `radius` and `width`).
 
 ## Not done, and known limits
-- The text form cannot say groups (`to_text` refuses a document that has them, `text.unsupported`), so a
-  model driving the engine through text cannot use groups yet (G4e).
+- The text form for groups (G4e) is done: `group name ... end` blocks with `expose` and `result` lines,
+  instances written `w = wheel(port=node, param=value)`, printed back canonically (`g4_text.rs`,
+  `g4e_02` in `ve-modeling`, and the MCP acceptance test). An instance behind its group cannot be
+  printed until it is upgraded, and groups are defined at the top level only.
 - The viewer panels do not show groups well: members appear in the outliner among the other nodes and
   the inspector has no widgets for overrides or an upgrade button. That is the editor work of V4.
 - Group inputs and results are solids only; profile and curve groups come with later gates.
