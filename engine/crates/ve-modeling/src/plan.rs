@@ -42,6 +42,7 @@ fn plan_nodes(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
     let mut types = BTreeMap::new();
     let mut sizes = BTreeMap::new();
     let mut placements = BTreeMap::new();
+    let mut frames = BTreeMap::new();
     let mut order = Vec::new();
     let mut live_bytes = 0_usize;
     while order.len() < doc.nodes.len() {
@@ -62,6 +63,7 @@ fn plan_nodes(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
                 .get(&node.op)
                 .ok_or_else(|| fail("parse.unknown_op", node.op.to_string()))?;
             validate(node, spec, &types)?;
+            let sockets = crate::frames::estimate(node, &frames, &placements)?;
             let kind = output_kind(node, spec, &types)?;
             let instances = if kind == PortType::Inst {
                 crate::instances::estimate(node, &placements)?
@@ -88,6 +90,7 @@ fn plan_nodes(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
             }
             live_bytes = live_bytes.saturating_add(triangles.saturating_mul(96));
             live_bytes = live_bytes.saturating_add(instances.saturating_mul(128));
+            live_bytes = live_bytes.saturating_add(sockets.saturating_mul(256));
             if live_bytes > 256 * 1024 * 1024 {
                 return Err(budget::exceeded(
                     "budget.memory",
@@ -98,6 +101,7 @@ fn plan_nodes(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
             types.insert(node.id.clone(), kind);
             sizes.insert(node.id.clone(), triangles);
             placements.insert(node.id.clone(), instances);
+            frames.insert(node.id.clone(), sockets);
             done.insert(node.id.clone());
             order.push(index);
         }
@@ -270,26 +274,10 @@ fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usize, Fail>
     let divisions = divisions as usize;
     // Profile nodes count points instead of triangles; they feed the solids built from them.
     match node.op.family().as_str() {
-        "profile.polygon" => Ok(match node.params.get("points") {
-            Some(ve_graph::Value::List(points)) => points.len(),
-            _ => 0,
-        }),
-        "profile.offset" => {
-            // The arcs of a round join turn through 2 pi per loop in total, so they add at most 64
-            // points per loop (64 segments per circle); a few loops are covered by the constant.
-            let round =
-                matches!(node.params.get("join"), Some(ve_graph::Value::Str(j)) if j == "round");
-            Ok(inputs.sum::<usize>().saturating_mul(2) + if round { 256 } else { 0 })
+        "profile.polygon" | "profile.offset" | "profile.difference" | "profile.smooth" => {
+            profile_estimate(node, inputs.sum(), segments)
         }
-        // A mirror doubles its input, like a profile difference doubles its inputs.
-        "profile.difference" | "xform.mirror" => Ok(inputs.sum::<usize>().saturating_mul(2)),
-        "profile.smooth" => {
-            let rounds = match node.params.get("iterations") {
-                Some(ve_graph::Value::Int(n)) => (*n).clamp(0, 5),
-                _ => 2,
-            };
-            Ok(inputs.sum::<usize>().saturating_mul(1_usize << rounds))
-        }
+        "xform.mirror" => Ok(inputs.sum::<usize>().saturating_mul(2)),
         "check.min_wall" => Ok(0),
         "profile.rect" => Ok(4),
         "profile.circle" => Ok(segments),
@@ -318,11 +306,48 @@ fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usize, Fail>
         "solid.union" | "solid.difference" | "solid.intersect" => {
             Ok(inputs.sum::<usize>().saturating_mul(4))
         }
-        "xform.move" | "xform.rotate" | "xform.scale" | "xform.align" | "solid.material"
-        | "inst.array" | "inst.radial" | "inst.repeat" | "inst.mirror" => Ok(inputs.sum()),
+        "xform.attach" => Ok(node
+            .inputs
+            .get("in")
+            .into_iter()
+            .flatten()
+            .map(|r| sizes.get(&r.node).copied().unwrap_or(0))
+            .sum()),
+        "xform.move" | "xform.rotate" | "xform.scale" | "xform.align" | "frame.add"
+        | "solid.material" | "inst.array" | "inst.radial" | "inst.repeat" | "inst.mirror" => {
+            Ok(inputs.sum())
+        }
         _ => Err(fail(
             "geometry.unsupported_case",
             format!("{} has no evaluator yet", node.op),
+        )),
+    }
+}
+
+fn profile_estimate(node: &Node, inputs: usize, segments: usize) -> Result<usize, Fail> {
+    match node.op.family().as_str() {
+        "profile.polygon" => Ok(match node.params.get("points") {
+            Some(ve_graph::Value::List(points)) => points.len(),
+            _ => 0,
+        }),
+        "profile.offset" => {
+            let round =
+                matches!(node.params.get("join"),Some(ve_graph::Value::Str(j)) if j=="round");
+            Ok(inputs.saturating_mul(2) + if round { 256 } else { 0 })
+        }
+        "profile.difference" => Ok(inputs.saturating_mul(2)),
+        "profile.smooth" => {
+            let rounds = match node.params.get("iterations") {
+                Some(ve_graph::Value::Int(n)) => (*n).clamp(0, 5),
+                _ => 2,
+            };
+            Ok(inputs.saturating_mul(1_usize << rounds))
+        }
+        "profile.rect" => Ok(4),
+        "profile.circle" => Ok(segments),
+        _ => Err(fail(
+            "geometry.unsupported_case",
+            format!("{} has no profile estimate", node.op),
         )),
     }
 }

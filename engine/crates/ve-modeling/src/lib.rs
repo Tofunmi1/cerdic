@@ -4,6 +4,7 @@ mod assembly;
 mod budget;
 mod cache;
 mod evaluate;
+mod frames;
 mod instances;
 mod job;
 mod operations;
@@ -13,6 +14,7 @@ mod result;
 mod shapes;
 
 pub use evaluate::Evaluator;
+pub use frames::Frame;
 pub use job::{JobToken, hash};
 pub use result::{Evaluation, Material, Part, Quality};
 

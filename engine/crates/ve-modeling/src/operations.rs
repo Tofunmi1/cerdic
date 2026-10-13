@@ -19,15 +19,20 @@ pub(crate) fn execute(
         let input = inputs
             .first()
             .ok_or_else(|| fail("graph.missing_input", "bypass requires an input"))?;
-        return Ok(Value {
-            mesh: input.mesh.clone(),
-            volume: input.volume,
-            loops: input.loops.clone(),
-            material: input.material.clone(),
-            instances: input.instances.clone(),
-        });
+        return Ok((**input).clone());
     }
     let family = node.op.family().as_str();
+    if family == "frame.add" {
+        return crate::frames::add(
+            node,
+            inputs
+                .first()
+                .ok_or_else(|| fail("graph.missing_input", "frame source"))?,
+        );
+    }
+    if family == "xform.attach" {
+        return crate::frames::attach(node, inputs);
+    }
     if family.starts_with("inst.") || inputs.first().is_some_and(|v| v.instances.is_some()) {
         return instances::execute(node, inputs, context).map_err(|mut error| {
             if error.node.is_none() {
@@ -47,7 +52,7 @@ pub(crate) fn execute(
         || (family == "solid.intersect" && inputs.iter().any(|input| input.mesh.is_empty()))
         || (family == "solid.union" && inputs.iter().all(|input| input.mesh.is_empty()))
     {
-        return Ok(Value::nothing());
+        return inherited(node, inputs, Value::nothing());
     }
     let nonempty: Vec<_> = inputs
         .iter()
@@ -70,7 +75,11 @@ pub(crate) fn execute(
             .to_mesh()
             .map_err(|e| fail("kernel.failed", e.to_string()))?
     };
-    let mut value = Value::solid(mesh, result.volume());
+    inherited(node, inputs, Value::solid(mesh, result.volume()))
+}
+
+fn inherited(node: &Node, inputs: &[Rc<Value>], mut value: Value) -> Result<Value, Fail> {
+    let family = node.op.family().as_str();
     // Moving, turning, scaling or combining keeps the first input's surface.
     if family.starts_with("xform.")
         || matches!(
@@ -79,6 +88,9 @@ pub(crate) fn execute(
         )
     {
         value.material = inputs.first().and_then(|input| input.material.clone());
+        if let Some(input) = inputs.first() {
+            value.frames = crate::frames::propagate(node, &input.frames)?;
+        }
     }
     Ok(value)
 }

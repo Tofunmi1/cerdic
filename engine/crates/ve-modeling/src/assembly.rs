@@ -33,9 +33,13 @@ pub(crate) fn alignment(node: &Node) -> Result<[f64; 12], KernelError> {
     };
     let pivot = DVec3::from_array(vector(node, "pivot")?);
     let matrix = DMat4::from_rotation_translation(rotation, pivot - rotation * pivot);
+    Ok(rows(matrix))
+}
+
+pub(crate) fn rows(matrix: DMat4) -> [f64; 12] {
     let c = matrix.to_cols_array_2d();
-    Ok([
+    [
         c[0][0], c[1][0], c[2][0], c[3][0], c[0][1], c[1][1], c[2][1], c[3][1], c[0][2], c[1][2],
         c[2][2], c[3][2],
-    ])
+    ]
 }

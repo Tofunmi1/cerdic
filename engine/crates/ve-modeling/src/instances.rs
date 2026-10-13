@@ -101,7 +101,7 @@ fn bounds_corners(mesh: &Mesh) -> Vec<DVec3> {
         .collect()
 }
 
-fn placements(node: &Node) -> Result<Vec<DMat4>, ve_kernel::KernelError> {
+pub(crate) fn placements(node: &Node) -> Result<Vec<DMat4>, ve_kernel::KernelError> {
     let translate = |v: [f64; 3]| DMat4::from_translation(DVec3::from_array(v));
     match node.op.family().as_str() {
         "xform.move" => Ok(vec![translate(vector(node, "by")?)]),
@@ -109,7 +109,7 @@ fn placements(node: &Node) -> Result<Vec<DMat4>, ve_kernel::KernelError> {
         "xform.scale" => Ok(vec![DMat4::from_scale(DVec3::from_array(vector(
             node, "by",
         )?))]),
-        "inst.mirror" => {
+        "inst.mirror" | "xform.mirror" => {
             let axis = match node.params.get("axis") {
                 Some(ve_graph::Value::Str(a)) if a == "x" => DVec3::new(-1.0, 1.0, 1.0),
                 Some(ve_graph::Value::Str(a)) if a == "y" => DVec3::new(1.0, -1.0, 1.0),
@@ -117,7 +117,7 @@ fn placements(node: &Node) -> Result<Vec<DMat4>, ve_kernel::KernelError> {
             };
             Ok(vec![DMat4::IDENTITY, DMat4::from_scale(axis)])
         }
-        "inst.array" => {
+        "inst.array" | "xform.array" => {
             let spacing = vector(node, "spacing")?;
             let mut out = Vec::new();
             for x in 0..whole(node, "count_x")? {
@@ -133,7 +133,7 @@ fn placements(node: &Node) -> Result<Vec<DMat4>, ve_kernel::KernelError> {
             }
             Ok(out)
         }
-        "inst.radial" => {
+        "inst.radial" | "xform.radial" => {
             let count = whole(node, "count")?;
             let radius = number(node, "radius")?;
             Ok((0..count)
@@ -219,5 +219,6 @@ fn realize(node: &Node, set: &InstanceSet, context: &ExecutionContext) -> Result
     };
     let mut value = Value::solid(mesh, solid.volume());
     value.material.clone_from(&set.prototype.material);
+    value.frames = crate::frames::copies(&set.prototype.frames, &set.transforms, false)?;
     Ok(value)
 }

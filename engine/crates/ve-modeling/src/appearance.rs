@@ -51,5 +51,6 @@ pub(crate) fn material(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail>
             emissive,
         }),
         instances: None,
+        frames: input.frames.clone(),
     })
 }
