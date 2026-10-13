@@ -9,6 +9,7 @@ export type Job = { token: Token; document: Document; test?: 'spin' | 'crash' };
 export type PartMaterial = { color: [number, number, number]; metallic: number; roughness: number; emissive: [number, number, number] };
 export type MeshPart = {
   node: string; name: string; volume: number; positions: Float32Array; indices: Uint32Array; material?: PartMaterial | null;
+  transforms?: Float32Array; instance_indices?: Uint32Array;
 };
 export type EvaluationStats = {
   evaluated_nodes: number; cache_hits: number; cache_bytes: number; elapsed_ms: number; memory_bytes: number;

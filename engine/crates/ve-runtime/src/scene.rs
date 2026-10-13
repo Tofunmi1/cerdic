@@ -21,6 +21,8 @@ use crate::{interact, mock_hmd, status, wands};
 /// Which built-in scene to show.
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum SceneKind {
+    /// G4c measurement of 10,000 entities sharing one prototype mesh.
+    InstanceProbe,
     /// Editor comparison gallery with the legacy starter's dimensions and poses.
     Gallery,
     /// An empty lit room (floor, walls, sun, warm lights) for looking at authored models.
@@ -51,6 +53,7 @@ impl FromStr for SceneKind {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "instance-probe" => Ok(Self::InstanceProbe),
             "gallery" => Ok(Self::Gallery),
             "stage" => Ok(Self::Stage),
             "" | "kernel" => Ok(Self::Kernel),
@@ -337,6 +340,7 @@ pub(crate) fn spawn_scene(
 ) {
     ambient.intensity = 0.2;
     let built = match *choice {
+        SceneKind::InstanceProbe => crate::instance_probe::spawn(&mut commands, &mut meshes),
         SceneKind::Gallery => crate::gallery::spawn(&mut commands, &mut meshes),
         SceneKind::Stage => {
             crate::bench_scene::stage_scene(&mut commands, &mut meshes, &mut ambient)

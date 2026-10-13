@@ -36,10 +36,11 @@ self.onmessage = async ({ data }) => {
     if (own !== serial) return;
     const parts = state.done.parts.map((part, index) => {
       const positions = api.eval_positions(index), indices = api.eval_indices(index);
-      return { ...part, positions, indices };
+      const transforms = api.eval_transforms(index), instance_indices = api.eval_instance_indices(index);
+      return { ...part, positions, indices, transforms, instance_indices };
     });
-    const bytes = parts.reduce((sum, part) => sum + part.positions.byteLength + part.indices.byteLength, 0);
-    const transfer = parts.flatMap(part => [part.positions.buffer, part.indices.buffer]);
+    const bytes = parts.reduce((sum, part) => sum + part.positions.byteLength + part.indices.byteLength + part.transforms.byteLength + part.instance_indices.byteLength, 0);
+    const transfer = parts.flatMap(part => [part.positions.buffer, part.indices.buffer, part.transforms.buffer, part.instance_indices.buffer]);
     postMessage({ kind: 'result', token: data.token, parts, bytes, sent_ms: performance.timeOrigin + performance.now(),
       stats: { ...state.done, parts: undefined, elapsed_ms: performance.now() - began,
         memory_bytes: wasm.memory.buffer.byteLength } }, transfer);

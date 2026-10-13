@@ -32,6 +32,7 @@ export function createInspector({ root, api, selection, document: documentOf, pr
     out.push(title, el("div", "ophelp", `${kind}${spec && !node.instance ? ` · ${spec.doc}` : ""} · ${node.id}`));
     if (node.group) out.push(memberNotice({ doc, node, selection }));
     out.push(...specific);
+    if (selection.instanceCount) out.push(el("div","ophelp",`${selection.instanceCount.toLocaleString()} instances${selection.instance===null ? "" : ` · selected instance ${selection.instance}`}`));
 
     const flags = el("div", "irow");
     for (const flag of ["muted", "bypass"]) {
@@ -97,7 +98,7 @@ export function createInspector({ root, api, selection, document: documentOf, pr
     // Rebuilding replaces the fields, so do it only when something shown has changed: a field being
     // typed into must not lose focus because an evaluation finished. Groups and the nodes inside them
     // are part of what an instance or a member shows.
-    const signature = JSON.stringify([node ?? null, group ?? null, doc.groups ?? [], node?.instance || group ? doc.nodes.filter((n) => n.group) : null, mine]);
+    const signature = JSON.stringify([node ?? null, group ?? null, doc.groups ?? [], node?.instance || group ? doc.nodes.filter((n) => n.group) : null, mine,selection.instance,selection.instanceCount]);
     if (signature === lastSignature) return;
     lastSignature = signature;
     if (group) {

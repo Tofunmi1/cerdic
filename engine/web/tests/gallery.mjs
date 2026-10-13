@@ -19,6 +19,8 @@ const logs = [];
 
 // name, centre, size (metres) and the feature the detail view looks at
 const pieces = {
+  instance_fence: {centre:[1.9,0.5,0],size:4,detail:[0.4,0.6,0],detailScale:0.15},
+  instance_bookshelf: {centre:[0.285,1.12,0],size:2.3,detail:[0.28,1.1,0.05],detailScale:0.25},
   vase: { centre: [0, 0.15, 0], size: 0.3, detail: [0, 0.3, 0] },
   twisted_tower: { centre: [0, 0.25, 0], size: 0.5, detail: [0, 0.5, 0] },
   offset_plate: { centre: [0, 0.0035, 0], size: 0.16, detail: [0.05, 0.006, 0.03], detailScale: 0.6 },

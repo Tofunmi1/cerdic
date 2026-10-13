@@ -14,7 +14,7 @@ mod machine;
 mod pointer;
 mod pose;
 
-pub use geometry::{Ray, Shape};
+pub use geometry::{Ray, Shape, ray_affine_box};
 pub use gesture::{PinchConfig, PinchRecognizer, PinchState, gaze_pointer, hand_pointer};
 pub use grab::{Anchor, SCALE_LIMITS, follow_one, follow_two};
 pub use machine::Interaction;

@@ -1,13 +1,25 @@
 import type { Runtime } from './bridge';
 import { uploadResult } from './mesh-upload';
-import type { Candidate, EvaluationStats, Job, Quality, Token, WorkerMessage } from './worker-types';
+import type { Candidate, EvaluationStats, Job, Quality, Token, WorkerMessage, MeshPart } from './worker-types';
 import { sameToken } from './worker-types';
 
-function boundsOf(parts: Array<{ positions: Float32Array }>) {
+function boundsOf(parts: MeshPart[]) {
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
   for (const part of parts) {
+    const localMin=[Infinity,Infinity,Infinity], localMax=[-Infinity,-Infinity,-Infinity];
     for (let i = 0; i < part.positions.length; i += 3) {
-      for (let k = 0; k < 3; k++) { min[k] = Math.min(min[k], part.positions[i + k]); max[k] = Math.max(max[k], part.positions[i + k]); }
+      for (let k = 0; k < 3; k++) { localMin[k] = Math.min(localMin[k], part.positions[i + k]); localMax[k] = Math.max(localMax[k], part.positions[i + k]); }
+    }
+    if (part.transforms?.length) {
+      for (let i=0;i<part.transforms.length;i+=16) {
+        const m=part.transforms;
+        for (let corner=0;corner<8;corner++) {
+          const p=[0,1,2].map(k=>(corner&(1<<k)) ? localMax[k] : localMin[k]);
+          for (let k=0;k<3;k++) { const v=m[i+k]*p[0]+m[i+4+k]*p[1]+m[i+8+k]*p[2]+m[i+12+k]; min[k]=Math.min(min[k],v);max[k]=Math.max(max[k],v); }
+        }
+      }
+    } else {
+      for (let k=0;k<3;k++) {min[k]=Math.min(min[k],localMin[k]);max[k]=Math.max(max[k],localMax[k]);}
     }
   }
   return Number.isFinite(min[0]) ? { min, max } : null;
