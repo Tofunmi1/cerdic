@@ -153,6 +153,7 @@ fn solid(
                 "xform.move" => value.translate(vector(node, "by")?),
                 "xform.rotate" => value.rotate(vector(node, "angles")?.map(f64::to_degrees)),
                 "xform.scale" => value.scale(vector(node, "by")?),
+                "xform.align" => value.transform(crate::assembly::alignment(node)?),
                 _ => {
                     for input in inputs.iter().skip(1) {
                         let next = Solid::from_mesh(&input.mesh)?;
