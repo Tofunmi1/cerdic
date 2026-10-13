@@ -20,6 +20,11 @@ export const PANEL_CSS = `
   .dock .obadge { padding: 0 5px; border-radius: 8px; background: rgba(255,255,255,.18); font-size: 10px; }
   .dock .obadge.part { background: rgba(120,200,140,.4); }
   .dock .odot { color: #ff8e7e; }
+  .dock .orow.ogroup { margin-top: 6px; font-weight: 600; border-top: 1px solid rgba(255,255,255,.12); border-radius: 0 0 6px 6px; }
+  .dock .orow.unused .oname { opacity: .5; font-style: italic; }
+  .dock .obadge.warn { background: rgba(255,170,90,.5); }
+  .dock .banner { margin: 4px 0; padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,.1); font-size: 11px; }
+  .dock .irow.overridden .cap { color: #9ccbff; font-weight: 600; }
   .dock .ohead { margin: 6px 0 2px; opacity: .6; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
   .dock .title { width: 100%; box-sizing: border-box; font: 600 13px system-ui, sans-serif; background: transparent; color: #fff; border: 1px solid transparent; border-radius: 6px; padding: 2px 4px; }
   .dock .title:hover, .dock .title:focus { border-color: rgba(255,255,255,.3); }

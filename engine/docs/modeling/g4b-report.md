@@ -41,8 +41,13 @@ used many times; ADR 0013 has the design. Instance sets and realization (G4c), s
   instances written `w = wheel(port=node, param=value)`, printed back canonically (`g4_text.rs`,
   `g4e_02` in `ve-modeling`, and the MCP acceptance test). An instance behind its group cannot be
   printed until it is upgraded, and groups are defined at the top level only.
-- The viewer panels do not show groups well: members appear in the outliner among the other nodes and
-  the inspector has no widgets for overrides or an upgrade button. That is the editor work of V4.
+- The viewer panels handle groups at a basic level (`panels/groups.js`, `web/tests/panels-groups.mjs`):
+  the outliner shows each group with its members and uses, a member lights up every part its group is
+  used in, an instance's inspector overrides and resets exposed parameters and offers an upgrade when it
+  is behind, and the group has its own editor. An edit of the group's interface (expose, unexpose) is
+  sent together with the upgrade of each instance, because evaluation refuses an instance that is
+  behind. What V4 still has to do: making a group from selected nodes by UI, entering a group with a
+  breadcrumb, a library panel, and showing the upgrade conflict before it is applied for every instance.
 - Group inputs and results are solids only; profile and curve groups come with later gates.
 - Instances are expanded to copies for evaluation; they are not yet shared in the renderer (G4c).
 - A bypassed instance passes its first input (by name order) through; a group with several inputs has

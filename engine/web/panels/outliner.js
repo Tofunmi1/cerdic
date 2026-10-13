@@ -26,33 +26,42 @@ export function createOutliner({ root, selection, document: documentOf, problems
     root.replaceChildren(
       ...rows.map((row) => {
         if (row.header) return el("div", "ohead", row.header);
-        const item = el("div", "orow");
-        item.dataset.id = row.id;
+        // A row is a node, or the header of a group (whose id is the group's).
+        const id = row.group ?? row.id;
+        const item = el("div", row.group ? "orow ogroup" : "orow");
+        item.dataset.id = id;
         item.tabIndex = 0;
         item.setAttribute("role", "treeitem");
-        item.style.paddingLeft = `${4 + row.depth * 14}px`;
-        item.classList.toggle("selected", selection.node === row.id);
-        item.classList.toggle("muted", row.muted);
-        const caret = el("span", "caret", row.children ? (row.collapsed ? "▸" : "▾") : "");
-        if (row.children) {
+        item.style.paddingLeft = `${4 + (row.depth ?? 0) * 14}px`;
+        item.classList.toggle("selected", selection.node === id);
+        item.classList.toggle("muted", !!row.muted);
+        item.classList.toggle("unused", !!row.unused);
+        const expandable = row.group ? true : row.children;
+        const caret = el("span", "caret", expandable ? (row.collapsed ? "▸" : "▾") : "");
+        if (expandable) {
           caret.addEventListener("click", (event) => {
             event.stopPropagation();
-            if (collapsed.has(row.id)) collapsed.delete(row.id);
-            else collapsed.add(row.id);
+            if (collapsed.has(id)) collapsed.delete(id);
+            else collapsed.add(id);
             render();
           });
         }
         item.append(caret, el("span", "oname", row.reference ? `↗ ${row.name}` : row.name));
-        if (row.output) item.append(el("span", "obadge part", row.output));
-        if (row.muted) item.append(el("span", "obadge", "muted"));
-        if (row.bypass) item.append(el("span", "obadge", "bypass"));
-        item.append(el("span", "oop", row.op));
-        if (bad.has(row.id)) {
+        if (row.group) {
+          item.append(el("span", "obadge", `v${row.version}`), el("span", "oop", `${row.instances} use${row.instances === 1 ? "" : "s"}`));
+        } else {
+          if (row.output) item.append(el("span", "obadge part", row.output));
+          if (row.muted) item.append(el("span", "obadge", "muted"));
+          if (row.bypass) item.append(el("span", "obadge", "bypass"));
+          if (row.outdated) item.append(el("span", "obadge warn", "outdated"));
+          item.append(el("span", "oop", row.instanceOf ?? row.op));
+        }
+        if (bad.has(id)) {
           const dot = el("span", "odot", "●");
-          dot.title = bad.get(row.id).map((d) => `${d.code}: ${d.message}`).join("\n");
+          dot.title = bad.get(id).map((d) => `${d.code}: ${d.message}`).join("\n");
           item.append(dot);
         }
-        const choose = () => selection.select(selection.node === row.id ? null : row.id);
+        const choose = () => selection.select(selection.node === id ? null : id);
         item.addEventListener("click", choose);
         item.addEventListener("keydown", (event) => {
           if (event.key === "Enter" || event.key === " ") { event.preventDefault(); choose(); }

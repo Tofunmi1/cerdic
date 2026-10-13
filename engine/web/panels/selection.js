@@ -29,7 +29,9 @@ export function createSelection({ runtime, state }) {
     select(id) { node = id ?? null; push(); emit(); },
     /// After the document changed: forget a node that no longer exists, and re-aim at the parts it builds.
     refresh() {
-      if (node && !state().document.nodes.some((candidate) => candidate.id === node)) node = null;
+      const doc = state().document;
+      const exists = doc.nodes.some((candidate) => candidate.id === node) || doc.groups?.some((g) => g.id === node);
+      if (node && !exists) node = null;
       push();
     },
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
