@@ -1,5 +1,6 @@
 //! Bounded geometry evaluation shared by native tools and the renderer-free browser worker.
 mod appearance;
+mod assembly;
 mod budget;
 mod cache;
 mod evaluate;

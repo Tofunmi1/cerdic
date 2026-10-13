@@ -209,6 +209,9 @@ fn validate(
             return Err(fail("graph.unknown_port", name));
         }
     }
+    if node.op.family().as_str() == "xform.align" {
+        crate::assembly::alignment(node).map_err(|e| crate::operations::kernel_fail(node, &e))?;
+    }
     for port in &spec.inputs {
         let links = node.inputs.get(port.name).map_or(&[][..], Vec::as_slice);
         let valid = match port.arity {
@@ -315,8 +318,8 @@ fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usize, Fail>
         "solid.union" | "solid.difference" | "solid.intersect" => {
             Ok(inputs.sum::<usize>().saturating_mul(4))
         }
-        "xform.move" | "xform.rotate" | "xform.scale" | "solid.material" | "inst.array"
-        | "inst.radial" | "inst.repeat" | "inst.mirror" => Ok(inputs.sum()),
+        "xform.move" | "xform.rotate" | "xform.scale" | "xform.align" | "solid.material"
+        | "inst.array" | "inst.radial" | "inst.repeat" | "inst.mirror" => Ok(inputs.sum()),
         _ => Err(fail(
             "geometry.unsupported_case",
             format!("{} has no evaluator yet", node.op),

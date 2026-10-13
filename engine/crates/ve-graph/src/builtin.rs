@@ -8,6 +8,7 @@ use crate::spec::{
 };
 use crate::value::{ParamType, Unit, Value};
 
+mod assembly;
 mod group_ops;
 mod instances;
 mod modeling;
@@ -97,6 +98,7 @@ fn all_specs() -> Vec<Option<OperatorSpec>> {
     all.extend(shapes::all());
     all.extend(group_ops::all());
     all.extend(instances::all());
+    all.extend(assembly::all());
     for spec in all.iter_mut().flatten() {
         if READY.contains(&spec.id.to_string().as_str()) {
             spec.readiness = Readiness::Ready;
@@ -140,6 +142,7 @@ const READY: &[&str] = &[
     "inst.radial@1",
     "inst.mirror@1",
     "inst.realize@1",
+    "xform.align@1",
 ];
 
 fn primitives() -> Vec<Option<OperatorSpec>> {

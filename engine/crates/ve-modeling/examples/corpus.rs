@@ -4,8 +4,7 @@
 use ve_graph::{Outcome, Session};
 use ve_modeling::{Evaluator, Quality};
 
-fn instances() -> Result<(), Box<dyn std::error::Error>> {
-    let source = "b = solid.box(size=[1,1,1])\ns = inst.repeat(b, count=3, step=[2,0,0])\nm = inst.mirror(s, axis=\"x\")\noutput m";
+fn text_case(source: &str) -> Result<(), Box<dyn std::error::Error>> {
     let parsed = ve_graph::parse_text(&ve_graph::builtin_registry(), source)
         .map_err(|error| format!("{error:?}"))?;
     let mut session = Session::with_builtin(1);
@@ -30,7 +29,12 @@ fn instances() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    instances()?;
+    text_case(
+        "b = solid.box(size=[1,1,1])\ns = inst.repeat(b, count=3, step=[2,0,0])\nm = inst.mirror(s, axis=\"x\")\noutput m",
+    )?;
+    text_case(
+        "b = solid.box(size=[2,4,6])\na = xform.align(b, from=[1,2,3], to=[-3,2,1], pivot=[2,1,0])\noutput a",
+    )?;
     let mut session = Session::with_builtin(1);
     let batch = serde_json::json!({"doc":session.document().id,"base_revision":0,
         "transaction":"t_parity","commands":[
