@@ -37,7 +37,8 @@ fn name_ok(name: &str, what: &str, longest: usize) -> Result<(), Fail> {
                 "param.range",
                 format!("{what} must be between 1 and {longest} bytes"),
             )
-            .with_limit(count(longest), count(name.len())),
+            .with_limit(count(longest), count(name.len()))
+            .suggest(format!("shorten it to at most {longest} bytes")),
         ));
     }
     Ok(())
@@ -105,7 +106,8 @@ fn member<'c>(ctx: &'c Ctx<'_>, group: &GroupId, node: &NodeId) -> Result<&'c No
                 "group.not_member",
                 format!("{node} is not a member of {group}"),
             )
-            .at_node(node),
+            .at_node(node)
+            .suggest("add the node to this group first"),
         ))
     }
 }
@@ -114,7 +116,9 @@ fn must_be_solid(ctx: &Ctx<'_>, node: &NodeId) -> Result<(), Fail> {
     match links::output_type(&ctx.doc, ctx.reg, node) {
         Some(PortType::Solid) => Ok(()),
         _ => Err(Box::new(
-            Diagnostic::error("graph.port_type", "a group's result must be a solid").at_node(node),
+            Diagnostic::error("graph.port_type", "a group's result must be a solid")
+                .at_node(node)
+                .suggest("make the group's result a solid, for example solid.box"),
         )),
     }
 }
@@ -129,7 +133,8 @@ pub(crate) fn create_group(
     if ctx.doc.groups.len() >= MAX_GROUPS {
         return Err(Box::new(
             Diagnostic::error("budget.groups", "the document has too many groups")
-                .with_limit(count(MAX_GROUPS), count(ctx.doc.groups.len() + 1)),
+                .with_limit(count(MAX_GROUPS), count(ctx.doc.groups.len() + 1))
+                .suggest("remove a group you no longer need"),
         ));
     }
     let unique: BTreeSet<&NodeId> = members.iter().collect();
@@ -147,14 +152,16 @@ pub(crate) fn create_group(
                     "group.not_member",
                     format!("{id} already belongs to {owner}"),
                 )
-                .at_node(id),
+                .at_node(id)
+                .suggest(format!("remove it from {owner} first")),
             ));
         }
     }
     if !unique.contains(output) {
         return Err(Box::new(
             Diagnostic::error("group.interface", "the result must be one of the members")
-                .at_node(output),
+                .at_node(output)
+                .suggest("name one of the members as the result"),
         ));
     }
     must_be_solid(ctx, output)?;
@@ -241,7 +248,8 @@ pub(crate) fn expose_param(
                 "group.interface",
                 format!("{name:?} is already exposed, or that parameter is, or there are too many"),
             )
-            .with_limit(count(MAX_GROUP_PARAMS), count(group.params.len() + 1)),
+            .with_limit(count(MAX_GROUP_PARAMS), count(group.params.len() + 1))
+            .suggest("unexpose a parameter first, or use a different name"),
         ));
     }
     if let Some(group) = ctx.doc.group_mut(id) {

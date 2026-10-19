@@ -8,6 +8,7 @@ const POLY: &[PortType] = &[PortType::Poly];
 
 pub(super) fn all() -> Vec<Option<OperatorSpec>> {
     vec![
+        bisect_spec(),
         spec(
             "poly.pack_uv@1",
             "Packs existing corner UV islands into the 0..1 square; UV discontinuities define island boundaries.",
@@ -77,6 +78,47 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
     ]
 }
 
+fn bisect_spec() -> Option<OperatorSpec> {
+    spec(
+        "poly.bisect@1",
+        "Cuts the whole polygon mesh with a plane; above is the side the normal points toward.",
+        vec![single("in", POLY)],
+        OutputSpec::Fixed(PortType::Poly),
+        vec![
+            default_vec3(
+                "point",
+                Unit::Length,
+                [0.0, 0.0, 0.0],
+                "Point on the plane in metres.",
+            ),
+            default_vec3(
+                "normal",
+                Unit::None,
+                [0.0, 1.0, 0.0],
+                "Plane normal; must be non-zero.",
+            ),
+            choice(
+                "keep",
+                &["both", "above", "below"],
+                "both",
+                "Which side to keep.",
+            ),
+            flag(
+                "fill",
+                true,
+                "Close the cut boundary when a side is removed.",
+            ),
+            number(
+                "distance",
+                Unit::Length,
+                (0.0, 1.0),
+                Some(0.0001),
+                "Distance used to classify vertices on the plane.",
+            ),
+        ],
+    )
+}
+
 fn flag(name: &'static str, default: bool, doc: &'static str) -> ParamSpec {
     ParamSpec {
         name,
@@ -117,4 +159,10 @@ fn number(
         default: default.map(Value::Num),
         doc,
     }
+}
+
+fn default_vec3(name: &'static str, unit: Unit, value: [f64; 3], doc: &'static str) -> ParamSpec {
+    let mut param = super::vec3(name, unit, -1.0e6, 1.0e6, doc);
+    param.default = Some(Value::List(value.into_iter().map(Value::Num).collect()));
+    param
 }

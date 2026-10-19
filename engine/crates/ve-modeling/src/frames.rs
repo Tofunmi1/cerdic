@@ -69,7 +69,8 @@ pub(crate) fn add(node: &Node, input: &Value) -> Result<Value, Fail> {
                 "socket.name",
                 "socket name needs letters, digits, _, - or .",
             )
-            .at_node(&node.id),
+            .at_node(&node.id)
+            .suggest("use letters, digits, _, - or . in `name`"),
         ));
     }
     if input.frames.contains_key(name) {
@@ -78,7 +79,8 @@ pub(crate) fn add(node: &Node, input: &Value) -> Result<Value, Fail> {
                 "socket.duplicate",
                 format!("socket {name:?} already exists"),
             )
-            .at_node(&node.id),
+            .at_node(&node.id)
+            .suggest("use a different `name`"),
         ));
     }
     let position = vector(node, "position").map_err(|e| kernel_fail(node, &e))?;

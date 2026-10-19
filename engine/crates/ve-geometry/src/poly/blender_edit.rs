@@ -14,7 +14,7 @@ fn selection_error(code: &'static str, element: Option<Element>) -> GeometryErro
 /// Runs one of Blender's mesh operators on the selected faces or edges.
 ///
 /// Inset and extrude need faces; solidify, poke and wireframe take faces or, when none are given, the
-/// whole mesh; subdivide needs edges; dissolve and symmetrize ignore the selection. The result keeps
+/// whole mesh; subdivide needs edges; dissolve, symmetrize and bisect ignore the selection. The result keeps
 /// each face's, point's and corner's attributes through provenance (new elements take their
 /// neighbour's); edge attributes refuse, as in the other polygon edits. At most 250,000 faces.
 ///

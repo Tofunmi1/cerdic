@@ -207,7 +207,10 @@ impl Session {
             return Outcome::Rejected {
                 diagnostics: vec![
                     Diagnostic::error("budget.commands", "too many commands in one batch")
-                        .with_limit(MAX_COMMANDS as f64, batch.commands.len() as f64),
+                        .with_limit(MAX_COMMANDS as f64, batch.commands.len() as f64)
+                        .suggest(format!(
+                            "split the edit into batches of at most {MAX_COMMANDS} commands"
+                        )),
                 ],
             };
         }

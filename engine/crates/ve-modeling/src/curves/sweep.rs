@@ -27,6 +27,7 @@ pub(super) fn build(
             node,
             "geometry.unsupported_topology",
             "sweep requires a valid sampled path and one profile loop",
+            "link a curve with enough points and one closed profile",
         ));
     }
     let loop_points = &profile.loops[0];
@@ -35,6 +36,7 @@ pub(super) fn build(
             node,
             "geometry.degenerate_profile",
             "sweep profile needs at least three points",
+            "give the profile at least three points",
         ));
     }
     if !convex(loop_points) {
@@ -42,6 +44,7 @@ pub(super) fn build(
             node,
             "geometry.unsupported_profile",
             "sweep end caps currently require one strictly convex profile loop",
+            "use one convex profile, for example profile.circle",
         ));
     }
     let number = |name: &str, default: f64| {
@@ -56,6 +59,7 @@ pub(super) fn build(
             node,
             "geometry.unsupported_topology",
             "scale_end and twist need an open curve: a closed loop has no end to taper or turn toward",
+            "use an open curve, or set scale_end=1 and twist=0",
         ));
     }
     // The widest the tube gets decides the curvature and path-crossing checks.
@@ -77,6 +81,7 @@ pub(super) fn build(
             &format!(
                 "tube radius {tube_radius:.6} must be less than local curvature radius {curvature_radius:.6}"
             ),
+            "shrink the profile or make the path less sharply curved",
         ));
     }
     if let Some(found) = overlap::crossing(&curve.points, &widest, curve.closed, context)? {
@@ -87,6 +92,7 @@ pub(super) fn build(
                 "the tube passes through itself: path segments {} and {} are {:.6} apart, less than the {:.6} the profile needs",
                 found.first, found.second, found.distance, found.needed
             ),
+            "widen the path or shrink the profile",
         ));
     }
     let mesh = build_mesh(
@@ -108,6 +114,7 @@ pub(super) fn build(
             node,
             "curve.sweep_self_intersection",
             &format!("non-adjacent swept triangles {first} and {second} intersect"),
+            "widen the path or shrink the profile",
         ));
     }
     let solid = Solid::from_mesh(&mesh).map_err(|error| kernel_fail(node, &error))?;
@@ -154,6 +161,7 @@ fn build_mesh(
             node,
             "geometry.invalid_frame",
             "sweep path contains a repeated point or reversal",
+            "remove repeated or reversing points from the path",
         )
     })?;
     for ((center, (normal, binormal)), travelled) in path.iter().zip(frames).zip(&along) {
@@ -316,8 +324,12 @@ fn minimum_curvature_radius(points: &[[f64; 3]], closed: bool) -> Option<f64> {
     minimum.is_finite().then_some(minimum)
 }
 
-fn node_fail(node: &Node, code: &str, message: &str) -> Fail {
-    Box::new(ve_graph::Diagnostic::error(code, message).at_node(&node.id))
+fn node_fail(node: &Node, code: &str, message: &str, suggestion: &str) -> Fail {
+    Box::new(
+        ve_graph::Diagnostic::error(code, message)
+            .at_node(&node.id)
+            .suggest(suggestion),
+    )
 }
 
 fn reflect(vector: [f64; 3], plane_normal: [f64; 3]) -> Option<[f64; 3]> {

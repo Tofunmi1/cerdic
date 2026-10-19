@@ -16,6 +16,7 @@ pub(super) fn build(
             node,
             "surface.section_count",
             "loft needs 2 to 64 profile sections",
+            "link between 2 and 64 sections",
         ));
     }
     let ring = validate_sections(node, &sections)?;
@@ -57,6 +58,7 @@ fn check_rows(node: &Node, rows: &[Vec<[f64; 2]>]) -> Result<(), Fail> {
                 &format!(
                     "blended section {index} is not convex; lower steps or reduce the change between sections"
                 ),
+                "lower `steps`, or move the sections closer together",
             ));
         }
     }
@@ -69,6 +71,7 @@ fn validate_sections(node: &Node, sections: &[&Rc<Value>]) -> Result<usize, Fail
             node,
             "surface.degenerate_section",
             "loft section has no closed loop",
+            "give each section a closed profile, for example profile.circle or profile.polygon",
         ));
     };
     if first.len() < 3 || !convex(first) {
@@ -76,6 +79,7 @@ fn validate_sections(node: &Node, sections: &[&Rc<Value>]) -> Result<usize, Fail
             node,
             "surface.unsupported_section",
             "loft requires strictly convex sections",
+            "use convex sections, for example profile.circle",
         ));
     }
     if sections.iter().any(|section| {
@@ -87,6 +91,7 @@ fn validate_sections(node: &Node, sections: &[&Rc<Value>]) -> Result<usize, Fail
             node,
             "surface.incompatible_sections",
             "loft sections need one convex loop with matching point counts",
+            "give every section the same point count, for example the same segments",
         ));
     }
     Ok(first.len())
@@ -214,6 +219,10 @@ fn to_f32(value: f64) -> f32 {
     }
 }
 
-fn node_fail(node: &Node, code: &str, message: &str) -> Fail {
-    Box::new(ve_graph::Diagnostic::error(code, message).at_node(&node.id))
+fn node_fail(node: &Node, code: &str, message: &str, suggestion: &str) -> Fail {
+    Box::new(
+        ve_graph::Diagnostic::error(code, message)
+            .at_node(&node.id)
+            .suggest(suggestion),
+    )
 }

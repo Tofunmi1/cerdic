@@ -90,6 +90,8 @@ pub fn suggestion(code: &str) -> Option<&'static str> {
         "poly.selection_kind" => {
             "set element on poly.select to the kind this edit needs (face, edge, vertex or loop)"
         }
+        "poly.bisect_normal_zero" => "choose a non-zero plane normal",
+        "poly.bisect_empty" => "move the plane or choose the other side to keep",
         "poly.select_rule_unsupported" => {
             "that rule does not apply to this element kind: faces take normal, box, attribute, height, extreme; edges take sharp, box, height, extreme; vertices take box, attribute, height, extreme; loops take box, height, extreme"
         }

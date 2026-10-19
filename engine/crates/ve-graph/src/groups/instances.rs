@@ -31,7 +31,8 @@ pub(crate) fn add_instance(
     if ctx.doc.nodes.len() >= MAX_NODES {
         return Err(Box::new(
             Diagnostic::error("budget.nodes", "the document has too many nodes")
-                .with_limit(count(MAX_NODES), count(ctx.doc.nodes.len() + 1)),
+                .with_limit(count(MAX_NODES), count(ctx.doc.nodes.len() + 1))
+                .suggest("remove nodes you no longer need"),
         ));
     }
     let op = OpId::new(INSTANCE_OP, 1).map_err(|e| fail("parse.unknown_op", e.to_string()))?;
@@ -94,7 +95,9 @@ fn exposed<'c>(
 
 fn not_instance(node: &NodeId) -> Fail {
     Box::new(
-        Diagnostic::error("group.not_instance", format!("{node} is not an instance")).at_node(node),
+        Diagnostic::error("group.not_instance", format!("{node} is not an instance"))
+            .at_node(node)
+            .suggest("use add_instance to make an instance"),
     )
 }
 
@@ -151,7 +154,8 @@ pub(crate) fn clear_instance_param(
                 "group.unknown_param",
                 format!("{param:?} has no override on this instance"),
             )
-            .at_node(node),
+            .at_node(node)
+            .suggest("check the spelling, or set the override first"),
         ));
     }
     ctx.changed.insert(node.clone());

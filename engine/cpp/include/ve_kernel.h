@@ -284,9 +284,10 @@ enum {
   VE_MESH_OP_WIREFRAME = 6,
   VE_MESH_OP_SYMMETRIZE = 7,
   VE_MESH_OP_DECIMATE = 8,
-  VE_MESH_OP_UNSUBDIVIDE = 9
-  ,VE_MESH_OP_TRIANGULATE = 10
-  ,VE_MESH_OP_REMOVE_DOUBLES = 11
+  VE_MESH_OP_UNSUBDIVIDE = 9,
+  VE_MESH_OP_TRIANGULATE = 10,
+  VE_MESH_OP_REMOVE_DOUBLES = 11,
+  VE_MESH_OP_BISECT = 12,
 };
 typedef struct ve_mesh_op_input {
   size_t struct_size;
@@ -298,7 +299,8 @@ typedef struct ve_mesh_op_input {
   size_t edge_count;
   const uint32_t* vertices;
   size_t vertex_count;
-  double params[4];
+  double params[12]; /* Operator numbers; unused entries are zero (most operators read the first
+                        four). */
   int32_t flags;
 } ve_mesh_op_input;
 ve_polymesh* ve_mesh_op(const ve_mesh_op_input* input, ve_status* status);
@@ -324,7 +326,8 @@ typedef struct ve_uv_input {
 ve_status ve_uv_unwrap(const ve_uv_input* input, float* uvs, size_t uv_capacity,
                        uint32_t* failed_islands);
 /* Packs an existing corner UV map. UV seams are inferred from discontinuities. `shape` is 0 for
- * axis-aligned bounds and 1 for convex hulls; `keep_density` preserves island scale where possible. */
+ * axis-aligned bounds and 1 for convex hulls; `keep_density` preserves island scale where possible.
+ */
 typedef struct ve_uv_pack_input {
   size_t struct_size;
   ve_polymesh_input mesh;
@@ -336,8 +339,9 @@ typedef struct ve_uv_pack_input {
 } ve_uv_pack_input;
 ve_status ve_uv_pack(const ve_uv_pack_input* input, float* uvs, size_t uv_capacity);
 
-/* Blender's easing curve (BLI_easing, "ease out", keyframe defaults) at `fraction` in 0..1, for checking the
- * engine's own copies. kind: 0 back, 1 bounce, 2 elastic; anything else returns `fraction`. */
+/* Blender's easing curve (BLI_easing, "ease out", keyframe defaults) at `fraction` in 0..1, for
+ * checking the engine's own copies. kind: 0 back, 1 bounce, 2 elastic; anything else returns
+ * `fraction`. */
 float ve_blender_ease(int32_t kind, float fraction);
 
 void ve_solid_free(ve_solid* s);

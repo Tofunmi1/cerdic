@@ -238,14 +238,15 @@ impl CommandBatch {
             #[expect(clippy::cast_precision_loss, reason = "sizes are far below 2^53")]
             return Err(Box::new(
                 Diagnostic::error("budget.source", "the batch is too large")
-                    .with_limit(MAX_BATCH_BYTES as f64, text.len() as f64),
+                    .with_limit(MAX_BATCH_BYTES as f64, text.len() as f64)
+                    .suggest("split the edit into smaller batches"),
             ));
         }
         serde_json::from_str(text).map_err(|e| {
-            Box::new(Diagnostic::error(
-                "parse.syntax",
-                format!("invalid batch: {e}"),
-            ))
+            Box::new(
+                Diagnostic::error("parse.syntax", format!("invalid batch: {e}"))
+                    .suggest("the batch must be a valid JSON object"),
+            )
         })
     }
 }

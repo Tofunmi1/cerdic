@@ -52,3 +52,12 @@ pub(crate) type Fail = Box<ve_graph::Diagnostic>;
 pub(crate) fn fail(code: &str, message: impl Into<String>) -> Fail {
     Box::new(ve_graph::Diagnostic::error(code, message))
 }
+
+/// Like [`fail`], for a refusal the caller can act on: `suggestion` names what to change.
+pub(crate) fn fail_suggest(
+    code: &str,
+    message: impl Into<String>,
+    suggestion: impl Into<String>,
+) -> Fail {
+    Box::new(ve_graph::Diagnostic::error(code, message).suggest(suggestion))
+}

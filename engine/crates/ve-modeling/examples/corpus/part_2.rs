@@ -1,5 +1,8 @@
 /// Polygon editing: every operator family, identical natively and in WASI.
 fn polygon_cases() -> Result<(), Box<dyn std::error::Error>> {
+    text_case(
+        "box = solid.box@1(size=[1,1,1])\nmesh = poly.from_solid@1(box)\ncut = poly.bisect@1(mesh, point=[0,0.2,0], normal=[0,1,0], keep=\"below\")\nsolid = poly.to_solid@1(cut)\noutput solid",
+    )?;
     // G10-09: UV packing an automatically unwrapped cube, included in native/WASI parity.
     text_case(
         "box = solid.box@1(size=[1,1,1])\nmesh = poly.from_solid@1(box)\nuv = poly.unwrap_uv@1(mesh, pack=false)\npacked = poly.pack_uv@1(uv, margin=0.02, rotate=false)\nsolid = poly.to_solid@1(packed)\noutput solid",

@@ -123,7 +123,11 @@ pub(super) fn orientation(
 }
 
 fn refusal(node: &Node, message: &str) -> Fail {
-    Box::new(ve_graph::Diagnostic::error("geometry.deformation_fold", message).at_node(&node.id))
+    Box::new(
+        ve_graph::Diagnostic::error("geometry.deformation_fold", message)
+            .at_node(&node.id)
+            .suggest("soften the deformation, or raise `tolerance`"),
+    )
 }
 
 fn add(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {

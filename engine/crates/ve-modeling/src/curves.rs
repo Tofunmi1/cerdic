@@ -35,6 +35,7 @@ pub(crate) fn evaluate(node: &Node) -> Result<Value, Fail> {
             node,
             "geometry.invalid_curve",
             "a closed cubic Bézier must end where it starts",
+            "make the first and last points equal, or set closed=false",
         ));
     }
     let mut sampled = if family == "curve.bezier" {
@@ -56,6 +57,7 @@ pub(crate) fn evaluate(node: &Node) -> Result<Value, Fail> {
             node,
             "geometry.invalid_curve",
             "a closed curve needs at least three unique samples",
+            "add more points, or set closed=false",
         ));
     }
     if sampled
@@ -67,6 +69,7 @@ pub(crate) fn evaluate(node: &Node) -> Result<Value, Fail> {
             node,
             "geometry.degenerate_curve",
             "curve has a repeated consecutive point",
+            "remove the repeated point from `points`",
         ));
     }
     Ok(Value::curve(Curve3 {
@@ -75,8 +78,12 @@ pub(crate) fn evaluate(node: &Node) -> Result<Value, Fail> {
     }))
 }
 
-fn curve_error(node: &Node, code: &str, message: &str) -> Fail {
-    Box::new(ve_graph::Diagnostic::error(code, message).at_node(&node.id))
+fn curve_error(node: &Node, code: &str, message: &str, suggestion: &str) -> Fail {
+    Box::new(
+        ve_graph::Diagnostic::error(code, message)
+            .at_node(&node.id)
+            .suggest(suggestion),
+    )
 }
 
 pub(crate) fn run(
