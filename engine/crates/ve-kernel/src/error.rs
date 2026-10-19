@@ -25,6 +25,12 @@ pub enum KernelError {
     /// The result is too large to represent.
     #[error("the result is too large to represent")]
     TooLarge,
+    /// Bounded per-vertex or face-varying channel storage was exceeded.
+    #[error("subdivision attribute channel storage exceeds its limit")]
+    AttributeLimit,
+    /// A Blender operator ran and declined the input (for example a solidify of a mesh with an open edge).
+    #[error("the operator declined this mesh")]
+    OperatorRefused,
     /// The kernel reported an unexpected failure.
     #[error("internal kernel failure (status {0})")]
     Internal(i32),
@@ -40,6 +46,8 @@ impl KernelError {
             VE_ERR_NON_FINITE => Self::NonFinite,
             VE_ERR_OUT_OF_BOUNDS => Self::OutOfBounds,
             VE_ERR_TOO_LARGE => Self::TooLarge,
+            ve_kernel_sys::VE_ERR_ATTRIBUTE_LIMIT => Self::AttributeLimit,
+            ve_kernel_sys::VE_ERR_OP_REFUSED => Self::OperatorRefused,
             1 => Self::InvalidArgument("rejected by the kernel"),
             other => Self::Internal(other),
         }

@@ -6,14 +6,11 @@
 #include <new>
 #include <vector>
 
+#include "context_handle.hpp"
 #include "manifold/manifold.h"
 #include "meshoptimizer.h"
 #include "solid_handle.hpp"
 #include "ve_kernel.h"
-
-struct ve_context {
-  manifold::ExecutionContext value;
-};
 
 namespace {
 
@@ -159,6 +156,55 @@ ve_solid* ve_solid_from_mesh(const float* positions, size_t vertex_count, const 
   return wrap(Manifold(mesh), status);
 }
 
+uint32_t ve_reserve_ids(uint32_t count) { return Manifold::ReserveIDs(count); }
+
+ve_solid* ve_solid_from_mesh_runs(const float* positions, size_t vertex_count,
+                                  const uint32_t* indices, size_t index_count,
+                                  const size_t* run_first_triangle, const uint32_t* run_ids,
+                                  size_t run_count, ve_status* status) {
+  const size_t triangles = index_count / 3;
+  bool runs_ok = run_first_triangle != nullptr && run_ids != nullptr && run_count > 0 &&
+                 run_count <= triangles && run_first_triangle[0] == 0;
+  for (size_t r = 1; runs_ok && r < run_count; ++r) {
+    runs_ok = run_first_triangle[r] > run_first_triangle[r - 1] &&
+              run_first_triangle[r] < triangles && run_ids[r] >= run_ids[r - 1];
+  }
+  if (positions == nullptr || indices == nullptr || vertex_count == 0 || index_count == 0 ||
+      !runs_ok || !valid_triangles(indices, index_count, vertex_count)) {
+    set_status(status, VE_ERR_INVALID_ARG);
+    return nullptr;
+  }
+  manifold::MeshGL mesh;
+  mesh.numProp = 3;
+  mesh.vertProperties.assign(positions, positions + (vertex_count * 3));
+  mesh.triVerts.assign(indices, indices + index_count);
+  for (size_t r = 0; r < run_count; ++r) {
+    mesh.runIndex.push_back(static_cast<uint32_t>(run_first_triangle[r] * 3));
+    mesh.runOriginalID.push_back(run_ids[r]);
+  }
+  mesh.runIndex.push_back(static_cast<uint32_t>(index_count));
+  mesh.Merge();
+  return wrap(Manifold(mesh), status);
+}
+
+size_t ve_solid_num_runs(const ve_solid* s) { return s == nullptr ? 0 : s->m.GetMeshGL().NumRun(); }
+
+ve_status ve_solid_copy_runs(const ve_solid* s, size_t* first_triangle, uint32_t* ids,
+                             size_t capacity) {
+  if (s == nullptr || (capacity != 0 && (first_triangle == nullptr || ids == nullptr))) {
+    return VE_ERR_INVALID_ARG;
+  }
+  const manifold::MeshGL mesh = s->m.GetMeshGL();
+  const size_t runs = mesh.NumRun();
+  if (capacity < runs) {
+    return VE_ERR_BUFFER_TOO_SMALL;
+  }
+  std::transform(mesh.runIndex.data(), mesh.runIndex.data() + runs, first_triangle,
+                 [](uint32_t index) { return static_cast<size_t>(index / 3); });
+  std::copy_n(mesh.runOriginalID.data(), runs, ids);
+  return VE_OK;
+}
+
 ve_solid* ve_solid_union(const ve_solid* a, const ve_solid* b, ve_status* status) {
   return boolean(a, b, manifold::OpType::Add, status);
 }
@@ -169,6 +215,70 @@ ve_solid* ve_solid_difference(const ve_solid* a, const ve_solid* b, ve_status* s
 
 ve_solid* ve_solid_intersect(const ve_solid* a, const ve_solid* b, ve_status* status) {
   return boolean(a, b, manifold::OpType::Intersect, status);
+}
+
+ve_solid* ve_solid_round(const ve_solid* solid, double radius, int32_t segments,
+                         ve_status* status) {
+  constexpr size_t kMaxRoundTriangles = 20'000;
+  constexpr size_t kMaxRoundResultTriangles = 250'000;
+  if (solid == nullptr || !finite_positive(radius) || segments < 6 || segments > 24) {
+    set_status(status, VE_ERR_INVALID_ARG);
+    return nullptr;
+  }
+  if (solid->m.NumTri() > kMaxRoundTriangles) {
+    set_status(status, VE_ERR_TOO_LARGE);
+    return nullptr;
+  }
+  const Manifold ball = Manifold::Sphere(radius, segments);
+  const Manifold core = solid->m.MinkowskiDifference(ball);
+  if (core.Status() != Manifold::Error::NoError || core.IsEmpty()) {
+    set_status(status, core.Status() == Manifold::Error::NoError ? VE_ERR_INVALID_ARG
+                                                                 : map_error(core.Status()));
+    return nullptr;
+  }
+  Manifold rounded = core.MinkowskiSum(ball);
+  if (rounded.NumTri() > kMaxRoundResultTriangles) {
+    set_status(status, VE_ERR_TOO_LARGE);
+    return nullptr;
+  }
+  return wrap(std::move(rounded), status);
+}
+
+ve_solid* ve_solid_chamfer(const ve_solid* solid, double width, ve_status* status) {
+  constexpr size_t kMaxChamferTriangles = 20'000;
+  constexpr size_t kMaxChamferResultTriangles = 250'000;
+  if (solid == nullptr || !finite_positive(width)) {
+    set_status(status, VE_ERR_INVALID_ARG);
+    return nullptr;
+  }
+  if (solid->m.NumTri() > kMaxChamferTriangles) {
+    set_status(status, VE_ERR_TOO_LARGE);
+    return nullptr;
+  }
+  // The octahedron is the L1 unit ball: eroding and dilating by it cuts a convex edge with a flat
+  // 45-degree facet rather than the circular arc a sphere leaves.
+  const Manifold octahedron = Manifold::Hull(std::vector<manifold::vec3>{{width, 0.0, 0.0},
+                                                                         {-width, 0.0, 0.0},
+                                                                         {0.0, width, 0.0},
+                                                                         {0.0, -width, 0.0},
+                                                                         {0.0, 0.0, width},
+                                                                         {0.0, 0.0, -width}});
+  if (octahedron.Status() != Manifold::Error::NoError) {
+    set_status(status, map_error(octahedron.Status()));
+    return nullptr;
+  }
+  const Manifold core = solid->m.MinkowskiDifference(octahedron);
+  if (core.Status() != Manifold::Error::NoError || core.IsEmpty()) {
+    set_status(status, core.Status() == Manifold::Error::NoError ? VE_ERR_INVALID_ARG
+                                                                 : map_error(core.Status()));
+    return nullptr;
+  }
+  Manifold chamfered = core.MinkowskiSum(octahedron);
+  if (chamfered.NumTri() > kMaxChamferResultTriangles) {
+    set_status(status, VE_ERR_TOO_LARGE);
+    return nullptr;
+  }
+  return wrap(std::move(chamfered), status);
 }
 
 ve_solid* ve_solid_translate(const ve_solid* s, double x, double y, double z, ve_status* status) {

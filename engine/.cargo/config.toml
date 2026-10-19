@@ -1,2 +1,12 @@
 [alias]
 xtask = "run --quiet --package xtask --"
+
+# The vendored Blender code references functions the engine never calls (file I/O, undo, editors).
+# For WebAssembly the linker replaces each unresolved function with a trap of exactly the right type;
+# `cargo xtask cpp` audits that the set of such functions is the one in cpp/blender/unresolved.txt.
+# Native builds link generated trap stubs for the same list instead.
+[target.wasm32-wasip1]
+rustflags = ["-C", "link-arg=--unresolved-symbols=ignore-all"]
+
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=--unresolved-symbols=ignore-all"]

@@ -5,6 +5,9 @@ use ve_kernel_sys::VE_MAX_SEGMENTS;
 use crate::ffi::{self, Handle};
 use crate::{KernelError, Mesh};
 
+mod origin;
+mod rounding;
+
 /// An axis-aligned bounding box in metres.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Bounds {
@@ -77,6 +80,19 @@ fn segments_arg(segments: u32) -> Result<i32, KernelError> {
 }
 
 impl Solid {
+    /// Samples a bounded positive-inside field tape into a manifold solid.
+    ///
+    /// # Errors
+    /// Invalid bounds, field tape, clipped or empty domains, exceeded cell/operation budgets,
+    /// cancellation, or a non-manifold kernel result.
+    pub fn from_field(
+        instructions: &[crate::FieldInstruction],
+        bounds: [[f64; 3]; 2],
+        edge_length: f64,
+        context: &crate::ExecutionContext,
+    ) -> Result<Self, crate::FieldError> {
+        crate::field::from_tape(instructions, bounds, edge_length, context).map(Self)
+    }
     /// Applies a proper rigid row-major 3x4 matrix (translation at indices 3, 7 and 11).
     ///
     /// # Errors
@@ -336,44 +352,4 @@ impl Solid {
         ffi::copy_mesh(&self.0, &mut positions, &mut indices)?;
         Ok(Mesh { positions, indices })
     }
-}
-
-/// Simplifies a mesh to roughly `target_ratio` of its indices (0 < ratio <= 1), within
-/// `target_error` relative to the mesh extent. Vertices are kept; only the index list shrinks.
-///
-/// # Errors
-/// [`KernelError::InvalidArgument`] for a ratio outside (0, 1], a negative or non-finite error, or an
-/// invalid mesh; [`KernelError::OutOfBounds`] for bad indices.
-pub fn simplify(mesh: &Mesh, target_ratio: f64, target_error: f64) -> Result<Mesh, KernelError> {
-    if !(target_ratio.is_finite() && target_ratio > 0.0 && target_ratio <= 1.0) {
-        return Err(KernelError::InvalidArgument(
-            "target ratio must be in (0, 1]",
-        ));
-    }
-    if !(target_error.is_finite() && target_error >= 0.0) {
-        return Err(KernelError::InvalidArgument(
-            "target error must be finite and non-negative",
-        ));
-    }
-    if mesh.indices.is_empty() || !mesh.indices.len().is_multiple_of(3) {
-        return Err(KernelError::InvalidArgument(
-            "mesh index count must be a non-zero multiple of three",
-        ));
-    }
-    if mesh.positions.iter().flatten().any(|c| !c.is_finite()) {
-        return Err(KernelError::NonFinite);
-    }
-    let count = mesh.positions.len();
-    if mesh
-        .indices
-        .iter()
-        .any(|&i| usize::try_from(i).map_or(true, |i| i >= count))
-    {
-        return Err(KernelError::OutOfBounds);
-    }
-    let indices = ffi::simplify(&mesh.positions, &mesh.indices, target_ratio, target_error)?;
-    Ok(Mesh {
-        positions: mesh.positions.clone(),
-        indices,
-    })
 }
