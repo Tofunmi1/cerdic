@@ -128,6 +128,13 @@ fn substitute(text: &str, line: u32, env: &Env) -> Result<String, Fail> {
     let (mut at, mut in_string) = (0, false);
     while at < chars.len() {
         let c = chars[at];
+        // An escaped character (`\"`, `\\`) inside a string neither ends it nor starts an expression.
+        if in_string && c == '\\' {
+            out.push(c);
+            out.extend(chars.get(at + 1));
+            at += 2;
+            continue;
+        }
         if c == '"' {
             in_string = !in_string;
         }

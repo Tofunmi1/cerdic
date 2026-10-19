@@ -408,6 +408,15 @@ Attach a bounded semicolon-separated DSL program with solid.texture@1. Example:
   textured = solid.texture@1(painted, program="grain = fbm(scale_x=5, scale_y=5); albedo = colorize(grain, gradient=[0:#553322, 1:#d6a15b]); roughness = grain")
   output textured
 The channels are albedo, roughness, metallic, height (converted to tangent-space normals), and emissive.
+Shader expressions: the expr node draws a texture from a few lines of code, and composes with any other node. In the graph text
+write the program string with escaped quotes (\" inside program="..."):
+  program="n = expr(code=\"w = p; for i in 0..6 { w = rot(w, 0.7) * 1.9 + snoise(w * 2) * 0.4 }; out = hsv(w.x, 0.6, 0.8)\"); albedo = n"
+Language: name = expression lines (newline or ;), the last must be out = float (grey), vec3 or vec4. Built in: p (uv 0..1), q (centred
+-1..1), t (0), PI, TAU; floats and vec2-vec4 with swizzles (.xy .rgb); + - * / %; sin cos tan asin acos atan abs sign floor ceil fract
+sqrt exp log pow min max clamp mix step smoothstep mod length distance dot cross normalize reflect; and hash(vec2), noise(vec2) 0..1,
+snoise(vec2) -1..1, fbm(vec2) 0..1, hsv(h, s, v), rot(vec2, angle). Loops: for i in 0..N { ... } with a whole-number N up to 64,
+two deep at most (256 passes in all). No if, while, comparisons or texture reads (use step, mix and smoothstep). At most 600
+characters. Variables first set inside a loop stay inside it. A mistake names the line, column and the fix.
 Export glTF bakes these in the browser, requires WebGL2 plus EXT_color_buffer_float, and embeds PNG maps.
 The viewport shows these baked maps on the model (up to 64 maps in all; later parts lose emissive, then
 metallic-roughness, then normal maps first, with a warning). Give a part UVs with poly.unwrap_uv before

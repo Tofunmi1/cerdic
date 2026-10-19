@@ -20,6 +20,16 @@ fn text_without_expressions_is_untouched() {
 }
 
 #[test]
+fn braces_inside_a_string_with_escaped_quotes_are_not_expressions() {
+    // A texture program with nested, escaped quotes and a shader loop `for i in 0..6 { w = w * 2 }`.
+    let text = "t = solid.texture@1(a, program=\"n = expr(code=\\\"for i in 0..6 { w = w * 2 }\\\")\")\nb = f({1 + 1})\n";
+    assert_eq!(
+        run(text),
+        "t = solid.texture@1(a, program=\"n = expr(code=\\\"for i in 0..6 { w = w * 2 }\\\")\")\nb = f(2)\n"
+    );
+}
+
+#[test]
 fn constants_and_arithmetic_fold_into_numbers() {
     let text = "let w = 1.5\nlet half = w / 2\nb = solid.box@1(size=[{w}, {half}, {w * 2 + 1}])\n";
     assert_eq!(run(text), "\n\nb = solid.box@1(size=[1.5, 0.75, 4])\n");

@@ -11,6 +11,7 @@
 // `#rgb`, `#rrggbb` or `#rrggbbaa`, an enum option by name (`noise=perlin`), a gradient `[0:#000, 1:#fff]`, a
 // curve `[0:0, 0.5:0.8, 1:1]`. `n.1` is the second output of node `n`. Channels: albedo, roughness, metallic,
 // height (becomes a normal map), emissive.
+import { EXPR_NODE, EXPR_TYPE } from './expr/node';
 import { expandGeneric } from './generic';
 import type { InputDef, Library, NodeDef, ParamDef, TexNode, ParamValue } from './types';
 
@@ -29,14 +30,19 @@ export class TextureError extends Error {
   }
 }
 
-/** Splits at `separator` outside brackets and parentheses. */
+/** Splits at `separator` outside brackets, parentheses and double-quoted strings. */
 function split(text: string, separator: RegExp | string): string[] {
   const out: string[] = [];
   let depth = 0;
   let start = 0;
+  let quoted = false;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
-    if (c === '(' || c === '[') depth++;
+    if (quoted) {
+      if (c === '\\') i++;
+      else if (c === '"') quoted = false;
+    } else if (c === '"') quoted = true;
+    else if (c === '(' || c === '[') depth++;
     else if (c === ')' || c === ']') depth--;
     else if (depth === 0 && (typeof separator === 'string' ? c === separator : separator.test(c))) {
       out.push(text.slice(start, i));
@@ -45,6 +51,19 @@ function split(text: string, separator: RegExp | string): string[] {
   }
   out.push(text.slice(start));
   return out;
+}
+
+/** A line without its `//` comment; a `//` inside a double-quoted string is kept. */
+function withoutComment(line: string): string {
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    if (quoted) {
+      if (line[i] === '\\') i++;
+      else if (line[i] === '"') quoted = false;
+    } else if (line[i] === '"') quoted = true;
+    else if (line[i] === '/' && line[i + 1] === '/') return line.slice(0, i);
+  }
+  return line;
 }
 
 const nameOf = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
@@ -92,6 +111,11 @@ function value(def: ParamDef, text: string, node: string): ParamValue {
       if (/^\d+$/.test(t) && Number(t) < values.length) return Number(t);
       throw new TextureError(`${where}: "${t}" is not one of ${values.map((v) => nameOf(v.name)).join(', ')}`);
     }
+    case 'string': {
+      const quoted = /^"([\s\S]*)"$/.exec(t);
+      if (!quoted) throw new TextureError(`${where}: write the text in double quotes, for example ${def.name}="out = vec3(p, 0)"`);
+      return quoted[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+    }
     case 'color':
       return colour(t, where);
     case 'gradient': {
@@ -115,7 +139,7 @@ const reference = /^([A-Za-z_][A-Za-z0-9_]*)(?:\.(\d+))?$/;
 export function parseTextureProgram(text: string, library: Library): TextureProgram {
   const program: TextureProgram = { nodes: [], channels: {} };
   const known = new Set<string>();
-  const statements = split(text.split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n'), /[;\n]/);
+  const statements = split(text.split('\n').map(withoutComment).join('\n'), /[;\n]/);
   let lineNumber = 0;
   const channelOf = (name: string): name is Channel => (CHANNELS as readonly string[]).includes(name);
   for (const raw of statements) {
@@ -137,7 +161,7 @@ export function parseTextureProgram(text: string, library: Library): TextureProg
     const open = right.indexOf('(');
     if (open < 1 || !right.endsWith(')')) throw new TextureError(`"${right}" is not a node call like fbm(scale_x=4)`, lineNumber);
     const type = right.slice(0, open).trim();
-    const def = library[type];
+    const def = type === EXPR_TYPE ? EXPR_NODE : library[type];
     if (!def) throw new TextureError(`unknown texture node "${type}"`, lineNumber);
     if (known.has(name)) throw new TextureError(`"${name}" is defined twice`, lineNumber);
     const args = split(right.slice(open + 1, -1), ',').map((a) => a.trim()).filter(Boolean);
