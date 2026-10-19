@@ -239,6 +239,7 @@ fn estimate_poly(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> usize {
         "poly.spin" => input
             .saturating_mul(count(node, "steps").clamp(2, 256))
             .min(250_000),
+        "poly.mirror" => input.saturating_mul(2),
         _ => input,
     }
 }

@@ -278,7 +278,9 @@ fn parse_with(
     mut groups: Groups,
     source: &str,
 ) -> Result<TextBatch, Vec<Diagnostic>> {
-    let statements = parse(source).map_err(|e| vec![*e])?;
+    // Constants and `{expression}` values are folded into plain numbers before the parser sees the text.
+    let expanded = super::expr::expand(source).map_err(|e| vec![*e])?;
+    let statements = parse(&expanded).map_err(|e| vec![*e])?;
     let mut errors = Vec::new();
     let names = collect_names(&statements, known, &mut errors);
     input_errors(&statements, &names, known, &mut errors);

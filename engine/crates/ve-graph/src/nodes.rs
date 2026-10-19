@@ -1,19 +1,20 @@
-//! Commands that add, remove and edit nodes, outputs, materials and the editor layer.
+//! Commands that add, remove and edit nodes.
+
+mod checks;
+
+pub(crate) use checks::{
+    define_material, editor_set_collapsed, editor_set_position, remove_material, set_output,
+};
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ve_core::Name;
-
 use crate::apply::{Ctx, Fail, fail};
 use crate::diag::Diagnostic;
-use crate::doc::{Flags, Material, Node, OUT_PORT, Output, PortRef};
+use crate::doc::{Flags, Node};
 use crate::group::INSTANCE_OP;
 use crate::groups;
-use crate::id::{MaterialId, NodeId};
-use crate::limits::{
-    MAX_EDITOR_COORD, MAX_LIST_VALUES, MAX_MATERIAL_ENTRIES, MAX_MATERIALS, MAX_NODES, MAX_OUTPUTS,
-    MAX_STRING_BYTES, count,
-};
+use crate::id::NodeId;
+use crate::limits::{MAX_NODES, MAX_STRING_BYTES, count};
 use crate::links;
 use crate::spec::{OpId, OperatorSpec};
 use crate::value::Value;
@@ -45,7 +46,10 @@ fn text_ok(text: &str, what: &str) -> Result<(), Fail> {
     if text.len() > MAX_STRING_BYTES {
         return Err(Box::new(
             Diagnostic::error("param.range", format!("{what} is too long"))
-                .with_limit(count(MAX_STRING_BYTES), count(text.len())),
+                .with_limit(count(MAX_STRING_BYTES), count(text.len()))
+                .suggest(format!(
+                    "shorten {what} to at most {MAX_STRING_BYTES} bytes"
+                )),
         ));
     }
     Ok(())
@@ -108,7 +112,10 @@ pub(crate) fn add_node(
     if ctx.doc.nodes.len() >= MAX_NODES {
         return Err(Box::new(
             Diagnostic::error("budget.nodes", "the document has too many nodes")
-                .with_limit(count(MAX_NODES), count(ctx.doc.nodes.len() + 1)),
+                .with_limit(count(MAX_NODES), count(ctx.doc.nodes.len() + 1))
+                .suggest(format!(
+                    "delete or group nodes to stay within {MAX_NODES} nodes"
+                )),
         ));
     }
     if let Some(label) = label {
@@ -247,19 +254,30 @@ pub(crate) fn set_flags(
 pub(crate) fn set_op_version(ctx: &mut Ctx<'_>, node: &NodeId, version: u32) -> Result<(), Fail> {
     let current = existing(ctx, node)?.clone();
     let target = current.op.with_version(version).map_err(|e| {
-        Box::new(Diagnostic::error("parse.unknown_op", e.to_string()).at_node(node))
+        Box::new(
+            Diagnostic::error("parse.unknown_op", e.to_string())
+                .at_node(node)
+                .suggest(format!("use a version of at least 1, not {version}")),
+        )
     })?;
     let spec = spec_of(ctx, &target)?;
     // Every existing parameter must still exist and be valid; new ones take their defaults.
     let params = build_params(spec, &current.params, Some(node))?;
     if let Some(port) = current.inputs.keys().find(|p| spec.input(p).is_none()) {
+        let valid: Vec<&str> = spec.inputs.iter().map(|p| p.name).collect();
+        let names = if valid.is_empty() {
+            "none".to_owned()
+        } else {
+            valid.join(", ")
+        };
         return Err(Box::new(
             Diagnostic::error(
                 "graph.unknown_port",
                 format!("{target} has no input {port:?}"),
             )
             .at_node(node)
-            .at_port(port),
+            .at_port(port)
+            .suggest(format!("{target} inputs: {names}")),
         ));
     }
     if let Some(n) = ctx.doc.node_mut(node) {
@@ -268,128 +286,4 @@ pub(crate) fn set_op_version(ctx: &mut Ctx<'_>, node: &NodeId, version: u32) -> 
     }
     ctx.changed.insert(node.clone());
     links::check_graph(ctx)
-}
-
-pub(crate) fn set_output(
-    ctx: &mut Ctx<'_>,
-    name: &str,
-    from: Option<&PortRef>,
-) -> Result<(), Fail> {
-    Name::new(name).map_err(|e| fail("parse.syntax", format!("bad output name: {e}")))?;
-    let Some(from) = from else {
-        ctx.doc.outputs.retain(|o| o.name != name);
-        return Ok(());
-    };
-    existing(ctx, &from.node)?;
-    if from.port != OUT_PORT {
-        return Err(Box::new(
-            Diagnostic::error(
-                "graph.unknown_port",
-                format!("no output port {:?}", from.port),
-            )
-            .at_node(&from.node),
-        ));
-    }
-    let is_new = ctx.doc.outputs.iter().all(|o| o.name != name);
-    if is_new && ctx.doc.outputs.len() >= MAX_OUTPUTS {
-        return Err(Box::new(
-            Diagnostic::error("budget.nodes", "too many named outputs")
-                .with_limit(count(MAX_OUTPUTS), count(ctx.doc.outputs.len() + 1)),
-        ));
-    }
-    let output = Output {
-        name: name.to_owned(),
-        from: from.clone(),
-    };
-    match ctx.doc.outputs.iter_mut().find(|o| o.name == name) {
-        Some(slot) => *slot = output,
-        None => ctx.doc.outputs.push(output),
-    }
-    ctx.changed.insert(from.node.clone());
-    Ok(())
-}
-
-fn plain_value_ok(value: &Value) -> bool {
-    match value {
-        Value::Num(n) => n.is_finite(),
-        Value::Str(s) => s.len() <= MAX_STRING_BYTES,
-        Value::List(items) => items.len() <= MAX_LIST_VALUES && items.iter().all(plain_value_ok),
-        Value::Bool(_) | Value::Int(_) => true,
-    }
-}
-
-pub(crate) fn define_material(
-    ctx: &mut Ctx<'_>,
-    def: &BTreeMap<String, Value>,
-) -> Result<(), Fail> {
-    if ctx.doc.materials.len() >= MAX_MATERIALS {
-        return Err(Box::new(
-            Diagnostic::error("budget.nodes", "too many materials")
-                .with_limit(count(MAX_MATERIALS), count(ctx.doc.materials.len() + 1)),
-        ));
-    }
-    let bad_key = def.keys().any(|k| k.is_empty() || k.len() > 64);
-    if def.len() > MAX_MATERIAL_ENTRIES || bad_key || !def.values().all(plain_value_ok) {
-        return Err(Box::new(
-            Diagnostic::error("param.range", "the material definition is out of bounds")
-                .with_limit(count(MAX_MATERIAL_ENTRIES), count(def.len())),
-        ));
-    }
-    let id = ctx
-        .doc
-        .issue_material_id()
-        .ok_or_else(|| fail("budget.nodes", "ids are used up"))?;
-    ctx.doc.materials.push(Material {
-        id,
-        def: def.clone(),
-    });
-    Ok(())
-}
-
-pub(crate) fn remove_material(ctx: &mut Ctx<'_>, id: &MaterialId) -> Result<(), Fail> {
-    let before = ctx.doc.materials.len();
-    ctx.doc.materials.retain(|m| &m.id != id);
-    if ctx.doc.materials.len() == before {
-        return Err(fail(
-            "graph.unknown_material",
-            format!("there is no material {id}"),
-        ));
-    }
-    Ok(())
-}
-
-pub(crate) fn editor_set_position(
-    ctx: &mut Ctx<'_>,
-    node: &NodeId,
-    x: f64,
-    y: f64,
-) -> Result<(), Fail> {
-    existing(ctx, node)?;
-    for v in [x, y] {
-        if !v.is_finite() {
-            return Err(fail("param.non_finite", "positions must be finite"));
-        }
-        if v.abs() > MAX_EDITOR_COORD {
-            return Err(Box::new(
-                Diagnostic::error("param.range", "position is too far from the origin")
-                    .with_limit(MAX_EDITOR_COORD, v.abs()),
-            ));
-        }
-    }
-    ctx.doc.editor.positions.insert(node.clone(), [x, y]);
-    Ok(())
-}
-
-pub(crate) fn editor_set_collapsed(
-    ctx: &mut Ctx<'_>,
-    node: &NodeId,
-    collapsed: bool,
-) -> Result<(), Fail> {
-    existing(ctx, node)?;
-    if collapsed {
-        ctx.doc.editor.collapsed.insert(node.clone());
-    } else {
-        ctx.doc.editor.collapsed.remove(node);
-    }
-    Ok(())
 }

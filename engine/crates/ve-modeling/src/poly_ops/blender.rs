@@ -30,6 +30,7 @@ pub(super) fn handles(family: &str) -> bool {
             | "poly.remove_doubles"
             | "poly.bisect"
             | "poly.spin"
+            | "poly.mirror"
     )
 }
 
@@ -44,6 +45,7 @@ pub(super) fn ignores_selection(family: &str) -> bool {
             | "poly.triangulate"
             | "poly.remove_doubles"
             | "poly.bisect"
+            | "poly.mirror"
             | "poly.pack_uv"
     )
 }
@@ -122,6 +124,13 @@ pub(super) fn apply(
             node,
             "poly.spin_axis_zero",
             "axis must be non-zero".to_owned(),
+        ));
+    }
+    if family == "poly.mirror" && vector(node, "normal")?.iter().all(|value| *value == 0.0) {
+        return Err(super::errors::refuse(
+            node,
+            "poly.mirror_normal_zero",
+            "normal must be non-zero".to_owned(),
         ));
     }
     let op = operator(node, family)?;
@@ -292,6 +301,12 @@ fn operator(node: &Node, family: &str) -> Result<MeshOp, Fail> {
             axis: vector(node, "axis")?,
             angle: number(node, "angle")?,
             steps: super::params::count(node, "steps")? as u32,
+            merge: flag(node, "merge")?,
+            distance: number(node, "distance")?,
+        },
+        "poly.mirror" => MeshOp::Mirror {
+            point: vector(node, "point")?,
+            normal: vector(node, "normal")?,
             merge: flag(node, "merge")?,
             distance: number(node, "distance")?,
         },

@@ -294,11 +294,39 @@ bool run_spin(BMesh* bm, const ve_mesh_op_input& in) {
                       in.params[8]);
 }
 
+bool run_mirror(BMesh* bm, const ve_mesh_op_input& in) {
+  const float normal[3] = {static_cast<float>(in.params[3]), static_cast<float>(in.params[4]), static_cast<float>(in.params[5])};
+  const float point[3] = {static_cast<float>(in.params[0]), static_cast<float>(in.params[1]), static_cast<float>(in.params[2])};
+  const float distance = static_cast<float>(in.params[6]);
+  const float len = std::sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+  float unit[3] = {normal[0] / len, normal[1] / len, normal[2] / len};
+  // Use Blender's duplicate and transform operators with the exact reflection matrix. Its mirror
+  // wrapper only tests world-axis coordinates when welding, so that wrapper cannot represent an
+  // arbitrary plane despite accepting a transform-space matrix.
+  float matrix[4][4]{};
+  for (int row = 0; row < 3; ++row) {
+    for (int col = 0; col < 3; ++col) matrix[row][col] = (row == col ? 1.0F : 0.0F) - 2.0F * unit[row] * unit[col];
+    matrix[3][row] = point[row] - (matrix[row][0] * point[0] + matrix[row][1] * point[1] + matrix[row][2] * point[2]);
+  }
+  matrix[3][3] = 1.0F;
+  BMOperator duplicate;
+  if (!BMO_op_initf(bm, &duplicate, BMO_FLAG_DEFAULTS, "duplicate geom=%hvef", BM_ELEM_SELECT)) return false;
+  BMO_op_exec(bm, &duplicate);
+  bool ok = BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "transform matrix=%m4 verts=%S", matrix, &duplicate, "geom.out");
+  if (ok) ok = BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "reverse_faces faces=%S", &duplicate, "geom.out");
+  BMO_op_finish(bm, &duplicate);
+  if (!ok || !flag(in, 1)) return ok;
+  BMIter iter;
+  BMVert* vert;
+  BM_ITER_MESH(vert, &iter, bm, BM_VERTS_OF_MESH) BM_elem_flag_enable(vert, BM_ELEM_SELECT);
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "remove_doubles verts=%hv dist=%f", BM_ELEM_SELECT, distance);
+}
+
 // Checks the numbers an operator takes and what it selects; returns VE_OK when the call may
 // proceed.
 ve_status validate_params(const ve_mesh_op_input& in) {
   const double* p = in.params;
-  const int param_count = in.op == VE_MESH_OP_SPIN ? 9 : in.op == VE_MESH_OP_BISECT ? 7 : 4;
+  const int param_count = in.op == VE_MESH_OP_MIRROR ? 7 : in.op == VE_MESH_OP_SPIN ? 9 : in.op == VE_MESH_OP_BISECT ? 7 : 4;
   for (int i = 0; i < param_count; ++i) {
     if (!finite_within(p[i])) {
       return VE_ERR_NON_FINITE;
@@ -344,6 +372,8 @@ ve_status validate_params(const ve_mesh_op_input& in) {
                      p[7] == static_cast<int>(p[7]) && p[8] > 0.0 &&
                      (p[3] != 0.0 || p[4] != 0.0 || p[5] != 0.0)
                  ? VE_OK : VE_ERR_INVALID_ARG;
+    case VE_MESH_OP_MIRROR:
+      return p[6] >= 0.0 && (p[3] != 0.0 || p[4] != 0.0 || p[5] != 0.0) ? VE_OK : VE_ERR_INVALID_ARG;
     default:
       return VE_ERR_INVALID_ARG;
   }
@@ -410,6 +440,8 @@ bool run_op(BMesh* bm, const ve_mesh_op_input& in, const LoadedMesh& mesh, const
       return run_bisect(bm, in);
     case VE_MESH_OP_SPIN:
       return run_spin(bm, in);
+    case VE_MESH_OP_MIRROR:
+      return run_mirror(bm, in);
     default:
       return run_symmetrize(bm, in);
   }

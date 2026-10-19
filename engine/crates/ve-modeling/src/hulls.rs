@@ -7,7 +7,9 @@ use std::rc::Rc;
 use glam::{DVec3, Vec3};
 use ve_graph::{Diagnostic, Node, Value as Param};
 use ve_kernel::{KernelError, Mesh, Profile, Solid};
-use ve_measure::{BoundingShape, BoundingShapes, MeasureError, ShapeKind, bounding_shapes, convex_hull};
+use ve_measure::{
+    BoundingShape, BoundingShapes, MeasureError, ShapeKind, bounding_shapes, convex_hull,
+};
 
 use crate::operations::kernel_fail;
 use crate::{EvaluationWarning, Fail, cache::Value, fail_suggest};
@@ -124,9 +126,7 @@ fn label(kind: ShapeKind) -> &'static str {
 fn shape_solid(node: &Node, kind: ShapeKind, shape: &BoundingShape) -> Result<Solid, Fail> {
     match kind {
         ShapeKind::Aabb | ShapeKind::Obb => box_solid(node, shape),
-        ShapeKind::Capsule => {
-            build_capsule(shape).map_err(|error| kernel_fail(node, &error))
-        }
+        ShapeKind::Capsule => build_capsule(shape).map_err(|error| kernel_fail(node, &error)),
     }
 }
 
@@ -175,16 +175,12 @@ fn build_capsule(shape: &BoundingShape) -> Result<Solid, KernelError> {
 /// A proper rigid 3x4 row-major matrix mapping local Y onto `direction` and the origin onto `centre`.
 fn orientation(direction: [f32; 3], centre: [f32; 3]) -> [f64; 12] {
     let direction = DVec3::from_array(direction.map(f64::from));
-    let d = direction
-        .try_normalize()
-        .unwrap_or(DVec3::Y);
+    let d = direction.try_normalize().unwrap_or(DVec3::Y);
     let helper = if d.x.abs() < 0.9 { DVec3::X } else { DVec3::Y };
     let u = helper.cross(d).normalize();
     let w = u.cross(d);
     let c = DVec3::from_array(centre.map(f64::from));
-    [
-        u.x, d.x, w.x, c.x, u.y, d.y, w.y, c.y, u.z, d.z, w.z, c.z,
-    ]
+    [u.x, d.x, w.x, c.x, u.y, d.y, w.y, c.y, u.z, d.z, w.z, c.z]
 }
 
 /// A `ve-measure` refusal as a diagnostic naming the node.
@@ -198,10 +194,7 @@ fn measure_fail(node: &Node, error: &MeasureError) -> Fail {
             "solid.hull_degenerate",
             "the solid has no volume to hull: check it is closed and not flat",
         ),
-        _ => (
-            "solid.measure_failed",
-            "check the solid is a closed mesh",
-        ),
+        _ => ("solid.measure_failed", "check the solid is a closed mesh"),
     };
     Box::new(
         Diagnostic::error(code, error.to_string())
