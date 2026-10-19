@@ -71,6 +71,7 @@ fn part(
         positions: value.mesh.positions.clone(),
         indices: value.mesh.indices.clone(),
         uvs: value.uvs.clone(),
+        baked: value.baked.clone(),
         occlusion: Vec::new(),
         volume: value.volume,
         material: value.material.clone(),

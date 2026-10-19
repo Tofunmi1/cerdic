@@ -27,6 +27,7 @@ mod noise;
 mod operations;
 pub mod physics;
 mod plan;
+mod bake;
 mod poly_ops;
 mod values;
 mod profile_ops;
@@ -45,8 +46,8 @@ pub use job::{JobToken, hash};
 pub use kits::{KITS, Kit};
 pub use poly_ops::suggestion as poly_suggestion;
 pub use result::{
-    Evaluation, EvaluationWarning, MAX_SCENE_LIGHTS, Material, MaterialRecipe, Part, Quality,
-    SceneEnvironment, SceneLight, SceneLightKind,
+    BakedMaps, Evaluation, EvaluationWarning, MAX_SCENE_LIGHTS, Material, MaterialRecipe, Part,
+    Quality, SceneEnvironment, SceneLight, SceneLightKind,
 };
 
 pub(crate) type Fail = Box<ve_graph::Diagnostic>;

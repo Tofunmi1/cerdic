@@ -136,6 +136,7 @@ mod tests {
             transforms: None,
             instance_indices: Vec::new(),
             region: 0,
+            baked: None,
         }
     }
 

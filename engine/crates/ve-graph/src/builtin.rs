@@ -10,6 +10,7 @@ use crate::value::{ParamType, Unit, Value};
 use ready::READY;
 
 mod assembly;
+mod bake;
 mod curve_tools;
 mod curves;
 mod deformers;
@@ -126,6 +127,7 @@ fn all_specs() -> Vec<Option<OperatorSpec>> {
     all.extend(shapes::all());
     all.extend(hulls::all());
     all.extend(values::all());
+    all.extend(bake::all());
     all.extend(group_ops::all());
     all.extend(instances::all());
     all.extend(lights::all());
