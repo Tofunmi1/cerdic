@@ -78,6 +78,9 @@ fn execute_special(
     if let Some(result) = crate::values::run(node, inputs) {
         return Some(result);
     }
+    if let Some(result) = crate::bake::run(node, inputs) {
+        return Some(result);
+    }
     if family == "frame.add" {
         let Some(input) = inputs.first() else {
             return Some(Err(fail("graph.missing_input", "frame source")));
@@ -220,6 +223,8 @@ pub(crate) fn inherited(
         )
     {
         value.material = inputs.first().and_then(|input| input.material.clone());
+        // Maps baked onto the UVs stay with the part through rigid moves.
+        value.baked = inputs.first().and_then(|input| input.baked.clone());
         if let Some(input) = inputs.first() {
             value.frames = crate::frames::propagate(node, &input.frames)?;
         }

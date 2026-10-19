@@ -118,6 +118,50 @@ pub fn eval_occlusion(part: u32) -> Vec<f32> {
     })
 }
 
+/// The side in pixels of the maps `bake.maps` baked onto a part, or 0 when it has none.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_baked_size(part: u32) -> u32 {
+    HOST.with(|cell| {
+        cell.borrow()
+            .result
+            .as_ref()
+            .and_then(|r| r.parts.get(part as usize))
+            .and_then(|p| p.baked.as_ref())
+            .map_or(0, |baked| baked.size)
+    })
+}
+
+/// A part's baked tangent-space normal map as `size * size * 4` RGBA bytes; empty when it has none.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_baked_normal(part: u32) -> Vec<u8> {
+    HOST.with(|cell| {
+        cell.borrow()
+            .result
+            .as_ref()
+            .and_then(|r| r.parts.get(part as usize))
+            .and_then(|p| p.baked.as_ref())
+            .and_then(|baked| baked.normal.clone())
+            .unwrap_or_default()
+    })
+}
+
+/// A part's baked ambient occlusion as `size * size * 4` RGBA bytes of grey (255 is open); empty when it has none.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_baked_ao(part: u32) -> Vec<u8> {
+    HOST.with(|cell| {
+        cell.borrow()
+            .result
+            .as_ref()
+            .and_then(|r| r.parts.get(part as usize))
+            .and_then(|p| p.baked.as_ref())
+            .and_then(|baked| baked.ao.clone())
+            .unwrap_or_default()
+    })
+}
+
 /// Four bone indices per vertex of a skinned part (ADR 0030); empty for a rigid part.
 #[wasm_bindgen]
 #[must_use]

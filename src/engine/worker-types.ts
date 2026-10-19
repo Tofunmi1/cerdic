@@ -28,6 +28,8 @@ export type MeshPart = {
   node: string; name: string; volume: number; positions: Float32Array; indices: Uint32Array; occlusion: Float32Array; material?: PartMaterial | null;
   /** Optional per-triangle-corner UVs, two floats per index. Missing values use generated box charts on export. */
   uvs?: Float32Array;
+  /** Evaluator-baked tangent-space normal and ambient occlusion maps. */
+  baked?: { size: number; normal?: Uint8Array; ao?: Uint8Array };
   /** Which colour of a fused multi-colour solid this part draws (0 for ordinary solids). */
   region?: number;
   transforms?: Float32Array; instance_indices?: Uint32Array;
@@ -54,6 +56,11 @@ export type MeshPart = {
     after: number; every: number; accepts: string | null; clip: string; target_clip: string; then: string[];
   } | null;
 };
+
+/** Reads evaluator baked-map exports, omitting the field for an unbaked part. */
+export function bakedMapsFromEvaluator(size: number, normal: () => Uint8Array, ao: () => Uint8Array): MeshPart['baked'] {
+  return size > 0 ? { size, normal: normal(), ao: ao() } : undefined;
+}
 export type EvaluationStats = {
   evaluated_nodes: number; cache_hits: number; cache_bytes: number; elapsed_ms: number; memory_bytes: number;
 };

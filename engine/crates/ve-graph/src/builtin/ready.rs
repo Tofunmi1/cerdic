@@ -46,6 +46,7 @@ pub(super) const READY: &[&str] = &[
     "solid.round@1",
     "solid.chamfer@1",
     "solid.hull@1",
+    "bake.maps@1",
     "value.number@1",
     "value.math@1",
     "value.size@1",

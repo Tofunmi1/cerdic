@@ -18,6 +18,16 @@ pub(super) fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<u
             return Ok(crate::curves::estimate_tool(node, input));
         }
         // A drop only reads its surface: the copies are the prototype's triangles, not the surface's.
+        // A bake returns its low part: only that input's triangles count, not the high part's.
+        "bake.maps" => {
+            return Ok(node
+                .inputs
+                .get("low")
+                .into_iter()
+                .flatten()
+                .map(|r| sizes.get(&r.node).copied().unwrap_or(0))
+                .sum());
+        }
         "inst.drop" | "inst.scatter_on" => {
             return Ok(node
                 .inputs

@@ -12,6 +12,7 @@ import { sampleClip, sampleLook, type SampledClip } from './animation';
 import { Baker, encodePng } from './texture/bake';
 import { bakeMaterialMaps } from './texture/apply';
 import { loadBrowserTextureLibrary } from './texture/browser-library';
+import { rgbaPng } from './png';
 
 export type GlbOptions = {
   /** Faces meeting at less than this angle share a smooth normal (degrees). Default 40, as the viewer. */
@@ -420,24 +421,33 @@ export function buildGlb(parts: MeshPart[], options: GlbOptions = {}): Uint8Arra
 }
 
 /** Bakes authored procedural programs in the browser and embeds their PNG maps in the exported GLB. */
-export async function buildGlbWithTextures(parts: MeshPart[], options: Omit<GlbOptions, 'textureImages'> = {}, textureSize = 512): Promise<Uint8Array> {
-  if (!parts.some(part => part.material?.texture_program)) return buildGlb(parts, options);
-  const { library, helpers } = await loadBrowserTextureLibrary();
-  const baker = new Baker(new OffscreenCanvas(1, 1));
-  const maps = new Map<number, GlbTexturePngs>();
+export async function buildGlbWithTextures(parts: MeshPart[], options: GlbOptions = {}, textureSize = 512): Promise<Uint8Array> {
+  if (!parts.some(part => part.material?.texture_program || part.baked?.normal || part.baked?.ao)) return buildGlb(parts, options);
+  const hasProcedural = parts.some(part => part.material?.texture_program);
+  const resources = hasProcedural ? await loadBrowserTextureLibrary() : undefined;
+  const baker = hasProcedural ? new Baker(new OffscreenCanvas(1, 1)) : undefined;
+  const maps = new Map<number, GlbTexturePngs>(options.textureImages);
   try {
     for (const [index, part] of parts.entries()) {
+      if (!part.baked) continue;
+      const pngs: GlbTexturePngs = { ...(maps.get(index) ?? {}) };
+      if (part.baked.normal) pngs.normal = await rgbaPng(part.baked.normal, part.baked.size);
+      if (part.baked.ao) pngs.occlusion = await rgbaPng(part.baked.ao, part.baked.size);
+      maps.set(index, pngs);
+    }
+    for (const [index, part] of parts.entries()) {
       if (!part.material?.texture_program) continue;
-      const baked = bakeMaterialMaps(library, helpers, part, baker, textureSize);
-      const pngs: GlbTexturePngs = {};
+      if (!resources || !baker) continue;
+      const baked = bakeMaterialMaps(resources.library, resources.helpers, part, baker, textureSize);
+      const pngs: GlbTexturePngs = maps.get(index) ?? {};
       if (baked.albedo) pngs.albedo = await encodePng(baked.albedo, baked.size);
       if (baked.metallicRoughness) pngs.metallicRoughness = await encodePng(baked.metallicRoughness, baked.size);
-      if (baked.normal) pngs.normal = await encodePng(baked.normal, baked.size);
+      if (baked.normal && !pngs.normal) pngs.normal = await encodePng(baked.normal, baked.size);
       if (baked.emissive) pngs.emissive = await encodePng(baked.emissive, baked.size);
       maps.set(index, pngs);
     }
   } finally {
-    baker.dispose();
+    baker?.dispose();
   }
   return buildGlb(parts, { ...options, textureImages: maps });
 }

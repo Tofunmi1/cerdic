@@ -19,6 +19,22 @@ function viewportMapSize(): number {
   return Number.isInteger(wanted) && wanted >= 64 && wanted <= 2048 ? wanted : DEFAULT_MAP_SIZE;
 }
 const NO_MAP = new Uint8Array(0);
+/** Resamples an RGBA square with pixel-centred bilinear filtering. */
+export function resampleRgba(source: Uint8Array, size: number, targetSize: number): Uint8Array {
+  if (size === targetSize) return source;
+  const out = new Uint8Array(targetSize * targetSize * 4);
+  for (let y = 0; y < targetSize; y++) for (let x = 0; x < targetSize; x++) {
+    const sx = (x / (targetSize - 1)) * (size - 1), sy = (y / (targetSize - 1)) * (size - 1);
+    const x0 = Math.floor(sx), y0 = Math.floor(sy), x1 = Math.min(x0 + 1, size - 1), y1 = Math.min(y0 + 1, size - 1);
+    const fx = sx - x0, fy = sy - y0, at = (y * targetSize + x) * 4;
+    for (let c = 0; c < 4; c++) {
+      const a = source[(y0 * size + x0) * 4 + c] * (1 - fx) + source[(y0 * size + x1) * 4 + c] * fx;
+      const b = source[(y1 * size + x0) * 4 + c] * (1 - fx) + source[(y1 * size + x1) * 4 + c] * fx;
+      out[at + c] = Math.round(a * (1 - fy) + b * fy);
+    }
+  }
+  return out;
+}
 const frame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 
 // Baked maps by program and mesh, so an edit that leaves a textured part alone does not bake it again.
@@ -110,13 +126,19 @@ export async function uploadResult(runtime: Runtime, token: Token, parts: MeshPa
       if (!runtime.eval_projection_body(text, part.node, JSON.stringify(part.body), needs ? part.positions : new Float32Array(0), needs ? part.indices : new Uint32Array(0))) return false;
     }
     const maps = baked.get(part);
-    if (maps && !runtime.eval_projection_maps(text, part.node, region, maps.albedo ?? NO_MAP, maps.normal ?? NO_MAP, maps.metallicRoughness ?? NO_MAP, maps.emissive ?? NO_MAP)) return false;
+    if (maps || part.baked?.normal || part.baked?.ao) {
+      const normal = maps?.normal ?? (part.baked?.normal && region === 0 ? resampleRgba(part.baked.normal, part.baked.size, viewportMapSize()) : NO_MAP);
+      if (!runtime.eval_projection_maps(text, part.node, region, maps?.albedo ?? NO_MAP, normal, maps?.metallicRoughness ?? NO_MAP, maps?.emissive ?? NO_MAP)) return false;
+    }
     const normals = part.indices.length / 3 <= SMOOTH_TRIANGLE_LIMIT ? cornerNormals(part.positions, part.indices) : null;
+    // A baked normal map is sampled with the part's own UVs (one pair per triangle corner), so they travel with its vertices.
+    const ownUvs = part.baked?.normal && !maps?.normal && region === 0 && part.uvs?.length === part.indices.length * 2 ? part.uvs : undefined;
+    const uvs = maps?.uvs ?? ownUvs;
     for (let offset = 0; offset < part.indices.length; offset += TRIANGLES_PER_CHUNK * 3) {
       if (!current()) return false;
       const end = Math.min(offset + TRIANGLES_PER_CHUNK * 3, part.indices.length);
-      const data = pack(part, offset, end, normals, maps?.uvs);
-      if (!runtime.eval_projection_chunk_part(text, group, region, part.node, part.name, data, !!maps?.uvs)) return false;
+      const data = pack(part, offset, end, normals, uvs);
+      if (!runtime.eval_projection_chunk_part(text, group, region, part.node, part.name, data, !!uvs)) return false;
       await frame();
     }
   }

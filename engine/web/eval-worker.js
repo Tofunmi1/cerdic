@@ -37,23 +37,26 @@ self.onmessage = async ({ data }) => {
     const parts = state.done.parts.map((part, index) => {
       const positions = api.eval_positions(index), indices = api.eval_indices(index), uvs = api.eval_uvs(index);
       const occlusion = api.eval_occlusion(index);
+      const bakedSize = api.eval_baked_size(index);
+      const baked = bakedSize ? { size: bakedSize, normal: api.eval_baked_normal(index), ao: api.eval_baked_ao(index) } : undefined;
       const transforms = api.eval_transforms(index), instance_indices = api.eval_instance_indices(index);
       // Per-vertex bone indices and weights only exist for a skinned part (ADR 0030).
       const skinned = Boolean(part.skin);
       const skin_joints = skinned ? api.eval_skin_joints(index) : new Uint32Array(0);
       const skin_weights = skinned ? api.eval_skin_weights(index) : new Float32Array(0);
-      return { ...part, positions, indices, uvs, occlusion, transforms, instance_indices, skin_joints, skin_weights };
+      return { ...part, positions, indices, uvs, occlusion, baked, transforms, instance_indices, skin_joints, skin_weights };
     });
     const warnings = state.done.warnings ?? [];
     const lights = state.done.lights ?? [];
     const environment = state.done.environment ?? null;
     const bytes = parts.reduce((sum, part) => sum + part.positions.byteLength + part.indices.byteLength + part.uvs.byteLength + part.occlusion.byteLength + part.transforms.byteLength + part.instance_indices.byteLength
       + part.skin_joints.byteLength + part.skin_weights.byteLength
+      + (part.baked?.normal?.byteLength ?? 0) + (part.baked?.ao?.byteLength ?? 0)
       + new TextEncoder().encode(JSON.stringify(part.frames ?? {})).byteLength, 0)
       + new TextEncoder().encode(JSON.stringify(lights)).byteLength
       + new TextEncoder().encode(JSON.stringify(environment)).byteLength
       + new TextEncoder().encode(JSON.stringify(warnings)).byteLength;
-    const transfer = parts.flatMap(part => [part.positions.buffer, part.indices.buffer, part.uvs.buffer, part.occlusion.buffer, part.transforms.buffer, part.instance_indices.buffer, part.skin_joints.buffer, part.skin_weights.buffer]);
+    const transfer = parts.flatMap(part => [part.positions.buffer, part.indices.buffer, part.uvs.buffer, part.occlusion.buffer, part.transforms.buffer, part.instance_indices.buffer, part.skin_joints.buffer, part.skin_weights.buffer, ...(part.baked?.normal ? [part.baked.normal.buffer] : []), ...(part.baked?.ao ? [part.baked.ao.buffer] : [])]);
     postMessage({ kind: 'result', token: data.token, parts, lights, environment, warnings, bytes, sent_ms: performance.timeOrigin + performance.now(),
       stats: { ...state.done, parts: undefined, warnings: undefined, elapsed_ms: performance.now() - began,
         memory_bytes: wasm.memory.buffer.byteLength } }, transfer);

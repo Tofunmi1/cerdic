@@ -268,6 +268,20 @@ pub struct Part {
     /// solid), 1, 2 and so on for the further colours of one fused solid. Parts of one output share
     /// `node` and `name`; the pair (`node`, `region`) identifies the surface to draw them with.
     pub region: u32,
+    /// Maps baked onto this part's UVs by `bake.maps`; None for a part without any.
+    #[serde(skip)]
+    pub baked: Option<std::sync::Arc<BakedMaps>>,
+}
+
+/// Images baked onto a part's UV layout: square RGBA8, row 0 at v = 0.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BakedMaps {
+    /// Side of each image, in pixels.
+    pub size: u32,
+    /// Tangent-space normal map (OpenGL convention), `size * size * 4` bytes, when baked.
+    pub normal: Option<Vec<u8>>,
+    /// Grey ambient occlusion (255 is open sky), `size * size * 4` bytes, when baked.
+    pub ao: Option<Vec<u8>>,
 }
 
 /// A successful complete evaluation. Failures never yield a partial scene.

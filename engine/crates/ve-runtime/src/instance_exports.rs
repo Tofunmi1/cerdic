@@ -29,7 +29,7 @@ pub fn eval_projection_material_region(
 }
 
 /// Stages the baked texture maps of one material region: albedo, tangent-space normal, packed
-/// metallic-roughness and emissive, each 512 by 512 RGBA8 (an empty array means that map is absent).
+/// metallic-roughness and emissive, each `ve_render::LAYER_SIZE` (1024) square RGBA8 (an empty array means that map is absent).
 #[wasm_bindgen]
 #[must_use]
 pub fn eval_projection_maps(

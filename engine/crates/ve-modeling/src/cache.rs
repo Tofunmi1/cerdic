@@ -55,6 +55,8 @@ pub(crate) struct Value {
     pub(crate) body: Option<crate::physics::PhysBody>,
     /// The number a `value.*` node produced; it fills a number parameter of the nodes that link to it.
     pub(crate) number: Option<f64>,
+    /// The maps a `bake.maps` node baked onto this part's UVs.
+    pub(crate) baked: Option<std::sync::Arc<crate::BakedMaps>>,
 }
 
 impl Value {
@@ -83,6 +85,7 @@ impl Value {
             ik: None,
             body: None,
             number: None,
+            baked: None,
         }
     }
 
@@ -111,6 +114,7 @@ impl Value {
             ik: None,
             body: None,
             number: None,
+            baked: None,
         }
     }
 
