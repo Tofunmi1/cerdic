@@ -29,6 +29,7 @@ use bevy_render::texture::{CachedTexture, TextureCache};
 use bevy_shader::Shader;
 
 use crate::counters::Pass;
+use crate::cutout::CutoutKind;
 use crate::geometry::bind_geometry;
 use crate::pass::bind_slot;
 use crate::pipeline::instance_layout;
@@ -209,6 +210,8 @@ pub(crate) fn ao_depth_pass(
     quality: Res<RenderQuality>,
     batches: Res<InstanceBatches>,
     pipelines: Res<AoDepthPipelines>,
+    cutouts: Res<crate::cutout::CutoutPipelines>,
+    textures: Res<crate::textures::TexturesGpu>,
     pipeline_cache: Res<PipelineCache>,
     view_uniforms: Res<ViewUniforms>,
     render_meshes: Res<RenderAssets<RenderMesh>>,
@@ -252,12 +255,21 @@ pub(crate) fn ao_depth_pass(
         let Some(render_mesh) = render_meshes.get(batch.mesh) else {
             continue;
         };
+        // A batch with a cut-out instance draws with the variant that tests the albedo alpha, when its mesh can.
+        let cutout = batch
+            .cutout
+            .then(|| cutouts.get(CutoutKind::Depth, &render_mesh.layout))
+            .flatten()
+            .zip(textures.bind_group.as_ref());
         // Pipelines are queued one frame after a mesh first appears.
-        let Some(pipeline) = pipelines
-            .cache
-            .get(&render_mesh.layout)
-            .and_then(|id| pipeline_cache.get_render_pipeline(*id))
-        else {
+        let id = match cutout {
+            Some((id, maps)) => {
+                pass.set_bind_group(1, maps, &[]);
+                Some(id)
+            }
+            None => pipelines.cache.get(&render_mesh.layout).copied(),
+        };
+        let Some(pipeline) = id.and_then(|id| pipeline_cache.get_render_pipeline(id)) else {
             continue;
         };
         pass.set_render_pipeline(pipeline);

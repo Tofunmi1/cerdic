@@ -1,39 +1,31 @@
-//! The sun's shadow map: its texture, per-frame matrix, depth-only pipelines and pass.
+//! The sun's shadow map: its texture and the pass that fills it (the pipelines, the sun cameras and this frame's parameters are
+//! in `shadow_pipelines`).
 //!
 //! Up to three cascaded orthographic maps share one atlas and follow the viewer (see `shadow_math`). They are sampled in the forward shader
 //! with a comparison sampler. When shadows are off the lights bind group still needs a texture, so a
 //! 1 by 1 stand-in is bound and the shader skips the lookup.
 
-use std::collections::HashMap;
-
-use bevy_asset::Handle;
 use bevy_ecs::prelude::*;
-use bevy_log::warn_once;
-use bevy_math::{Vec3, Vec4};
-use bevy_mesh::{Mesh, MeshVertexBufferLayoutRef, VertexBufferLayout};
 use bevy_render::mesh::RenderMesh;
 use bevy_render::mesh::allocator::MeshAllocator;
 use bevy_render::render_asset::RenderAssets;
 use bevy_render::render_resource::{
-    BindGroup, BindGroupEntry, BindGroupLayoutDescriptor, CachedRenderPipelineId, CompareFunction,
-    DepthBiasState, DepthStencilState, DynamicUniformBuffer, Extent3d, FilterMode, LoadOp,
-    MultisampleState, Operations, PipelineCache, PrimitiveState, PrimitiveTopology,
-    RenderPassDepthStencilAttachment, RenderPassDescriptor, RenderPipelineDescriptor, Sampler,
-    SamplerDescriptor, StencilState, StoreOp, Texture, TextureDescriptor, TextureDimension,
-    TextureFormat, TextureUsages, TextureView, TextureViewDescriptor, VertexState,
+    CompareFunction, Extent3d, FilterMode, LoadOp, Operations, PipelineCache,
+    RenderPassDepthStencilAttachment, RenderPassDescriptor, Sampler, SamplerDescriptor, StoreOp,
+    Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView,
+    TextureViewDescriptor,
 };
-use bevy_render::renderer::{RenderContext, RenderDevice, RenderQueue};
-use bevy_render::view::ExtractedView;
-use bevy_shader::Shader;
+use bevy_render::renderer::{RenderContext, RenderDevice};
 
 use crate::counters::{self, Pass};
+use crate::cutout::{CutoutKind, CutoutPipelines};
 use crate::geometry::bind_geometry;
-use crate::light::ExtractedLights;
-use crate::pipeline::instance_layout;
-use crate::prepare::{InstanceBatches, ViewUniform};
+use crate::prepare::InstanceBatches;
 use crate::quality::RenderQuality;
-use crate::shadow_math::{MAX_CASCADES, ShadowParams, sun_cascades, view_frustum};
-use crate::stereo::{StereoViews, viewer_position};
+use crate::shadow_math::MAX_CASCADES;
+pub(crate) use crate::shadow_pipelines::{
+    ShadowPipelines, ShadowState, prepare_shadow_state, queue_shadow_pipelines,
+};
 
 /// Source of the shadow shader.
 pub(crate) const SHADOW_SHADER: &str = include_str!("shaders/shadow.wgsl");
@@ -151,178 +143,13 @@ pub(crate) fn prepare_shadow_map(
     }
 }
 
-/// This frame's shadow parameters (disabled when there is no map or no sun).
-#[derive(Resource, Default)]
-pub(crate) struct ShadowState {
-    pub(crate) params: ShadowParams,
-}
-
-/// The depth-only pipelines and the sun camera's uniform.
-#[derive(Resource)]
-pub(crate) struct ShadowPipelines {
-    view_layout: BindGroupLayoutDescriptor,
-    shader: Handle<Shader>,
-    cache: HashMap<MeshVertexBufferLayoutRef, CachedRenderPipelineId>,
-    /// One camera per cascade, addressed by dynamic offset.
-    view_buffer: DynamicUniformBuffer<ViewUniform>,
-    offsets: Vec<u32>,
-    view_bind_group: Option<BindGroup>,
-}
-
-impl ShadowPipelines {
-    pub(crate) fn new(shader: Handle<Shader>) -> Self {
-        Self {
-            // The sun cameras have a bind group of their own: just the uniform, without the exposure texture.
-            view_layout: crate::pipeline::uniform_only_view_layout(),
-            shader,
-            cache: HashMap::new(),
-            view_buffer: DynamicUniformBuffer::default(),
-            offsets: Vec::new(),
-            view_bind_group: None,
-        }
-    }
-
-    fn descriptor(&self, mesh_layout: VertexBufferLayout) -> RenderPipelineDescriptor {
-        RenderPipelineDescriptor {
-            label: Some("ve_shadow".into()),
-            layout: vec![self.view_layout.clone()],
-            vertex: VertexState {
-                shader: self.shader.clone(),
-                entry_point: Some("vertex".into()),
-                buffers: vec![mesh_layout, instance_layout()],
-                ..Default::default()
-            },
-            primitive: PrimitiveState {
-                topology: PrimitiveTopology::TriangleList,
-                // Both faces cast: thin shells would otherwise let light through.
-                cull_mode: None,
-                ..Default::default()
-            },
-            depth_stencil: Some(DepthStencilState {
-                format: SHADOW_FORMAT,
-                depth_write_enabled: Some(true),
-                depth_compare: Some(CompareFunction::Less),
-                stencil: StencilState::default(),
-                bias: DepthBiasState {
-                    constant: 2,
-                    slope_scale: 2.0,
-                    clamp: 0.0,
-                },
-            }),
-            multisample: MultisampleState::default(),
-            fragment: None,
-            ..Default::default()
-        }
-    }
-}
-
-/// Fits the sun camera to the viewer, uploads its uniform and records this frame's shadow parameters.
-pub(crate) fn prepare_shadow_state(
-    lights: Res<ExtractedLights>,
-    quality: Res<RenderQuality>,
-    map: Res<ShadowMap>,
-    views: Query<(&ExtractedView, Option<&StereoViews>)>,
-    mut state: ResMut<ShadowState>,
-    mut pipelines: ResMut<ShadowPipelines>,
-    pipeline_cache: Res<PipelineCache>,
-    device: Res<RenderDevice>,
-    queue: Res<RenderQueue>,
-) {
-    let sun = lights
-        .sun
-        .as_ref()
-        .filter(|(_, light)| light.intensity > 0.0);
-    let (Some((resolution, cascades)), Some((forward, _))) = (map.layout(), sun) else {
-        state.params = ShadowParams::default();
-        return;
-    };
-    let viewer = viewer_position(
-        views
-            .iter()
-            .map(|(view, stereo)| (view.world_from_view.translation(), stereo)),
-    );
-    // The cascades follow the first view's direction and field of view (the head, for a headset).
-    let (view_forward, tan) = views
-        .iter()
-        .next()
-        .map_or((Vec3::NEG_Z, [1.0, 0.6]), |(view, _)| {
-            view_frustum(view.world_from_view.rotation(), view.clip_from_view)
-        });
-    let params = sun_cascades(
-        -*forward,
-        viewer,
-        view_forward,
-        tan,
-        cascades as usize,
-        resolution,
-        quality.shadow_pcf_radius,
-    );
-    pipelines.view_buffer.clear();
-    pipelines.offsets.clear();
-    for cascade in 0..params.cascades {
-        let uniform = ViewUniform {
-            clip_from_world: params.clip_from_world[cascade],
-            camera_position: Vec4::ZERO,
-            exposure: Vec4::new(1.0, 0.0, 0.0, 0.0),
-            // The depth-only shadow pass does not grade; keep the fields neutral but present.
-            grading: Vec4::new(1.0, 1.0, 0.0, 0.0),
-            tint: Vec4::new(1.0, 1.0, 1.0, 0.0),
-            ..ViewUniform::default()
-        };
-        let offset = pipelines.view_buffer.push(&uniform);
-        pipelines.offsets.push(offset);
-    }
-    pipelines.view_buffer.write_buffer(&device, &queue);
-    let layout = pipeline_cache.get_bind_group_layout(&pipelines.view_layout);
-    pipelines.view_bind_group = pipelines.view_buffer.binding().map(|binding| {
-        device.create_bind_group(
-            "ve_shadow_view_bind_group",
-            &layout,
-            &[BindGroupEntry {
-                binding: 0,
-                resource: binding,
-            }],
-        )
-    });
-    state.params = params;
-}
-
-/// Queues the depth-only pipeline for every mesh layout about to be drawn, while shadows are on.
-pub(crate) fn queue_shadow_pipelines(
-    mut pipelines: ResMut<ShadowPipelines>,
-    state: Res<ShadowState>,
-    pipeline_cache: Res<PipelineCache>,
-    render_meshes: Res<RenderAssets<RenderMesh>>,
-    batches: Res<InstanceBatches>,
-) {
-    if !state.params.enabled {
-        return;
-    }
-    for batch in &batches.batches {
-        let Some(render_mesh) = render_meshes.get(batch.mesh) else {
-            continue;
-        };
-        let layout = &render_mesh.layout;
-        if pipelines.cache.contains_key(layout) {
-            continue;
-        }
-        let Ok(mesh_layout) = layout
-            .0
-            .get_layout(&[Mesh::ATTRIBUTE_POSITION.at_shader_location(0)])
-        else {
-            warn_once!("shadow pipeline: a mesh lacks POSITION attributes");
-            continue;
-        };
-        let id = pipeline_cache.queue_render_pipeline(pipelines.descriptor(mesh_layout));
-        pipelines.cache.insert(layout.clone(), id);
-    }
-}
-
 /// Renders every batch into the shadow map from the sun's point of view.
 pub(crate) fn shadow_pass(
     state: Res<ShadowState>,
     map: Res<ShadowMap>,
     pipelines: Res<ShadowPipelines>,
+    cutouts: Res<CutoutPipelines>,
+    textures: Res<crate::textures::TexturesGpu>,
     pipeline_cache: Res<PipelineCache>,
     batches: Res<InstanceBatches>,
     render_meshes: Res<RenderAssets<RenderMesh>>,
@@ -377,12 +204,21 @@ pub(crate) fn shadow_pass(
             let Some(render_mesh) = render_meshes.get(batch.mesh) else {
                 continue;
             };
+            // A batch with a cut-out instance draws with the variant that tests the albedo alpha, when its mesh can.
+            let cutout = batch
+                .cutout
+                .then(|| cutouts.get(CutoutKind::Shadow, &render_mesh.layout))
+                .flatten()
+                .zip(textures.bind_group.as_ref());
             // Pipelines are queued one frame after a mesh first appears.
-            let Some(pipeline) = pipelines
-                .cache
-                .get(&render_mesh.layout)
-                .and_then(|id| pipeline_cache.get_render_pipeline(*id))
-            else {
+            let id = match cutout {
+                Some((id, maps)) => {
+                    pass.set_bind_group(1, maps, &[]);
+                    Some(id)
+                }
+                None => pipelines.cache.get(&render_mesh.layout).copied(),
+            };
+            let Some(pipeline) = id.and_then(|id| pipeline_cache.get_render_pipeline(id)) else {
                 continue;
             };
             pass.set_render_pipeline(pipeline);

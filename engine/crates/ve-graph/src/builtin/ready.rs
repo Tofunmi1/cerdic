@@ -30,6 +30,7 @@ pub(super) const READY: &[&str] = &[
     "solid.texture@1",
     "solid.toon@1",
     "solid.style@1",
+    "solid.foliage@1",
     "anim.track@1",
     "anim.wave@1",
     "rig.bone@1",

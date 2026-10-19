@@ -156,6 +156,9 @@ fn execute_special(
     if family == "solid.style" {
         return Some(crate::style::style(node, inputs));
     }
+    if family == "solid.foliage" {
+        return Some(crate::foliage::foliage(node, inputs));
+    }
     if family.starts_with("inst.") || inputs.first().is_some_and(|v| v.instances.is_some()) {
         return Some(
             instances::execute(node, inputs, context).map_err(|error| at_node(error, node)),

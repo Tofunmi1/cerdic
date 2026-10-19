@@ -48,6 +48,8 @@ pub(crate) enum PassKind {
     Transparent,
     /// The toon outline: a second draw with front faces culled and the vertices pushed outward.
     Outline,
+    /// The opaque draw of a batch with foliage (leaves, grass, fences): thin cards seen from both sides, so nothing is culled.
+    TwoSided,
 }
 
 type PipelineKey = (MeshVertexBufferLayoutRef, TextureFormat, u32, PassKind);
@@ -157,7 +159,11 @@ impl ForwardPipelines {
                 topology: PrimitiveTopology::TriangleList,
                 front_face: FrontFace::Ccw,
                 // The outline hull shows only its back faces, which peek out around the silhouette.
-                cull_mode: Some(if outline { Face::Front } else { Face::Back }),
+                cull_mode: match kind {
+                    PassKind::Outline => Some(Face::Front),
+                    PassKind::TwoSided => None,
+                    PassKind::Opaque | PassKind::Transparent => Some(Face::Back),
+                },
                 ..Default::default()
             },
             depth_stencil: Some(DepthStencilState {
@@ -197,13 +203,13 @@ impl ForwardPipelines {
 
 /// Instance buffer layout: the model matrix as four `vec4` columns (locations 3 to 6), then base
 /// colour, material parameters, emissive and texture-array layers (locations 7 to 10), then the three toon
-/// vectors (locations 12 to 14; 11 is the mesh's texture coordinates).
+/// vectors (locations 12 to 14; 11 is the mesh's texture coordinates), then the foliage vector (location 15).
 pub(crate) fn instance_layout() -> VertexBufferLayout {
     let vec4 = u64::try_from(size_of::<[f32; 4]>()).unwrap_or(16);
     VertexBufferLayout {
-        array_stride: u64::try_from(size_of::<InstanceData>()).unwrap_or(176),
+        array_stride: u64::try_from(size_of::<InstanceData>()).unwrap_or(192),
         step_mode: VertexStepMode::Instance,
-        attributes: (0..11_u32)
+        attributes: (0..12_u32)
             .map(|i| VertexAttribute {
                 format: VertexFormat::Float32x4,
                 offset: vec4 * u64::from(i),
@@ -253,7 +259,16 @@ pub(crate) fn queue_forward_pipelines(
             continue;
         };
         for &(format, samples) in &variants {
-            for kind in [PassKind::Opaque, PassKind::Transparent, PassKind::Outline] {
+            let kinds = [
+                (PassKind::Opaque, true),
+                (PassKind::Transparent, true),
+                (PassKind::Outline, true),
+                (PassKind::TwoSided, batch.foliage),
+            ];
+            for kind in kinds
+                .into_iter()
+                .filter_map(|(kind, wanted)| wanted.then_some(kind))
+            {
                 let key = (layout.clone(), format, samples, kind);
                 if pipelines.cache.contains_key(&key) {
                     continue;
@@ -275,7 +290,10 @@ mod tests {
     fn the_shader_without_texture_coordinates_drops_exactly_the_uv_input() {
         let plain = forward_shader_without_uv();
         assert!(FORWARD_SHADER.contains("@location(11) uv: vec2<f32>,"));
-        assert!(!plain.contains("@location(11)"), "the vertex input is gone");
+        assert!(
+            !plain.contains("@location(11) uv"),
+            "the vertex input is gone"
+        );
         assert!(
             !plain.contains("out.uv = input.uv"),
             "the vertex stage no longer copies it"
@@ -287,5 +305,26 @@ mod tests {
             FORWARD_SHADER.lines().count(),
             "one line fewer"
         );
+    }
+
+    #[test]
+    fn only_the_foliage_draw_skips_culling() {
+        let pipelines = ForwardPipelines::new(Handle::default(), Handle::default());
+        let cull = |kind| {
+            pipelines
+                .descriptor(
+                    VertexBufferLayout::default(),
+                    TextureFormat::Rgba8UnormSrgb,
+                    1,
+                    false,
+                    kind,
+                )
+                .primitive
+                .cull_mode
+        };
+        assert_eq!(cull(PassKind::Opaque), Some(Face::Back));
+        assert_eq!(cull(PassKind::Transparent), Some(Face::Back));
+        assert_eq!(cull(PassKind::Outline), Some(Face::Front));
+        assert_eq!(cull(PassKind::TwoSided), None);
     }
 }

@@ -90,6 +90,17 @@ fn default_outline_color() -> [f32; 3] {
     [0.1, 0.06, 0.14]
 }
 
+/// How a leaf-like surface is cut out and moves, from a `solid.foliage` node.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Foliage {
+    /// The surface is cut away where its albedo map's alpha is below this (0 keeps every pixel, 1 keeps only the opaque ones).
+    pub alpha_cutoff: f32,
+    /// How far the whole shape bends with the wind, 0 still to 1 swaying strongly; stronger the higher it is above its base.
+    pub sway: f32,
+    /// How much the surface flutters in the wind at a smaller scale (leaves trembling), 0 to 1.
+    pub flutter: f32,
+}
+
 /// A solid's surface, as set by a `solid.material` node. Colour is sRGB, emissive is linear.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Material {
@@ -123,6 +134,9 @@ pub struct Material {
     /// the program made them.
     #[serde(default)]
     pub texture_style: Option<String>,
+    /// Cutout and wind from a `solid.foliage` node; `None` is an ordinary solid surface.
+    #[serde(default)]
+    pub foliage: Option<Foliage>,
 }
 
 const fn opaque_opacity() -> f32 {

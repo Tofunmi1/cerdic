@@ -45,6 +45,16 @@ function materialJson(material: PartMaterial | null | undefined, maps: Partial<R
     },
   };
   if ((material?.opacity ?? 1) < 1) json.alphaMode = 'BLEND';
+  // Foliage (leaves, grass, fences) is two-sided, and a cutoff makes the albedo texture's alpha a mask. glTF reads the alpha of
+  // the base colour texture times the factor, so the cutoff applies as it is; with no texture there is nothing to cut.
+  const foliage = material?.foliage;
+  if (foliage && (foliage.alpha_cutoff > 0 || foliage.sway > 0 || foliage.flutter > 0)) {
+    json.doubleSided = true;
+    if (foliage.alpha_cutoff > 0 && maps.albedo && json.alphaMode !== 'BLEND') {
+      json.alphaMode = 'MASK';
+      json.alphaCutoff = foliage.alpha_cutoff;
+    }
+  }
   if (maps.albedo || maps.metallicRoughness) {
     const pbr = json.pbrMetallicRoughness as Json;
     if (maps.albedo) pbr.baseColorTexture = maps.albedo;

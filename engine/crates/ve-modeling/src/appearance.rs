@@ -70,6 +70,7 @@ pub(crate) fn material(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail>
         toon: None,
         texture_program: None,
         texture_style: None,
+        foliage: None,
     };
     // A placement set keeps sharing one prototype; the surface goes on that prototype, so every
     // placement draws with it and the set stays a set.
@@ -162,6 +163,7 @@ fn textured_surface(existing: Option<&Material>, program: &str, tile: f32) -> Ma
         toon: None,
         texture_program: None,
         texture_style: None,
+        foliage: None,
     });
     material.texture_program = Some(program.to_owned());
     material.texture_tile = tile;
@@ -200,12 +202,17 @@ pub(crate) fn restyle(
     toon: Option<crate::result::Toon>,
     texture_style: Option<&str>,
 ) -> Value {
-    let apply = |existing: Option<&Material>| {
+    with_surfaces(input, |existing| {
         let mut material = textured_surface_default(existing);
         material.toon.clone_from(&toon);
         material.texture_style = texture_style.map(str::to_owned);
         material
-    };
+    })
+}
+
+/// `input` with `apply` run on its surface, on every region's, and on a placement set's prototype (and its regions), each given
+/// the surface already there, if any.
+pub(crate) fn with_surfaces(input: &Value, apply: impl Fn(Option<&Material>) -> Material) -> Value {
     let mut value = input.clone();
     value.material = Some(apply(value.material.as_ref()));
     for region in &mut value.regions {
@@ -226,7 +233,7 @@ pub(crate) fn restyle(
 }
 
 /// The surface already on a shape, or the default one.
-fn textured_surface_default(existing: Option<&Material>) -> Material {
+pub(crate) fn textured_surface_default(existing: Option<&Material>) -> Material {
     existing.cloned().unwrap_or(Material {
         color: [0.8; 3],
         opacity: 1.0,
@@ -240,5 +247,6 @@ fn textured_surface_default(existing: Option<&Material>) -> Material {
         toon: None,
         texture_program: None,
         texture_style: None,
+        foliage: None,
     })
 }

@@ -87,6 +87,8 @@ struct VertexInput {
     @location(13) toon_b: vec4<f32>,
     // rgb outline colour (linear), w outline width in screen pixels (0 draws none).
     @location(14) toon_c: vec4<f32>,
+    // Leaf-like surfaces: x alpha cutoff (0 keeps every pixel), y sway, z flutter.
+    @location(15) foliage: vec4<f32>,
 };
 
 struct VertexOutput {
@@ -102,6 +104,7 @@ struct VertexOutput {
     @location(8) uv: vec2<f32>,
     @location(9) @interpolate(flat) toon_a: vec4<f32>,
     @location(10) @interpolate(flat) toon_b: vec4<f32>,
+    @location(11) @interpolate(flat) foliage: vec4<f32>,
 };
 
 // The per-vertex occlusion slot of a static mesh carries three things in one exactly-representable float (an integer
@@ -157,6 +160,7 @@ fn vertex(input: VertexInput) -> VertexOutput {
     out.occlusion = unpack_occlusion(input.occlusion);
     out.object_position = input.position;
     out.maps = input.maps;
+    out.foliage = input.foliage;
     out.uv = input.uv;
     out.toon_a = input.toon_a;
     out.toon_b = input.toon_b;
@@ -493,7 +497,10 @@ fn toon_step(x: f32, bands: f32, feather: f32) -> f32 {
 }
 
 @fragment
-fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
+fn fragment(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @location(0) vec4<f32> {
+    // Foliage is drawn two-sided (leaves, grass, fences), so its back faces are lit with the normal turned toward the viewer.
+    let two_sided = input.foliage.x > 0.0 || input.foliage.y > 0.0 || input.foliage.z > 0.0;
+    let surface_normal = select(input.world_normal, -input.world_normal, two_sided && !front_facing);
     let pattern = procedural_surface(
         input.params.z,
         input.object_position * clamp(input.params.w, 0.1, 50.0),
@@ -501,7 +508,7 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
     );
     let bump_gradient = dpdx(input.world_position) * dpdx(pattern.z)
         + dpdy(input.world_position) * dpdy(pattern.z);
-    var n = normalize(input.world_normal - bump_gradient * 0.035);
+    var n = normalize(surface_normal - bump_gradient * 0.035);
     let v = normalize(view.camera_position.xyz - input.world_position);
     // Baked maps: sampled unconditionally (the layer index is clamped) so derivatives stay uniform, then
     // used only where the surface has them.
@@ -514,7 +521,7 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
     let mr_map = textureSample(material_maps, material_sampler, input.uv, mr_layer);
     let emissive_map = textureSample(material_maps, material_sampler, input.uv, emissive_layer);
     // Derivatives must be taken in uniform control flow, so the mapped normal is always computed.
-    let mapped_normal = perturb_normal(normalize(input.world_normal), input.world_position, input.uv, normalize(normal_map.xyz * 2.0 - vec3<f32>(1.0)));
+    let mapped_normal = perturb_normal(normalize(surface_normal), input.world_position, input.uv, normalize(normal_map.xyz * 2.0 - vec3<f32>(1.0)));
     n = select(n, mapped_normal, input.maps.y >= 0.0);
     var metallic = input.params.x;
     if input.params.z > 9.5 && input.params.z < 10.5 { metallic = 0.0; }
@@ -629,6 +636,11 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
         }
         // The baked ambient occlusion is a smooth gradient, which a cel look does not have: it is left out here.
         color = toon + emitted;
+    }
+    // Cutout (leaves, grass, fences): the albedo map's alpha under the cutoff drops the pixel. This comes last, after every
+    // texture lookup and derivative, so the discard cannot disturb them.
+    if (input.foliage.x > 0.0 && input.maps.x >= 0.0 && albedo_map.a < input.foliage.x) {
+        discard;
     }
     let auto_exposure = textureLoad(exposure_state, vec2<i32>(0, 0), 0).x;
     return vec4<f32>(grade(tonemap_aces(color * view.exposure.x * auto_exposure)), input.base_color.a);

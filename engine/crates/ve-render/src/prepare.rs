@@ -38,6 +38,7 @@ pub(crate) struct InstanceData {
     pub(crate) toon_a: [f32; 4],
     pub(crate) toon_b: [f32; 4],
     pub(crate) toon_c: [f32; 4],
+    pub(crate) foliage: [f32; 4],
 }
 
 /// A run of consecutive instances that share a mesh and can be drawn with one call.
@@ -50,6 +51,10 @@ pub(crate) struct Batch {
     pub(crate) sort_key: u64,
     /// Whether any instance of the batch has an outline, so the outline pass draws it.
     pub(crate) outlined: bool,
+    /// Whether any instance is cut out by its albedo alpha, so the shadow and depth passes must test it too.
+    pub(crate) cutout: bool,
+    /// Whether any instance has foliage (a cutout or wind), so the batch is drawn two-sided.
+    pub(crate) foliage: bool,
 }
 
 /// The instance buffer and the draw batches over it.
@@ -97,12 +102,17 @@ pub(crate) fn group_into_batches(meshes: &[ExtractedMesh]) -> (Vec<InstanceData>
             toon_a: mesh.material.toon_a,
             toon_b: mesh.material.toon_b,
             toon_c: mesh.material.toon_c,
+            foliage: mesh.material.foliage,
         });
         let outlined = mesh.material.toon_c[3] > 0.0;
+        let cutout = mesh.material.foliage[0] > 0.0;
+        let foliage = mesh.material.foliage[..3].iter().any(|&lane| lane > 0.0);
         match batches.last_mut() {
             Some(batch) if !batch.transparent && !mesh.transparent && batch.mesh == mesh.mesh => {
                 batch.instances.end = index + 1;
                 batch.outlined |= outlined;
+                batch.cutout |= cutout;
+                batch.foliage |= foliage;
             }
             _ => batches.push(Batch {
                 mesh: mesh.mesh,
@@ -111,6 +121,8 @@ pub(crate) fn group_into_batches(meshes: &[ExtractedMesh]) -> (Vec<InstanceData>
                 center: mesh.center,
                 sort_key: mesh.sort_key,
                 outlined,
+                cutout,
+                foliage,
             }),
         }
     }
@@ -351,5 +363,6 @@ mod tests {
         assert!(data[1].params[0].abs() < f32::EPSILON);
     }
 
+    mod foliage_tests;
     mod opacity_tests;
 }

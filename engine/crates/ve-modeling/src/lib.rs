@@ -3,6 +3,7 @@ pub mod anim;
 mod ao;
 mod appearance;
 mod assembly;
+mod bake;
 mod bezier;
 mod budget;
 mod cache;
@@ -15,6 +16,7 @@ mod environment;
 mod evaluate;
 mod field_ops;
 pub mod flags;
+mod foliage;
 mod frames;
 pub mod hierarchy;
 mod hulls;
@@ -27,9 +29,7 @@ mod noise;
 mod operations;
 pub mod physics;
 mod plan;
-mod bake;
 mod poly_ops;
-mod values;
 mod profile_ops;
 mod reaction;
 mod regions;
@@ -38,6 +38,7 @@ pub mod rig;
 mod shapes;
 mod style;
 mod terrain;
+mod values;
 mod wave;
 
 pub use evaluate::Evaluator;
@@ -46,8 +47,8 @@ pub use job::{JobToken, hash};
 pub use kits::{KITS, Kit};
 pub use poly_ops::suggestion as poly_suggestion;
 pub use result::{
-    BakedMaps, Evaluation, EvaluationWarning, MAX_SCENE_LIGHTS, Material, MaterialRecipe, Part,
-    Quality, SceneEnvironment, SceneLight, SceneLightKind,
+    BakedMaps, Evaluation, EvaluationWarning, Foliage, MAX_SCENE_LIGHTS, Material, MaterialRecipe,
+    Part, Quality, SceneEnvironment, SceneLight, SceneLightKind,
 };
 
 pub(crate) type Fail = Box<ve_graph::Diagnostic>;
