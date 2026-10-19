@@ -6,6 +6,8 @@
 #![cfg(target_arch = "wasm32")]
 
 mod animation;
+mod bake_exports;
+pub use bake_exports::bake_maps;
 mod app;
 mod audio_exports;
 pub use audio_exports::{audio_music, audio_sfx, fx_explode, fx_live_particles};

@@ -30,13 +30,14 @@ const RESERVED: [&str; 13] = [
     "radians",
 ];
 
-/// The source with every `let` line blanked and every `{expression}` replaced by its number.
+/// The source with every `let` line blanked and every `{expression}` replaced by its number, and the names of the
+/// constants it defined (so a later "no node is named w" can say that `w` is a constant).
 ///
 /// # Errors
 /// `parse.expression` with the span of the expression and a suggestion.
-pub(super) fn expand(source: &str) -> Result<String, Fail> {
+pub(super) fn expand(source: &str) -> Result<(String, Vec<String>), Fail> {
     if !source.contains('{') && !source.lines().any(|line| definition(line).is_some()) {
-        return Ok(source.to_owned());
+        return Ok((source.to_owned(), Vec::new()));
     }
     let mut env = Env::new();
     let mut out = String::with_capacity(source.len());
@@ -51,7 +52,7 @@ pub(super) fn expand(source: &str) -> Result<String, Fail> {
         }
         out.push_str(ending);
     }
-    Ok(out)
+    Ok((out, env.into_keys().collect()))
 }
 
 /// What follows `let` when the line defines a constant.
@@ -109,6 +110,12 @@ fn define(rest: &str, line: u32, env: &mut Env) -> Result<(), Fail> {
             "give the second one another name",
         ));
     }
+    // `let r = {w * 2}` is accepted too: braces mark an expression everywhere else, so a model may write them here.
+    let expression = expression.trim();
+    let expression = expression
+        .strip_prefix('{')
+        .and_then(|inner| inner.strip_suffix('}'))
+        .unwrap_or(expression);
     let value = evaluate(expression, span, env)?;
     env.insert(name.to_owned(), value);
     Ok(())

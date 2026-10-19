@@ -8,6 +8,7 @@ import type { EvaluationHost } from './evaluation';
 import type { MeshPart } from './worker-types';
 import { buildGlbWithTextures } from './gltf';
 import { snapshotView } from './snapshot';
+import { rgbaPng } from './png';
 import { loadBrowserTextureLibrary } from './texture/browser-library';
 import { describe as describeTextureNode, nodeInfo, search as searchTextureNodes, summary as textureNodeSummary } from './texture/catalog';
 
@@ -125,6 +126,45 @@ export function measureParts(host: Host, params: Record<string, unknown>) {
   return detail === 'full' ? { revision: evaluation.state.revision, parts: reports } : blocks.join('\n\n');
 }
 
+/** Bake selected maps from an evaluated high part onto the UVs of a low part. */
+export function bakeParts(host: Host, params: Record<string, unknown>) {
+  const evaluation = host.evaluation!, runtime = host.runtime!;
+  const pick = (value: unknown) => typeof value === 'string' ? value.trim() : '';
+  const lowName = pick(params.low), highName = pick(params.high);
+  if (!lowName || !highName) return { ok: false, error: 'low and high part names are required' };
+  const part = (name: string) => evaluation.parts.find(p => p.name === name || p.node === name);
+  const names = evaluation.parts.map(p => p.name || p.node);
+  const low = part(lowName), high = part(highName);
+  if (!low || !high) return { ok: false, error: `part not found; on-screen parts: ${names.join(', ') || '(none)'}` };
+  if (!low.uvs || low.uvs.length !== low.indices.length * 2) return { ok: false, error: 'low part has no per-corner UVs; unwrap it with poly.unwrap_uv first' };
+  const size = params.size === undefined ? 512 : Number(params.size);
+  const requestedMaps = params.maps === undefined ? ['normal', 'ao'] : params.maps;
+  if (!Number.isInteger(size) || size < 64 || size > 2048) return { ok: false, error: 'size must be 64 to 2048' };
+  if (!Array.isArray(requestedMaps) || requestedMaps.length === 0 || requestedMaps.some(m => m !== 'normal' && m !== 'ao')) return { ok: false, error: 'maps must contain normal and/or ao' };
+  const wanted = [...new Set(requestedMaps)];
+  const rays = params.rays === undefined ? 64 : Number(params.rays);
+  if (!Number.isInteger(rays) || rays < 1 || rays > 256) return { ok: false, error: 'rays must be 1 to 256' };
+  const bounds = (positions: Float32Array) => {
+    const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < positions.length; i += 3) for (let axis = 0; axis < 3; axis++) { min[axis] = Math.min(min[axis], positions[i + axis]); max[axis] = Math.max(max[axis], positions[i + axis]); }
+    return Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+  };
+  const diagonal = bounds(low.positions), setting = (key: string, fallback: number) => params[key] === undefined ? fallback : Number(params[key]);
+  const cage = setting('cage', diagonal * 0.05), maxDistance = setting('max_distance', diagonal * 0.1), bias = setting('bias', diagonal * 0.001);
+  if (![cage, maxDistance, bias].every(Number.isFinite) || cage < 0 || maxDistance <= 0 || bias < 0) return { ok: false, error: 'cage and bias must be non-negative; max_distance must be positive' };
+  const mapMode = wanted.length === 2 ? 'both' : wanted[0] as string;
+  const result = JSON.parse(runtime.bake_maps(low.positions, low.indices, low.uvs, high.positions, high.indices, size, mapMode, cage, maxDistance, rays, bias)) as { ok: boolean; error?: string; suggestion?: string; size: number; normal: null | { covered: number; rgbaBase64: string }; ao: null | { covered: number; rgbaBase64: string } };
+  if (!result.ok) return { ok: false, error: `${result.error ?? 'bake failed'}${result.suggestion ? `; ${result.suggestion}` : ''}` };
+  const maps: Record<string, string> = {};
+  for (const [name, item] of [['normal', result.normal], ['ao', result.ao]] as const) if (item) {
+    const binary = atob(item.rgbaBase64), rgba = Uint8Array.from(binary, c => c.charCodeAt(0));
+    if (rgba.length !== size * size * 4) return { ok: false, error: `${name} map has ${rgba.length} RGBA bytes; expected ${size * size * 4}` };
+    const png = rgbaPng(rgba, size); let encoded = ''; for (let i = 0; i < png.length; i += 0x8000) encoded += String.fromCharCode(...png.subarray(i, i + 0x8000));
+    maps[name] = btoa(encoded);
+  }
+  return { ok: true, size, covered: Math.max(result.normal?.covered ?? 0, result.ao?.covered ?? 0), maps };
+}
+
 async function run(host: Host, method: string, params: Record<string, unknown>) {
   if (!host.ready || !host.doc || !host.evaluation || !host.runtime) throw new Error('the engine is still starting');
   const doc = host.doc, runtime = host.runtime;
@@ -154,6 +194,7 @@ async function run(host: Host, method: string, params: Record<string, unknown>) 
       return { revision: state.revision, nodes: state.nodes, can_undo: state.can_undo, can_redo: state.can_redo, evaluation: host.evaluation.state, projection: JSON.parse(runtime.eval_projection_status()) };
     }
     case 'measure': return measureParts(host, params);
+    case 'bake': return bakeParts(host, params);
     case 'export_glb': {
       // The server writes the file; the bytes cross the socket as base64.
       const parts = host.evaluation.parts;

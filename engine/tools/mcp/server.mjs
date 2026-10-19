@@ -10,6 +10,8 @@
 // stdout carries only MCP messages; everything else goes to stderr.
 import { writeFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
+import { coreWithMenu, splitGuide, topicText } from './guide-topics.mjs';
+import { fullSpecs, indexText, select } from './operator-index.mjs';
 
 const PORT = Number(process.env.VE_MCP_PORT ?? 8765);
 const TIMEOUT_MS = 90000;
@@ -53,12 +55,15 @@ function callPage(method, params) {
   });
 }
 
-const KIT_CATALOG = [
-  { name: 'desk', doc: 'Writing desk 1.4 x 0.76 x 0.7 m with a side drawer; origin at floor centre.', file: '../../crates/ve-modeling/kits/desk.txt' },
-  { name: 'shelf', doc: 'Bookcase 0.85 x 1.8 x 0.3 m with six boards and a row of leaning books; arrangement is the seed.', file: '../../crates/ve-modeling/kits/shelf.txt' },
-  { name: 'window', doc: 'Window 1.0 x 1.2 x 0.12 m with frame, cross bars and glass; centred on the origin.', file: '../../crates/ve-modeling/kits/window.txt' },
-].map(async kit => ({ ...kit, source: await Bun.file(new URL(kit.file, import.meta.url)).text() }));
-const KITS = await Promise.all(KIT_CATALOG);
+// The kits come from the engine's own registry (crates/ve-modeling/src/kits.rs), so a kit added there reaches the model
+// without a second list to keep in step: each entry is `name`, `doc` and the `source` file it includes.
+const KITS_RS = await Bun.file(new URL('../../crates/ve-modeling/src/kits.rs', import.meta.url)).text();
+const KIT_ENTRY = /name: "([a-z_0-9]+)",\s*doc: "((?:[^"\\]|\\.)*)",\s*source: include_str!\("\.\.\/kits\/([a-z_0-9]+)\.txt"\)/g;
+const KITS = await Promise.all([...KITS_RS.matchAll(KIT_ENTRY)].map(async ([, name, doc, file]) => ({
+  name,
+  doc: JSON.parse(`"${doc}"`),
+  source: await Bun.file(new URL(`../../crates/ve-modeling/kits/${file}.txt`, import.meta.url)).text(),
+})));
 
 const GUIDE = `The document is a graph of operators, written one node per line:
 
@@ -76,7 +81,7 @@ component as size.y), for example r = value.number@1(value=0.5), d = value.math@
 ball = solid.sphere@1(radius=d), box = solid.box@1(size=[1, 1, 1], size.y=h). value.size@1(part,
 measure="height") measures a part (width, height, depth, longest, shortest, volume, area), so one part
 can be sized from another. Only operators from
-list_operators can be used. Y is up. Profiles live in the XY
+list_operators (a one-line-each index; pass ids=["solid.box@1"] for full parameter docs) can be used. Y is up. Profiles live in the XY
 plane: solid.revolve spins one (x >= 0) about Y, solid.extrude stands one up from y=0.
 
 Example (a vase, with a 3 mm minimum wall that the engine enforces):
@@ -117,12 +122,10 @@ convex primitive, solid.round@1(solid, radius=0.01, segments=12) rounds all edge
 outside bounds. It accepts at most 20,000 input and 250,000 output triangles; radius must be less
 than half the smallest bounds dimension. This is not a per-edge bevel or general concave filleting.
 
-Ready-made modeling kits (listed alongside operators by list_operators):
-${KITS.map(kit => `- ${kit.name}: ${kit.doc}\n  Paste its complete group source below, then instantiate it with item = ${kit.name}():\n${kit.source.split('\n').map(line => `  ${line}`).join('\n')}`).join('\n')}
-Each group source is the canonical kit definition from crates/ve-modeling/kits. Paste only the group
-definition once and route its instance to an output. Kits are text
-groups, so their construction remains editable in the same graph; their dimensions and exposed
-parameters are stated in the source and list_operators.
+Ready-made modeling kits (${KITS.length}): ${KITS.map(kit => kit.name).join(', ')}. list_operators shows each with its size and
+parameters; list_operators ids=["kit.door"] returns the group source. Paste that source once at the top of
+your program, then instantiate it with item = door() (parameters as key=value) and route the instance to an
+output. Kits are text groups, so their construction stays editable in the same graph.
 
 Curved paths (initial bounded subset): curve.polyline@1(points=[[x,y,z], ...], closed=true) makes a
 periodic path; omit closed or set it to false for an open path. A repeated final point equal to the
@@ -229,6 +232,7 @@ foot; align=1 tilts each to the slope). Scatter inside the ground's footprint fi
   trees = inst.drop@1(crowd, land, offset=-0.05)   output ground = grass   output forest = trees
 Noise amplitude must stay well below the feature scale or the shape folds: a fold is refused with
 geometry.deformation_fold, which means lower the amplitude or raise the scale.
+Use bake to bake normal and ambient-occlusion maps from a high part onto a low part; unwrap it first with poly.unwrap_uv.
 
 Water and atmosphere: water.surface@1(size=[x,z], level=0, depth=1, color=[0.08,0.34,0.5], opacity=0.6,
 wave_height=0.05, wave_length=3, speed=1, seed=2, resolution=64) creates a bounded closed slab with a seeded
@@ -331,6 +335,18 @@ A raised rounded panel on a block:
   rounded = poly.bevel_network@1(raised, hard, width=0.02, segments=3)
   solid = poly.to_solid@1(rounded)
   output solid
+
+More polygon tools. poly.round_edges@1(mesh, width=0.02, segments=3, angle=30deg) rounds every hard edge in one
+step (merge_coplanar a solid first). poly.select by="height" (height=, axis=, tolerance=) or by="extreme" (side="max"
+is the top, "min" the bottom, axis="y") picks elements without coordinates. poly.bisect@1(mesh, point=[0,0,0],
+normal=[0,1,0], keep="below", fill=true) cuts with a plane and keeps a side. poly.mirror@1(mesh, point, normal,
+merge=true) adds the mirror image and welds the seam; mirror an OPEN half (bisect with fill=false), or the two caps
+stay as inner faces. poly.spin@1(profile, center=[x,0,0], axis=[0,1,0], angle=360deg, steps=32, merge=true) revolves
+faces or selected edges like a lathe; a full turn with merge=true gives a closed ring. poly.loop_cut@1(mesh, at=[x,y,z],
+cuts=1) cuts the ring of quads through the edge nearest "at". poly.pack_uv after poly.unwrap_uv packs the islands;
+poly.lod@1(mesh, levels=2, level=1, ratio=0.5) is a simplified copy, and parts named base_lod0, base_lod1 ... export
+as one glTF LOD chain. solid.hull and solid.collision_boxes make collision shapes; inst.scatter_on scatters copies over
+a solid's surface. To check or bake a result use the measure, snapshot and bake tools.
 
 Groups (build once, use many times): a group is an assembly with its own nodes, a result and the
 parameters you choose to expose; an instance is one use of it. Write the group first, then instances:
@@ -563,15 +579,20 @@ already exists use apply_commands, which addresses nodes by ID (get_nodes lists 
 parameters and inputs; set_param is the usual command). Read the result after each call. A refused edit leaves the
 document unchanged and says why (for example constraint.min_wall with the measured thickness).`;
 
+// The guide is served in pieces: a short core every session reads, and topics asked for by name.
+const GUIDE_SPLIT = splitGuide(GUIDE);
+if (GUIDE_SPLIT.missing.length > 0) log(`guide topics not found in the guide text (left in the core): ${GUIDE_SPLIT.missing.join(', ')}`);
+
 const object = (properties, required = []) => ({ type: 'object', properties, required });
 const TOOLS = [
-  { name: 'get_guide', description: 'How the text language works, with an example. Read this first.', inputSchema: object({}) },
-  { name: 'list_operators', description: 'The operators you may use: ports, parameters with units and ranges, one-line help.', inputSchema: object({}) },
+  { name: 'get_guide', description: 'How the text language works, with an example. Read this first: it is short and ends with how to work. For a subject you need (curves, terrain, poly, groups, look, animation, rigging, behaviour) call it again with that topic; topic="all" returns the whole guide.', inputSchema: object({ topic: { type: 'string', description: 'curves, terrain, poly, groups, look, animation, rigging, behaviour, or all. Omit for the core guide and the topic list.' } }) },
+  { name: 'list_operators', description: 'The operators you may use. By default a compact index: one line per operator with its inputs, output, parameters (type, range, unit, default) and what it does, grouped by family, plus the ready-made kits. Narrow it with query (words in the id or help) or family (solid, poly, inst, xform, value ...). Pass ids=["solid.box@1", "kit.door"] to get the full documentation of just those (a kit returns its source), or detail="full" for everything (large).', inputSchema: object({ query: { type: 'string', description: 'Words that must appear in the operator id or help, for example "scatter surface".' }, family: { type: 'string', description: 'Only this family: the part of the id before the dot, such as poly or inst.' }, ids: { type: 'array', items: { type: 'string' }, description: 'Full specs of exactly these operator ids (for example solid.box@1) or kits (kit.door).' }, detail: { type: 'string', enum: ['index', 'full'], description: 'index (default) is one line per operator; full is every operator with all parameter documentation.' } }) },
   { name: 'texture_nodes', description: 'Search the procedural texture node catalog with query, or describe one exact node with node. Use this before authoring a solid.texture@1 program.', inputSchema: object({ query: { type: 'string' }, node: { type: 'string' }, limit: { type: 'number' } }) },
   { name: 'get_text', description: 'The current document as canonical text, and its revision.', inputSchema: object({}) },
   { name: 'get_nodes', description: 'Every node with its id, label, operator, parameters, inputs, flags, the group it belongs to (nodes inside a group definition) or its instance data, plus the outputs and the groups. Use the ids in apply_commands.', inputSchema: object({}) },
   { name: 'get_status', description: 'Revision, node count, evaluation state (last failure, timings) and the last projected geometry.', inputSchema: object({}) },
   { name: 'measure', description: 'Measures the evaluated parts on screen, through the same geometry the viewer shows. By default a short text report per part: triangles, size, volume, watertight, thickness and the first problem with its fix. detail "full" gives the complete JSON report (topology, components, bounding shapes, symmetry, UVs). part names one output/part (default every part); checks (thickness, symmetry, uv, collision) limits which optional sections the full report keeps. A part that is not closed says where and what to do.', inputSchema: object({ part: { type: 'string' }, detail: { type: 'string', enum: ['summary', 'full'] }, checks: { type: 'array', items: { type: 'string', enum: ['thickness', 'symmetry', 'uv', 'collision'] } } }) },
+  { name: 'bake', description: "Bake a high-poly part's normals and ambient occlusion onto a low-poly part's UVs; the model must have unwrapped the low part with poly.unwrap_uv.", inputSchema: object({ low: { type: 'string' }, high: { type: 'string' }, size: { type: 'number', description: '64 to 2048; default 512.' }, maps: { type: 'array', items: { type: 'string', enum: ['normal', 'ao'] } }, cage: { type: 'number' }, max_distance: { type: 'number' }, rays: { type: 'number', description: '1 to 256; default 64.' }, bias: { type: 'number' } }, ['low', 'high']) },
   { name: 'export_glb', description: 'Exports the model on screen as a binary glTF (.glb) file with PBR materials, shared instances, UVs, and embedded PNG maps for solid.texture programs. Give a path ending in .glb (relative paths are under the current directory); the file is written there. Baked textures require WebGL2 and EXT_color_buffer_float.', inputSchema: object({ path: { type: 'string' } }, ['path']) },
   { name: 'apply_text', description: 'Adds the nodes described by a program in the text language to the document, evaluates it, and reports the outcome or the diagnostics (each with a line and column). Atomic: nothing changes unless all of it is valid. Limits: 256 KiB source text; translated batches allow 1,000 typed commands and 1 MiB.', inputSchema: object({ text: { type: 'string' }, label: { type: 'string' } }, ['text']) },
   { name: 'make_character', description: 'Adds a whole animated character or creature to the document: one smooth body skinned to a skeleton, with walk (main clip), run and idle clips, toon shaded with outlines. Give a body `plan` ("biped", "quadruped" or "serpent") with optional `sliders` (size in metres 0.2 to 20; head, limbs, torso, legs, neck, tail as multipliers 0.5 to 2; color [r,g,b] 0 to 1; horns and wings for a quadruped), or a whole `creature` you write yourself: bones (name, parent, head, tail, radius [at head, at tail], role leg|arm|spine|neck|head|tail|wing|free, pair for left/right copies defined on +x, phase) and blobs (name, center, radii). The creature stands on y=0 and faces +z. A `name` keeps several characters apart. Errors say which bone or slider to change. Call frame_view afterwards.', inputSchema: object({ plan: { type: 'string', enum: ['biped', 'quadruped', 'serpent'] }, sliders: { type: 'object' }, creature: { type: 'object' }, name: { type: 'string' }, label: { type: 'string' } }) },
@@ -599,7 +620,10 @@ async function exportGlb({ path: target }) {
 }
 
 async function callTool(name, args) {
-  if (name === 'get_guide') return content(GUIDE);
+  if (name === 'get_guide') {
+    const topic = typeof args?.topic === 'string' ? args.topic.trim().toLowerCase() : '';
+    return content(topic ? topicText(GUIDE_SPLIT, topic) : coreWithMenu(GUIDE_SPLIT));
+  }
   if (!TOOLS.some((t) => t.name === name)) return content(`unknown tool ${name}`, true);
   if (name === 'export_glb') return exportGlb(args ?? {});
   const reply = await callPage(name, args ?? {});
@@ -610,12 +634,24 @@ async function callTool(name, args) {
     const text = { type: 'text', text: JSON.stringify(rest, null, 2) };
     return { content: jpegBase64 ? [{ type: 'image', data: jpegBase64, mimeType: 'image/jpeg' }, text] : [text], isError: rest.ok === false };
   }
+  if (name === 'bake') {
+    const { maps = {}, ...summary } = reply.result ?? {};
+    const images = Object.entries(maps).map(([, data]) => ({ type: 'image', data, mimeType: 'image/png' }));
+    return { content: [...images, { type: 'text', text: JSON.stringify({ ...summary, maps: Object.keys(maps) }, null, 2) }], isError: summary.ok === false };
+  }
   if (name === 'list_operators' && Array.isArray(reply.result)) {
     const kits = KITS.map(kit => ({
       id: `kit.${kit.name}`, readiness: 'ready', category: 'kit', doc: kit.doc,
       source: kit.source, usage: `Paste source once, then call ${kit.name}()`,
     }));
-    return content([...reply.result, ...kits]);
+    const everything = [...reply.result, ...kits];
+    const { ids, detail, query, family } = args ?? {};
+    if (Array.isArray(ids) && ids.length > 0) {
+      const { found, missing } = fullSpecs(everything, ids.map(String));
+      return content({ operators: found, ...(missing.length ? { unknown: missing, hint: 'ids look like solid.box@1 or kit.door; list_operators without ids shows them all' } : {}) }, found.length === 0);
+    }
+    if (detail === 'full') return content(select(everything, { query, family }));
+    return content(indexText(everything, { query, family }));
   }
   return content(reply.result ?? {});
 }
