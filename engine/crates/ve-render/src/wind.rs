@@ -73,20 +73,28 @@ impl WindField {
 mod tests {
     use super::WindField;
 
-    /// The wind function is written out in three shaders; they must stay the same text.
-    fn snippet(source: &str) -> &str {
-        let start = source.find("// wind:begin").map_or(0, |i| i);
-        let end = source.find("// wind:end").map_or(0, |i| i);
-        assert!(start < end, "a wind:begin and wind:end pair");
-        &source[start..end]
-    }
-
     #[test]
-    fn the_three_shaders_share_one_wind_function() {
-        let forward = snippet(include_str!("shaders/forward.wgsl"));
-        assert!(forward.contains("fn wind_displacement"));
-        assert_eq!(forward, snippet(include_str!("shaders/shadow.wgsl")));
-        assert_eq!(forward, snippet(include_str!("shaders/ao_depth.wgsl")));
+    fn the_wind_function_is_defined_once_and_built_into_all_three_shaders() {
+        let definition = "fn wind_displacement";
+        assert!(include_str!("shaders/wind.wgsl").contains(definition));
+        for (name, own) in [
+            ("forward", include_str!("shaders/forward.wgsl")),
+            ("shadow", include_str!("shaders/shadow.wgsl")),
+            ("ao_depth", include_str!("shaders/ao_depth.wgsl")),
+        ] {
+            assert!(
+                !own.contains(definition),
+                "{name}.wgsl defines its own copy"
+            );
+            assert!(own.contains("wind_displacement("), "{name}.wgsl uses it");
+        }
+        for built in [
+            crate::pipeline::FORWARD_SHADER,
+            crate::shadow::SHADOW_SHADER,
+            crate::ao_depth::SHADER,
+        ] {
+            assert_eq!(built.matches(definition).count(), 1);
+        }
     }
 
     #[test]

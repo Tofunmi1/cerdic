@@ -73,14 +73,14 @@ fn the_post_pass_reads_depth_from_a_colour_texture() {
     let present = include_str!("shaders/present.wgsl");
     assert!(present.contains("depth_source: texture_2d<f32>"));
     assert!(!present.contains("texture_depth_2d"));
-    check("ao_depth.wgsl", include_str!("shaders/ao_depth.wgsl"));
+    check("ao_depth.wgsl", crate::ao_depth::SHADER);
     check("ao.wgsl", include_str!("shaders/ao.wgsl"));
     check("exposure.wgsl", include_str!("shaders/exposure.wgsl"));
 }
 
 #[test]
 fn the_forward_shader_parses_and_validates() {
-    check("forward.wgsl", include_str!("shaders/forward.wgsl"));
+    check("forward.wgsl", crate::pipeline::FORWARD_SHADER);
 }
 
 #[test]
@@ -90,7 +90,7 @@ fn the_present_shader_parses_and_validates() {
 
 #[test]
 fn the_shadow_shader_parses_and_validates() {
-    check("shadow.wgsl", include_str!("shaders/shadow.wgsl"));
+    check("shadow.wgsl", crate::shadow::SHADOW_SHADER);
 }
 
 #[test]

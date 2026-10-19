@@ -38,7 +38,10 @@ use crate::quality::RenderQuality;
 use crate::targets::DEPTH_FORMAT;
 
 /// Source of the depth shader.
-pub(crate) const SHADER: &str = include_str!("shaders/ao_depth.wgsl");
+pub(crate) const SHADER: &str = concat!(
+    include_str!("shaders/wind.wgsl"),
+    include_str!("shaders/ao_depth.wgsl")
+);
 
 /// The shader's asset name.
 pub(crate) const SHADER_NAME: &str = "ve_ao_depth.wgsl";

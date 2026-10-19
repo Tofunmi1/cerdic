@@ -28,7 +28,10 @@ use crate::quality::RenderQuality;
 use crate::targets::{DEPTH_FORMAT, render_format};
 
 /// Source of the forward shader, compiled at runtime by the shader pipeline.
-pub(crate) const FORWARD_SHADER: &str = include_str!("shaders/forward.wgsl");
+pub(crate) const FORWARD_SHADER: &str = concat!(
+    include_str!("shaders/wind.wgsl"),
+    include_str!("shaders/forward.wgsl")
+);
 
 /// The forward shader for meshes without texture coordinates: the same source with the vertex input and its
 /// copy removed (plain WGSL has no preprocessor here). Meshes without baked maps use it, which keeps their
