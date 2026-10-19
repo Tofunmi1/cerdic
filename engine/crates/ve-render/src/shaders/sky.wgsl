@@ -15,6 +15,8 @@ struct View {
     cloud: vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> view: View;
+// The automatic exposure now in use (1 while it is off): the sky scales with the scene, as it does through a camera.
+@group(0) @binding(1) var exposure_state: texture_2d<f32>;
 
 fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
     let low = c / 12.92;
@@ -85,5 +87,6 @@ fn fragment(@builtin(position) pixel: vec4<f32>) -> @location(0) vec4<f32> {
         let cloud = smoothstep(0.82-view.cloud.y*0.58,0.92-view.cloud.y*0.45,n);
         color = mix(color,vec3<f32>(0.90,0.92,0.96),cloud*0.78);
     }
-    return vec4<f32>(srgb_to_linear(color),1.0);
+    let auto_exposure = textureLoad(exposure_state, vec2<i32>(0, 0), 0).x;
+    return vec4<f32>(srgb_to_linear(color) * auto_exposure, 1.0);
 }

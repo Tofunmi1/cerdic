@@ -54,7 +54,7 @@
   </div>
   <script type="module">
     import init, {
-      start, status, set_quality, set_shadows, set_specular_aa, set_ssao, set_bloom, set_governor, set_window_hz, xr_supported, enter_xr, exit_xr,
+      start, status, set_quality, set_shadows, set_specular_aa, set_ssao, set_bloom, set_auto_exposure, set_governor, set_window_hz, xr_supported, enter_xr, exit_xr,
       viewer_configure, viewer_look, viewer_move, viewer_set_locked, viewer_reset, viewer_set_lens,
       set_grading, set_grading_preset, grading_status, audio_sfx, audio_music, fx_explode, fx_live_particles, viewer_pose,
       doc_open, doc_reset, doc_state, doc_apply, doc_undo, doc_redo, doc_save, doc_operators,
@@ -84,6 +84,7 @@
       set_specular_aa(params.get("specular-aa") === "on");
       set_ssao(params.get("ssao") === "on");
       set_bloom(params.get("bloom") === "on");
+      set_auto_exposure(params.get("autoexposure") === "on");
       if (params.get("shadows") === "off") set_shadows(false);
       else if (params.get("shadows") === "on") set_shadows(true);
       if (params.get("governor") === "1") set_governor(true);
@@ -185,7 +186,7 @@
           viewer_configure, viewer_look, viewer_move, viewer_set_locked, viewer_reset, viewer_set_lens, set_quality,
           set_shadows,
           set_specular_aa,
-          set_ssao, set_bloom,
+          set_ssao, set_bloom, set_auto_exposure,
           set_grading, set_grading_preset, grading_status, audio_sfx, audio_music, fx_explode, fx_live_particles, viewer_pose,
           viewer_zoom: runtimeApi.viewer_zoom, viewer_orbit: runtimeApi.viewer_orbit, viewer_frame: runtimeApi.viewer_frame,
           viewer_look_at: runtimeApi.viewer_look_at,

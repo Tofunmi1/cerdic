@@ -6,10 +6,9 @@ use bevy_ecs::prelude::*;
 use bevy_render::render_resource::binding_types::{texture_2d, uniform_buffer};
 use bevy_render::render_resource::{
     BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntries, BindingResource,
-    CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState, LoadOp,
-    MultisampleState, Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment,
-    RenderPassDescriptor, RenderPipelineDescriptor, ShaderStages, StoreOp, TextureFormat,
-    TextureSampleType, VertexState,
+    CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState, LoadOp, MultisampleState,
+    Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor,
+    RenderPipelineDescriptor, ShaderStages, StoreOp, TextureFormat, TextureSampleType, VertexState,
 };
 use bevy_render::renderer::{RenderContext, RenderDevice, ViewQuery};
 use bevy_shader::Shader;

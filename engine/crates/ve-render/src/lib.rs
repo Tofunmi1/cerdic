@@ -8,6 +8,8 @@
 mod ao;
 mod ao_depth;
 mod counters;
+mod exposure;
+pub use exposure::FrameDelta;
 mod extract;
 mod placement;
 pub use placement::VeInstanceTransform;
@@ -76,6 +78,7 @@ impl Plugin for VeRenderPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ClearColor>()
             .init_resource::<VeAmbientLight>()
+            .init_resource::<FrameDelta>()
             .init_resource::<RenderQuality>()
             .init_resource::<Grading>()
             .init_resource::<LensWarp>()
@@ -114,11 +117,9 @@ impl Plugin for VeRenderPlugin {
                         shadow::SHADOW_SHADER_NAME,
                     )),
                     shaders.add(Shader::from_wgsl(sky::SHADER, "ve_sky.wgsl")),
-                    shaders.add(Shader::from_wgsl(
-                        ao_depth::SHADER,
-                        ao_depth::SHADER_NAME,
-                    )),
+                    shaders.add(Shader::from_wgsl(ao_depth::SHADER, ao_depth::SHADER_NAME)),
                     shaders.add(Shader::from_wgsl(ao::SHADER, ao::SHADER_NAME)),
+                    shaders.add(Shader::from_wgsl(exposure::SHADER, exposure::SHADER_NAME)),
                 )
             });
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
@@ -132,13 +133,15 @@ impl Plugin for VeRenderPlugin {
             sky_shader,
             ao_depth_shader,
             ao_shader,
+            exposure_shader,
         )) = shaders
         {
             let forward = pipeline::ForwardPipelines::new(forward, forward_without_uv);
             let sky_pipelines = sky::SkyPipelines::new(sky_shader, forward.view_layout.clone());
             render_app
-                .insert_resource(shadow::ShadowPipelines::new(
-                    shadow,
+                .insert_resource(shadow::ShadowPipelines::new(shadow))
+                .insert_resource(exposure::ExposurePipeline::new(
+                    exposure_shader,
                     forward.view_layout.clone(),
                 ))
                 .insert_resource(ao_depth::AoDepthPipelines::new(
@@ -163,6 +166,8 @@ fn add_render_systems(render_app: &mut SubApp) {
         .init_resource::<prepare::ViewUniforms>()
         .init_resource::<prepare::LightsGpu>()
         .init_resource::<quality::RenderQuality>()
+        .init_resource::<FrameDelta>()
+        .init_resource::<exposure::ExposureState>()
         .init_resource::<grade::Grading>()
         .init_resource::<lens::LensWarp>()
         .init_resource::<lens::LensGpu>()
@@ -179,6 +184,7 @@ fn add_render_systems(render_app: &mut SubApp) {
                 light::extract_lights,
                 quality::extract_quality,
                 grade::extract_grading,
+                exposure::extract_frame_delta,
                 lens::extract_lens,
                 textures::extract_textures,
             ),
@@ -188,7 +194,12 @@ fn add_render_systems(render_app: &mut SubApp) {
             (
                 prepare::prepare_instances,
                 readiness::publish,
-                prepare::prepare_view_uniforms,
+                // The view bind group carries the exposure texture, so that is settled first.
+                (
+                    exposure::prepare_exposure_state,
+                    prepare::prepare_view_uniforms,
+                )
+                    .chain(),
                 // The lights uniform includes the sun's shadow matrix and binds the shadow map.
                 (
                     shadow::prepare_shadow_map,
@@ -214,6 +225,7 @@ fn add_render_systems(render_app: &mut SubApp) {
                 shadow::queue_shadow_pipelines,
                 ao_depth::queue_ao_depth_pipelines,
                 ao::queue_ao_pipeline,
+                exposure::queue_exposure_pipeline,
                 sky::queue,
             )
                 .in_set(RenderSystems::Queue),
@@ -226,6 +238,10 @@ fn add_render_systems(render_app: &mut SubApp) {
                 ao::ao_pass
                     .in_set(Forward3dSystems::MainPass)
                     .after(ao_depth::ao_depth_pass),
+                // Measures the finished picture, so it runs after the scene is drawn.
+                exposure::exposure_pass
+                    .in_set(Forward3dSystems::MainPass)
+                    .after(pass::forward_pass),
                 present::present_pass.in_set(Forward3dSystems::Present),
             ),
         )

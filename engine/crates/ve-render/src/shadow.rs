@@ -170,9 +170,10 @@ pub(crate) struct ShadowPipelines {
 }
 
 impl ShadowPipelines {
-    pub(crate) fn new(shader: Handle<Shader>, view_layout: BindGroupLayoutDescriptor) -> Self {
+    pub(crate) fn new(shader: Handle<Shader>) -> Self {
         Self {
-            view_layout,
+            // The sun cameras have a bind group of their own: just the uniform, without the exposure texture.
+            view_layout: crate::pipeline::uniform_only_view_layout(),
             shader,
             cache: HashMap::new(),
             view_buffer: DynamicUniformBuffer::default(),

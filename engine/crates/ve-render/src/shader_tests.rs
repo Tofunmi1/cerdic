@@ -18,7 +18,8 @@ fn check(name: &str, source: &str) {
 /// as a validation error that stops the whole frame.
 fn translates_to_webgl(source: &str) -> Result<String, String> {
     use naga::back::glsl::{Options, PipelineOptions, Version, Writer};
-    let module = naga::front::wgsl::parse_str(source).map_err(|error| error.emit_to_string(source))?;
+    let module =
+        naga::front::wgsl::parse_str(source).map_err(|error| error.emit_to_string(source))?;
     let info = Validator::new(ValidationFlags::all(), Capabilities::all())
         .validate(&module)
         .map_err(|error| format!("{error:?}"))?;
@@ -74,6 +75,7 @@ fn the_post_pass_reads_depth_from_a_colour_texture() {
     assert!(!present.contains("texture_depth_2d"));
     check("ao_depth.wgsl", include_str!("shaders/ao_depth.wgsl"));
     check("ao.wgsl", include_str!("shaders/ao.wgsl"));
+    check("exposure.wgsl", include_str!("shaders/exposure.wgsl"));
 }
 
 #[test]

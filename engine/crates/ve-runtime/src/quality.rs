@@ -14,6 +14,7 @@ thread_local! {
     static REQUESTED_SPECULAR_AA: Cell<Option<bool>> = const { Cell::new(None) };
     static REQUESTED_SSAO: Cell<Option<bool>> = const { Cell::new(None) };
     static REQUESTED_BLOOM: Cell<Option<bool>> = const { Cell::new(None) };
+    static REQUESTED_AUTO_EXPOSURE: Cell<Option<bool>> = const { Cell::new(None) };
     static CURRENT: Cell<QualityTier> = const { Cell::new(QualityTier::High) };
 }
 
@@ -60,6 +61,20 @@ pub fn set_bloom(enabled: bool) {
     REQUESTED_BLOOM.with(|slot| slot.set(Some(enabled)));
 }
 
+/// Enables automatic exposure (eye adaptation) on the next frame.
+#[wasm_bindgen]
+pub fn set_auto_exposure(enabled: bool) {
+    REQUESTED_AUTO_EXPOSURE.with(|slot| slot.set(Some(enabled)));
+}
+
+/// Tells the renderer how long the last frame took, so exposure adapts at the same speed at any frame rate.
+pub(crate) fn publish_frame_delta(
+    time: Res<bevy_time::Time<bevy_time::Real>>,
+    mut delta: ResMut<ve_render::FrameDelta>,
+) {
+    delta.0 = time.delta_secs();
+}
+
 /// The resolution scale the headset's layer is allocated at: the largest any tier asks for. A
 /// layer cannot be resized while it is bound, so it is made big enough for the best tier once, and
 /// lower tiers render into a smaller part of it (see [`sync_xr_scale`]).
@@ -85,9 +100,12 @@ pub(crate) fn apply_requested(
     if let Some(tier) = REQUESTED.with(Cell::take) {
         CURRENT.with(|slot| slot.set(tier));
         if quality.tier != tier {
-            let specular_aa_enabled = quality.specular_aa_enabled;
+            // Settings the person chose stay across a tier change.
+            let (specular_aa_enabled, auto_exposure_enabled) =
+                (quality.specular_aa_enabled, quality.auto_exposure_enabled);
             *quality = RenderQuality::for_tier(tier);
             quality.specular_aa_enabled = specular_aa_enabled;
+            quality.auto_exposure_enabled = auto_exposure_enabled;
         }
     }
     if let Some(enabled) = REQUESTED_SHADOWS.with(Cell::take) {
@@ -110,6 +128,9 @@ pub(crate) fn apply_requested(
     }
     if let Some(enabled) = REQUESTED_BLOOM.with(Cell::take) {
         quality.bloom_enabled = enabled;
+    }
+    if let Some(enabled) = REQUESTED_AUTO_EXPOSURE.with(Cell::take) {
+        quality.auto_exposure_enabled = enabled;
     }
     // Occlusion reads its own single-sample depth texture (`ve_render::ao_depth`), so it does not limit the sample count.
     let wanted = Msaa::from_samples(quality.msaa_samples);

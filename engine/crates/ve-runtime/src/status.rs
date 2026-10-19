@@ -115,6 +115,7 @@ pub(crate) fn publish(
             "specular_aa": quality.specular_aa_enabled,
             "ssao": quality.ssao_enabled,
             "bloom": quality.bloom_enabled,
+            "auto_exposure": quality.auto_exposure_enabled,
         },
         "xr": {
             "state": format!("{:?}", ve_xr_web::session_state()),

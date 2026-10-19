@@ -58,6 +58,10 @@ impl FromStr for QualityTier {
 
 /// Settings that trade image quality for speed.
 #[derive(Resource, Clone, Copy, Debug, PartialEq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "each flag is an independent switch the page turns on or off; grouping them would only hide that"
+)]
 pub struct RenderQuality {
     /// The tier these settings came from (informational; the fields below are what the renderer reads).
     pub tier: QualityTier,
@@ -81,6 +85,8 @@ pub struct RenderQuality {
     pub ssao_enabled: bool,
     /// Enables the bounded bright-region bloom pass.
     pub bloom_enabled: bool,
+    /// Adapts the exposure to the brightness of the picture over about a second, like an eye or a camera.
+    pub auto_exposure_enabled: bool,
 }
 
 impl RenderQuality {
@@ -100,6 +106,7 @@ impl RenderQuality {
                 specular_aa_enabled: false,
                 ssao_enabled: false,
                 bloom_enabled: false,
+                auto_exposure_enabled: false,
             },
             QualityTier::Medium => Self {
                 tier,
@@ -113,6 +120,7 @@ impl RenderQuality {
                 specular_aa_enabled: false,
                 ssao_enabled: false,
                 bloom_enabled: false,
+                auto_exposure_enabled: false,
             },
             QualityTier::High => Self {
                 tier,
@@ -126,6 +134,7 @@ impl RenderQuality {
                 specular_aa_enabled: false,
                 ssao_enabled: false,
                 bloom_enabled: false,
+                auto_exposure_enabled: false,
             },
         }
     }
