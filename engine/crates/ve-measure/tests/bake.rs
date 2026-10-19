@@ -234,3 +234,75 @@ fn bad_input_is_a_typed_error() {
         Err(MeasureError::Bake(_))
     ));
 }
+
+/// A unit cube on eight shared vertices (outward winding) with each face in its own tile of a 3 x 2 atlas.
+fn cube() -> (Vec<[f32; 3]>, Vec<u32>, Vec<[f32; 2]>) {
+    let positions: Vec<[f32; 3]> = (0..8)
+        .map(|i| {
+            let s = |bit: u32| if i & bit == 0 { -0.5 } else { 0.5 };
+            [s(1), s(2), s(4)]
+        })
+        .collect();
+    // Corner order of each face, counter-clockwise seen from outside: -z, +z, -x, +x, -y, +y.
+    let faces: [[u32; 4]; 6] = [
+        [0, 2, 3, 1],
+        [4, 5, 7, 6],
+        [0, 4, 6, 2],
+        [1, 3, 7, 5],
+        [0, 1, 5, 4],
+        [2, 6, 7, 3],
+    ];
+    let (mut indices, mut uvs) = (Vec::new(), Vec::new());
+    for (face, quad) in (0_u8..).zip(faces.iter()) {
+        let (column, row) = (f32::from(face % 3), f32::from(face / 3));
+        let corner_uv = |k: usize| {
+            let (u, v) = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)][k];
+            [
+                (column + 0.02 + 0.96 * u) / 3.0,
+                (row + 0.02 + 0.96 * v) / 2.0,
+            ]
+        };
+        for k in [0, 1, 2, 0, 2, 3] {
+            indices.push(quad[k]);
+            uvs.push(corner_uv(k));
+        }
+    }
+    (positions, indices, uvs)
+}
+
+#[test]
+fn a_hard_edged_cube_bakes_flat_against_itself() {
+    // Smoothing normals across the 90 degree edges would tilt every face toward its corners; with a crease angle the
+    // faces stay flat, so a cube baked against itself is the flat normal everywhere.
+    let (positions, indices, uvs) = cube();
+    let low = LowMesh::new(&positions, &indices, &uvs).unwrap();
+    let bake = bake_normals(&low, &Mesh::new(&positions, &indices), 96, 0.1, 0.5).unwrap();
+    let mut checked = 0;
+    for y in 0..96 {
+        for x in 0..96 {
+            let p = pixel(&bake, x, y);
+            if p[3] == 255 {
+                near(p[0], 128, 1, "red");
+                near(p[1], 128, 1, "green");
+                near(p[2], 255, 1, "blue");
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked > 96 * 96 / 2, "only {checked} texels covered");
+}
+
+#[test]
+fn a_hard_edged_cube_is_fully_open_to_the_sky() {
+    let (positions, indices, uvs) = cube();
+    let low = LowMesh::new(&positions, &indices, &uvs).unwrap();
+    let bake = bake_ao(&low, &Mesh::new(&positions, &indices), 48, 64, 5.0, 0.001).unwrap();
+    for y in 0..48 {
+        for x in 0..48 {
+            let p = pixel(&bake, x, y);
+            if p[3] == 255 {
+                near(p[0], 255, 2, "a convex shape occludes nothing of itself");
+            }
+        }
+    }
+}

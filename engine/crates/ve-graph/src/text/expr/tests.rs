@@ -1,7 +1,16 @@
 use super::expand;
 
 fn run(text: &str) -> String {
-    expand(text).unwrap()
+    expand(text).unwrap().0
+}
+
+#[test]
+fn the_constants_defined_are_reported() {
+    assert_eq!(
+        expand("let w = 1\nlet d = 2\nx = f({w})\n").unwrap().1,
+        ["d", "w"]
+    );
+    assert!(expand("x = f(1)\n").unwrap().1.is_empty());
 }
 
 #[test]
@@ -14,6 +23,14 @@ fn text_without_expressions_is_untouched() {
 fn constants_and_arithmetic_fold_into_numbers() {
     let text = "let w = 1.5\nlet half = w / 2\nb = solid.box@1(size=[{w}, {half}, {w * 2 + 1}])\n";
     assert_eq!(run(text), "\n\nb = solid.box@1(size=[1.5, 0.75, 4])\n");
+}
+
+#[test]
+fn a_let_may_wrap_its_expression_in_braces() {
+    assert_eq!(
+        run("let a = 2\nlet b = {a * 3}\nx = f({b}, {a + b})\n"),
+        "\n\nx = f(6, 8)\n"
+    );
 }
 
 #[test]

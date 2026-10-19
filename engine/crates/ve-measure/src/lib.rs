@@ -20,6 +20,7 @@
 )]
 
 mod bake;
+mod bake_tool;
 mod bvh;
 mod collision;
 mod error;
@@ -35,6 +36,7 @@ mod tool;
 mod uv;
 
 pub use bake::{Bake, LowMesh, MAX_RAYS, MAX_SIZE, MIN_SIZE, PADDING, bake_ao, bake_normals};
+pub use bake_tool::bake_maps_json;
 pub use bvh::{Bvh, Hausdorff, closest_point, distance_between, raycast};
 pub use collision::{ConvexDecomposition, ConvexPart, convex_decomposition};
 pub use error::MeasureError;

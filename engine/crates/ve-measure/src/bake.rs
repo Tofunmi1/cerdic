@@ -5,6 +5,8 @@
 //! Texels covered by a UV triangle are shaded; the nearest covered texels (within [`PADDING`]) are copied outward so
 //! filtering at island borders does not bleed in the background, and everything else is transparent.
 
+// The low mesh is shaded the way the engine draws it: faces within 45 degrees of each other share a smooth normal at
+// a corner, a sharper edge stays hard (so a cube bakes flat and a sphere bakes smooth).
 mod frame;
 
 use glam::Vec3;
@@ -12,7 +14,7 @@ use glam::Vec3;
 use crate::bvh::Bvh;
 use crate::error::MeasureError;
 use crate::mesh::Mesh;
-use frame::{Frame, hemisphere, smooth_normals, texel_turn, uv_directions};
+use frame::{Frame, corner_normals, hemisphere, texel_turn, uv_directions};
 
 /// Smallest image side a bake accepts.
 pub const MIN_SIZE: u32 = 8;
@@ -195,7 +197,7 @@ pub fn bake_ao(
 /// Visits every texel a low-mesh UV triangle covers (the first triangle in order wins an overlap), writes what `shade`
 /// returns, then pads outward.
 fn walk(low: &LowMesh, pixels: u32, mut shade: impl FnMut(&Texel) -> [u8; 3]) -> Bake {
-    let normals = smooth_normals(low.positions, low.indices);
+    let normals = corner_normals(low.positions, low.indices);
     let side = pixels as usize;
     let mut rgba = vec![0_u8; side * side * 4];
     for pixel in rgba.chunks_exact_mut(4) {
@@ -206,7 +208,7 @@ fn walk(low: &LowMesh, pixels: u32, mut shade: impl FnMut(&Texel) -> [u8; 3]) ->
     for (t, tri) in low.indices.chunks_exact(3).enumerate() {
         let corner = [tri[0], tri[1], tri[2]];
         let p = corner.map(|i| Vec3::from_array(low.positions[i as usize]));
-        let n = corner.map(|i| normals[i as usize]);
+        let n = [normals[t * 3], normals[t * 3 + 1], normals[t * 3 + 2]];
         let uv = [0, 1, 2].map(|k| low.corner_uvs[t * 3 + k]);
         let Some((tangent, bitangent)) = uv_directions(p, uv) else {
             continue;

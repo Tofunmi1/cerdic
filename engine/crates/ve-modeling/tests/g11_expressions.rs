@@ -83,3 +83,26 @@ fn a_mistake_is_reported_at_the_expression_with_a_fix() {
     );
     assert_eq!(first.span.map(|s| s.line), Some(1));
 }
+
+#[test]
+fn a_constant_written_where_a_node_goes_says_to_use_braces() {
+    // `radius=w` reads w as a node; the fix is `radius={w}`.
+    let errors = parse_text(
+        &builtin_registry(),
+        "let w = 2\nball = solid.sphere@1(radius=w, segments=24)\noutput ball",
+    )
+    .unwrap_err();
+    assert_eq!(errors[0].code, "parse.unknown_name");
+    let hint = errors[0].suggestion.as_deref().unwrap_or_default();
+    assert!(hint.contains("constant") && hint.contains("{w}"), "{hint}");
+    // And the fix works: the same program with radius={w} is a sphere of radius 2.
+    let fixed = volume("let w = 2\nball = solid.sphere@1(radius={w}, segments=48)\noutput ball");
+    let typed = volume("ball = solid.sphere@1(radius=2, segments=48)\noutput ball");
+    assert!((fixed - typed).abs() < 1.0e-9, "{fixed} vs {typed}");
+}
+
+#[test]
+fn a_braced_let_is_accepted() {
+    let v = volume("let w = 2\nlet h = {w * 3}\nbox = solid.box@1(size=[{w}, {h}, 1])\noutput box");
+    assert!((v - 12.0).abs() < 1.0e-6, "volume {v}");
+}

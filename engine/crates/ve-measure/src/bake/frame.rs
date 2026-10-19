@@ -44,27 +44,44 @@ impl Frame {
     }
 }
 
-/// Area-weighted vertex normals, welded by position so a UV seam does not split the shading.
-pub(super) fn smooth_normals(positions: &[[f32; 3]], indices: &[u32]) -> Vec<Vec3> {
+/// Faces whose normals are within this angle of each other share a smooth normal at a corner (cosine of 45 degrees);
+/// a sharper edge stays hard, so a cube bakes flat and a sphere bakes smooth.
+pub(super) const CREASE_COS: f32 = std::f32::consts::FRAC_1_SQRT_2;
+
+/// One normal per triangle corner (the order of `indices`): the area-weighted average of the faces that meet at the
+/// corner's position (so a UV seam does not split the shading) and lie within the crease angle of this corner's face.
+pub(super) fn corner_normals(positions: &[[f32; 3]], indices: &[u32]) -> Vec<Vec3> {
     let key = |p: &[f32; 3]| [p[0].to_bits(), p[1].to_bits(), p[2].to_bits()];
-    let mut sums: BTreeMap<[u32; 3], Vec3> = BTreeMap::new();
-    for tri in indices.chunks_exact(3) {
-        let [a, b, c] = [tri[0], tri[1], tri[2]].map(|i| positions[i as usize]);
-        let face = (Vec3::from_array(b) - Vec3::from_array(a))
-            .cross(Vec3::from_array(c) - Vec3::from_array(a));
-        for corner in [a, b, c] {
-            *sums.entry(key(&corner)).or_insert(Vec3::ZERO) += face;
+    let faces: Vec<Vec3> = indices
+        .chunks_exact(3)
+        .map(|tri| {
+            let [a, b, c] =
+                [tri[0], tri[1], tri[2]].map(|i| Vec3::from_array(positions[i as usize]));
+            (b - a).cross(c - a)
+        })
+        .collect();
+    let mut around: BTreeMap<[u32; 3], Vec<usize>> = BTreeMap::new();
+    for (t, tri) in indices.chunks_exact(3).enumerate() {
+        for &index in tri {
+            around
+                .entry(key(&positions[index as usize]))
+                .or_default()
+                .push(t);
         }
     }
-    positions
-        .iter()
-        .map(|p| {
-            sums.get(&key(p))
-                .copied()
-                .unwrap_or(Vec3::ZERO)
-                .normalize_or_zero()
-        })
-        .collect()
+    let mut out = Vec::with_capacity(indices.len());
+    for (t, tri) in indices.chunks_exact(3).enumerate() {
+        let own = faces[t].normalize_or_zero();
+        for &index in tri {
+            let sum: Vec3 = around[&key(&positions[index as usize])]
+                .iter()
+                .filter(|&&u| faces[u].normalize_or_zero().dot(own) >= CREASE_COS)
+                .map(|&u| faces[u])
+                .sum();
+            out.push(sum.normalize_or(own));
+        }
+    }
+    out
 }
 
 /// Directions of increasing u and v on a triangle, from its corner positions and UVs; `None` when the UV triangle has no area.

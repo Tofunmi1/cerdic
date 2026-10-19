@@ -12,6 +12,7 @@ export interface Runtime {
   status(): string;
   eval_tangents(positions: Float32Array, normals: Float32Array, uvs: Float32Array, indices: Uint32Array): Float32Array;
   measure_mesh(positions: Float32Array, indices: Uint32Array, uvs: Float32Array, detail: string): string;
+  bake_maps(lowPositions: Float32Array, lowIndices: Uint32Array, lowCornerUvs: Float32Array, highPositions: Float32Array, highIndices: Uint32Array, size: number, maps: string, cage: number, maxDistance: number, rays: number, bias: number): string;
   doc_open(name: string, seed: number): string;
   doc_reset(name: string, seed: number): string;
   doc_state(): string;

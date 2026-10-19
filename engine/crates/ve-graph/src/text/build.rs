@@ -279,7 +279,7 @@ fn parse_with(
     source: &str,
 ) -> Result<TextBatch, Vec<Diagnostic>> {
     // Constants and `{expression}` values are folded into plain numbers before the parser sees the text.
-    let expanded = super::expr::expand(source).map_err(|e| vec![*e])?;
+    let (expanded, constants) = super::expr::expand(source).map_err(|e| vec![*e])?;
     let statements = parse(&expanded).map_err(|e| vec![*e])?;
     let mut errors = Vec::new();
     let names = collect_names(&statements, known, &mut errors);
@@ -353,6 +353,18 @@ fn parse_with(
                 Ok(item) => push(vec![item]),
                 Err(e) => errors.push(*e),
             },
+        }
+    }
+    // A constant used where a node is expected (`radius=w` instead of `radius={w}`) gets the fix spelled out.
+    for error in &mut errors {
+        let name = error.message.rsplit(' ').next().unwrap_or("").to_owned();
+        if error.code == "parse.unknown_name"
+            && error.suggestion.is_none()
+            && constants.contains(&name)
+        {
+            error.suggestion = Some(format!(
+                "{name} is a constant, not a node: write {{{name}}} where its value goes"
+            ));
         }
     }
     errors.sort_by_key(|e| e.span.map(|s| (s.line, s.col)));
