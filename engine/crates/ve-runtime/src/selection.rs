@@ -80,8 +80,14 @@ pub(crate) fn to_json() -> String {
 pub(crate) fn select_on_click(
     mut interaction: ResMut<InteractionState>,
     authored: Query<(&Authored, Option<&crate::projection::InstanceIndex>)>,
+    mut behaviors: ResMut<crate::behavior::Behaviors>,
 ) {
     for entity in interaction.take_clicked() {
+        behaviors.clicked(entity);
+        // Play mode is for using the scene, not editing it: a click acts and does not select.
+        if behaviors.play {
+            continue;
+        }
         if let Ok((part, index)) = authored.get(entity) {
             set_instance(
                 Some(part.node().to_owned()),

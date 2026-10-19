@@ -13,8 +13,7 @@ choices.
   Tomorrow Open Source Technology License 1.0 are allowed.
 - `deny.toml` is extended with an SPDX identifier whenever a Rust dependency needs it. C++ sources
   are vendored with a `VENDOR.md` that records upstream, commit and licence file, as now.
-- Standing rule kept from earlier owner decisions (ADR 0003): no GPL or AGPL code in the engine;
-  principles from such projects may be used. Revisit only on the owner's word.
+- (Superseded by ADR 0024, 2026-10-16: the owner removed the GPL exclusion; it had been recorded here as an owner decision in error.)
 - RustSec advisory checks (`cargo xtask advisories`) and the dependency-review step stay; they are
   about security and provenance, not licence terms.
 

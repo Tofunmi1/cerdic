@@ -1,0 +1,39 @@
+# One carved stone in six styles, left to right and front to back: anime, realistic, painterly, flat, retro, ink.
+# The shape, colours and texture program are the same; only a `solid.style` line differs. Wear on the edges, dirt in the creases
+# and moss on the top come from the shape itself (see weathered_stone).
+
+slab = solid.box@1(size=[0.8, 0.55, 0.6])
+groove = solid.box@1(size=[0.9, 0.04, 0.03])
+groove_at = xform.move@1(groove, by=[0, 0.06, 0.3])
+hole = solid.cylinder@1(radius=0.09, height=0.7, segments=24)
+hole_turn = xform.rotate@1(hole, angles=[90, 0, 0])
+hole_at = xform.move@1(hole_turn, by=[-0.18, 0.02, 0])
+carved = solid.difference@1(slab, groove_at, hole_at)
+softened = solid.round@1(carved, radius=0.02, segments=6)
+standing = xform.move@1(softened, by=[0, 0.275, 0])
+
+stone = solid.texture@1(standing, program="ao = surface_ao(strength=0.35); stone = colorize(ao, gradient=[0:#4a4038, 1:#a8978a]); moss_col = colorize(ao, gradient=[0:#2e4a1c, 1:#78a83e]); dirt_col = colorize(ao, gradient=[0:#1c140e, 1:#443428]); wear_col = colorize(ao, gradient=[0:#a79b8a, 1:#efe6d4]); up = surface_up(power=3); cav = surface_cavity(gain=7); edge = surface_convex(gain=7); a1 = blend(moss_col, stone, up, blend_type=normal, amount=0.9); a2 = blend(dirt_col, a1, cav, blend_type=normal, amount=0.9); albedo = blend(wear_col, a2, edge, blend_type=normal, amount=0.85); roughness = colorize(edge, gradient=[0:#f0f0f0, 1:#909090])")
+
+anime_look = solid.style@1(stone, style="anime")
+anime_at = xform.move@1(anime_look, by=[-1.1, 0, 0.6])
+output anime = anime_at
+
+real_look = solid.style@1(stone, style="realistic")
+real_at = xform.move@1(real_look, by=[0, 0, 0.6])
+output realistic = real_at
+
+paint_look = solid.style@1(stone, style="painterly")
+paint_at = xform.move@1(paint_look, by=[1.1, 0, 0.6])
+output painterly = paint_at
+
+flat_look = solid.style@1(stone, style="flat")
+flat_at = xform.move@1(flat_look, by=[-1.1, 0, -0.5])
+output flat = flat_at
+
+retro_look = solid.style@1(stone, style="retro")
+retro_at = xform.move@1(retro_look, by=[0, 0, -0.5])
+output retro = retro_at
+
+ink_look = solid.style@1(stone, style="ink")
+ink_at = xform.move@1(ink_look, by=[1.1, 0, -0.5])
+output ink = ink_at

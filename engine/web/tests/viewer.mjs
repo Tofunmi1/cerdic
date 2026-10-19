@@ -18,7 +18,7 @@ try {
   });
   page.on("pageerror", (e) => logs.push(`pageerror: ${e.message}`));
 
-  await page.goto(`http://127.0.0.1:${port}/?scene=xr&viewer=1&fov=70`);
+  await page.goto(`http://127.0.0.1:${port}/?scene=xr&viewer=1`);
   await page.waitForFunction(() => window.__ve?.ready || window.__ve?.error, null, { timeout: 90000 });
   check(!(await page.evaluate(() => window.__ve.error)), `start failed: ${await page.evaluate(() => window.__ve.error)}`);
   const view = () => page.evaluate(() => window.__ve.read().viewer);
@@ -29,6 +29,7 @@ try {
   const api = (call, ...args) => page.evaluate(([name, rest]) => window.__ve.viewer.api[name](...rest), [call, args]);
   await page.waitForFunction(() => window.__ve.read().viewer.started, null, { timeout: 30000 });
   check(await page.evaluate(() => !!document.getElementById("viewer-hud")), "the viewer panel is missing");
+  check(await page.locator("#v-fov").inputValue() === "45", "the product-review field of view defaults to 45 degrees");
 
   // The viewer starts where the scene's own camera was: standing back from the cube, looking at it.
   const home = await view();

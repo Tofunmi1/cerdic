@@ -1,0 +1,38 @@
+# Reference scene: material grid. Top row dielectric, bottom row metal, roughness 0.05 to 1 from left to right, on a neutral floor under sky light.
+sky = scene.sky@1(sun_elevation=42, sun_azimuth=30, sun_intensity=5, turbidity=2.5, ground_color=[0.45, 0.42, 0.38], clouds=false, seed=3)
+output sky = sky
+floor_box = solid.box@1(size=[8, 0.2, 5])
+floor_low = xform.move@1(floor_box, by=[0, -0.1, 0.2])
+floor_mat = solid.material@1(floor_low, color=[0.55, 0.55, 0.55], roughness=0.8)
+output floor = floor_mat
+ball = solid.sphere@1(radius=0.45, segments=56)
+d0 = solid.material@1(ball, color=[0.75, 0.2, 0.15], metallic=0, roughness=0.05)
+d0p = xform.move@1(d0, by=[-2.2, 1.0, 0])
+output d0 = d0p
+d1 = solid.material@1(ball, color=[0.75, 0.2, 0.15], metallic=0, roughness=0.25)
+d1p = xform.move@1(d1, by=[-1.1, 1.0, 0])
+output d1 = d1p
+d2 = solid.material@1(ball, color=[0.75, 0.2, 0.15], metallic=0, roughness=0.5)
+d2p = xform.move@1(d2, by=[0, 1.0, 0])
+output d2 = d2p
+d3 = solid.material@1(ball, color=[0.75, 0.2, 0.15], metallic=0, roughness=0.75)
+d3p = xform.move@1(d3, by=[1.1, 1.0, 0])
+output d3 = d3p
+d4 = solid.material@1(ball, color=[0.75, 0.2, 0.15], metallic=0, roughness=1.0)
+d4p = xform.move@1(d4, by=[2.2, 1.0, 0])
+output d4 = d4p
+m0 = solid.material@1(ball, color=[0.95, 0.75, 0.35], metallic=1, roughness=0.05)
+m0p = xform.move@1(m0, by=[-2.2, 0.45, 1.1])
+output m0 = m0p
+m1 = solid.material@1(ball, color=[0.95, 0.75, 0.35], metallic=1, roughness=0.25)
+m1p = xform.move@1(m1, by=[-1.1, 0.45, 1.1])
+output m1 = m1p
+m2 = solid.material@1(ball, color=[0.95, 0.75, 0.35], metallic=1, roughness=0.5)
+m2p = xform.move@1(m2, by=[0, 0.45, 1.1])
+output m2 = m2p
+m3 = solid.material@1(ball, color=[0.95, 0.75, 0.35], metallic=1, roughness=0.75)
+m3p = xform.move@1(m3, by=[1.1, 0.45, 1.1])
+output m3 = m3p
+m4 = solid.material@1(ball, color=[0.95, 0.75, 0.35], metallic=1, roughness=1.0)
+m4p = xform.move@1(m4, by=[2.2, 0.45, 1.1])
+output m4 = m4p

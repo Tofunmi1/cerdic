@@ -10,7 +10,7 @@ use bevy_ecs::prelude::*;
 use bevy_render::Extract;
 use bevy_render::view::Msaa;
 
-use crate::light::MAX_POINT_LIGHTS;
+use crate::light::{MAX_POINT_LIGHTS, MAX_SPOT_LIGHTS};
 
 /// A named quality level.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -63,14 +63,24 @@ pub struct RenderQuality {
     pub tier: QualityTier,
     /// Samples per pixel: 1, 2 or 4.
     pub msaa_samples: u32,
-    /// Side of the sun's shadow map in texels; zero turns shadows off.
+    /// Side of one cascade of the sun's shadow map in texels; zero turns shadows off.
     pub shadow_resolution: u32,
+    /// How many cascades the sun's shadow map has (1 to 3): more keep near shadows sharp and still reach far.
+    pub shadow_cascades: u32,
     /// Shadow filter radius in taps: 0 is one hardware-filtered tap, 1 is a 3 by 3 grid.
     pub shadow_pcf_radius: u32,
     /// Point lights shaded per frame (the closest to the viewer are kept).
     pub max_point_lights: usize,
+    /// Spot lights shaded per frame (nearest first, unshadowed).
+    pub max_spot_lights: usize,
     /// Scale of the headset's render resolution relative to the runtime's recommendation.
     pub resolution_scale: f32,
+    /// Broadens specular highlights using the screen-space normal footprint.
+    pub specular_aa_enabled: bool,
+    /// Enables screen-space ambient occlusion in the post pass.
+    pub ssao_enabled: bool,
+    /// Enables the bounded bright-region bloom pass.
+    pub bloom_enabled: bool,
 }
 
 impl RenderQuality {
@@ -82,25 +92,40 @@ impl RenderQuality {
                 tier,
                 msaa_samples: 1,
                 shadow_resolution: 0,
+                shadow_cascades: 1,
                 shadow_pcf_radius: 0,
                 max_point_lights: 2,
+                max_spot_lights: 2,
                 resolution_scale: 0.8,
+                specular_aa_enabled: false,
+                ssao_enabled: false,
+                bloom_enabled: false,
             },
             QualityTier::Medium => Self {
                 tier,
                 msaa_samples: 2,
                 shadow_resolution: 1024,
+                shadow_cascades: 2,
                 shadow_pcf_radius: 0,
                 max_point_lights: 4,
+                max_spot_lights: 4,
                 resolution_scale: 1.0,
+                specular_aa_enabled: false,
+                ssao_enabled: false,
+                bloom_enabled: false,
             },
             QualityTier::High => Self {
                 tier,
                 msaa_samples: 4,
                 shadow_resolution: 2048,
+                shadow_cascades: 3,
                 shadow_pcf_radius: 1,
                 max_point_lights: MAX_POINT_LIGHTS,
+                max_spot_lights: MAX_SPOT_LIGHTS,
                 resolution_scale: 1.0,
+                specular_aa_enabled: false,
+                ssao_enabled: false,
+                bloom_enabled: false,
             },
         }
     }
@@ -128,7 +153,13 @@ pub(crate) fn apply_quality_to_cameras(
     quality: Res<RenderQuality>,
     mut cameras: Query<(Ref<Camera3d>, &mut Msaa)>,
 ) {
-    let wanted = Msaa::from_samples(quality.msaa_samples);
+    // The post pass samples resolved depth. Use single-sample depth while AO or bloom is active;
+    // this also bounds the headset cost of the extra pass.
+    let wanted = Msaa::from_samples(if quality.ssao_enabled || quality.bloom_enabled {
+        1
+    } else {
+        quality.msaa_samples
+    });
     for (camera, mut msaa) in &mut cameras {
         if (quality.is_changed() || camera.is_added()) && *msaa != wanted {
             *msaa = wanted;
@@ -150,6 +181,24 @@ mod tests {
         assert!(medium.shadow_resolution <= high.shadow_resolution);
         assert!(low.max_point_lights <= medium.max_point_lights);
         assert!(medium.max_point_lights <= high.max_point_lights);
+        assert!(low.max_spot_lights <= medium.max_spot_lights);
+        assert!(medium.max_spot_lights <= high.max_spot_lights);
+        assert_eq!(
+            (
+                low.max_point_lights,
+                medium.max_point_lights,
+                high.max_point_lights
+            ),
+            (2, 4, 16)
+        );
+        assert_eq!(
+            (
+                low.max_spot_lights,
+                medium.max_spot_lights,
+                high.max_spot_lights
+            ),
+            (2, 4, 8)
+        );
         assert!(low.resolution_scale <= medium.resolution_scale);
         assert!(medium.resolution_scale <= high.resolution_scale);
     }
@@ -167,6 +216,7 @@ mod tests {
             let quality = RenderQuality::for_tier(tier);
             assert!([1, 2, 4].contains(&quality.msaa_samples), "{tier}");
             assert!(quality.max_point_lights <= MAX_POINT_LIGHTS, "{tier}");
+            assert!(quality.max_spot_lights <= MAX_SPOT_LIGHTS, "{tier}");
             assert!(quality.shadow_resolution == 0 || quality.shadow_resolution.is_power_of_two());
             assert!((0.5..=1.5).contains(&quality.resolution_scale), "{tier}");
             assert_eq!(quality.tier, tier);
@@ -184,7 +234,11 @@ mod tests {
 
     #[test]
     fn default_is_the_desktop_tier() {
-        assert_eq!(RenderQuality::default().tier, QualityTier::High);
+        let quality = RenderQuality::default();
+        assert_eq!(quality.tier, QualityTier::High);
+        assert!(!quality.specular_aa_enabled);
+        assert!(!quality.ssao_enabled);
+        assert!(!quality.bloom_enabled);
     }
 
     #[test]
@@ -201,5 +255,15 @@ mod tests {
         app.insert_resource(RenderQuality::for_tier(QualityTier::Low));
         app.update();
         assert_eq!(app.world().get::<Msaa>(camera), Some(&Msaa::Off));
+
+        app.insert_resource(RenderQuality {
+            ssao_enabled: true,
+            ..RenderQuality::for_tier(QualityTier::High)
+        });
+        app.update();
+        assert_eq!(app.world().get::<Msaa>(camera), Some(&Msaa::Off));
+        app.insert_resource(RenderQuality::for_tier(QualityTier::High));
+        app.update();
+        assert_eq!(app.world().get::<Msaa>(camera), Some(&Msaa::Sample4));
     }
 }

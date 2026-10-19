@@ -48,8 +48,12 @@ pub struct EyeView {
     pub viewport: Viewport,
 }
 
-/// A stand-in headset for desktop development and tests: two eyes a fixed distance apart with
-/// identical symmetric fields of view.
+/// How far each eye's field of view leans outward, as a fraction of the half-width (0.15 gives about 15 percent more
+/// view on the outer side than on the nose side, like a Quest).
+const NASAL_SHIFT: f32 = 0.15;
+
+/// A stand-in headset for desktop development and tests: two eyes a fixed distance apart, each with the same field of
+/// view leaning outward (see [`NASAL_SHIFT`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MockHmd {
     /// Distance between the eyes in metres. Typical adults are 0.058 to 0.072.
@@ -71,13 +75,25 @@ impl MockHmd {
     pub fn eyes(&self, head: Pose, target: (u32, u32), near: f32) -> [EyeView; 2] {
         let half = self.ipd * 0.5;
         let [left, right] = side_by_side(target.0, target.1);
-        let clip_from_view = self.fov.projection_reverse_z(near);
-        let eye = |offset_x: f32, viewport: Viewport| EyeView {
+        // Real headsets show each eye more to the outside than toward the nose, so the two views overlap in the middle
+        // rather than being the same picture. The window keeps its width (so the image is not stretched) and slides
+        // outward: the left eye's window moves left, the right eye's moves right.
+        let outward = |sign: f32| {
+            let shift = |edge: f32, grows: f32| edge * (1.0 + grows * NASAL_SHIFT);
+            FovTangents {
+                left: shift(self.fov.left, sign),
+                right: shift(self.fov.right, -sign),
+                down: self.fov.down,
+                up: self.fov.up,
+            }
+            .projection_reverse_z(near)
+        };
+        let eye = |offset_x: f32, sign: f32, viewport: Viewport| EyeView {
             world_from_view: eye_pose(head, Vec3::new(offset_x, 0.0, 0.0)).to_matrix(),
-            clip_from_view,
+            clip_from_view: outward(sign),
             viewport,
         };
-        [eye(-half, left), eye(half, right)]
+        [eye(-half, 1.0, left), eye(half, -1.0, right)]
     }
 }
 
@@ -123,9 +139,21 @@ mod tests {
     }
 
     #[test]
-    fn eyes_share_a_projection_and_tile_the_target() {
+    fn eyes_mirror_each_other_and_tile_the_target() {
         let [left, right] = hmd().eyes(Pose::IDENTITY, (1001, 500), 0.05);
-        assert_eq!(left.clip_from_view, right.clip_from_view);
+        assert_ne!(
+            left.clip_from_view, right.clip_from_view,
+            "the eyes do not see the same window"
+        );
+        // Mirror images: the horizontal terms of one are the negatives of the other's, the vertical ones are equal.
+        let (l, r) = (left.clip_from_view, right.clip_from_view);
+        assert!((l.x_axis.x - r.x_axis.x).abs() < 1e-6 && (l.y_axis.y - r.y_axis.y).abs() < 1e-6);
+        assert!(
+            (l.z_axis.x + r.z_axis.x).abs() < 1e-5,
+            "{} {}",
+            l.z_axis.x,
+            r.z_axis.x
+        );
         assert_eq!(left.viewport.width + right.viewport.width, 1001);
         assert_eq!(left.viewport.x + left.viewport.width, right.viewport.x);
     }

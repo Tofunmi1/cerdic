@@ -29,6 +29,8 @@ try {
   await page.click(`.orow[data-id="${id}"]`);
   assert.match(await page.textContent('#dock-inspector'),/10,000 instances/);
   await page.click(`.orow[data-id="${id}"]`);
+  // Keep this pick regression independent of the viewer's product-shot FOV default.
+  await page.evaluate(()=>window.__runtime.viewer_configure(true,90,false,2));
   await page.evaluate(()=>window.__runtime.viewer_look_at(0.6,1.5,0.61,0.6,0,0.6));
   await page.waitForTimeout(1200);
   let selected=null;

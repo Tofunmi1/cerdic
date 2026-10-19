@@ -4,6 +4,7 @@
 import { documentBridge } from './bridge';
 import type { Runtime } from './bridge';
 import { EvaluationHost } from './evaluation';
+import { buildGlbWithTextures } from './gltf';
 import { connectMcpBridge } from './mcp-bridge';
 
 type Options = { workerUrl: string; mcpPort?: number; onChange: () => void };
@@ -36,6 +37,8 @@ export function attachEvaluation(runtime: Runtime, { workerUrl, mcpPort, onChang
     },
     sendText: (text: string, label: string) => staged.sendText(text, label),
     text: () => staged.text(),
+    /** The evaluated model as a binary glTF file (metres, Y up), or null when nothing is evaluated yet. */
+    exportGlb: async () => (evaluation.parts.length > 0 ? buildGlbWithTextures(evaluation.parts, { name: 'model', mikkTangents: runtime.eval_tangents.bind(runtime) }) : null),
   };
   const host = { get ready() { return (window as unknown as { __ve?: { ready: boolean } }).__ve?.ready ?? false; }, doc: staged, evaluation, runtime };
   const stop = mcpPort ? connectMcpBridge(host, mcpPort) : () => {};

@@ -9,7 +9,11 @@ import { PNG } from 'pngjs';
 import { driverAdvisory } from './support.mjs';
 
 const root = new URL('../../../', import.meta.url).pathname;
-const child = Bun.spawn(['bun', 'x', 'vite', '--host', '127.0.0.1', '--port', '5189'], {
+// The gate runs the pieces as parallel shards (GALLERY_SHARD=i/n, each with its own GALLERY_PORT); shard 0
+// also runs the vase sequence. Alone, with no variables, this runs everything on port 5189.
+const port = Number(process.env.GALLERY_PORT ?? 5189);
+const [shardIndex, shardCount] = (process.env.GALLERY_SHARD ?? '0/1').split('/').map(Number);
+const child = Bun.spawn(['bun', 'x', 'vite', '--host', '127.0.0.1', '--port', String(port)], {
   cwd: root, stdout: 'ignore', stderr: 'inherit',
 });
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
@@ -27,9 +31,30 @@ const pieces = {
   twisted_tower: { centre: [0, 0.25, 0], size: 0.5, detail: [0, 0.5, 0] },
   offset_plate: { centre: [0, 0.0035, 0], size: 0.16, detail: [0.05, 0.006, 0.03], detailScale: 0.6 },
   ceramic_vase: { centre: [0, 0.16, 0], size: 0.32, detail: [0, 0.3, 0] },
+  pipe_elbow: { centre: [0.5, 0.5, 0], size: 1.1, detail: [0.4, 0.7, 0], detailScale: 0.25 },
+  lofted_vase: { centre: [0, 0.36, 0], size: 0.62, detail: [0, 0.48, 0] },
+  curved_panel: { centre: [0, 0, 0.1], size: 0.9, detail: [0, 0.05, 0.15] },
+  coil_spring: { centre: [0, 0.15, 0], size: 0.55, detail: [0.24, 0.15, 0], detailScale: 0.2 },
+  turbine_blade: { centre: [0, 0.24, 0], size: 0.5, detail: [0, 0.24, 0], detailScale: 0.25 },
   table: { centre: [0, 0.38, 0], size: 1.3, detail: [0.55, 0.72, 0.3], detailScale: 0.3 },
   gear: { centre: [0, 0.01, 0], size: 0.22, detail: [0.1, 0.01, 0], detailScale: 0.5 },
   spiral_stair: { centre: [0, 1.1, 0], size: 1.6, detail: [0.3, 1.0, 0], detailScale: 0.4 },
+  staircase: { centre: [0, 1.8, 0], size: 2.05, detail: [0.35, 1.5, 0], detailScale: 0.35, fov: 48 },
+  lamp: { centre: [0.05, 0.25, 0], size: 0.7, detail: [0.1, 0.35, 0], detailScale: 0.3 },
+  goblet: { centre: [0, 0.16, 0], size: 0.45, detail: [0, 0.27, 0], detailScale: 0.3 },
+  bridge: { centre: [0, 0.9, 0], size: 2, detail: [0, 0.65, 0], detailScale: 0.55 },
+  sword: { centre: [0, 0.12, 0], size: 0.65, detail: [0, 0.42, 0], detailScale: 0.25 },
+  car: { centre: [0, 0.3, 0], size: 2, detail: [0.62, 0.2, 0.42], detailScale: 0.35 },
+  vase_smooth: { centre: [0, 0.16, 0], size: 0.5, detail: [0.2, 0.2, 0], detailScale: 0.45 },
+  car_fused: { centre: [0, 0.3, 0], size: 2, detail: [0.62, 0.2, 0.42], detailScale: 0.35 },
+  poly_facade: { centre: [0, 2, 0.06], size: 6.4, detail: [-1.5, 1.5, 0.12], detailScale: 0.25 },
+  poly_panel: { centre: [0, 0.6, 0], size: 1.4, detail: [0.3, 1.1, 0.3], detailScale: 0.3 },
+  poly_bevel_block: { centre: [0, 0.5, 0], size: 1.1, detail: [0.5, 0.9, 0.5], detailScale: 0.3 },
+  poly_tunnel: { centre: [1.5, 0.5, 0], size: 4, detail: [1.5, 0.5, 0.5], detailScale: 0.4 },
+  poly_subdivided_block: { centre: [0, 0.5, 0], size: 1.2, detail: [0.5, 0.9, 0.5], detailScale: 0.28 },
+  uv_subdivided_grid: { centre: [0, 0.5, 0], size: 1.2, detail: [0, 0.5, 0], detailScale: 0.35 },
+  field_repeat_tube: { centre: [0, 0.25, 0], size: 0.8, detail: [0, 0.25, 0], detailScale: 0.4 },
+  field_creature: { centre: [0, 0.9, 0], size: 1.5, detail: [0, 1.45, 0.18], detailScale: 0.2 },
 };
 
 const eye = (centre, distance, azimuth, elevation) => {
@@ -50,7 +75,7 @@ const views = (piece) => {
 
 try {
   for (let i = 0; i < 100; i++) {
-    try { if ((await fetch('http://127.0.0.1:5189')).ok) break; } catch {}
+    try { if ((await fetch(`http://127.0.0.1:${port}`)).ok) break; } catch {}
     await Bun.sleep(100);
   }
   await mkdir(out, { recursive: true });
@@ -60,9 +85,15 @@ try {
     if (message.type() === 'error' && !driverAdvisory.test(message.text())) logs.push(message.text());
   });
   const idle = () => page.waitForFunction(() => window.__spatial?.ready
-    && window.__spatial.evaluation.state.worker === 'idle', null, { timeout: 60000 });
+    && window.__spatial.evaluation.state.worker === 'idle', null, { timeout: 60000 }).catch(async error => {
+    console.error('gallery idle timeout', await page.evaluate(() => ({
+      spatial: Boolean(window.__spatial), ready: window.__spatial?.ready,
+      state: window.__spatial?.evaluation?.state,
+    })).catch(() => null), logs);
+    throw error;
+  });
   const open = async (docname) => {
-    await page.goto(`http://127.0.0.1:5189/?docname=${docname}&evaltest=1`);
+    await page.goto(`http://127.0.0.1:${port}/?docname=${docname}&evaltest=1`);
     await idle();
   };
   const frames = async (n = 6) => {
@@ -71,12 +102,15 @@ try {
   };
 
   // ---- every gallery piece: text in, geometry out, six fixed views
-  for (const [name, piece] of Object.entries(pieces)) {
+  for (const [name, piece] of Object.entries(pieces)
+    .filter((_, index) => index % shardCount === shardIndex)
+    .filter(([name]) => !process.env.GALLERY_ONLY || name === process.env.GALLERY_ONLY)) {
     await open(`g3-gallery-${name}-${Date.now()}`);
     const text = await readFile(`${programs}${name}.txt`, 'utf8');
     const sent = await page.evaluate(t => window.__spatial.doc.sendText(t, `Gallery: ${t.slice(0, 20)}`), text);
     assert(sent.pending, `${name}: the text reads and stages (${JSON.stringify(sent).slice(0, 200)})`);
-    await page.waitForFunction(() => window.__spatial.evaluation.state.revision === 1, null, { timeout: 60000 });
+    await page.waitForFunction(() => window.__spatial.evaluation.state.revision === 1
+      || window.__spatial.evaluation.state.lastFailure, null, { timeout: 60000 });
     await idle();
     const state = await page.evaluate(() => ({ failure: window.__spatial.evaluation.state.lastFailure, nodes: window.__spatial.doc.state().nodes,
       projection: JSON.parse(window.__spatial.runtime.eval_projection_status()) }));
@@ -86,7 +120,7 @@ try {
     assert(printed.text?.includes('output'), `${name}: the document prints back as text`);
     const reread = await page.evaluate(t => window.__spatial.runtime.doc_parse_text_standalone(t), printed.text);
     assert(JSON.parse(reread).commands?.length > 0, `${name}: printed text reads again`);
-    await page.evaluate(() => window.__spatial.runtime.viewer_configure(true, 40, false, 2));
+    await page.evaluate(fov => window.__spatial.runtime.viewer_configure(true, fov, false, 2), piece.fov ?? 40);
     for (const [view, [position, target]] of Object.entries(views(piece))) {
       assert(await page.evaluate(([p, t]) => window.__spatial.runtime.viewer_look_at(...p, ...t), [position, target]), `${name}/${view}: pose accepted`);
       await frames();
@@ -101,6 +135,14 @@ try {
       assert(lit / (png.width * png.height) > 0.004, `${name}/${view}: the piece is visible (${(100 * lit / (png.width * png.height)).toFixed(2)} percent of pixels)`);
     }
     console.log(`G3 gallery ${name}: six views captured`);
+  }
+
+  if (shardIndex !== 0) {
+    assert.deepEqual(logs, [], 'no page errors');
+    console.log(`G3 gallery shard ${shardIndex}/${shardCount} passed`);
+    await browser.close();
+    child.kill();
+    process.exit(0);
   }
 
   // ---- the vase sequence: create, widen, manual edit, undo, reload; a wall-breaking edit is refused

@@ -51,6 +51,7 @@ export const PANEL_CSS = `
   .dock .hrow.undone { opacity: .45; }
   .dock .hnow { margin: 2px 0; text-align: center; font-size: 10px; opacity: .6; border-top: 1px dashed rgba(255,255,255,.3); }
   .dock .prow { color: #ffb4a8; white-space: normal; }
+  .dock .prow.report { color: #ffd28a; }
 `;
 
 /// Puts the panels into `root` (the document panel) and returns what the page calls after each change.
@@ -73,10 +74,13 @@ export function mountPanels({ root, api, runtime, evaluation, onOutcome }) {
   // Everything the engine has said that is still true: document issues, the last evaluation failure,
   // and (in the inspector) the reasons the last edit was refused.
   const problems = () => {
-    const failure = evaluation?.state.lastFailure;
+    // `lastFailure` is history (the status panel keeps a crash visible); it is a problem only while it
+    // still describes the scene on screen.
+    const failure = evaluation?.state.failureCurrent ? evaluation.state.lastFailure : null;
     // The document and the evaluation can report the same failure; list it once, with the node if either names one.
     const unique = new Map();
-    for (const problem of [...(api.state().issues ?? []), ...(failure ? [failure] : [])]) {
+    const warnings = evaluation?.state.warnings ?? [];
+    for (const problem of [...(api.state().issues ?? []), ...(failure ? [failure] : []), ...warnings]) {
       const key = `${problem.code}|${problem.message}`;
       if (!unique.get(key)?.node) unique.set(key, problem);
     }

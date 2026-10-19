@@ -1,0 +1,14 @@
+[
+  {
+    "name": "reaching-arm",
+    "prompt": "Make a robot arm of two bars, each 0.5 m long and 0.08 m thick, joined end to end with its shoulder at the origin. A small red ball 0.12 m across moves back and forth along a path 0.6 m up and 0.5 m to the side over two seconds, and the arm must always reach for the ball: its end stays on the ball and the elbow bends as the ball moves.",
+    "uses": ["rig.ik", "rig.bone", "anim.parent"],
+    "ik": { "chains": 1, "minBones": 2, "targetMoves": true }
+  },
+  {
+    "name": "grab-and-reach",
+    "prompt": "Make a three-link arm (three bars 0.4 m long and 0.06 m thick, joined end to end, shoulder at the origin) whose end follows a small yellow ball that a person can pick up and carry around in play mode.",
+    "uses": ["rig.ik", "rig.bone", "anim.parent"],
+    "ik": { "chains": 1, "minBones": 3, "targetGrabbable": true }
+  }
+]

@@ -31,7 +31,13 @@ export function startDocPanel({ api, name = "default", evaluation = null, runtim
     <div>
       <button id="doc-box">+ box</button><button id="doc-sphere">+ sphere</button>
       <button id="doc-undo">undo</button><button id="doc-redo">redo</button>
-      <button id="doc-save">save</button><button id="doc-load">reload</button>
+      <button id="doc-save">save</button><button id="doc-load">reload</button><button id="doc-export">export .glb</button><button id="doc-texture-preview" disabled>3D texture preview</button>
+    </div>
+    <div id="doc-character" title="Adds a skinned, animated, toon-shaded character built from a skeleton tree (a few lines of the text language per bone)">
+      <select id="char-plan" aria-label="Body plan"><option>biped</option><option>quadruped</option><option>serpent</option></select>
+      <label>height <input id="char-size" type="number" min="0.2" max="20" step="0.1" value="1.7" style="width:54px"> m</label>
+      <label><input id="char-extras" type="checkbox"> horns and wings</label>
+      <button id="char-make">+ character</button>
     </div>
     <div id="doc-message"></div>
     <details id="doc-text-box" hidden open><summary>Text</summary><div id="doc-text"></div></details>
@@ -43,6 +49,7 @@ export function startDocPanel({ api, name = "default", evaluation = null, runtim
     $("doc-message").textContent = text;
     $("doc-message").classList.toggle("bad", bad);
   };
+  let evaluationNotice = null;
   const describe = (diagnostics) =>
     diagnostics.map((d) => `${d.code}: ${d.message}`).join(" | ");
   const render = () => {
@@ -61,8 +68,15 @@ export function startDocPanel({ api, name = "default", evaluation = null, runtim
     }
     if (evaluation) {
       const e = evaluation.state;
-      $("doc-status").textContent += ` · ${e.worker}`;
-      if (e.lastFailure) say(`${e.lastFailure.code}: ${e.lastFailure.message}`, true);
+      $("doc-texture-preview").disabled = !evaluation.parts.some(part => part.material?.texture_program);
+      $("doc-status").textContent += ` · ${e.refining ? 'refining' : e.worker}`;
+      if (e.lastFailure && e.failureCurrent) {
+        evaluationNotice = `${e.lastFailure.code}: ${e.lastFailure.message}`;
+        say(evaluationNotice, true);
+      } else if (evaluationNotice) {
+        if ($("doc-message").textContent === evaluationNotice) say("");
+        evaluationNotice = null;
+      }
     }
     if (s.issues.length) say(describe(s.issues), true);
     panels?.render();
@@ -83,6 +97,32 @@ export function startDocPanel({ api, name = "default", evaluation = null, runtim
 
   $("doc-box").addEventListener("click", () => report(api.send([BOX], "add box")));
   $("doc-sphere").addEventListener("click", () => report(api.send([SPHERE], "add sphere")));
+  // The character maker: the engine writes the whole skeleton, body, skin and clips as text, which goes in like any edit.
+  let made = 0;
+  const addCharacter = (plan, size, extras) => {
+    if (!runtime?.creature_make) { say("this build has no character maker", true); return; }
+    const request = {
+      plan,
+      name: `${plan}${Date.now().toString(36).slice(-4)}`,
+      at: [made * 2.4, 0, 0],
+      sliders: { size, horns: extras && plan === "quadruped", wings: extras && plan === "quadruped" },
+    };
+    const text = JSON.parse(runtime.creature_make(JSON.stringify(request)));
+    if (text.error) { say(text.error, true); return; }
+    const read = JSON.parse(runtime.doc_parse_text(text.text));
+    if (!read.commands) { say(describe(read.diagnostics ?? []), true); return; }
+    made += 1;
+    report(api.send(read.commands, `add ${plan}`));
+  };
+  $("char-make").addEventListener("click", () => addCharacter($("char-plan").value, Number($("char-size").value), $("char-extras").checked));
+  // ?characters=biped:1.7,quadruped:2.4:wings,serpent:1 opens with those characters already in the document.
+  const wanted = new URLSearchParams(location.search).get("characters");
+  if (wanted) {
+    for (const item of wanted.split(",")) {
+      const [plan, size, extras] = item.split(":");
+      addCharacter(plan, Number(size) || 1.7, extras === "wings");
+    }
+  }
   $("doc-undo").addEventListener("click", () => { api.undo(); say("undone"); render(); });
   $("doc-redo").addEventListener("click", () => { api.redo(); say("redone"); render(); });
   $("doc-save").addEventListener("click", () => {
@@ -92,6 +132,34 @@ export function startDocPanel({ api, name = "default", evaluation = null, runtim
     render();
   });
   $("doc-load").addEventListener("click", () => { api.open(name); say("reloaded from storage"); render(); });
+  // The evaluated model as a glTF file for Blender, game engines and web viewers (needs the evaluation pipeline).
+  $("doc-export").addEventListener("click", async () => {
+    say("preparing glTF export…");
+    try {
+      const glb = await api.exportGlb?.();
+      if (!glb) { say("nothing to export yet", true); return; }
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob([glb], { type: "model/gltf-binary" }));
+      link.download = `${name || "model"}.glb`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      say(`exported ${(glb.byteLength / 1024).toFixed(1)} KB`);
+    } catch (error) {
+      say(error instanceof Error ? error.message : String(error), true);
+    }
+  });
+  $("doc-texture-preview").addEventListener("click", async () => {
+    const part = evaluation?.parts.find(item => item.material?.texture_program);
+    if (!part) { say("add a solid.texture program to preview", true); return; }
+    say("baking 3D material preview…");
+    try {
+      const { openTexturePreview } = await import("./texture-preview.js");
+      await openTexturePreview(part);
+      say("");
+    } catch (error) {
+      say(error instanceof Error ? error.message : String(error), true);
+    }
+  });
 
   render();
   return { render, panel, selection: panels?.selection ?? null };

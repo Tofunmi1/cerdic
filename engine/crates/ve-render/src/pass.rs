@@ -13,13 +13,14 @@ use bevy_render::render_resource::{
     RenderPassDescriptor, StoreOp, TextureFormat, WgpuTextureView,
 };
 use bevy_render::renderer::{RenderContext, ViewQuery};
-use bevy_render::view::{Msaa, ViewDepthStencilTexture, ViewTarget};
+use bevy_render::view::{ExtractedView, Msaa, ViewDepthStencilTexture, ViewTarget};
 
 use crate::counters::Pass;
 use crate::geometry::bind_geometry;
 use crate::lens::LensWarp;
-use crate::pipeline::ForwardPipelines;
+use crate::pipeline::{ForwardPipelines, PassKind};
 use crate::prepare::{Batch, InstanceBatches, LightsGpu, ViewSlot, ViewSlots, ViewUniforms};
+use crate::quality::RenderQuality;
 use crate::targets::{ViewMsaaColor, ViewOffscreen, blits, render_format};
 
 /// Chooses the pass's colour attachment on top of the view's `output` attachment.
@@ -96,28 +97,33 @@ pub(crate) fn forward_pass(
         &Msaa,
         Option<&ViewMsaaColor>,
         Option<&ViewOffscreen>,
+        &ExtractedView,
     )>,
     batches: Res<InstanceBatches>,
     pipelines: Res<ForwardPipelines>,
     pipeline_cache: Res<PipelineCache>,
     view_uniforms: Res<ViewUniforms>,
     lights: Res<LightsGpu>,
+    textures: Res<crate::textures::TexturesGpu>,
     render_meshes: Res<RenderAssets<RenderMesh>>,
     allocator: Res<MeshAllocator>,
     clear: Res<ClearColor>,
     lens: Res<LensWarp>,
+    sky: Res<crate::SkyBackground>,
+    sky_pipelines: Res<crate::sky::SkyPipelines>,
+    quality: Res<RenderQuality>,
     mut ctx: RenderContext,
 ) {
-    let (target, depth, slots, msaa, msaa_color, offscreen) = view.into_inner();
+    let (target, depth, slots, msaa, msaa_color, offscreen, extracted_view) = view.into_inner();
     let clear_color = clear.0.to_linear();
     let Some(output_format) = target.out_texture_view_format() else {
         info_once!("forward pass skipped: the view has no output texture");
         return;
     };
-    let format = render_format(output_format, *lens);
+    let format = render_format(output_format, *lens, *quality);
     // Views that need the present pass render offscreen; the present pass takes the output
     // attachment (and so marks it written). Others take it here.
-    let destination = if blits(output_format, *lens) {
+    let destination = if blits(output_format, *lens, *quality) {
         let Some(offscreen) = offscreen else {
             info_once!("forward pass skipped: the offscreen target is not ready");
             return;
@@ -129,19 +135,25 @@ pub(crate) fn forward_pass(
         };
         Destination::Output(output)
     };
-    let (Some(view_bind_group), Some(lights_bind_group), Some(instance_buffer)) = (
+    let (
+        Some(view_bind_group),
+        Some(lights_bind_group),
+        Some(textures_bind_group),
+        Some(instance_buffer),
+    ) = (
         view_uniforms.bind_group.as_ref(),
         lights.bind_group.as_ref(),
+        textures.bind_group.as_ref(),
         batches.buffer.buffer(),
-    ) else {
-        info_once!("forward pass skipped: view, lights or instance data is not ready");
+    )
+    else {
+        info_once!("forward pass skipped: view, lights, textures or instance data is not ready");
         return;
     };
-    let samples = msaa.samples();
     let color_attachments = [Some(color_attachment(
         destination,
         msaa_color,
-        samples,
+        msaa.samples(),
         clear_color,
     ))];
     let mut pass = ctx.begin_tracked_render_pass(RenderPassDescriptor {
@@ -152,7 +164,18 @@ pub(crate) fn forward_pass(
         occlusion_query_set: None,
         multiview_mask: None,
     });
+    draw_sky(
+        &mut pass,
+        &sky,
+        &sky_pipelines,
+        &pipeline_cache,
+        format,
+        msaa.samples(),
+        view_bind_group,
+        slots,
+    );
     pass.set_bind_group(1, lights_bind_group, &[]);
+    pass.set_bind_group(2, textures_bind_group, &[]);
 
     let gpu = BatchGpu {
         pipelines: &pipelines,
@@ -162,10 +185,79 @@ pub(crate) fn forward_pass(
         view_bind_group,
         instance_buffer,
         format,
-        samples,
+        samples: msaa.samples(),
     };
-    for batch in &batches.batches {
-        draw_batch(&mut pass, &gpu, batch, slots);
+    draw_opaque_with_outlines(&mut pass, &gpu, &batches, slots);
+    draw_transparent(
+        &mut pass,
+        &gpu,
+        &batches,
+        extracted_view.world_from_view.translation(),
+        slots,
+    );
+}
+
+/// Draws the opaque batches, then the toon outline hull of every batch that has an outlined instance (the others' hull is clipped away in
+/// the shader).
+fn draw_opaque_with_outlines<'a>(
+    pass: &mut TrackedRenderPass<'a>,
+    gpu: &BatchGpu<'a>,
+    batches: &InstanceBatches,
+    slots: &ViewSlots,
+) {
+    for batch in batches.batches.iter().filter(|batch| !batch.transparent) {
+        draw_batch(pass, gpu, batch, slots, PassKind::Opaque);
+    }
+    for batch in batches
+        .batches
+        .iter()
+        .filter(|batch| !batch.transparent && batch.outlined)
+    {
+        draw_batch(pass, gpu, batch, slots, PassKind::Outline);
+    }
+}
+
+fn draw_transparent<'a>(
+    pass: &mut TrackedRenderPass<'a>,
+    gpu: &BatchGpu<'a>,
+    batches: &InstanceBatches,
+    camera: bevy_math::Vec3,
+    slots: &ViewSlots,
+) {
+    let mut transparent: Vec<_> = batches
+        .batches
+        .iter()
+        .filter(|batch| batch.transparent)
+        .collect();
+    transparent.sort_by(|a, b| {
+        let da = a.center.distance_squared(camera);
+        let db = b.center.distance_squared(camera);
+        db.total_cmp(&da).then_with(|| a.sort_key.cmp(&b.sort_key))
+    });
+    for batch in transparent {
+        draw_batch(pass, gpu, batch, slots, PassKind::Transparent);
+    }
+}
+
+fn draw_sky<'a>(
+    pass: &mut TrackedRenderPass<'a>,
+    sky: &crate::SkyBackground,
+    pipelines: &crate::sky::SkyPipelines,
+    pipeline_cache: &'a PipelineCache,
+    format: TextureFormat,
+    samples: u32,
+    view_bind_group: &'a BindGroup,
+    slots: &ViewSlots,
+) {
+    if sky.enabled
+        && let Some(id) = pipelines.get(format, samples)
+        && let Some(pipeline) = pipeline_cache.get_render_pipeline(id)
+    {
+        pass.set_render_pipeline(pipeline);
+        for slot in &slots.0 {
+            bind_slot(pass, view_bind_group, slot);
+            pass.draw(0..3, 0..1);
+        }
     }
 }
 
@@ -187,6 +279,7 @@ fn draw_batch<'a>(
     gpu: &BatchGpu<'a>,
     batch: &Batch,
     slots: &ViewSlots,
+    kind: PassKind,
 ) {
     let Some(render_mesh) = gpu.render_meshes.get(batch.mesh) else {
         info_once!("forward pass: a mesh is not uploaded to the GPU yet");
@@ -195,7 +288,7 @@ fn draw_batch<'a>(
     // Pipelines are queued one frame after a mesh first appears.
     let Some(pipeline) = gpu
         .pipelines
-        .get(&render_mesh.layout, gpu.format, gpu.samples)
+        .get(&render_mesh.layout, gpu.format, gpu.samples, kind)
         .and_then(|id| gpu.pipeline_cache.get_render_pipeline(id))
     else {
         info_once!("forward pass: no ready pipeline for a mesh layout yet");

@@ -1,0 +1,17 @@
+[package]
+name = "ve-particles"
+version = "0.0.0"
+description = "Deterministic CPU particle simulation core."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+glam = "0.33"
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+
+[lints]
+workspace = true

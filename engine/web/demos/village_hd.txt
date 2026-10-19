@@ -1,0 +1,343 @@
+# Detailed village. Press Play, click the view, then WASD walks, Shift runs, Space jumps, the mouse looks.
+# Detail comes from: rounded edges on every box, a gabled roof of 400 individual tiles, windows with frames, glass and
+# mullions, a chimney, porch steps, a cobble path, 2000+ grass blades and flowers, lily pads on the pond, noise-lumpy rocks
+# and tree canopies, barrels, lanterns with glass, and a procedural afternoon sky. Drag the barrels or the door.
+
+afternoon = scene.sky@1(sun_elevation=30, sun_azimuth=-50, sun_intensity=6, turbidity=2.6, ground_color=[0.45, 0.38, 0.28], clouds=true, cloud_cover=0.5, seed=33)
+output sky = afternoon
+
+# ---- Ground and plaza ----
+ground_box = solid.box@1(size=[34, 0.4, 34])
+ground_low = xform.move@1(ground_box, by=[0, -0.2, 0])
+ground_grass = solid.texture@1(ground_low, tile=4, program="n = fbm(scale_x=6, scale_y=6); m = fbm(scale_x=24, scale_y=24); albedo = colorize(n, gradient=[0:#436b2e, 0.45:#6f9c42, 1:#a9ba5f]); roughness = brightness_contrast(m, brightness=0.45, contrast=0.4)")
+ground_body = phys.body@1(ground_grass, kind="static", shape="box", friction=0.9)
+ground = phys.world@1(ground_body, gravity=[0, -9.81, 0], walker=true, speed=3.2, jump=4.5)
+output ground = ground
+plaza_box = solid.box@1(size=[10, 0.12, 10])
+plaza_round = solid.round@1(plaza_box, radius=0.03, segments=6)
+plaza_up = xform.move@1(plaza_round, by=[0, 0.06, 0])
+plaza_stone = solid.texture@1(plaza_up, tile=2, program="b = bricks(rows=8, columns=5, mortar=0.06, bevel=0.1, round=0.5, row_offset=0.5); g = fbm(scale_x=8, scale_y=8); f = fbm(scale_x=32, scale_y=32); albedo = colorize(g, gradient=[0:#6d6a64, 0.5:#8e8a82, 1:#b4afa4]); roughness = brightness_contrast(f, brightness=0.45, contrast=0.4); height = b")
+plaza = phys.body@1(plaza_stone, kind="static", shape="box", friction=0.8)
+output plaza = plaza
+
+# ---- House walls (brick recipe, rounded), with window openings ----
+wall_back_box = solid.box@1(size=[6, 2.6, 0.3])
+wall_back_round = solid.round@1(wall_back_box, radius=0.02, segments=6)
+wall_back_at = xform.move@1(wall_back_round, by=[-8, 1.3, -9])
+window_hole_back = solid.box@1(size=[1.2, 1.0, 0.6])
+window_hole_back_at = xform.move@1(window_hole_back, by=[-8, 1.5, -9])
+wall_back_cut = solid.difference@1(wall_back_at, window_hole_back_at)
+wall_back_brick = solid.texture@1(wall_back_cut, tile=1, program="b = bricks(rows=14, columns=4, mortar=0.05, bevel=0.1, round=0.03); g = fbm(scale_x=8, scale_y=8); albedo = colorize(b, gradient=[0:#5d574f, 0.08:#5d574f, 0.1:#8c3f2b, 1:#b9533a]); roughness = brightness_contrast(g, brightness=0.45, contrast=0.4); height = b")
+wall_back = phys.body@1(wall_back_brick, kind="static", shape="mesh")
+output house_back = wall_back
+wall_side_box = solid.box@1(size=[0.3, 2.6, 4])
+wall_side_round = solid.round@1(wall_side_box, radius=0.02, segments=6)
+side_hole = solid.box@1(size=[0.6, 1.0, 1.2])
+wall_left_at = xform.move@1(wall_side_round, by=[-11, 1.3, -7])
+side_hole_left = xform.move@1(side_hole, by=[-11, 1.5, -7])
+wall_left_cut = solid.difference@1(wall_left_at, side_hole_left)
+wall_left_brick = solid.texture@1(wall_left_cut, tile=1, program="b = bricks(rows=14, columns=4, mortar=0.05, bevel=0.1, round=0.03); g = fbm(scale_x=8, scale_y=8); albedo = colorize(b, gradient=[0:#5d574f, 0.08:#5d574f, 0.1:#8c3f2b, 1:#b9533a]); roughness = brightness_contrast(g, brightness=0.45, contrast=0.4); height = b")
+wall_left = phys.body@1(wall_left_brick, kind="static", shape="mesh")
+output house_left = wall_left
+wall_right_at = xform.move@1(wall_side_round, by=[-5, 1.3, -7])
+side_hole_right = xform.move@1(side_hole, by=[-5, 1.5, -7])
+wall_right_cut = solid.difference@1(wall_right_at, side_hole_right)
+wall_right_brick = solid.texture@1(wall_right_cut, tile=1, program="b = bricks(rows=14, columns=4, mortar=0.05, bevel=0.1, round=0.03); g = fbm(scale_x=8, scale_y=8); albedo = colorize(b, gradient=[0:#5d574f, 0.08:#5d574f, 0.1:#8c3f2b, 1:#b9533a]); roughness = brightness_contrast(g, brightness=0.45, contrast=0.4); height = b")
+wall_right = phys.body@1(wall_right_brick, kind="static", shape="mesh")
+output house_right = wall_right
+wall_front_box = solid.box@1(size=[2.4, 2.6, 0.3])
+wall_front_round = solid.round@1(wall_front_box, radius=0.02, segments=6)
+wall_front_brick = solid.texture@1(wall_front_round, tile=1, program="b = bricks(rows=14, columns=4, mortar=0.05, bevel=0.1, round=0.03); g = fbm(scale_x=8, scale_y=8); albedo = colorize(b, gradient=[0:#5d574f, 0.08:#5d574f, 0.1:#8c3f2b, 1:#b9533a]); roughness = brightness_contrast(g, brightness=0.45, contrast=0.4); height = b")
+front_left_at = xform.move@1(wall_front_brick, by=[-9.8, 1.3, -5])
+front_left = phys.body@1(front_left_at, kind="static", shape="box")
+output house_front_left = front_left
+front_right_at = xform.move@1(wall_front_brick, by=[-6.2, 1.3, -5])
+front_right = phys.body@1(front_right_at, kind="static", shape="box")
+output house_front_right = front_right
+lintel_box = solid.box@1(size=[1.4, 0.55, 0.36])
+lintel_round = solid.round@1(lintel_box, radius=0.03, segments=6)
+lintel_stone = solid.texture@1(lintel_round, tile=1.5, program="b = bricks(rows=4, columns=3, mortar=0.04, bevel=0.14, round=0.12, row_offset=0.5); g = fbm(scale_x=6, scale_y=6); f = fbm(scale_x=32, scale_y=32); albedo = colorize(g, gradient=[0:#7a766e, 0.5:#9a968c, 1:#bcb7aa]); roughness = brightness_contrast(f, brightness=0.45, contrast=0.4); height = b")
+lintel_at = xform.move@1(lintel_stone, by=[-8, 2.3, -5])
+lintel = phys.body@1(lintel_at, kind="static", shape="box")
+output house_lintel = lintel
+foundation_box = solid.box@1(size=[6.4, 0.35, 4.4])
+foundation_round = solid.round@1(foundation_box, radius=0.04, segments=6)
+foundation_stone = solid.texture@1(foundation_round, tile=1.5, program="b = bricks(rows=4, columns=3, mortar=0.04, bevel=0.14, round=0.12, row_offset=0.5); g = fbm(scale_x=6, scale_y=6); f = fbm(scale_x=32, scale_y=32); albedo = colorize(g, gradient=[0:#7a766e, 0.5:#9a968c, 1:#bcb7aa]); roughness = brightness_contrast(f, brightness=0.45, contrast=0.4); height = b")
+foundation_at = xform.move@1(foundation_stone, by=[-8, 0.17, -7])
+output foundation = foundation_at
+floor_planks_box = solid.box@1(size=[5.6, 0.1, 3.8])
+floor_planks = solid.texture@1(floor_planks_box, tile=1, program="b = bricks(rows=6, columns=1, mortar=0.03, bevel=0.06, round=0.01, row_offset=0); g = fbm(scale_x=2, scale_y=40); albedo = colorize(g, gradient=[0:#6b4527, 0.5:#8a5a32, 1:#a8794a]); roughness = brightness_contrast(g, brightness=0.35, contrast=0.4); height = b")
+floor_at = xform.move@1(floor_planks, by=[-8, 0.38, -7])
+house_floor = phys.body@1(floor_at, kind="static", shape="box", friction=0.8)
+output house_floor = house_floor
+
+# ---- Windows: stone sill, wooden frame with mullions, translucent glass ----
+frame_outer = solid.box@1(size=[0.16, 1.3, 1.5])
+frame_inner = solid.box@1(size=[0.4, 1.0, 1.2])
+frame_ring = solid.difference@1(frame_outer, frame_inner)
+mullion_v = solid.box@1(size=[0.08, 1.0, 0.06])
+mullion_h = solid.box@1(size=[0.08, 0.06, 1.2])
+window_wood_parts = solid.union@1(frame_ring, mullion_v, mullion_h)
+window_wood_round = solid.round@1(window_wood_parts, radius=0.012, segments=6)
+window_wood = solid.material@1(window_wood_round, color=[0.9, 0.88, 0.8], roughness=0.5, recipe="wood", texture_scale=3)
+glass_pane = solid.box@1(size=[0.04, 1.0, 1.2])
+glass_clear = solid.material@1(glass_pane, color=[0.55, 0.75, 0.85], roughness=0.05, opacity=0.28)
+sill_box = solid.box@1(size=[0.34, 0.08, 1.7])
+sill_round = solid.round@1(sill_box, radius=0.02, segments=6)
+sill_stone = solid.material@1(sill_round, color=[0.72, 0.7, 0.66], roughness=0.8, recipe="concrete", texture_scale=3)
+win_left_wood = xform.move@1(window_wood, by=[-11.1, 1.5, -7])
+win_left_glass = xform.move@1(glass_clear, by=[-11, 1.5, -7])
+win_left_sill = xform.move@1(sill_stone, by=[-11.12, 0.92, -7])
+win_right_wood = xform.move@1(window_wood, by=[-4.9, 1.5, -7])
+win_right_glass = xform.move@1(glass_clear, by=[-5, 1.5, -7])
+win_right_sill = xform.move@1(sill_stone, by=[-4.88, 0.92, -7])
+back_wood_turn = xform.rotate@1(window_wood, angles=[0, 90, 0])
+win_back_wood = xform.move@1(back_wood_turn, by=[-8, 1.5, -9.1])
+back_glass_turn = xform.rotate@1(glass_clear, angles=[0, 90, 0])
+win_back_glass = xform.move@1(back_glass_turn, by=[-8, 1.5, -9])
+windows_wood = solid.union@1(win_left_wood, win_left_sill, win_right_wood, win_right_sill, win_back_wood)
+output windows_wood = windows_wood
+windows_glass = solid.union@1(win_left_glass, win_right_glass, win_back_glass)
+output windows_glass = windows_glass
+
+# ---- Door with a stone step and a porch ----
+door_box = solid.box@1(size=[1.12, 1.55, 0.08])
+door_round = solid.round@1(door_box, radius=0.015, segments=6)
+door_oak = solid.texture@1(door_round, tile=1, program="b = bricks(rows=6, columns=1, mortar=0.03, bevel=0.06, round=0.01, row_offset=0); g = fbm(scale_x=2, scale_y=40); albedo = colorize(g, gradient=[0:#6b4527, 0.5:#8a5a32, 1:#a8794a]); roughness = brightness_contrast(g, brightness=0.35, contrast=0.4); height = b")
+door_at = xform.move@1(door_oak, by=[-8, 1.23, -5])
+door_body = phys.body@1(door_at, shape="box", density=0.4)
+door = phys.joint@1(door_body, kind="hinge", to="house_front_left", anchor=[-8.58, 1.23, -5], axis=[0, 1, 0], limited=true, low=-100, high=100, damping=2)
+output door = door
+step_a = solid.box@1(size=[1.9, 0.14, 0.5])
+step_a_round = solid.round@1(step_a, radius=0.025, segments=6)
+step_stone = solid.texture@1(step_a_round, tile=1.5, program="b = bricks(rows=4, columns=3, mortar=0.04, bevel=0.14, round=0.12, row_offset=0.5); g = fbm(scale_x=6, scale_y=6); f = fbm(scale_x=32, scale_y=32); albedo = colorize(g, gradient=[0:#7a766e, 0.5:#9a968c, 1:#bcb7aa]); roughness = brightness_contrast(f, brightness=0.45, contrast=0.4); height = b")
+porch1_at = xform.move@1(step_stone, by=[-8, 0.07, -4.6])
+porch1 = phys.body@1(porch1_at, kind="static", shape="box")
+output porch_step1 = porch1
+porch2_at = xform.move@1(step_stone, by=[-8, 0.21, -4.9])
+porch2 = phys.body@1(porch2_at, kind="static", shape="box")
+output porch_step2 = porch2
+
+# ---- Gabled roof: a dark core, then 400 individual tiles on each slope ----
+roof_core = solid.box@1(size=[3.9, 0.12, 4.9])
+roof_dark = solid.material@1(roof_core, color=[0.18, 0.1, 0.08], roughness=0.9)
+roof_core_left_turn = xform.rotate@1(roof_dark, angles=[0, 0, 28])
+roof_core_left = xform.move@1(roof_core_left_turn, by=[-9.65, 3.5, -7])
+roof_core_right_turn = xform.rotate@1(roof_dark, angles=[0, 0, -28])
+roof_core_right = xform.move@1(roof_core_right_turn, by=[-6.35, 3.5, -7])
+roof_core_both = solid.union@1(roof_core_left, roof_core_right)
+output roof_core = roof_core_both
+tile_box = solid.box@1(size=[0.4, 0.035, 0.24])
+tile_clay = solid.material@1(tile_box, color=[0.62, 0.26, 0.17], roughness=0.75)
+tile_rows = inst.array@1(tile_clay, count_x=10, count_z=20, spacing=[0.39, 0, 0.245])
+tile_hand = inst.jitter@1(tile_rows, shift=[0.008, 0.004, 0.006], yaw_jitter=0.04, scale_jitter=0.03, seed=5)
+tile_centre = xform.move@1(tile_hand, by=[-1.755, 0.09, -2.33])
+tile_left_turn = xform.rotate@1(tile_centre, angles=[0, 0, 28])
+tiles_left = xform.move@1(tile_left_turn, by=[-9.65, 3.5, -7])
+output roof_tiles_left = tiles_left
+tile_right_turn = xform.rotate@1(tile_centre, angles=[0, 0, -28])
+tiles_right = xform.move@1(tile_right_turn, by=[-6.35, 3.5, -7])
+output roof_tiles_right = tiles_right
+ridge_box = solid.box@1(size=[0.3, 0.12, 4.9])
+ridge_round = solid.round@1(ridge_box, radius=0.04, segments=6)
+ridge_clay = solid.material@1(ridge_round, color=[0.5, 0.2, 0.14], roughness=0.7)
+ridge_at = xform.move@1(ridge_clay, by=[-8, 4.4, -7])
+
+# ---- Chimney ----
+chimney_box = solid.box@1(size=[0.7, 2.2, 0.7])
+chimney_round = solid.round@1(chimney_box, radius=0.03, segments=6)
+chimney_stone = solid.texture@1(chimney_round, tile=1, program="b = bricks(rows=14, columns=4, mortar=0.05, bevel=0.1, round=0.03); g = fbm(scale_x=8, scale_y=8); albedo = colorize(b, gradient=[0:#5d574f, 0.08:#5d574f, 0.1:#8c3f2b, 1:#b9533a]); roughness = brightness_contrast(g, brightness=0.45, contrast=0.4); height = b")
+chimney_at = xform.move@1(chimney_stone, by=[-6.2, 4.3, -8.2])
+chimney_cap_box = solid.box@1(size=[0.9, 0.12, 0.9])
+chimney_cap_round = solid.round@1(chimney_cap_box, radius=0.03, segments=6)
+chimney_cap_stone = solid.material@1(chimney_cap_round, color=[0.6, 0.6, 0.62], roughness=0.8, recipe="concrete", texture_scale=2)
+chimney_cap_at = xform.move@1(chimney_cap_stone, by=[-6.2, 5.46, -8.2])
+roof_top = solid.union@1(ridge_at, chimney_at, chimney_cap_at)
+output roof_top = roof_top
+
+# ---- Pond: stone rim, water, lily pads ----
+rim_outer = solid.cylinder@1(radius=3, height=0.45, segments=48)
+rim_cut = solid.cylinder@1(radius=2.5, height=0.8, segments=48)
+rim_ring = solid.difference@1(rim_outer, rim_cut)
+rim_stone = solid.texture@1(rim_ring, tile=1.5, program="b = bricks(rows=4, columns=3, mortar=0.04, bevel=0.14, round=0.12, row_offset=0.5); g = fbm(scale_x=6, scale_y=6); f = fbm(scale_x=32, scale_y=32); albedo = colorize(g, gradient=[0:#7a766e, 0.5:#9a968c, 1:#bcb7aa]); roughness = brightness_contrast(f, brightness=0.45, contrast=0.4); height = b")
+rim_at = xform.move@1(rim_stone, by=[7, 0.225, -5])
+pond_rim = phys.body@1(rim_at, kind="static", shape="mesh")
+output pond_rim = pond_rim
+pond_water = water.surface@1(size=[3.4, 3.4], level=0.32, depth=0.28, color=[0.07, 0.34, 0.48], opacity=0.62, wave_height=0.02, wave_length=1.2, speed=0.8, seed=4, resolution=48)
+pond_at = xform.move@1(pond_water, by=[7, 0, -5])
+output pond = pond_at
+pad = solid.cylinder@1(radius=0.2, height=0.015, segments=16)
+pad_green = solid.material@1(pad, color=[0.15, 0.5, 0.2], roughness=0.5)
+pads = inst.scatter@1(pad_green, count=8, width=3, depth=3, min_spacing=0.6, yaw_jitter=3.14, scale_jitter=0.3, seed=2)
+pads_at = xform.move@1(pads, by=[7, 0.335, -5])
+output lily_pads = pads_at
+
+# ---- Marble well with a little wooden roof ----
+well_ring = solid.cylinder@1(radius=0.75, height=0.9, segments=32)
+well_hole = solid.cylinder@1(radius=0.5, height=1.2, segments=32)
+well_shell = solid.difference@1(well_ring, well_hole)
+well_marble = solid.material@1(well_shell, color=[0.9, 0.89, 0.86], roughness=0.3, recipe="marble", texture_scale=3)
+well_at = xform.move@1(well_marble, by=[-3, 0.45, 3.5])
+well = phys.body@1(well_at, kind="static", shape="mesh")
+output well = well
+well_post = solid.box@1(size=[0.1, 1.6, 0.1])
+well_wood = solid.material@1(well_post, color=[0.5, 0.33, 0.18], roughness=0.7, recipe="wood", texture_scale=3)
+well_post_a = xform.move@1(well_wood, by=[-3.65, 1.7, 3.5])
+output well_post_a = well_post_a
+well_post_b = xform.move@1(well_wood, by=[-2.35, 1.7, 3.5])
+output well_post_b = well_post_b
+well_roof = solid.cone@1(radius=1.2, height=0.6, segments=4)
+well_roof_turn = xform.rotate@1(well_roof, angles=[0, 45, 0])
+well_roof_wood = solid.material@1(well_roof_turn, color=[0.45, 0.2, 0.14], roughness=0.8, recipe="planks", texture_scale=3)
+well_roof_at = xform.move@1(well_roof_wood, by=[-3, 2.8, 3.5])
+output well_roof = well_roof_at
+
+# ---- Lanterns: a post, a glass lantern and a glowing bulb (one prototype, four places) ----
+lamp_post = solid.cylinder@1(radius=0.06, height=2.4, segments=16)
+lamp_base = solid.cylinder@1(radius=0.14, height=0.18, segments=16)
+lamp_cap = solid.cone@1(radius=0.26, height=0.2, segments=4)
+lamp_base_at = xform.move@1(lamp_base, by=[0, -1.1, 0])
+lamp_cap_at = xform.move@1(lamp_cap, by=[0, 1.52, 0])
+lamp_iron = solid.union@1(lamp_post, lamp_base_at, lamp_cap_at)
+lamp_metal = solid.material@1(lamp_iron, color=[0.12, 0.13, 0.15], roughness=0.4, metallic=0.9, recipe="brushed_metal", texture_scale=2)
+lantern_glass_box = solid.box@1(size=[0.26, 0.34, 0.26])
+lantern_glass = solid.material@1(lantern_glass_box, color=[0.9, 0.8, 0.5], roughness=0.05, opacity=0.35)
+bulb = solid.sphere@1(radius=0.1, segments=16)
+bulb_glow = solid.material@1(bulb, color=[0.05, 0.05, 0.05], emissive=[3.5, 2.6, 1.3], emits_light=true, roughness=0.3)
+l1_post_at = xform.move@1(lamp_metal, by=[4.6, 1.2, 4.6])
+l1_glass_at = xform.move@1(lantern_glass, by=[4.6, 2.55, 4.6])
+l1_bulb_at = xform.move@1(bulb_glow, by=[4.6, 2.55, 4.6])
+l2_post_at = xform.move@1(lamp_metal, by=[-4.6, 1.2, 4.6])
+l2_glass_at = xform.move@1(lantern_glass, by=[-4.6, 2.55, 4.6])
+l2_bulb_at = xform.move@1(bulb_glow, by=[-4.6, 2.55, 4.6])
+l3_post_at = xform.move@1(lamp_metal, by=[4.6, 1.2, -4.6])
+l3_glass_at = xform.move@1(lantern_glass, by=[4.6, 2.55, -4.6])
+l3_bulb_at = xform.move@1(bulb_glow, by=[4.6, 2.55, -4.6])
+lamp_posts = solid.union@1(l1_post_at, l2_post_at, l3_post_at)
+lamp_posts_body = phys.body@1(lamp_posts, kind="static", shape="mesh")
+output lamp_posts = lamp_posts_body
+lamp_lanterns = solid.union@1(l1_glass_at, l2_glass_at, l3_glass_at)
+output lamp_lanterns = lamp_lanterns
+lamp_bulbs = solid.union@1(l1_bulb_at, l2_bulb_at, l3_bulb_at)
+output lamp_bulbs = lamp_bulbs
+
+# ---- Trees: tapering bark trunks and lumpy three-lobed canopies built once and reused ----
+trunk = solid.cone@1(radius=0.34, height=3.6, segments=20)
+trunk_bark = solid.texture@1(trunk, tile=1, program="g = fbm(scale_x=3, scale_y=20); n = fbm(scale_x=10, scale_y=40); albedo = colorize(g, gradient=[0:#2a1d12, 0.5:#4a3422, 1:#6a4d33]); roughness = brightness_contrast(n, brightness=0.45, contrast=0.4); height = n")
+lobe_a = solid.sphere@1(radius=1.35, segments=16)
+lobe_b = solid.sphere@1(radius=1.0, segments=14)
+lobe_c = solid.sphere@1(radius=1.0, segments=14)
+lobe_a_lumpy = xform.noise@1(lobe_a, amplitude=0.26, scale=0.8, seed=3, tolerance=0.1)
+lobe_b_lumpy = xform.noise@1(lobe_b, amplitude=0.22, scale=0.7, seed=8, tolerance=0.1)
+lobe_c_lumpy = xform.noise@1(lobe_c, amplitude=0.22, scale=0.7, seed=12, tolerance=0.1)
+lobe_b_at = xform.move@1(lobe_b_lumpy, by=[0.95, -0.35, 0.4])
+lobe_c_at = xform.move@1(lobe_c_lumpy, by=[-0.85, -0.25, -0.5])
+canopy_all = solid.union@1(lobe_a_lumpy, lobe_b_at, lobe_c_at)
+canopy_green = solid.material@1(canopy_all, color=[0.2, 0.44, 0.17], roughness=0.85)
+t1_trunk_at = xform.move@1(trunk_bark, by=[11, 1.8, 9])
+t1_canopy_at = xform.move@1(canopy_green, by=[11, 3.9, 9])
+t2_trunk_at = xform.move@1(trunk_bark, by=[-11, 1.8, 10])
+t2_canopy_at = xform.move@1(canopy_green, by=[-11, 3.9, 10])
+t3_trunk_at = xform.move@1(trunk_bark, by=[13, 1.8, 1])
+t3_canopy_at = xform.move@1(canopy_green, by=[13, 3.9, 1])
+t4_trunk_at = xform.move@1(trunk_bark, by=[-13, 1.8, 2])
+t4_canopy_at = xform.move@1(canopy_green, by=[-13, 3.9, 2])
+t5_trunk_at = xform.move@1(trunk_bark, by=[2, 1.8, 13])
+t5_canopy_at = xform.move@1(canopy_green, by=[2, 3.9, 13])
+t6_trunk_at = xform.move@1(trunk_bark, by=[13, 1.8, -12])
+t6_canopy_at = xform.move@1(canopy_green, by=[13, 3.9, -12])
+tree_trunks = solid.union@1(t1_trunk_at, t2_trunk_at, t3_trunk_at, t4_trunk_at, t5_trunk_at, t6_trunk_at)
+tree_trunks_body = phys.body@1(tree_trunks, kind="static", shape="mesh")
+output tree_trunks = tree_trunks_body
+tree_canopies = solid.union@1(t1_canopy_at, t2_canopy_at, t3_canopy_at, t4_canopy_at, t5_canopy_at, t6_canopy_at)
+output tree_canopies = tree_canopies
+
+# ---- Rocks: noise-lumpy, flattened ----
+rock_sphere = solid.sphere@1(radius=0.6, segments=16)
+rock_lumpy = xform.noise@1(rock_sphere, amplitude=0.14, scale=0.45, seed=21, tolerance=0.07)
+rock_flat = xform.scale@1(rock_lumpy, by=[1.3, 0.7, 1])
+rock_stone = solid.texture@1(rock_flat, tile=1.5, program="b = bricks(rows=4, columns=3, mortar=0.04, bevel=0.14, round=0.12, row_offset=0.5); g = fbm(scale_x=6, scale_y=6); f = fbm(scale_x=32, scale_y=32); albedo = colorize(g, gradient=[0:#7a766e, 0.5:#9a968c, 1:#bcb7aa]); roughness = brightness_contrast(f, brightness=0.45, contrast=0.4); height = b")
+rock1_at = xform.move@1(rock_stone, by=[9.5, 0.4, -8.5])
+rock2_at = xform.move@1(rock_stone, by=[-6, 0.4, 7])
+rock3_at = xform.move@1(rock_stone, by=[12, 0.4, 5])
+rocks = solid.union@1(rock1_at, rock2_at, rock3_at)
+rocks_body = phys.body@1(rocks, kind="static", shape="mesh")
+output rocks = rocks_body
+
+# ---- Grass blades, flowers and a cobble path (instanced, cheap) ----
+blade = solid.cone@1(radius=0.025, height=0.38, segments=5)
+blade_green = solid.material@1(blade, color=[0.3, 0.55, 0.2], roughness=0.8)
+grass_front = inst.scatter@1(blade_green, count=900, width=30, depth=9, min_spacing=0, yaw_jitter=3.14, scale_jitter=0.45, seed=7)
+grass_front_at = xform.move@1(grass_front, by=[0, 0.19, 11.5])
+output grass_front = grass_front_at
+grass_right = inst.scatter@1(blade_green, count=450, width=8, depth=8, min_spacing=0, yaw_jitter=3.14, scale_jitter=0.45, seed=9)
+grass_right_at = xform.move@1(grass_right, by=[12.5, 0.19, -0.5])
+output grass_right = grass_right_at
+grass_left = inst.scatter@1(blade_green, count=450, width=8, depth=8, min_spacing=0, yaw_jitter=3.14, scale_jitter=0.45, seed=11)
+grass_left_at = xform.move@1(grass_left, by=[-12.5, 0.19, 0.5])
+output grass_left = grass_left_at
+flower = solid.sphere@1(radius=0.05, segments=8)
+flower_red = solid.material@1(flower, color=[0.9, 0.2, 0.2], roughness=0.5)
+flower_yellow = solid.material@1(flower, color=[0.95, 0.8, 0.2], roughness=0.5)
+flowers_a = inst.scatter@1(flower_red, count=60, width=8, depth=3, min_spacing=0.2, seed=13)
+flowers_a_at = xform.move@1(flowers_a, by=[0, 0.3, 8.2])
+output flowers_red = flowers_a_at
+flowers_b = inst.scatter@1(flower_yellow, count=60, width=8, depth=3, min_spacing=0.2, seed=17)
+flowers_b_at = xform.move@1(flowers_b, by=[-8, 0.3, 8.8])
+output flowers_yellow = flowers_b_at
+cobble = solid.sphere@1(radius=0.11, segments=8)
+cobble_flat = xform.scale@1(cobble, by=[1, 0.35, 1])
+cobble_grey = solid.material@1(cobble_flat, color=[0.55, 0.53, 0.5], roughness=0.9, recipe="concrete", texture_scale=3)
+path = inst.scatter@1(cobble_grey, count=60, width=1.4, depth=4.2, min_spacing=0.22, yaw_jitter=3.14, scale_jitter=0.3, seed=19)
+path_at = xform.move@1(path, by=[-8, 0.02, -2.6])
+output cobble_path = path_at
+
+# ---- Picket fence along the back with pointed tops ----
+picket = solid.box@1(size=[0.1, 1.0, 0.04])
+picket_tip = solid.cone@1(radius=0.07, height=0.14, segments=4)
+picket_tip_at = xform.move@1(picket_tip, by=[0, 0.57, 0])
+picket_whole = solid.union@1(picket, picket_tip_at)
+picket_white = solid.texture@1(picket_whole, tile=1, program="b = bricks(rows=6, columns=1, mortar=0.03, bevel=0.06, round=0.01, row_offset=0); g = fbm(scale_x=2, scale_y=40); albedo = colorize(g, gradient=[0:#6b4527, 0.5:#8a5a32, 1:#a8794a]); roughness = brightness_contrast(g, brightness=0.35, contrast=0.4); height = b")
+picket_start = xform.move@1(picket_white, by=[-16, 0.5, 16.2])
+pickets = inst.repeat@1(picket_start, count=80, step=[0.4, 0, 0])
+output fence_pickets = pickets
+rail = solid.box@1(size=[32, 0.07, 0.05])
+rail_white = solid.material@1(rail, color=[0.9, 0.88, 0.82], roughness=0.6, recipe="wood", texture_scale=2)
+rail_low = xform.move@1(rail_white, by=[0, 0.3, 16.1])
+output fence_rail_low = rail_low
+rail_high = xform.move@1(rail_white, by=[0, 0.75, 16.1])
+output fence_rail_high = rail_high
+
+# ---- Barrels (loose bodies, drag them) and crates ----
+barrel = solid.cylinder@1(radius=0.3, height=0.8, segments=24)
+barrel_band = solid.cylinder@1(radius=0.315, height=0.05, segments=24)
+band_low = xform.move@1(barrel_band, by=[0, -0.25, 0])
+band_high = xform.move@1(barrel_band, by=[0, 0.25, 0])
+barrel_whole = solid.union@1(barrel, band_low, band_high)
+barrel_wood = solid.texture@1(barrel_whole, tile=1, program="b = bricks(rows=6, columns=1, mortar=0.03, bevel=0.06, round=0.01, row_offset=0); g = fbm(scale_x=2, scale_y=40); albedo = colorize(g, gradient=[0:#6b4527, 0.5:#8a5a32, 1:#a8794a]); roughness = brightness_contrast(g, brightness=0.35, contrast=0.4); height = b")
+b1_at = xform.move@1(barrel_wood, by=[-5.5, 0.4, -3.2])
+b1 = phys.body@1(b1_at, shape="cylinder", density=0.6)
+output barrel1 = b1
+b2_at = xform.move@1(barrel_wood, by=[-4.8, 0.4, -3.4])
+b2 = phys.body@1(b2_at, shape="cylinder", density=0.6)
+output barrel2 = b2
+b3_at = xform.move@1(barrel_wood, by=[-5.2, 1.2, -3.3])
+b3 = phys.body@1(b3_at, shape="cylinder", density=0.6)
+output barrel3 = b3
+crate = solid.box@1(size=[0.6, 0.6, 0.6])
+crate_round = solid.round@1(crate, radius=0.02, segments=6)
+crate_wood = solid.texture@1(crate_round, tile=1, program="b = bricks(rows=6, columns=1, mortar=0.03, bevel=0.06, round=0.01, row_offset=0); g = fbm(scale_x=2, scale_y=40); albedo = colorize(g, gradient=[0:#6b4527, 0.5:#8a5a32, 1:#a8794a]); roughness = brightness_contrast(g, brightness=0.35, contrast=0.4); height = b")
+c1_at = xform.move@1(crate_wood, by=[2, 0.4, 2])
+c1 = phys.body@1(c1_at, shape="box", friction=0.8)
+output crate1 = c1
+c2_at = xform.move@1(crate_wood, by=[2, 1.01, 2])
+c2 = phys.body@1(c2_at, shape="box", friction=0.8)
+output crate2 = c2
+c3_at = xform.move@1(crate_wood, by=[2.7, 0.4, 2.1])
+c3 = phys.body@1(c3_at, shape="box", friction=0.8)
+output crate3 = c3
+ball = solid.sphere@1(radius=0.3, segments=24)
+ball_red = solid.material@1(ball, color=[0.85, 0.15, 0.12], roughness=0.35)
+ball_at = xform.move@1(ball_red, by=[0.5, 0.5, 3])
+beach_ball = phys.body@1(ball_at, shape="sphere", restitution=0.7, density=0.5)
+output ball = beach_ball

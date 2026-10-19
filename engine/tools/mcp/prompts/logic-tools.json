@@ -1,0 +1,26 @@
+[
+  {
+    "name": "locked-door",
+    "prompt": "Make a door 0.9 m wide, 2 m tall and 0.05 m thick, hinged at its left edge, that opens 90 degrees over a second when clicked, but only after the person has picked up a small key. The key is a 0.1 m by 0.05 m by 0.02 m block placed near the door; clicking it makes it disappear and unlocks the door. Until then clicking the door does nothing.",
+    "uses": ["anim.track", "behavior.on"],
+    "logic": { "sets": 1, "needs": 1, "properties": ["rotation", "visible"] }
+  },
+  {
+    "name": "carry-the-key",
+    "prompt": "Make a small gold key, a 0.12 m by 0.05 m by 0.02 m block, that a person can pick up and carry around. Make a door 0.9 m wide, 2 m tall and 0.05 m thick, hinged at its left edge, which swings open 90 degrees over a second when clicked, but only once the key has been picked up at least once.",
+    "uses": ["anim.track", "behavior.on"],
+    "logic": { "sets": 1, "needs": 1, "triggers": ["grab"], "properties": ["rotation"] }
+  },
+  {
+    "name": "switch-and-lamp",
+    "prompt": "Make a lamp: a glowing bulb of radius 0.1 m that emits light, which starts off and fades up to full brightness over 0.3 seconds when a wall switch is clicked, and fades off when the switch is clicked again. The switch is a 0.1 m square plate. The lamp must always match the switch's state.",
+    "uses": ["anim.track", "behavior.on"],
+    "logic": { "sets": 1, "watch": 1, "properties": ["glow"] }
+  },
+  {
+    "name": "two-levers-vault",
+    "prompt": "Make a vault door, a slab 1.2 m wide, 2 m tall and 0.1 m thick, that slides up 2 metres over two seconds when it is opened. It opens only while BOTH of two separate levers (0.1 m wide, 0.5 m long bars pivoting at one end) have been pulled down 60 degrees by clicking them. Each lever stays down once pulled.",
+    "uses": ["anim.track", "behavior.on"],
+    "logic": { "sets": 2, "needs": 1, "properties": ["rotation", "position"] }
+  }
+]

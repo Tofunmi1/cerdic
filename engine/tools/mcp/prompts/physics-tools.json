@@ -1,0 +1,20 @@
+[
+  {
+    "name": "bouncing-ball",
+    "prompt": "Make a rubber ball (radius 0.25 m, red) that starts 2.5 m in the air above a floor and, in play mode, falls and bounces several times before settling. The floor is a flat 10 m square slab.",
+    "uses": ["phys.body"],
+    "physics": { "dynamic": 1, "static": 1, "bouncy": true }
+  },
+  {
+    "name": "block-tower",
+    "prompt": "Make a tower of five wooden crates (0.5 m cubes) stacked on a floor, which in play mode can be knocked over and picked up. The floor is a flat 12 m square slab. Give the crates grip (friction 0.8) so the tower stands.",
+    "uses": ["phys.body"],
+    "physics": { "dynamic": 5, "static": 1 }
+  },
+  {
+    "name": "ramp-and-rolling-ball",
+    "prompt": "Make a ramp: a flat wooden board 3 m long and 1 m wide tilted 20 degrees so it slopes down toward +X, on a floor, with a ball (0.2 m radius) placed at the top of the ramp that will roll down it in play mode.",
+    "uses": ["phys.body"],
+    "physics": { "dynamic": 1, "static": 2 }
+  }
+]

@@ -1,0 +1,30 @@
+[
+  {
+    "name": "swinging-door",
+    "prompt": "Make a door 0.9 m wide, 2 m tall and 0.05 m thick that is hinged at its left edge and swings open 90 degrees over 1.5 seconds, then stays open.",
+    "uses": ["anim.track"],
+    "size": [0.9, 2, 0.05], "sizeTolerance": 0.05,
+    "animation": { "properties": ["rotation"], "minDuration": 1.2, "maxDuration": 1.8, "loop": false, "pivotNearEdge": true }
+  },
+  {
+    "name": "spinning-fan",
+    "prompt": "Make a fan: a thin bar 1 m long, 0.1 m wide and 0.02 m thick that spins around its centre once per second, forever.",
+    "uses": ["anim.track"],
+    "size": [1, 0.1, 0.02], "sizeTolerance": 0.05,
+    "animation": { "properties": ["rotation"], "minDuration": 0.9, "maxDuration": 1.1, "loop": true }
+  },
+  {
+    "name": "bobbing-lamp",
+    "prompt": "Make a ball of radius 0.2 m that bobs up and down by 0.3 m every two seconds, smoothly, and keeps going.",
+    "uses": ["anim.track"],
+    "size": [0.4, 0.4, 0.4], "sizeTolerance": 0.05,
+    "animation": { "properties": ["position"], "minDuration": 1.8, "maxDuration": 2.2, "loop": true }
+  },
+  {
+    "name": "pulsing-cube",
+    "prompt": "Make a 0.5 m cube that grows to 1.5 times its size and back every second, and also turns a full circle around the vertical axis every four seconds.",
+    "uses": ["anim.track"],
+    "size": [0.5, 0.5, 0.5], "sizeTolerance": 0.05,
+    "animation": { "properties": ["scale", "rotation"], "minDuration": 0.9, "maxDuration": 4.2, "loop": true }
+  }
+]

@@ -173,7 +173,7 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import
   const { port } = await startServer({ host, port: requested, secure });
   const scheme = secure ? "https" : "http";
   console.log(`serving web/dist on ${scheme}://${host}:${port} (Ctrl-C to stop)\n`);
-  const queries = ["?scene=xr&xr=auto", "?scene=bench1&bench=1&seconds=60", "?scene=bench2&bench=1&seconds=60", "?scene=bench3&bench=1&seconds=60"];
+  const queries = ["?scene=xr&xr=auto", "?scene=bench1&bench=1&seconds=60", "?scene=bench2&bench=1&seconds=60", "?scene=bench3&bench=1&seconds=60", "?scene=bench4&bench=1&seconds=60", "?scene=bench5&bench=1&seconds=60"];
   const hosts = host === "0.0.0.0" ? ["localhost", ...lanAddresses()] : [host];
   for (const name of hosts) {
     console.log(`  ${scheme}://${name}:${port}/`);

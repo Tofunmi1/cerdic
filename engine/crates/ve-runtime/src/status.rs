@@ -111,6 +111,9 @@ pub(crate) fn publish(
             "shadow_resolution": quality.shadow_resolution,
             "max_point_lights": quality.max_point_lights,
             "resolution_scale": quality.resolution_scale,
+            "specular_aa": quality.specular_aa_enabled,
+            "ssao": quality.ssao_enabled,
+            "bloom": quality.bloom_enabled,
         },
         "xr": {
             "state": format!("{:?}", ve_xr_web::session_state()),

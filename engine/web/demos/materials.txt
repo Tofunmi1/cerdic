@@ -1,0 +1,21 @@
+# PBR material kit sample: each slab is a texture program with albedo, roughness, metallic and a height channel
+# (grooves and bevels become normals). Brick count follows the slab: rows = height / 0.075, columns = width / 0.25.
+brick_slab = solid.box@1(size=[2.4, 1.6, 0.2])
+brick_wall = solid.texture@1(brick_slab, program="b = bricks(rows=21, columns=10, mortar=0.05, bevel=0.1, round=0.03); g = fbm(scale_x=70, scale_y=70); albedo = colorize(b, gradient=[0:#5d574f, 0.08:#5d574f, 0.1:#8c3f2b, 1:#b9533a]); roughness = colorize(g, gradient=[0:#c8c8c8, 1:#f0f0f0]); metallic = colorize(b, gradient=[0:#000000, 1:#000000]); height = b")
+brick_at = xform.move@1(brick_wall, by=[-1.4, 0.8, 0])
+output bricks = brick_at
+
+stone_slab = solid.box@1(size=[2.4, 1.6, 0.2])
+stone_wall = solid.texture@1(stone_slab, program="b = bricks(rows=6, columns=4, mortar=0.04, bevel=0.14, round=0.12, row_offset=0.4); g = fbm(scale_x=18, scale_y=18); f = fbm(scale_x=140, scale_y=140); albedo = colorize(g, gradient=[0:#6f6c66, 0.5:#8d8a82, 1:#b0aca2]); roughness = colorize(f, gradient=[0:#d0d0d0, 1:#f5f5f5]); metallic = colorize(b, gradient=[0:#000000, 1:#000000]); height = b")
+stone_at = xform.move@1(stone_wall, by=[1.4, 0.8, 0])
+output stone = stone_at
+
+plank_slab = solid.box@1(size=[2.4, 1.6, 0.2])
+plank_wall = solid.texture@1(plank_slab, program="b = bricks(rows=1, columns=9, mortar=0.025, bevel=0.04, round=0.01, row_offset=0); g = fbm(scale_x=2, scale_y=90); albedo = colorize(g, gradient=[0:#6b4527, 0.5:#8a5a32, 1:#a8794a]); roughness = colorize(g, gradient=[0:#b0b0b0, 1:#e0e0e0]); metallic = colorize(b, gradient=[0:#000000, 1:#000000]); height = b")
+plank_at = xform.move@1(plank_wall, by=[-1.4, 2.6, 0])
+output planks = plank_at
+
+tile_slab = solid.box@1(size=[2.4, 1.6, 0.2])
+roof_tiles = solid.texture@1(tile_slab, program="b = bricks(rows=12, columns=14, mortar=0.04, bevel=0.2, round=0.35, row_offset=0.5); g = fbm(scale_x=40, scale_y=40); albedo = colorize(g, gradient=[0:#6a2a1c, 0.5:#8f3b26, 1:#b25a3a]); roughness = colorize(g, gradient=[0:#c0c0c0, 1:#ececec]); metallic = colorize(b, gradient=[0:#000000, 1:#000000]); height = b")
+tile_at = xform.move@1(roof_tiles, by=[1.4, 2.6, 0])
+output tiles = tile_at

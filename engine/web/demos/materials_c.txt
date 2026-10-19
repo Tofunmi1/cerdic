@@ -1,0 +1,4 @@
+slab = solid.box@1(size=[2.4, 1.6, 0.2])
+two_colorizes = solid.texture@1(slab, program="g = fbm(scale_x=20, scale_y=20); m = fbm(scale_x=60, scale_y=60); albedo = colorize(g, gradient=[0:#4d7a35, 1:#b5c26a]); roughness = colorize(m, gradient=[0:#c8c8c8, 1:#f0f0f0])")
+placed = xform.move@1(two_colorizes, by=[0, 0.8, 0])
+output slab = placed

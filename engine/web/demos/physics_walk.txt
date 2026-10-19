@@ -1,0 +1,105 @@
+# Moon walk. Press Play, then click the view to capture the mouse: WASD walks, Shift runs, Space jumps, the mouse looks.
+# Gravity here is the Moon's (1.62 m/s2), so jumps are long and floaty. You stand on the floor, can hop up the four
+# platforms to the front (0.6 to 2.4 m high), walk up the stairs and the ramp at the side, and shove the crates around
+# (they are loose bodies: drag one with the mouse, or run into the stack and watch it fall slowly).
+# Press Stop to go back to the flying camera.
+
+floor_box = solid.box@1(size=[40, 0.2, 40])
+floor_down = xform.move@1(floor_box, by=[0, -0.1, 0])
+floor_dust = solid.material@1(floor_down, color=[0.55, 0.53, 0.5], roughness=0.95)
+floor_body = phys.body@1(floor_dust, kind="static", shape="box", friction=0.9)
+floor = phys.world@1(floor_body, gravity=[0, -1.62, 0], walker=true, jump=3.2, speed=3.5)
+output ground = floor
+
+# Four platforms to hop up, each higher than the last.
+slab1 = solid.box@1(size=[3, 0.6, 3])
+slab1_grey = solid.material@1(slab1, color=[0.45, 0.5, 0.6], roughness=0.7)
+p1_at = xform.move@1(slab1_grey, by=[-6, 0.3, -6])
+platform1 = phys.body@1(p1_at, kind="static", shape="box")
+output platform1 = platform1
+slab2 = solid.box@1(size=[3, 1.2, 3])
+slab2_grey = solid.material@1(slab2, color=[0.45, 0.5, 0.6], roughness=0.7)
+p2_at = xform.move@1(slab2_grey, by=[-2, 0.6, -9])
+platform2 = phys.body@1(p2_at, kind="static", shape="box")
+output platform2 = platform2
+slab3 = solid.box@1(size=[3, 1.8, 3])
+slab3_grey = solid.material@1(slab3, color=[0.45, 0.5, 0.6], roughness=0.7)
+p3_at = xform.move@1(slab3_grey, by=[2, 0.9, -12])
+platform3 = phys.body@1(p3_at, kind="static", shape="box")
+output platform3 = platform3
+slab4 = solid.box@1(size=[3, 2.4, 3])
+slab4_grey = solid.material@1(slab4, color=[0.45, 0.5, 0.6], roughness=0.7)
+p4_at = xform.move@1(slab4_grey, by=[6, 1.2, -15])
+platform4 = phys.body@1(p4_at, kind="static", shape="box")
+output platform4 = platform4
+
+# Stairs: six steps, 0.2 m high and 0.6 m deep each.
+step_a = solid.box@1(size=[2, 0.2, 0.6])
+step_stone = solid.material@1(step_a, color=[0.7, 0.68, 0.62], roughness=0.8)
+s1_at = xform.move@1(step_stone, by=[8, 0.1, -2.0])
+stair1 = phys.body@1(s1_at, kind="static", shape="box")
+output stair1 = stair1
+step_b = solid.box@1(size=[2, 0.4, 0.6])
+step_b_stone = solid.material@1(step_b, color=[0.7, 0.68, 0.62], roughness=0.8)
+s2_at = xform.move@1(step_b_stone, by=[8, 0.2, -2.6])
+stair2 = phys.body@1(s2_at, kind="static", shape="box")
+output stair2 = stair2
+step_c = solid.box@1(size=[2, 0.6, 0.6])
+step_c_stone = solid.material@1(step_c, color=[0.7, 0.68, 0.62], roughness=0.8)
+s3_at = xform.move@1(step_c_stone, by=[8, 0.3, -3.2])
+stair3 = phys.body@1(s3_at, kind="static", shape="box")
+output stair3 = stair3
+step_d = solid.box@1(size=[2, 0.8, 0.6])
+step_d_stone = solid.material@1(step_d, color=[0.7, 0.68, 0.62], roughness=0.8)
+s4_at = xform.move@1(step_d_stone, by=[8, 0.4, -3.8])
+stair4 = phys.body@1(s4_at, kind="static", shape="box")
+output stair4 = stair4
+step_e = solid.box@1(size=[2, 1.0, 0.6])
+step_e_stone = solid.material@1(step_e, color=[0.7, 0.68, 0.62], roughness=0.8)
+s5_at = xform.move@1(step_e_stone, by=[8, 0.5, -4.4])
+stair5 = phys.body@1(s5_at, kind="static", shape="box")
+output stair5 = stair5
+step_f = solid.box@1(size=[2, 1.2, 0.6])
+step_f_stone = solid.material@1(step_f, color=[0.7, 0.68, 0.62], roughness=0.8)
+s6_at = xform.move@1(step_f_stone, by=[8, 0.6, -5.0])
+stair6 = phys.body@1(s6_at, kind="static", shape="box")
+output stair6 = stair6
+
+# A ramp up to the left.
+ramp_board = solid.box@1(size=[4, 0.15, 2])
+ramp_tilt = xform.rotate@1(ramp_board, angles=[0, 0, 15])
+ramp_at = xform.move@1(ramp_tilt, by=[-9, 0.5, 2])
+ramp_paint = solid.material@1(ramp_at, color=[0.6, 0.45, 0.3], roughness=0.7)
+ramp = phys.body@1(ramp_paint, kind="static", shape="convex", friction=0.9)
+output ramp = ramp
+
+# A wall with a doorway 1.2 m wide behind you.
+wall_a = solid.box@1(size=[4, 2.5, 0.3])
+wall_paint = solid.material@1(wall_a, color=[0.8, 0.78, 0.72], roughness=0.9)
+wl_at = xform.move@1(wall_paint, by=[-2.6, 1.25, 8])
+wall_left = phys.body@1(wl_at, kind="static", shape="box")
+output wall_left = wall_left
+wr_at = xform.move@1(wall_paint, by=[2.6, 1.25, 8])
+wall_right = phys.body@1(wr_at, kind="static", shape="box")
+output wall_right = wall_right
+lintel = solid.box@1(size=[1.2, 0.6, 0.3])
+lintel_paint = solid.material@1(lintel, color=[0.8, 0.78, 0.72], roughness=0.9)
+lt_at = xform.move@1(lintel_paint, by=[0, 2.2, 8])
+wall_top = phys.body@1(lt_at, kind="static", shape="box")
+output wall_top = wall_top
+
+# Loose crates to push around: a stack of four.
+crate = solid.box@1(size=[0.6, 0.6, 0.6])
+crate_wood = solid.material@1(crate, color=[0.75, 0.5, 0.2], roughness=0.8)
+c1_at = xform.move@1(crate_wood, by=[3, 0.3, 3])
+c1 = phys.body@1(c1_at, shape="box", friction=0.7)
+output crate1 = c1
+c2_at = xform.move@1(crate_wood, by=[3, 0.91, 3])
+c2 = phys.body@1(c2_at, shape="box", friction=0.7)
+output crate2 = c2
+c3_at = xform.move@1(crate_wood, by=[3, 1.52, 3])
+c3 = phys.body@1(c3_at, shape="box", friction=0.7)
+output crate3 = c3
+c4_at = xform.move@1(crate_wood, by=[3, 2.13, 3])
+c4 = phys.body@1(c4_at, shape="box", friction=0.7)
+output crate4 = c4

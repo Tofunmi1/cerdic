@@ -1,0 +1,49 @@
+# Animation demo. The green rubber arm bends by itself (a skinned mesh on two bones); the red ball bobs; the blue
+# switch lights the lamp when clicked in play mode (press Play first); the door beside it swings open and shut when clicked.
+lower = solid.box@1(size=[0.05, 0.05, 0.05])
+lower_head = xform.move@1(lower, by=[0, 0.25, 0])
+lower_bone_part = rig.bone@1(lower_head, head=[0, 0.5, 0], tail=[0, 1, 0])
+bend = anim.track@1(lower_bone_part, property="rotation", keys="0:0,0,0; 1:0,0,90; 2:0,0,0", interpolation="smooth", pivot=[0, 0.5, 0])
+output lower_bone = bend
+upper = solid.box@1(size=[0.05, 0.05, 0.05])
+upper_head = xform.move@1(upper, by=[0, 0.75, 0])
+upper_bone_part = rig.bone@1(upper_head, head=[0, 0, 0], tail=[0, 0.5, 0])
+output upper_bone = upper_bone_part
+tall = solid.box@1(size=[0.2, 1, 0.2])
+tall_up = xform.move@1(tall, by=[0, 0.5, 0])
+cage = poly.from_solid@1(tall_up)
+flat = poly.merge_coplanar@1(cage)
+uprights = poly.select@1(flat, element="edge", by="box", box_min=[-1, 0.4, -1], box_max=[1, 0.6, 1])
+cut = poly.subdivide_edges@1(flat, uprights, cuts=7)
+skinned = rig.skin@1(cut, bones="upper_bone; lower_bone")
+rubber = solid.material@1(skinned, color=[0.1, 0.8, 0.2], roughness=0.6)
+output arm = rubber
+
+ball = solid.sphere@1(radius=0.15)
+red = solid.material@1(ball, color=[0.9, 0.1, 0.1], roughness=0.4)
+ball_up = xform.move@1(red, by=[-1, 0.5, 0])
+bob = anim.wave@1(ball_up, property="position", amplitude=[0, 0.25, 0], period=1.6)
+output bobbing_ball = bob
+
+wall = solid.box@1(size=[2.4, 1.6, 0.05])
+plaster = solid.material@1(wall, color=[0.9, 0.9, 0.9], roughness=0.9)
+backdrop = xform.move@1(plaster, by=[2.5, 0.8, -0.3])
+output wall_out = backdrop
+bulb = solid.sphere@1(radius=0.12)
+glass = solid.material@1(bulb, color=[0.05, 0.05, 0.05], emissive=[2, 1.7, 1.1], emits_light=true, roughness=0.3)
+raised = xform.move@1(glass, by=[2.5, 0.8, 0.1])
+fade = anim.track@1(raised, property="glow", keys="0:0; 0.3:1", loop=false)
+listen = behavior.on@1(fade, trigger="signal")
+output lamp = listen
+cap = solid.box@1(size=[0.15, 0.15, 0.05])
+blue = solid.material@1(cap, color=[0.1, 0.3, 0.9], roughness=0.4)
+spot = xform.move@1(blue, by=[3.2, 0.4, 0.1])
+press = behavior.on@1(spot, trigger="select", target="lamp")
+output switch = press
+
+door_box = solid.box@1(size=[0.5, 0.9, 0.04])
+oak = solid.material@1(door_box, color=[0.5, 0.3, 0.15], roughness=0.8)
+door_at = xform.move@1(oak, by=[1.5, 0.45, 0.2])
+swing = anim.track@1(door_at, property="rotation", keys="0:0,0,0; 0.6:0,-100,0", interpolation="ease_out", pivot=[1.25, 0.45, 0.2], loop=false)
+door_click = behavior.on@1(swing, trigger="select", action="toggle")
+output door = door_click

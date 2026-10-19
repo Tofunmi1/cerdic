@@ -1,0 +1,4 @@
+slab = solid.box@1(size=[2.4, 1.6, 0.2])
+no_height = solid.texture@1(slab, program="b = bricks(rows=21, columns=10, mortar=0.05, bevel=0.1, round=0.03); g = fbm(scale_x=70, scale_y=70); albedo = colorize(b, gradient=[0:#5d574f, 0.08:#5d574f, 0.1:#8c3f2b, 1:#b9533a]); roughness = colorize(g, gradient=[0:#c8c8c8, 1:#f0f0f0])")
+placed = xform.move@1(no_height, by=[0, 0.8, 0])
+output slab = placed

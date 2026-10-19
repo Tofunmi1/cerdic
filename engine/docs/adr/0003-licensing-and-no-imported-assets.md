@@ -1,5 +1,5 @@
 # 0003: Licensing and no imported assets
-- Status: accepted; the "permissive code only" sentence is superseded by 0005 (no-imported-assets and GPL exclusion stand)
+- Status: accepted; "permissive code only" superseded by 0005 and the GPL exclusion superseded by 0024 (no-imported-assets stands)
 - Date: 2026-10-11
 
 ## Decision

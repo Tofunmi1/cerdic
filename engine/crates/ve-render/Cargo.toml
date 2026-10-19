@@ -25,5 +25,9 @@ bytemuck.workspace = true
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 bevy_render = { path = "../../third_party/bevy/crates/bevy_render", default-features = false, features = ["webgl"] }
 
+[dev-dependencies]
+# Parses and validates every shader at test time, so a WGSL mistake fails `cargo test` and not only a browser run.
+naga = { version = "30", default-features = false, features = ["wgsl-in"] }
+
 [lints]
 workspace = true

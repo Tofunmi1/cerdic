@@ -4,6 +4,147 @@ One section per experiment (X1 to X9 in the plan). Spike code is throwaway and l
 (never imported by the engine); the findings live here. Machine for every number: Apple M1, 16 GB,
 macOS 26.1, headless Chromium from Playwright 1.64, release builds, warm HTTP cache.
 
+## X2: Curvo as the G5 geometry adapter (2026-10-13) — answered: do not embed in the evaluator
+
+**Question.** Can Curvo provide G5's curves, loft, sweep, revolve and adaptive tessellation without
+breaking the panic-free Rust/WASM evaluator or its geometry budgets?
+
+**Build.** Isolated spike `spikes/x2-curvo` against Curvo 0.3.2 (MIT), Rust 1.97.1, Apple M1. The
+probe constructs an analytic circle, interpolated cubic curve, periodic profile, sweep and revolve;
+it compiled for `wasm32-unknown-unknown`. A native 256-section loft with Curvo default adaptive
+tessellation took 1,354 ms and produced 139,503 vertices / 277,440 triangles. The reported 10,006,632
+bytes estimates only point and face payload (`24 B` per each); it excludes allocator capacity, normals,
+UVs, hash maps and surface construction data. An exact analytic-circle radial sample had zero measured
+error at 257 points. The first periodic interpolation check sampled `[0,1]` instead of the curve's knot
+domain; that result was invalid and was replaced by the analytic-circle check.
+
+The minimal WASM probe with circle, interpolation, sweep and revolve was 726,498 bytes raw and 144,425
+bytes Brotli q9. This is an absolute spike artifact, not a delta against the engine baseline; no size
+claim is made for Curvo's incremental cost in Spatial Lab. `cargo tree --target wasm32-unknown-unknown`
+reported about 107 package entries in the normal dependency tree. Curvo's Bevy integration is optional
+and was not enabled. A source scan found hundreds of `unwrap`/`expect`/panic spellings under `src/`,
+including unchecked conversions in curve and surface evaluation paths; the raw count includes doc
+examples and is not a count of reachable production panics. The API does not carry our
+`ExecutionContext`, so long adaptive tessellation cannot cooperate with the worker's cancellation.
+
+**Decision.** The WASM build and accuracy smoke check pass, but the production-safety and cancellation
+requirements do not. Do not add Curvo to the evaluator dependency graph. Implement a deterministic,
+bounded in-house subset with polyline and cubic Bézier curves and rotation-minimizing frames; make
+unsupported control topology and self-intersections explicit diagnostics. NURBS remains deferred.
+
+**Not measured.** No fair baseline/feature size delta; no repeated benchmark distribution; no memory
+profiler; no degeneracy fuzzing; no Curvo/WASM runtime or browser integration. The native loft is one
+warm run and its result exceeds the 200,000-triangle preview budget, so it cannot be used as-is for a
+preview. Curvo may be reconsidered after an auditable panic-safe subset, cooperative cancellation,
+budget-aware tessellation and a measured size delta exist.
+
+## X3: OpenSubdiv and PMP for G6/G7 (2026-10-14) — answered with a split choice
+
+**Question.** Which library can provide subdivision or polygon operators without violating the
+evaluator's WASM, exception, determinism, budget and cancellation constraints?
+
+**Pinned sources.** The isolated probe in `spikes/x3-polygon/` uses OpenSubdiv 3.7.0, commit
+`9dab8a47bfbb1388ec8388fe61f5f916e6123f38`, under Pixar's Tomorrow Open Source Technology License 1.0;
+and PMP 3.0.0, commit `f2fb04f4a4188a5c1ab137e83b96e62fa99c639f`, under MIT plus its employer disclaimer.
+OpenSubdiv core is C++ with no dependencies beyond the standard library. PMP's processing library uses
+its bundled Eigen 3.4.0 headers (primarily MPL-2.0); the native PMP build also succeeded with Eigen's
+`EIGEN_MPL2_ONLY` guard enabled. Viewers and their GLFW/GLEW/ImGui dependencies were disabled. No
+upstream code is copied into the engine by this probe. Primary sources: [OpenSubdiv repository and
+build options](https://github.com/PixarAnimationStudios/OpenSubdiv/tree/v3_7_0), [OpenSubdiv topology
+descriptor](https://github.com/PixarAnimationStudios/OpenSubdiv/blob/v3_7_0/opensubdiv/far/topologyDescriptor.h),
+[Sdc rules](https://github.com/PixarAnimationStudios/OpenSubdiv/blob/v3_7_0/opensubdiv/sdc/options.h),
+[PMP repository and license](https://github.com/pmp-library/pmp-library/tree/3.0.0), and [PMP
+algorithms](https://github.com/pmp-library/pmp-library/tree/3.0.0/src/pmp/algorithms).
+
+**Build and compatibility.** Both configure and build as native static libraries with optional viewers,
+GPU APIs, docs, examples and tests disabled. OpenSubdiv also builds for `wasm32-wasip1` with
+`-fno-exceptions -fno-rtti`; one upstream translation unit (`bfr/tessellation.cpp`) needed an
+out-of-tree `<cmath>` include because WASI's libc++ did not expose `std::abs` through its existing
+includes. This local probe-only patch is not an engine patch. A small Catmark program runs under Node's
+WASI and returns the same 641 vertices and 600 faces as native. The experiment did not measure a full
+large-mesh WASI run or byte-identical positions. The engine's existing `ve-kernel-sys/build.rs` uses
+the wasi-sdk C++ toolchain for WebAssembly builds, then links its WASI sysroot libraries for the
+`wasm32-unknown-unknown` Rust target. The probe used that C++ (`wasm32-wasip1`) build route; it did
+not produce a standalone C++ artifact targeted directly at `wasm32-unknown-unknown`.
+
+PMP 3.0.0 does **not** build under the engine's `-fno-exceptions -fno-rtti` WASI C++ settings:
+`SurfaceMesh` and algorithms contain `throw` paths, and property lookup uses `dynamic_cast`. The build
+reported both `cannot use 'throw' with exceptions disabled` and `dynamic_cast requires -frtti` errors.
+A broad source scan found 197 `throw`, `assert`, `dynamic_cast` or `abort` spellings under `src/pmp/`;
+the inspected subdivision/remeshing/hole-fill/decimation/utility implementations account for 23 of
+those. These are source counts, not a full reachable-path audit; `surface_mesh.h` and property access
+also contain exception/RTTI paths.
+There is no evidence here that an exception-enabled PMP archive can safely cross this engine's C ABI;
+do not link it into the evaluator as-is.
+
+**Benchmark.** `spikes/x3-polygon/probe.cpp` constructs the input mesh and measures setup plus one
+Catmark subdivision step; ten release repetitions on an Apple M1, macOS 26.1, clang 17. A 40 x 25
+cell mesh (2,000 input triangles) produced 6,000 faces; PMP median was 0.515 ms (0.505–0.610),
+OpenSubdiv 0.330 ms (0.326–0.416). At 250 x 200 cells (100,000 input triangles), both produced
+300,000 quad faces. The final ten-run PMP median was 24.95 ms (24.65–30.62); OpenSubdiv median
+was 16.07 ms (15.85–21.03). Peak process RSS from `time -l` in those runs was 59.5 MB for PMP
+and 47.0 MB for OpenSubdiv.
+These are single-process, single-machine smoke numbers, include mesh/topology setup, and do not
+establish evaluator latency. Small-mesh peak memory was not measured.
+
+The OpenSubdiv WASI Catmark probe is 1,832,964 bytes raw / 358,754 bytes Brotli q9. A matching
+minimal C++ WASI executable without OpenSubdiv is 1,754,514 / 328,693 bytes, so the linked probe's
+increment is 78,450 raw / 30,061 compressed bytes. Both numbers include the WASI C++ runtime, and
+the programs are standalone `wasm32-wasip1` executables. The current evaluator release baseline in
+`g5-report.md` is 1,405,870 raw / 394,881 Brotli; **this is not a measured evaluator integration
+delta**. PMP has no WASM size because its compatible no-exception/no-RTTI build failed. A future
+engine integration must measure its actual evaluator delta after the link and exports are defined.
+
+**Capabilities found in pinned public APIs and source.** OpenSubdiv Far/Sdc provides Catmull-Clark
+topology refinement and primvar interpolation, boundary rules, edge and vertex creases, and
+face-varying channels. It is subdivision evaluation, not a face-editing toolkit. PMP exposes
+Catmull-Clark, Loop and quad-tri subdivision; normal/face flipping; hole filling; triangulation;
+decimation; uniform/adaptive remeshing; and lower-level halfedge insert/remove/split operations.
+Its named APIs do not provide face extrusion, inset, bridge loops, weld, dissolve or bevel. The
+operator evidence and limits are in [ADR 0019](../adr/0019-polygon-and-subdivision-backend.md).
+
+OpenSubdiv's topology descriptor carries creases, corners, holes and per-corner face-varying value
+indices; Sdc exposes boundary interpolation, crease method and face-varying interpolation rules.
+PMP's property model has vertex, halfedge, edge and face domains (halfedges can represent corners),
+but its built-in algorithms do not promise our semantic propagation contract. Neither API supplies
+our `ExecutionContext` cancellation protocol. Bound topology and subdivision level before entry,
+check cancellation between bounded phases, and do not claim interruption inside a library call.
+
+**Operator table (source/API inspection at the pinned commits):**
+
+| Operator | OpenSubdiv | PMP | Result | Failure and cancellation evidence |
+|---|---|---|---|---|
+| Face extrusion | Missing | Missing as a named operator; halfedge insert/split primitives only | In-house on `PolyMesh` | No operator preconditions supplied by either library; our narrow planar-patch contract and typed refusals apply. Neither is cancellable inside a call. |
+| Inset | Missing | Missing | In-house on `PolyMesh` | No offset/self-intersection contract in either API; restrict v1 to planar convex faces and refuse unsafe offsets. |
+| Bridge boundary loops | Missing | Missing | In-house on `PolyMesh` | No loop correspondence or winding contract provided; equal-count loops and typed mismatch/winding refusals. |
+| Weld by distance | Missing | Missing as a named op; low-level vertex/edge edits exist | In-house on `PolyMesh` | No tolerance clustering or attribute seam rule; deterministic clustering, collapsed-face and non-manifold validation required. |
+| Dissolve edge/vertex/face | Missing | Missing as a named op; halfedge removal primitives exist | In-house on `PolyMesh` | No safe merge contract; require simple resulting loops and validate incidence/winding. |
+| Orientation change | Missing | Partial: `pmp::flip_faces` reverses faces | PMP provides a primitive, but whole-component selection and semantic propagation remain ours | PMP has no selection/topology policy in this helper; constrain to components and revalidate. No cancellation callback. |
+| Restricted bevel | Missing | Missing | In-house on `PolyMesh` | No bevel API or typed width refusal. Start with isolated manifold edges, bounded width/segments and transactional refusal. |
+| Catmull-Clark | Far topology refinement and `PrimvarRefiner` | `catmull_clark_subdivision`, one step | Both provide | OpenSubdiv requires valid topology descriptor and bounded level; PMP has input/algorithm exceptions. Neither offers our mid-call cancellation callback. |
+| Boundary and crease rules | Sdc exposes vertex boundary interpolation, uniform/Chaikin crease methods, edge/corner crease inputs | PMP feature flags in its subdivision source; no fractional crease weights/rule selection comparable to Sdc | OpenSubdiv provided; PMP partial | Numerical parity and boundary/non-manifold fixtures not run in X3. Bound levels and refuse unsupported topology before entry. |
+| Face-varying data / UV corners | Descriptor channels index values per face corner; Sdc exposes interpolation modes | Halfedge property domain can store corner values, but built-in subdivision does not establish our seam-preserving propagation contract | OpenSubdiv provided; PMP partial | UV seam interpolation not measured; require a chart-seam reference fixture before G7. No cancellation callback. |
+| Fill holes | `holeIndices` excludes faces from subdivision; this is not a hole-filling operator | `fill_hole` for simple boundary loops, triangulation + remeshing + fairing | PMP provided | PMP preconditions exclude non-manifold holes and invalid/non-boundary halfedges, with exceptions. Whole operation is not interruptible. |
+| Remeshing / decimation | Missing | Uniform/adaptive remeshing and decimation provided | PMP provided, but not evaluator-compatible as probed | Remeshing requires triangles; invalid preconditions can throw. Iterations are bounded parameters, but no `ExecutionContext` polling. |
+
+The failure column describes available API behavior, not exhaustive fuzz results. In particular, neither
+library was runtime-probed on non-manifold input, PMP property survival through these operators was not
+tested, and the source scan is not proof that all panic/abort paths have been found.
+
+**Decision.** Use OpenSubdiv's CPU Far path as the proposed G7 Catmull-Clark backend, gated on a
+small engine adapter proving bounded growth, cancellation boundaries, boundary/crease/UV cases and
+native/WASI parity. Build G6 editing operators on our `PolyMesh` plus deterministic adjacency and
+typed contracts. Keep PMP as a measured reference and possible isolated remeshing adapter; do not
+make it an evaluator dependency unless a reviewed no-exception/no-RTTI port or safe boundary is
+demonstrated. PMP's mesh-editing primitives may inform algorithms, but the engine operator code must
+be authored and validated against our own cases. This narrows D2 in the plan by ADR 0019.
+
+**Not measured.** OpenSubdiv crease, boundary and face-varying numerical fixtures; PMP exception-enabled
+WASI; either library's behaviour on deliberately non-manifold inputs; per-attribute propagation through
+PMP algorithms; concurrent or threaded modes; peak WASM linear memory; full evaluator-link size delta;
+large WASI timings; and browser rendering. Source/API inspection is not runtime acceptance. G6 must
+not start until the owner has reviewed this X3 result, ADR 0019, the operator plan and G6 cases.
+
 ## X10: which control surface should a model use? (2026-10-12) — answered: no difference worth a third surface
 
 **Question.** Does a model build and edit geometry more reliably through the line-per-node text

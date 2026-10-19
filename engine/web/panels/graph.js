@@ -66,6 +66,29 @@ export function partsFor(doc, id) {
   return [...seen].filter((node) => shown.has(node));
 }
 
+/// What a click on a part could mean at the level of the authored features that build it. The evaluator
+/// does not record which node made which face, so provenance is by construction: from the part's node,
+/// follow single inputs (a move, a material, a smoothing step) down to the one feature that makes the
+/// shape; where a node combines several operands the clicked face could come from any of them, so the
+/// answer is `selection.ambiguous` with those operands as the candidates, never a guess.
+/// Returns `{ node, path }` (one feature, `path` lists the nodes walked from the part), `{ ambiguous,
+/// at, path }` (candidate node ids and the combining node) or `{ lost }` (the part is not in the document).
+export function featureCandidates(doc, partId) {
+  const path = [];
+  let current = doc.nodes.find((node) => node.id === partId);
+  if (!current) return { lost: partId };
+  for (let steps = 0; steps <= doc.nodes.length; steps++) {
+    path.push(current.id);
+    const operands = [...new Set(inputsOf(current))];
+    if (current.instance || operands.length === 0) return { node: current.id, path };
+    if (operands.length > 1) return { ambiguous: operands, at: current.id, path };
+    const next = doc.nodes.find((node) => node.id === operands[0]);
+    if (!next) return { lost: operands[0] };
+    current = next;
+  }
+  return { lost: partId };
+}
+
 /// The group an instance node is a use of, and what to know about it: whether it is behind the
 /// group's version, what an upgrade would drop, and the group's input names. `null` for other nodes.
 export function instanceInfo(doc, node) {

@@ -1,0 +1,94 @@
+[
+  {
+    "name": "rounded-block",
+    "prompt": "Make a block 2 m long, 1 m tall and 0.5 m deep with every edge rounded by 0.03 m.",
+    "uses": ["poly.bevel_network|solid.round"],
+    "size": [2, 1, 0.5], "sizeTolerance": 0.03,
+    "volume": [0.95, 1.0]
+  },
+  {
+    "name": "raised-panel",
+    "prompt": "Make a 1 m cube with a square panel on its top: inset the top face by 0.2 m, then raise the inner square 0.1 m.",
+    "uses": ["poly.inset_region|poly.inset_faces", "poly.extrude_region|poly.extrude_faces"],
+    "size": [1, 1.1, 1], "sizeTolerance": 0.03,
+    "volume": [1.02, 1.05]
+  },
+  {
+    "name": "thick-wall",
+    "prompt": "Make a flat wall 4 m wide and 2.5 m tall from a quad grid (poly.grid, 4 columns by 2 rows) and give it a thickness of 0.2 m.",
+    "uses": ["poly.solidify"],
+    "size": [4, 2.5, 0.2], "sizeTolerance": 0.03,
+    "volume": [1.95, 2.05]
+  },
+  {
+    "name": "pyramid-roof",
+    "prompt": "Make a pyramid roof: a flat square slab 3 m by 3 m and 0.1 m thick with a peak raised 1 m above its top face.",
+    "uses": ["poly.poke"],
+    "size": [3, 1.1, 3], "sizeTolerance": 0.05,
+    "volume": [3.7, 4.1]
+  },
+  {
+    "name": "wire-cage",
+    "prompt": "Make a wire cage: a 1 m cube turned into a frame of struts about 0.05 m thick with no solid faces.",
+    "uses": ["poly.wireframe"],
+    "size": [1, 1, 1], "sizeTolerance": 0.2,
+    "volume": [0.001, 0.6]
+  },
+  {
+    "name": "mirror-half",
+    "prompt": "Build only the right half (x from 0 to 1) of a box that is 2 m wide, 1 m tall and 1 m deep, from polygon tools, then mirror it with the symmetrize tool so the whole box is made from the half.",
+    "uses": ["poly.symmetrize"],
+    "size": [2, 1, 1], "sizeTolerance": 0.03,
+    "volume": [1.9, 2.1]
+  },
+  {
+    "name": "stepped-tower",
+    "prompt": "Make a tower: a 1 m by 1 m by 3 m box, then twice inset the top face by 0.15 m and extrude the inner square up 0.8 m, so it steps in like a wedding cake.",
+    "uses": ["poly.inset_region", "poly.extrude_region"],
+    "size": [1, 4.6, 1], "sizeTolerance": 0.05,
+    "volume": [3.3, 3.9]
+  },
+  {
+    "name": "crate-with-recess",
+    "prompt": "Make a crate: a 1 m cube with all edges slightly rounded (0.04 m) and a square recess 0.6 m wide sunk 0.05 m into the front face (the +z face).",
+    "uses": ["poly.bevel_network|solid.round", "poly.inset_region|poly.inset_faces|solid.difference"],
+    "size": [1, 1, 1], "sizeTolerance": 0.03,
+    "volume": [0.93, 0.99]
+  },
+  {
+    "name": "cut-edge",
+    "prompt": "Take a 1 m cube as an editable polygon mesh and subdivide its top front edge (along x, at the top, +z side) into 4 pieces with the polygon subdivide tool.",
+    "uses": ["poly.subdivide_edges"],
+    "size": [1, 1, 1], "sizeTolerance": 0.02,
+    "volume": [0.98, 1.02]
+  },
+  {
+    "name": "uv-cube",
+    "prompt": "Make a 1 m cube as a polygon mesh and unwrap it to UV coordinates, cutting along its sharp edges.",
+    "uses": ["poly.unwrap_uv"],
+    "size": [1, 1, 1], "sizeTolerance": 0.02,
+    "volume": [0.98, 1.02]
+  },
+  {
+    "name": "house",
+    "prompt": "Make a small house: a box 4 m wide, 3 m deep and 2.5 m tall with a pyramid roof 1.5 m high on top, edges slightly rounded (0.05 m), walls beige and roof dark red.",
+    "uses": ["poly.poke", "poly.bevel_network"],
+    "size": [4, 4, 3], "sizeTolerance": 0.35,
+    "volume": [28, 40]
+  },
+  {
+    "name": "lod-sphere",
+    "prompt": "Make a low-detail (LOD) version of a smooth sphere: a sphere of radius 1 m with 64 segments, reduced to about a quarter of its triangles while keeping its shape. The only output should be the low-detail sphere (no comparison copy).",
+    "uses": ["poly.decimate"],
+    "size": [2, 2, 2], "sizeTolerance": 0.1,
+    "volume": [3.7, 4.3],
+    "triangles": [350, 700]
+  },
+  {
+    "name": "plinth",
+    "prompt": "Make a plinth: a 1.2 m by 1.2 m by 0.4 m block, its top inset by 0.1 m and pressed down 0.05 m (a shallow recess), all outer edges rounded 0.02 m.",
+    "uses": ["poly.inset_region", "poly.bevel_network"],
+    "size": [1.2, 0.4, 1.2], "sizeTolerance": 0.03,
+    "volume": [0.5, 0.53]
+  }
+]

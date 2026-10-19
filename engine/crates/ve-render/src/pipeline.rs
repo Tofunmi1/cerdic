@@ -10,9 +10,9 @@ use bevy_render::mesh::RenderMesh;
 use bevy_render::render_asset::RenderAssets;
 use bevy_render::render_resource::binding_types::{sampler, texture_depth_2d, uniform_buffer};
 use bevy_render::render_resource::{
-    BindGroupLayoutDescriptor, BindGroupLayoutEntries, CachedRenderPipelineId, ColorTargetState,
-    ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Face, FragmentState,
-    FrontFace, MultisampleState, PipelineCache, PrimitiveState, PrimitiveTopology,
+    BindGroupLayoutDescriptor, BindGroupLayoutEntries, BlendState, CachedRenderPipelineId,
+    ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Face,
+    FragmentState, FrontFace, MultisampleState, PipelineCache, PrimitiveState, PrimitiveTopology,
     RenderPipelineDescriptor, SamplerBindingType, ShaderStages, StencilState, TextureFormat,
     VertexAttribute, VertexFormat, VertexState, VertexStepMode,
 };
@@ -22,24 +22,47 @@ use bevy_shader::Shader;
 use crate::lens::LensWarp;
 use crate::light::LightsUniform;
 use crate::prepare::{InstanceBatches, InstanceData, ViewUniform};
+use crate::quality::RenderQuality;
 use crate::targets::{DEPTH_FORMAT, render_format};
 
 /// Source of the forward shader, compiled at runtime by the shader pipeline.
 pub(crate) const FORWARD_SHADER: &str = include_str!("shaders/forward.wgsl");
 
-type PipelineKey = (MeshVertexBufferLayoutRef, TextureFormat, u32);
+/// The forward shader for meshes without texture coordinates: the same source with the vertex input and its
+/// copy removed (plain WGSL has no preprocessor here). Meshes without baked maps use it, which keeps their
+/// vertices 8 bytes smaller.
+pub(crate) fn forward_shader_without_uv() -> String {
+    FORWARD_SHADER
+        .replace("    @location(11) uv: vec2<f32>,\n", "")
+        .replace("    out.uv = input.uv;\n", "    out.uv = vec2<f32>(0.0);\n")
+}
+
+/// Which draw of a batch a pipeline serves.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum PassKind {
+    /// The ordinary opaque draw.
+    Opaque,
+    /// The alpha-blended draw.
+    Transparent,
+    /// The toon outline: a second draw with front faces culled and the vertices pushed outward.
+    Outline,
+}
+
+type PipelineKey = (MeshVertexBufferLayoutRef, TextureFormat, u32, PassKind);
 
 /// The forward pipeline family: shared layouts and shader, specialised lazily.
 #[derive(Resource)]
 pub(crate) struct ForwardPipelines {
     pub(crate) view_layout: BindGroupLayoutDescriptor,
     pub(crate) lights_layout: BindGroupLayoutDescriptor,
+    pub(crate) textures_layout: BindGroupLayoutDescriptor,
     shader: Handle<Shader>,
+    shader_without_uv: Handle<Shader>,
     cache: HashMap<PipelineKey, CachedRenderPipelineId>,
 }
 
 impl ForwardPipelines {
-    pub(crate) fn new(shader: Handle<Shader>) -> Self {
+    pub(crate) fn new(shader: Handle<Shader>, shader_without_uv: Handle<Shader>) -> Self {
         let view_layout = BindGroupLayoutDescriptor::new(
             "ve_view_layout",
             &BindGroupLayoutEntries::single(
@@ -62,7 +85,9 @@ impl ForwardPipelines {
         Self {
             view_layout,
             lights_layout,
+            textures_layout: crate::textures::textures_layout(),
             shader,
+            shader_without_uv,
             cache: HashMap::new(),
         }
     }
@@ -73,8 +98,11 @@ impl ForwardPipelines {
         layout: &MeshVertexBufferLayoutRef,
         format: TextureFormat,
         samples: u32,
+        kind: PassKind,
     ) -> Option<CachedRenderPipelineId> {
-        self.cache.get(&(layout.clone(), format, samples)).copied()
+        self.cache
+            .get(&(layout.clone(), format, samples, kind))
+            .copied()
     }
 
     fn descriptor(
@@ -82,25 +110,40 @@ impl ForwardPipelines {
         mesh_layout: VertexBufferLayout,
         format: TextureFormat,
         samples: u32,
+        has_uv: bool,
+        kind: PassKind,
     ) -> RenderPipelineDescriptor {
+        let transparent = kind == PassKind::Transparent;
+        let outline = kind == PassKind::Outline;
+        // Meshes without baked maps carry no texture coordinates; their variant reads none.
+        let shader = if has_uv {
+            self.shader.clone()
+        } else {
+            self.shader_without_uv.clone()
+        };
         RenderPipelineDescriptor {
             label: Some("ve_forward".into()),
-            layout: vec![self.view_layout.clone(), self.lights_layout.clone()],
+            layout: vec![
+                self.view_layout.clone(),
+                self.lights_layout.clone(),
+                self.textures_layout.clone(),
+            ],
             vertex: VertexState {
-                shader: self.shader.clone(),
-                entry_point: Some("vertex".into()),
+                shader: shader.clone(),
+                entry_point: Some(if outline { "vertex_outline" } else { "vertex" }.into()),
                 buffers: vec![mesh_layout, instance_layout()],
                 ..Default::default()
             },
             primitive: PrimitiveState {
                 topology: PrimitiveTopology::TriangleList,
                 front_face: FrontFace::Ccw,
-                cull_mode: Some(Face::Back),
+                // The outline hull shows only its back faces, which peek out around the silhouette.
+                cull_mode: Some(if outline { Face::Front } else { Face::Back }),
                 ..Default::default()
             },
             depth_stencil: Some(DepthStencilState {
                 format: DEPTH_FORMAT,
-                depth_write_enabled: Some(true),
+                depth_write_enabled: Some(!transparent),
                 // Bevy projections are reverse-z: nearer fragments have larger depth.
                 depth_compare: Some(CompareFunction::GreaterEqual),
                 stencil: StencilState::default(),
@@ -112,11 +155,18 @@ impl ForwardPipelines {
                 alpha_to_coverage_enabled: false,
             },
             fragment: Some(FragmentState {
-                shader: self.shader.clone(),
-                entry_point: Some("fragment".into()),
+                shader,
+                entry_point: Some(
+                    if outline {
+                        "fragment_outline"
+                    } else {
+                        "fragment"
+                    }
+                    .into(),
+                ),
                 targets: vec![Some(ColorTargetState {
                     format,
-                    blend: None,
+                    blend: transparent.then_some(BlendState::ALPHA_BLENDING),
                     write_mask: ColorWrites::ALL,
                 })],
                 ..Default::default()
@@ -127,17 +177,18 @@ impl ForwardPipelines {
 }
 
 /// Instance buffer layout: the model matrix as four `vec4` columns (locations 3 to 6), then base
-/// colour, material parameters and emissive (locations 7 to 9).
+/// colour, material parameters, emissive and texture-array layers (locations 7 to 10), then the three toon
+/// vectors (locations 12 to 14; 11 is the mesh's texture coordinates).
 pub(crate) fn instance_layout() -> VertexBufferLayout {
     let vec4 = u64::try_from(size_of::<[f32; 4]>()).unwrap_or(16);
     VertexBufferLayout {
-        array_stride: u64::try_from(size_of::<InstanceData>()).unwrap_or(112),
+        array_stride: u64::try_from(size_of::<InstanceData>()).unwrap_or(176),
         step_mode: VertexStepMode::Instance,
-        attributes: (0..7_u32)
+        attributes: (0..11_u32)
             .map(|i| VertexAttribute {
                 format: VertexFormat::Float32x4,
                 offset: vec4 * u64::from(i),
-                shader_location: 3 + i,
+                shader_location: if i < 8 { 3 + i } else { 4 + i },
             })
             .collect(),
     }
@@ -150,13 +201,14 @@ pub(crate) fn queue_forward_pipelines(
     render_meshes: Res<RenderAssets<RenderMesh>>,
     batches: Res<InstanceBatches>,
     lens: Res<LensWarp>,
+    quality: Res<RenderQuality>,
     views: Query<(&ViewTarget, &Msaa)>,
 ) {
     let variants: Vec<(TextureFormat, u32)> = views
         .iter()
         .filter_map(|(target, msaa)| {
             Some((
-                render_format(target.out_texture_view_format()?, *lens),
+                render_format(target.out_texture_view_format()?, *lens, *quality),
                 msaa.samples(),
             ))
         })
@@ -167,22 +219,54 @@ pub(crate) fn queue_forward_pipelines(
             continue;
         };
         let layout = &render_mesh.layout;
-        let Ok(mesh_layout) = layout.0.get_layout(&[
+        let has_uv = layout.0.contains(Mesh::ATTRIBUTE_UV_0);
+        let mut wanted = vec![
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
             Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
-        ]) else {
+            crate::ATTRIBUTE_OCCLUSION.at_shader_location(2),
+        ];
+        if has_uv {
+            wanted.push(Mesh::ATTRIBUTE_UV_0.at_shader_location(11));
+        }
+        let Ok(mesh_layout) = layout.0.get_layout(&wanted) else {
             // A mesh without positions and normals cannot be drawn by this pipeline.
             warn_once!("pipeline queue: a mesh lacks POSITION or NORMAL attributes");
             continue;
         };
         for &(format, samples) in &variants {
-            let key = (layout.clone(), format, samples);
-            if pipelines.cache.contains_key(&key) {
-                continue;
+            for kind in [PassKind::Opaque, PassKind::Transparent, PassKind::Outline] {
+                let key = (layout.clone(), format, samples, kind);
+                if pipelines.cache.contains_key(&key) {
+                    continue;
+                }
+                let descriptor =
+                    pipelines.descriptor(mesh_layout.clone(), format, samples, has_uv, kind);
+                let id = pipeline_cache.queue_render_pipeline(descriptor);
+                pipelines.cache.insert(key, id);
             }
-            let descriptor = pipelines.descriptor(mesh_layout.clone(), format, samples);
-            let id = pipeline_cache.queue_render_pipeline(descriptor);
-            pipelines.cache.insert(key, id);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_shader_without_texture_coordinates_drops_exactly_the_uv_input() {
+        let plain = forward_shader_without_uv();
+        assert!(FORWARD_SHADER.contains("@location(11) uv: vec2<f32>,"));
+        assert!(!plain.contains("@location(11)"), "the vertex input is gone");
+        assert!(
+            !plain.contains("out.uv = input.uv"),
+            "the vertex stage no longer copies it"
+        );
+        assert!(plain.contains("out.uv = vec2<f32>(0.0);"));
+        // Everything else is the same source.
+        assert_eq!(
+            plain.lines().count() + 1,
+            FORWARD_SHADER.lines().count(),
+            "one line fewer"
+        );
     }
 }

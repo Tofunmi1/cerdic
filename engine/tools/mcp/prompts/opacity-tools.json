@@ -1,0 +1,5 @@
+[
+  { "name": "glass-aquarium", "prompt": "Build a small glass aquarium: a rectangular transparent tinted glass tank with a visible water volume inside, on a solid base. Use translucent glass and water materials. Keep the scene compact and name the parts clearly.", "materialOpacity": { "part": "glass|water|tank", "max": 0.95 } },
+  { "name": "window-wall", "prompt": "Build a short wall with a blue tinted glass window pane in its opening. The pane must be transparent enough that the background can be seen through it. Name the pane clearly.", "materialOpacity": { "part": "glass|window|pane", "max": 0.8 } },
+  { "name": "glass-bottle", "prompt": "Build a simple transparent blue glass bottle with a hollow-looking body and a narrow neck. Give the bottle glass a translucent material and name the glass part clearly.", "materialOpacity": { "part": "glass|bottle", "max": 0.8 } }
+]

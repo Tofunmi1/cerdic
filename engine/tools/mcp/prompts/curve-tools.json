@@ -1,0 +1,21 @@
+[
+  {
+    "name": "coil-spring",
+    "prompt": "Make a coil spring: a wire 0.03 m thick wound in 6 turns with a coil radius of 0.25 m, each turn rising 0.1 m, so it is about 0.6 m tall.",
+    "uses": ["curve.helix", "solid.sweep"],
+    "size": [0.53, 0.63, 0.53], "sizeTolerance": 0.05,
+    "volume": [0.005, 0.008]
+  },
+  {
+    "name": "tapering-horn",
+    "prompt": "Make a curved horn: a round tube starting 0.2 m across at the base that curves up and to the side over about 1 m and tapers to a thin tip, a tenth of the base size.",
+    "uses": ["solid.sweep"],
+    "volume": [0.003, 0.02]
+  },
+  {
+    "name": "rounded-pipe-run",
+    "prompt": "Make a pipe run: a round pipe 0.05 m across that goes 1 m along X, then 1 m up, then 1 m along Z, with the two bends rounded smoothly (not sharp corners).",
+    "uses": ["curve.fillet|curve.spline", "solid.sweep"],
+    "volume": [0.004, 0.0065]
+  }
+]

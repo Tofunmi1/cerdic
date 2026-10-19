@@ -1,0 +1,44 @@
+[
+  {
+    "name": "wood-crate",
+    "prompt": "Make a 1 m wooden crate (a cube) and give it a procedural wood texture: brown tones with visible grain.",
+    "uses": ["solid.texture"],
+    "size": [1, 1, 1], "sizeTolerance": 0.03,
+    "texture": { "channels": ["albedo"] }
+  },
+  {
+    "name": "brick-wall",
+    "prompt": "Make a wall 4 m wide, 2.5 m tall and 0.2 m thick, with a red brick texture and grey mortar lines. Use the brick pattern node of the texture catalog.",
+    "uses": ["solid.texture"],
+    "size": [4, 2.5, 0.2], "sizeTolerance": 0.05,
+    "texture": { "channels": ["albedo"], "uses": ["bricks|bricks2|bricks3|bricks_uneven|skewed_bricks"] }
+  },
+  {
+    "name": "marble-tile",
+    "prompt": "Make a floor tile 2 m by 2 m and 0.05 m thick with a white marble look: grey veins and a glossy surface (give it a roughness texture channel too).",
+    "uses": ["solid.texture"],
+    "size": [2, 0.05, 2], "sizeTolerance": 0.02,
+    "texture": { "channels": ["albedo", "roughness"] }
+  },
+  {
+    "name": "rusty-barrel",
+    "prompt": "Make a barrel: a cylinder 0.6 m across and 0.9 m tall, with a rusty metal texture. Fill the albedo, metallic and height channels (height makes the surface pitted).",
+    "uses": ["solid.texture"],
+    "size": [0.6, 0.9, 0.6], "sizeTolerance": 0.05,
+    "texture": { "channels": ["albedo", "metallic", "height"] }
+  },
+  {
+    "name": "seamless-stone",
+    "prompt": "Make a sphere of radius 0.5 m that looks like speckled granite. Use a 3D (object-space) texture, the tex3d_ nodes, so the pattern has no seam anywhere.",
+    "uses": ["solid.texture"],
+    "size": [1, 1, 1], "sizeTolerance": 0.03,
+    "texture": { "channels": ["albedo"], "space": "3d" }
+  },
+  {
+    "name": "mossy-block",
+    "prompt": "Make a stone block 1 m by 0.5 m by 0.5 m, grey and bumpy (use the height channel for bumps), with green patches of moss (the albedo shows grey stone with green patches).",
+    "uses": ["solid.texture"],
+    "size": [1, 0.5, 0.5], "sizeTolerance": 0.03,
+    "texture": { "channels": ["albedo", "height"] }
+  }
+]

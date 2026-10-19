@@ -1,0 +1,14 @@
+[
+  {
+    "name": "two-motion-arm",
+    "prompt": "Make a bar 0.1 m thick and 0.8 m long that pivots about its lower end. It has two separate motions: a wave (swing 50 degrees sideways over one second) and a reach (tilt 70 degrees forward over two seconds). Add two small buttons, each 0.1 m: one runs only the wave, the other only the reach, and each leaves the other motion where it was.",
+    "uses": ["anim.track", "behavior.on"],
+    "clips": { "names": ["wave", "reach"], "targetsWithClip": 2 }
+  },
+  {
+    "name": "dance-sequence",
+    "prompt": "Make a 0.2 m cube that does a little dance when clicked: first it slides 1 m to the right in half a second, then it hops up 1 m in half a second, then it moves 1 m forward in half a second, one after the other. Clicking again does the dance again.",
+    "uses": ["anim.track", "behavior.on"],
+    "clips": { "names": ["a|b|c|slide|hop|forward|right|up"], "sequence": 3 }
+  }
+]

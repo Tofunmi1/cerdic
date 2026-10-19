@@ -1,25 +1,52 @@
 //! The runtime entry point called from the web page.
 //!
 //! `start(canvas_id, scene)` assembles the engine's plugins into a Bevy app that renders into the
-//! canvas. `status()` reports what the page needs to verify the run (adapter, limits, frame count,
-//! XR session). `enter_xr` and `exit_xr` move the running app into and out of a headset session.
+//! canvas. `status()` reports what the page needs to verify the run (adapter, limits, frame count, XR
+//! session). `enter_xr` and `exit_xr` move the running app into and out of a headset session.
 #![cfg(target_arch = "wasm32")]
 
+mod animation;
 mod app;
+mod audio_exports;
+pub use audio_exports::{audio_music, audio_sfx, fx_explode, fx_live_particles};
+mod behavior;
 mod bench_scene;
 mod document;
+pub mod document_exports;
+mod fx;
 mod gallery;
+mod gizmo;
+mod gizmo_exports;
+pub use gizmo_exports::{
+    gizmo_begin, gizmo_begin_camera_plane, gizmo_begin_profile, gizmo_cancel, gizmo_update,
+    viewer_gizmo, viewer_gizmo_at,
+};
+pub mod grading;
 mod instance_exports;
 mod instance_probe;
 mod interact;
+mod measure_exports;
+pub use measure_exports::measure_mesh;
 mod mock_hmd;
 mod perf;
 mod projection;
-pub use instance_exports::{eval_projection_chunk_group, eval_projection_instances};
-mod quality;
+pub use instance_exports::{
+    eval_projection_animation, eval_projection_behavior, eval_projection_body,
+    eval_projection_chunk_group, eval_projection_chunk_part, eval_projection_environment,
+    eval_projection_ik, eval_projection_instances, eval_projection_lights, eval_projection_maps,
+    eval_projection_material_region, eval_projection_parent, eval_projection_skin,
+    viewer_animation, viewer_animation_speed, viewer_behaviors, viewer_flag, viewer_physics,
+    viewer_play_mode, viewer_press,
+};
+pub use tangent_exports::eval_tangents;
+mod physics;
+pub mod quality;
 mod scene;
 mod selection;
+mod skinning;
 mod status;
+mod studio;
+mod tangent_exports;
 mod viewer;
 mod viewer_nav;
 mod wands;
@@ -50,20 +77,6 @@ pub fn start(canvas_id: &str, scene: &str) -> Result<(), JsError> {
 #[must_use]
 pub fn status() -> String {
     status::snapshot()
-}
-
-/// Switches the render quality tier (`"low"`, `"medium"` or `"high"`). Takes effect on the next
-/// frame, and may be called before `start`.
-///
-/// # Errors
-/// Fails if the tier name is unknown.
-#[wasm_bindgen]
-pub fn set_quality(tier: &str) -> Result<(), JsError> {
-    let tier = tier
-        .parse()
-        .map_err(|()| JsError::new(&format!("unknown quality tier {tier:?}")))?;
-    quality::request(tier);
-    Ok(())
 }
 
 /// Turns the automatic quality governor on or off. When on, the quality tier follows measured frame
@@ -157,6 +170,24 @@ pub fn viewer_frame(
     viewer_nav::frame((lo + hi) * 0.5, ((hi - lo).length() * 0.5).max(0.02))
 }
 
+/// Projects a world point to canvas pixels as JSON `{x, y, depth}`; `y` is measured from the top.
+#[wasm_bindgen]
+#[must_use]
+pub fn viewer_project(x: f32, y: f32, z: f32, width: f32, height: f32) -> String {
+    if !width.is_finite() || !height.is_finite() || width <= 0.0 || height <= 0.0 {
+        return String::new();
+    }
+    let Some(point) = viewer::project(bevy_math::Vec3::new(x, y, z), width / height) else {
+        return String::new();
+    };
+    serde_json::json!({
+        "x": (point.x + 1.0) * 0.5 * width,
+        "y": (1.0 - point.y) * 0.5 * height,
+        "depth": point.z,
+    })
+    .to_string()
+}
+
 /// Selects `node` and lights up the viewport parts named in `parts_json` (a JSON array of node
 /// ids: the outputs the node builds). Returns false, changing nothing, for input that is not a
 /// short list of short ids.
@@ -199,118 +230,6 @@ pub fn viewer_reset() {
     viewer::request_reset();
 }
 
-/// Opens the document called `name` from local storage (or starts an empty one with `seed`) and
-/// returns the state as JSON: `{ id, revision, nodes, can_undo, can_redo, read_only,
-/// saved_generation, issues, document }`. A document that cannot be loaded opens read-only with the
-/// reasons in `issues`; storage is not modified.
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_open(name: &str, seed: u32) -> String {
-    document::open(name, u64::from(seed))
-}
-
-/// Starts an empty document called `name`, replacing the session (nothing is saved yet).
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_reset(name: &str, seed: u32) -> String {
-    document::reset(name, u64::from(seed))
-}
-
-/// The current document and session state, as for `doc_open`.
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_state() -> String {
-    document::state()
-}
-
-/// Applies a command batch (JSON) and returns the outcome as JSON: `committed`, `rejected`,
-/// `conflict` or `already_applied`. Bad input is a `rejected` outcome, never an exception.
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_apply(batch_json: &str) -> String {
-    document::apply(batch_json)
-}
-
-/// Undoes the last transaction: `{ revision, changed }`, or `null` if there is nothing to undo.
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_undo() -> String {
-    document::step(true)
-}
-
-/// Redoes the last undone transaction: `{ revision, changed }`, or `null`.
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_redo() -> String {
-    document::step(false)
-}
-
-/// Saves the document to local storage: `{ generation }`, or `{ error }` with a diagnostic. The
-/// previous save stays intact if this one fails.
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_save() -> String {
-    document::save()
-}
-
-/// Every operator the session knows, as JSON: ports, parameters with bounds, readiness.
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_operators() -> String {
-    document::operators()
-}
-
-/// Reads the text form into commands: `{ commands, spans }` or `{ diagnostics }` (each with a source
-/// span). The page wraps the commands in a batch for the current revision.
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_parse_text(text: &str) -> String {
-    document::text::parse(text)
-}
-
-/// Reads text on its own, as for a new document (names resolve only within the text): `{ commands,
-/// spans }` or `{ diagnostics }`. `doc_parse_text` is the one for adding to the open document.
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_parse_text_standalone(text: &str) -> String {
-    document::text::parse_standalone(text)
-}
-
-/// The working document as canonical text: `{ text }` or `{ error }`.
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_text() -> String {
-    document::text::print()
-}
-
-/// The Rust-owned working candidate and its dependency hash.
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_candidate_state() -> String {
-    document::staging::state()
-}
-
-/// Stages a batch without committing its document before geometry succeeds.
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_stage(batch: &str) -> String {
-    document::staging::apply(batch)
-}
-
-/// Stages an undo for evaluation before it becomes the committed scene.
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_stage_undo() -> String {
-    document::staging::step(true)
-}
-
-/// Stages a redo for evaluation before it becomes the committed scene.
-#[wasm_bindgen]
-#[must_use]
-pub fn doc_stage_redo() -> String {
-    document::staging::step(false)
-}
-
 /// Binds the current candidate to one exact worker request token.
 #[wasm_bindgen]
 #[must_use]
@@ -318,7 +237,7 @@ pub fn eval_bind(token: &str) -> bool {
     document::staging::bind(token)
 }
 
-/// Discards a failed matching candidate while preserving the committed scene.
+/// Rejects a failed candidate, except that a Preview triangle budget refusal keeps a staged edit for Final.
 #[wasm_bindgen]
 #[must_use]
 pub fn eval_reject(token: &str, code: &str, message: &str) -> bool {
@@ -384,4 +303,14 @@ pub async fn enter_xr(canvas_id: &str) -> Result<(), JsError> {
 #[wasm_bindgen]
 pub async fn exit_xr() {
     ve_xr_web::exit().await;
+}
+
+/// Current viewer camera pose as JSON `{position, rotation}` for spatial browser audio.
+#[wasm_bindgen]
+#[must_use]
+pub fn viewer_pose() -> String {
+    viewer::pose().map_or_else(String::new, |(position, rotation)| {
+        serde_json::json!({ "position": position.to_array(), "rotation": rotation.to_array() })
+            .to_string()
+    })
 }

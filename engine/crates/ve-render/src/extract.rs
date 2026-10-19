@@ -16,6 +16,9 @@ pub(crate) struct ExtractedMesh {
     pub(crate) mesh: AssetId<Mesh>,
     pub(crate) world_from_local: Mat4,
     pub(crate) material: PackedMaterial,
+    pub(crate) transparent: bool,
+    pub(crate) sort_key: u64,
+    pub(crate) center: bevy_math::Vec3,
 }
 
 /// Every visible mesh instance this frame, rebuilt by [`extract_meshes`].
@@ -45,6 +48,7 @@ pub(crate) fn extract_meshes(
     mut out: ResMut<ExtractedMeshes>,
     meshes: Extract<
         Query<(
+            Entity,
             &Mesh3d,
             &GlobalTransform,
             Option<&VeMaterial>,
@@ -57,11 +61,24 @@ pub(crate) fn extract_meshes(
     out.0.extend(
         meshes
             .iter()
-            .filter(|(_, _, _, visibility, _)| visibility.is_none_or(|v| v.get()))
-            .map(|(mesh, transform, material, _, placement)| ExtractedMesh {
-                mesh: mesh.id(),
-                world_from_local: placement.map_or_else(|| transform.to_matrix(), |m| m.0),
-                material: material.copied().unwrap_or_default().pack(),
+            .filter(|(_, _, _, _, visibility, _)| visibility.is_none_or(|v| v.get()))
+            .map(|(entity, mesh, transform, material, _, placement)| {
+                let surface = material.copied().unwrap_or_default();
+                ExtractedMesh {
+                    mesh: mesh.id(),
+                    world_from_local: placement.map_or_else(|| transform.to_matrix(), |m| m.0),
+                    material: surface.pack_for_instance(placement.map_or(0, |instance| instance.1)),
+                    transparent: surface.opacity < 1.0,
+                    sort_key: if surface.sort_key == 0 {
+                        entity.to_bits()
+                    } else {
+                        surface.sort_key
+                    },
+                    center: placement.map_or_else(
+                        || transform.translation(),
+                        |instance| instance.0.w_axis.truncate(),
+                    ),
+                }
             })
             .filter(|mesh| drawable(&mesh.world_from_local)),
     );

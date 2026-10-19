@@ -25,11 +25,25 @@ program's nodes; diagnostics carry line and column), `apply_commands` (typed edi
 `undo`, `redo`, `frame_view` (the whole model fills the view), `set_view`. A refused edit (for example
 `constraint.min_wall`, with the measured thickness) leaves the document unchanged and says so.
 
+Both apply tools use one atomic undoable transaction, up to 1,000 typed commands and 1 MiB of batch
+JSON. `apply_text` also retains the 256 KiB source-text cap. The furnished study-room fixture applies
+in one transaction (382 commands); larger work must be split into deliberate transactions.
+
+`poly.grid` supplies normalized UV corner attributes. `poly.subdivide` carries those UV seams and F32
+point attributes into its refined mesh. The `uv_subdivided_grid` gallery fixture exercises this path
+through the browser evaluator and viewport; the gallery test checks the visible viewport from six views.
+
 ## Colour
 `solid.material@1(solid, color=[r,g,b], metallic, roughness, emissive)` gives a solid a surface
-(sRGB colour, metal 0 to 1, roughness 0 to 1, emissive glow); the shape is unchanged. Transforms and
-booleans keep their first input's surface, so it can sit anywhere on the way to the output. A part's
-surface travels with its mesh from the evaluator to the renderer (`eval_projection_material`). Opacity
+(sRGB colour, metal 0 to 1, roughness 0 to 1, emissive glow); the shape is unchanged. It also takes a
+placement set (`inst.*`) and colours every placement. Inputs of one colour keep it through transforms
+and booleans. Inputs of two or more colours stay those colours: unions, differences, intersections,
+moves, rotations, scales, mirrors and arrays label each input's faces in the kernel and the result is
+one solid drawn as one part per colour (ADR 0018). A cutter without a colour of its own leaves the body's
+colour on the faces it cuts; a coloured cutter inlays its colour. A material on top recolours the whole
+solid, and twist, taper and bend keep only the first input's colour. A part's surface travels with its
+mesh from the evaluator to the renderer (`eval_projection_material_region`, keyed by node and colour
+region; `eval_projection_material` is region 0). Opacity
 (glass) is not supported by the renderer yet. This is the first slice of the appearance work planned
 for G10 (procedural materials), pulled forward because a request for a "red vase" has to be possible.
 

@@ -1,0 +1,185 @@
+# Mechanisms demo. Press Play. Everything here hangs on joints:
+#  - a pendulum (rod hinged to the ceiling bar, a bob welded to its end) swinging from the horizontal,
+#  - a door on a hinge and a drawer on a slider: drag them with the mouse,
+#  - a weight on a spring, bouncing,
+#  - a windmill turned by a hinge motor,
+#  - a plank bridge (six planks hinged to each other and to two posts) with a heavy ball on it,
+#  - a seesaw with a ball dropped on one end,
+#  - a bell: the ball that falls on it sets the flag "ring", and the lamp beside it lights.
+# Drag any loose part to move or throw it. Stop puts everything back.
+
+floor_box = solid.box@1(size=[16, 0.2, 14])
+floor_down = xform.move@1(floor_box, by=[0, -0.1, 1.5])
+floor_tint = solid.material@1(floor_down, color=[0.42, 0.47, 0.42], roughness=0.9)
+floor = phys.body@1(floor_tint, kind="static", shape="box", friction=0.7)
+output ground = floor
+
+# Low walls so loose balls stay on the floor.
+wall_long = solid.box@1(size=[16.4, 0.6, 0.2])
+wall_short = solid.box@1(size=[0.2, 0.6, 14.2])
+wall_tint = solid.material@1(wall_long, color=[0.55, 0.58, 0.7], roughness=0.8)
+wall_short_tint = solid.material@1(wall_short, color=[0.55, 0.58, 0.7], roughness=0.8)
+wall_n_at = xform.move@1(wall_tint, by=[0, 0.3, -5.6])
+wall_n = phys.body@1(wall_n_at, kind="static", shape="box")
+output wall_north = wall_n
+wall_s_at = xform.move@1(wall_tint, by=[0, 0.3, 8.6])
+wall_s = phys.body@1(wall_s_at, kind="static", shape="box")
+output wall_south = wall_s
+wall_e_at = xform.move@1(wall_short_tint, by=[8.1, 0.3, 1.5])
+wall_e = phys.body@1(wall_e_at, kind="static", shape="box")
+output wall_east = wall_e
+wall_w_at = xform.move@1(wall_short_tint, by=[-8.1, 0.3, 1.5])
+wall_w = phys.body@1(wall_w_at, kind="static", shape="box")
+output wall_west = wall_w
+
+# Pendulum.
+bar = solid.box@1(size=[3, 0.1, 0.1])
+bar_at = xform.move@1(bar, by=[-5.2, 4.4, -3])
+bar_steel = solid.material@1(bar_at, color=[0.5, 0.55, 0.6], roughness=0.4)
+ceiling_bar = phys.body@1(bar_steel, kind="static", shape="box")
+output pendulum_bar = ceiling_bar
+rod = solid.box@1(size=[1.5, 0.05, 0.05])
+rod_at = xform.move@1(rod, by=[-5.25, 4, -3])
+rod_steel = solid.material@1(rod_at, color=[0.7, 0.7, 0.75], roughness=0.3)
+rod_body = phys.body@1(rod_steel, shape="box", density=30)
+rod_hinge = phys.joint@1(rod_body, kind="hinge", to="pendulum_bar", anchor=[-6, 4, -3], axis=[0, 0, 1], damping=0.02)
+output pendulum_rod = rod_hinge
+bob = solid.sphere@1(radius=0.3, segments=24)
+bob_red = solid.material@1(bob, color=[0.85, 0.15, 0.15], roughness=0.3)
+bob_at = xform.move@1(bob_red, by=[-4.5, 4, -3])
+bob_body = phys.body@1(bob_at, shape="sphere", density=4)
+bob_weld = phys.joint@1(bob_body, kind="fixed", to="pendulum_rod", anchor=[-4.5, 4, -3])
+output pendulum_bob = bob_weld
+
+# Door on a hinge (drag it open) and a drawer on a slider (drag it out).
+post = solid.box@1(size=[0.1, 2, 0.1])
+post_at = xform.move@1(post, by=[-1, 1, -3])
+post_wood = solid.material@1(post_at, color=[0.45, 0.3, 0.15], roughness=0.8)
+door_post = phys.body@1(post_wood, kind="static", shape="box")
+output door_post = door_post
+door = solid.box@1(size=[1, 1.8, 0.06])
+door_at = xform.move@1(door, by=[-0.5, 0.9, -3])
+door_oak = solid.material@1(door_at, color=[0.55, 0.35, 0.18], roughness=0.7)
+door_body = phys.body@1(door_oak, shape="box", density=0.5)
+door_hinge = phys.joint@1(door_body, kind="hinge", to="door_post", anchor=[-0.95, 0.9, -3], axis=[0, 1, 0], limited=true, low=-110, high=110, damping=1.5)
+output door = door_hinge
+cabinet = solid.box@1(size=[1.2, 1, 0.8])
+cabinet_at = xform.move@1(cabinet, by=[3, 0.5, -3.4])
+cabinet_grey = solid.material@1(cabinet_at, color=[0.35, 0.4, 0.5], roughness=0.6)
+cabinet_body = phys.body@1(cabinet_grey, kind="static", shape="box")
+output cabinet = cabinet_body
+drawer = solid.box@1(size=[1, 0.3, 0.7])
+drawer_at = xform.move@1(drawer, by=[3, 0.65, -3.1])
+drawer_gold = solid.material@1(drawer_at, color=[0.85, 0.65, 0.2], roughness=0.4)
+drawer_body = phys.body@1(drawer_gold, shape="box", density=0.5)
+drawer_slide = phys.joint@1(drawer_body, kind="slider", to="cabinet", anchor=[3, 0.65, -3.1], axis=[0, 0, 1], limited=true, low=0, high=0.6, damping=2)
+output drawer = drawer_slide
+
+# A weight on a spring.
+spring_bar = solid.box@1(size=[1, 0.1, 0.1])
+spring_bar_at = xform.move@1(spring_bar, by=[6, 4, -3])
+spring_bar_steel = solid.material@1(spring_bar_at, color=[0.5, 0.55, 0.6], roughness=0.4)
+spring_hook = phys.body@1(spring_bar_steel, kind="static", shape="box")
+output spring_hook = spring_hook
+weight = solid.box@1(size=[0.5, 0.5, 0.5])
+weight_at = xform.move@1(weight, by=[6, 2.4, -3])
+weight_blue = solid.material@1(weight_at, color=[0.2, 0.35, 0.85], roughness=0.5)
+weight_body = phys.body@1(weight_blue, shape="box", density=3)
+weight_spring = phys.joint@1(weight_body, kind="spring", to="spring_hook", anchor=[6, 2.65, -3], anchor_b=[6, 3.95, -3], rest_length=0.9, stiffness=25, damping=0.8)
+output spring_weight = weight_spring
+
+# Windmill: the blades turn on a hinge with a motor.
+tower = solid.box@1(size=[0.3, 3, 0.3])
+tower_at = xform.move@1(tower, by=[-6, 1.5, 3])
+tower_stone = solid.material@1(tower_at, color=[0.75, 0.7, 0.6], roughness=0.9)
+windmill_tower = phys.body@1(tower_stone, kind="static", shape="box")
+output windmill_tower = windmill_tower
+blades = solid.box@1(size=[3, 0.25, 0.05])
+blades_at = xform.move@1(blades, by=[-6, 3.1, 3.25])
+blades_cross = solid.box@1(size=[0.25, 3, 0.05])
+blades_cross_at = xform.move@1(blades_cross, by=[-6, 3.1, 3.25])
+blades_both = solid.union@1(blades_at, blades_cross_at)
+blades_red = solid.material@1(blades_both, color=[0.8, 0.25, 0.2], roughness=0.5)
+blades_body = phys.body@1(blades_red, shape="convex", density=0.5)
+blades_motor = phys.joint@1(blades_body, kind="hinge", to="windmill_tower", anchor=[-6, 3.1, 3.25], axis=[0, 0, 1], motor_speed=80, motor_force=30)
+output windmill_blades = blades_motor
+
+# A plank bridge: six planks hinged to each other, to a post at each end, with a heavy ball on it.
+post_left = solid.box@1(size=[0.1, 2, 0.6])
+post_left_at = xform.move@1(post_left, by=[0.1, 1, 3])
+post_stone = solid.material@1(post_left_at, color=[0.6, 0.6, 0.65], roughness=0.9)
+bridge_post_a = phys.body@1(post_stone, kind="static", shape="box")
+output bridge_post_a = bridge_post_a
+post_right_at = xform.move@1(post_left, by=[4.3, 1, 3])
+post_right_stone = solid.material@1(post_right_at, color=[0.6, 0.6, 0.65], roughness=0.9)
+bridge_post_b = phys.body@1(post_right_stone, kind="static", shape="box")
+output bridge_post_b = bridge_post_b
+plank = solid.box@1(size=[0.6, 0.05, 0.5])
+plank_wood = solid.material@1(plank, color=[0.6, 0.42, 0.22], roughness=0.8)
+pl0_at = xform.move@1(plank_wood, by=[0.45, 2, 3])
+pl0_body = phys.body@1(pl0_at, shape="box", friction=0.8, density=15)
+pl0 = phys.joint@1(pl0_body, kind="hinge", to="bridge_post_a", anchor=[0.15, 2, 3], axis=[0, 0, 1], damping=0.1)
+output plank0 = pl0
+pl1_at = xform.move@1(plank_wood, by=[1.15, 2, 3])
+pl1_body = phys.body@1(pl1_at, shape="box", friction=0.8, density=15)
+pl1 = phys.joint@1(pl1_body, kind="hinge", to="plank0", anchor=[0.8, 2, 3], axis=[0, 0, 1], damping=0.1)
+output plank1 = pl1
+pl2_at = xform.move@1(plank_wood, by=[1.85, 2, 3])
+pl2_body = phys.body@1(pl2_at, shape="box", friction=0.8, density=15)
+pl2 = phys.joint@1(pl2_body, kind="hinge", to="plank1", anchor=[1.5, 2, 3], axis=[0, 0, 1], damping=0.1)
+output plank2 = pl2
+pl3_at = xform.move@1(plank_wood, by=[2.55, 2, 3])
+pl3_body = phys.body@1(pl3_at, shape="box", friction=0.8, density=15)
+pl3 = phys.joint@1(pl3_body, kind="hinge", to="plank2", anchor=[2.2, 2, 3], axis=[0, 0, 1], damping=0.1)
+output plank3 = pl3
+pl4_at = xform.move@1(plank_wood, by=[3.25, 2, 3])
+pl4_body = phys.body@1(pl4_at, shape="box", friction=0.8, density=15)
+pl4 = phys.joint@1(pl4_body, kind="hinge", to="plank3", anchor=[2.9, 2, 3], axis=[0, 0, 1], damping=0.1)
+output plank4 = pl4
+pl5_at = xform.move@1(plank_wood, by=[3.95, 2, 3])
+pl5_body = phys.body@1(pl5_at, shape="box", friction=0.8, density=15)
+pl5_a = phys.joint@1(pl5_body, kind="hinge", to="plank4", anchor=[3.6, 2, 3], axis=[0, 0, 1], damping=0.1)
+pl5 = phys.joint@1(pl5_a, kind="hinge", to="bridge_post_b", anchor=[4.25, 2, 3], axis=[0, 0, 1], damping=0.1)
+output plank5 = pl5
+cannon = solid.sphere@1(radius=0.25, segments=24)
+cannon_dark = solid.material@1(cannon, color=[0.15, 0.15, 0.2], roughness=0.3)
+cannon_at = xform.move@1(cannon_dark, by=[2.3, 3.2, 3])
+cannon_ball = phys.body@1(cannon_at, shape="sphere", density=6)
+output bridge_ball = cannon_ball
+
+# A seesaw with a ball dropped on one end.
+fulcrum = solid.box@1(size=[0.2, 0.3, 1])
+fulcrum_at = xform.move@1(fulcrum, by=[-2, 0.15, 6])
+fulcrum_grey = solid.material@1(fulcrum_at, color=[0.4, 0.4, 0.45], roughness=0.7)
+seesaw_base = phys.body@1(fulcrum_grey, kind="static", shape="box")
+output seesaw_base = seesaw_base
+seesaw_plank = solid.box@1(size=[4, 0.1, 0.9])
+seesaw_at = xform.move@1(seesaw_plank, by=[-2, 0.4, 6])
+seesaw_wood = solid.material@1(seesaw_at, color=[0.65, 0.45, 0.25], roughness=0.7)
+seesaw_body = phys.body@1(seesaw_wood, shape="box", density=0.6)
+seesaw_hinge = phys.joint@1(seesaw_body, kind="hinge", to="seesaw_base", anchor=[-2, 0.35, 6], axis=[0, 0, 1], limited=true, low=-18, high=18, damping=0.3)
+output seesaw = seesaw_hinge
+drop_ball = solid.sphere@1(radius=0.22, segments=24)
+drop_green = solid.material@1(drop_ball, color=[0.15, 0.7, 0.3], roughness=0.4)
+drop_at = xform.move@1(drop_green, by=[-3.6, 3, 6])
+seesaw_ball = phys.body@1(drop_at, shape="sphere", density=6)
+output seesaw_ball = seesaw_ball
+
+# A bell, and a ball that rings it: the collision sets the flag "ring", and the lamp follows that flag.
+bell = solid.sphere@1(radius=0.3, segments=24)
+bell_gold = solid.material@1(bell, color=[0.95, 0.75, 0.2], roughness=0.25, metallic=0.8)
+bell_at = xform.move@1(bell_gold, by=[3, 1.4, 6])
+bell_body = phys.body@1(bell_at, kind="static", shape="sphere")
+output bell = bell_body
+clapper = solid.sphere@1(radius=0.18, segments=24)
+clapper_blue = solid.material@1(clapper, color=[0.2, 0.4, 0.95], roughness=0.3)
+clapper_at = xform.move@1(clapper_blue, by=[3.1, 4, 6])
+clapper_body = phys.body@1(clapper_at, shape="sphere", restitution=0.5)
+clapper_rings = behavior.on@1(clapper_body, trigger="collide", accepts="bell", sets="ring")
+output ringer = clapper_rings
+lamp_bulb = solid.sphere@1(radius=0.2, segments=24)
+lamp_glass = solid.material@1(lamp_bulb, color=[0.05, 0.05, 0.05], emissive=[3, 2.4, 1.2], emits_light=true, roughness=0.3)
+lamp_at = xform.move@1(lamp_glass, by=[4.6, 1.4, 6])
+lamp_glow = anim.track@1(lamp_at, property="glow", keys="0:0; 0.4:1", loop=false)
+lamp_follows = behavior.on@1(lamp_glow, trigger="flag", watch="ring", action="follow")
+output lamp = lamp_follows

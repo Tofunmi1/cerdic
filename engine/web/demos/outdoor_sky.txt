@@ -1,0 +1,13 @@
+# Reference scene: outdoors. Fractal terrain, a lake, scattered trees, a sky with clouds and a low sun.
+land = terrain.heightfield@1(size=[24, 20], height=3.5, scale=7, octaves=4, roughness=0.52, seed=17, resolution=96, base=1.2, style="hills", edge_falloff=0.12, flat_below=0.15)
+grass = solid.material@1(land, color=[0.3, 0.5, 0.22], roughness=0.85)
+output land = grass
+water = water.surface@1(size=[14, 11], level=0.7, depth=0.55, color=[0.08, 0.34, 0.5], opacity=0.6, wave_height=0.035, wave_length=2.4, speed=0.7, seed=9, resolution=64)
+output lake = water
+pine = solid.cone@1(radius=0.3, height=2.2, segments=10)
+bark = solid.material@1(pine, color=[0.12, 0.3, 0.14], roughness=0.8)
+forest = inst.scatter@1(bark, count=34, width=22, depth=18, min_spacing=1.3, seed=5)
+trees = inst.drop@1(forest, land, offset=0, align=0.4)
+output trees = trees
+sky = scene.sky@1(sun_elevation=20, sun_azimuth=-35, sun_intensity=4, turbidity=4, ground_color=[0.32, 0.25, 0.18], clouds=true, cloud_cover=0.4, seed=13)
+output sky = sky

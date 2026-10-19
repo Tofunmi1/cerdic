@@ -15,11 +15,15 @@ use bevy_render::view::ExtractedView;
 use bytemuck::{Pod, Zeroable};
 
 use crate::extract::{ExtractedMesh, ExtractedMeshes};
+use crate::grade::Grading;
 use crate::light::{ExtractedLights, LightsUniform, pack_lights};
 use crate::pipeline::ForwardPipelines;
 use crate::quality::RenderQuality;
 use crate::shadow::{ShadowMap, ShadowState};
 use crate::stereo::{StereoViews, viewer_position};
+
+#[path = "prepare/view_uniform.rs"]
+mod view_uniform;
 
 /// Per-instance vertex data: the model matrix (four `vec4` columns) and the material.
 #[repr(C)]
@@ -29,13 +33,22 @@ pub(crate) struct InstanceData {
     pub(crate) base_color: [f32; 4],
     pub(crate) params: [f32; 4],
     pub(crate) emissive: [f32; 4],
+    pub(crate) maps: [f32; 4],
+    pub(crate) toon_a: [f32; 4],
+    pub(crate) toon_b: [f32; 4],
+    pub(crate) toon_c: [f32; 4],
 }
 
 /// A run of consecutive instances that share a mesh and can be drawn with one call.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Batch {
     pub(crate) mesh: AssetId<Mesh>,
     pub(crate) instances: Range<u32>,
+    pub(crate) transparent: bool,
+    pub(crate) center: bevy_math::Vec3,
+    pub(crate) sort_key: u64,
+    /// Whether any instance of the batch has an outline, so the outline pass draws it.
+    pub(crate) outlined: bool,
 }
 
 /// The instance buffer and the draw batches over it.
@@ -54,14 +67,22 @@ impl Default for InstanceBatches {
     }
 }
 
-/// Sorts instances by mesh and groups equal meshes into consecutive batches.
-///
-/// Returns the per-instance data in draw order and the batches over it. The sort is stable, so
-/// instances of one mesh keep their extraction order. Materials ride along as instance data, so
-/// only the mesh decides which instances can share a draw call.
+/// Sorts instances by mesh (stably) and groups equal meshes into batches; materials ride along as
+/// instance data, so only the mesh decides what shares a draw call. Returns data in draw order.
 pub(crate) fn group_into_batches(meshes: &[ExtractedMesh]) -> (Vec<InstanceData>, Vec<Batch>) {
     let mut sorted = meshes.to_vec();
-    sorted.sort_by_key(|m| m.mesh);
+    sorted.sort_by(|a, b| {
+        a.transparent
+            .cmp(&b.transparent)
+            .then_with(|| a.mesh.cmp(&b.mesh))
+            .then_with(|| {
+                if a.transparent {
+                    a.sort_key.cmp(&b.sort_key)
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            })
+    });
     let mut data = Vec::with_capacity(sorted.len());
     let mut batches: Vec<Batch> = Vec::new();
     for mesh in &sorted {
@@ -71,12 +92,24 @@ pub(crate) fn group_into_batches(meshes: &[ExtractedMesh]) -> (Vec<InstanceData>
             base_color: mesh.material.base_color,
             params: mesh.material.params,
             emissive: mesh.material.emissive,
+            maps: mesh.material.maps,
+            toon_a: mesh.material.toon_a,
+            toon_b: mesh.material.toon_b,
+            toon_c: mesh.material.toon_c,
         });
+        let outlined = mesh.material.toon_c[3] > 0.0;
         match batches.last_mut() {
-            Some(batch) if batch.mesh == mesh.mesh => batch.instances.end = index + 1,
+            Some(batch) if !batch.transparent && !mesh.transparent && batch.mesh == mesh.mesh => {
+                batch.instances.end = index + 1;
+                batch.outlined |= outlined;
+            }
             _ => batches.push(Batch {
                 mesh: mesh.mesh,
                 instances: index..index + 1,
+                transparent: mesh.transparent,
+                center: mesh.center,
+                sort_key: mesh.sort_key,
+                outlined,
             }),
         }
     }
@@ -107,17 +140,19 @@ pub(crate) struct ViewUniform {
     pub(crate) camera_position: Vec4,
     /// x: exposure multiplier applied before tonemapping.
     pub(crate) exposure: Vec4,
-}
-
-impl ViewUniform {
-    /// The uniform for an eye or camera at `world_from_view` with projection `clip_from_view`.
-    pub(crate) fn new(world_from_view: Mat4, clip_from_view: Mat4) -> Self {
-        Self {
-            clip_from_world: clip_from_view * world_from_view.inverse(),
-            camera_position: world_from_view.w_axis.truncate().extend(1.0),
-            exposure: Vec4::new(1.0, 0.0, 0.0, 0.0),
-        }
-    }
+    /// x: contrast, y: saturation (applied after tonemapping); z, w unused.
+    pub(crate) grading: Vec4,
+    /// rgb: per-channel tint multiplier; w unused.
+    pub(crate) tint: Vec4,
+    /// x enables geometric specular anti-aliasing; remaining lanes reserved.
+    pub(crate) effects: Vec4,
+    pub(crate) world_from_clip: Mat4,
+    pub(crate) viewport: Vec4,
+    pub(crate) horizon: Vec4,
+    pub(crate) zenith: Vec4,
+    pub(crate) ground: Vec4,
+    pub(crate) sun: Vec4,
+    pub(crate) cloud: Vec4,
 }
 
 /// One drawing of the scene from a viewpoint: where its uniform lives in the shared dynamic buffer
@@ -144,6 +179,9 @@ pub(crate) fn prepare_view_uniforms(
     mut commands: Commands,
     mut uniforms: ResMut<ViewUniforms>,
     views: Query<(Entity, &ExtractedView, Option<&StereoViews>)>,
+    grading: Res<Grading>,
+    quality: Res<RenderQuality>,
+    sky: Res<crate::SkyBackground>,
     pipelines: Res<ForwardPipelines>,
     pipeline_cache: Res<PipelineCache>,
     device: Res<RenderDevice>,
@@ -155,11 +193,15 @@ pub(crate) fn prepare_view_uniforms(
             stereo
                 .eyes
                 .iter()
-                .map(|eye| ViewSlot {
-                    offset: uniforms
-                        .buffer
-                        .push(&ViewUniform::new(eye.world_from_view, eye.clip_from_view)),
-                    viewport: Some(eye.viewport),
+                .map(|eye| {
+                    let mut uniform = ViewUniform::new(eye.world_from_view, eye.clip_from_view);
+                    uniform.set_grading(&grading);
+                    uniform.set_quality(&quality);
+                    uniform.set_sky(&sky, eye.viewport);
+                    ViewSlot {
+                        offset: uniforms.buffer.push(&uniform),
+                        viewport: Some(eye.viewport),
+                    }
                 })
                 .collect()
         } else {
@@ -168,6 +210,9 @@ pub(crate) fn prepare_view_uniforms(
             if let Some(clip_from_world) = view.clip_from_world {
                 uniform.clip_from_world = clip_from_world;
             }
+            uniform.set_grading(&grading);
+            uniform.set_quality(&quality);
+            uniform.set_sky(&sky, view.viewport.to_array());
             vec![ViewSlot {
                 offset: uniforms.buffer.push(&uniform),
                 viewport: None,
@@ -218,6 +263,7 @@ pub(crate) fn prepare_lights(
         &lights,
         viewer,
         quality.max_point_lights,
+        quality.max_spot_lights,
         &shadow.params,
     ));
     gpu.buffer.write_buffer(&device, &queue);
@@ -268,7 +314,10 @@ mod tests {
         ExtractedMesh {
             mesh: mesh_id(mesh),
             world_from_local: Mat4::from_translation(Vec3::new(x, 0.0, 0.0)),
-            material: VeMaterial::default().pack(),
+            material: VeMaterial::default().pack_for_instance(0),
+            transparent: false,
+            sort_key: u64::try_from(mesh).unwrap_or(u64::MAX),
+            center: Vec3::new(x, 0.0, 0.0),
         }
     }
 
@@ -304,7 +353,9 @@ mod tests {
 
     #[test]
     fn instance_data_follows_batch_order_and_keeps_extraction_order_within_a_mesh() {
-        let input = [instance(2, 10.0), instance(1, 20.0), instance(2, 30.0)];
+        let mut input = [instance(2, 10.0), instance(1, 20.0), instance(2, 30.0)];
+        input[0].sort_key = 99;
+        input[2].sort_key = 1;
         let (data, batches) = group_into_batches(&input);
         // Mesh 1 sorts first with one instance; mesh 2 follows with its two in extraction order.
         assert_eq!(batches[0].mesh, mesh_id(1));
@@ -338,10 +389,12 @@ mod tests {
             roughness: 0.1,
             ..VeMaterial::default()
         }
-        .pack();
+        .pack_for_instance(0);
         let (data, batches) = group_into_batches(&[shiny, instance(1, 1.0)]);
         assert_eq!(batches.len(), 1);
         assert!((data[0].params[0] - 1.0).abs() < f32::EPSILON);
         assert!(data[1].params[0].abs() < f32::EPSILON);
     }
+
+    mod opacity_tests;
 }

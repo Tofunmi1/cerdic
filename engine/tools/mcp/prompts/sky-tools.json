@@ -1,0 +1,5 @@
+[
+  { "name": "clear-noon", "prompt": "Create a simple open field with a small tree and a clear procedural noon sky. The sky should be blue overhead, paler near the horizon, and its sun should light the field. Set clouds=false.", "uses": ["terrain.heightfield", "scene.sky"], "sky": { "clouds": false } },
+  { "name": "stormy-dusk", "prompt": "Create a low dark landscape at stormy dusk with a turbulent-looking grey procedural sky, heavy clouds and a low warm sun. Keep the scene editable and use the sky node for outdoor lighting. Set clouds=true.", "uses": ["terrain.heightfield", "scene.sky"], "sky": { "clouds": true } },
+  { "name": "moonlit-night", "prompt": "Create a quiet night landscape under a very dark blue procedural sky with the sun below the horizon and a small pale moon model. Use procedural clouds and keep the moon as actual geometry. Set clouds=true.", "uses": ["terrain.heightfield", "scene.sky"], "sky": { "clouds": true } }
+]

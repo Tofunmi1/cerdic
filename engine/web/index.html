@@ -15,15 +15,48 @@
       cursor: pointer;
     }
     #enter-vr[hidden] { display: none; }
+    #play-mode {
+      position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 5;
+      padding: 8px 18px; border: 1px solid rgba(255,255,255,.35); border-radius: 999px;
+      background: rgba(20,20,24,.55); color: #fff; font: 600 14px system-ui, sans-serif;
+      backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4);
+      cursor: pointer;
+    }
+    #play-mode[hidden] { display: none; }
+    #timeline {
+      position: fixed; left: 50%; bottom: 124px; transform: translateX(-50%); z-index: 5;
+      display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+      border: 1px solid rgba(255,255,255,.35); border-radius: 999px;
+      background: rgba(20,20,24,.55); color: #fff; font: 600 13px system-ui, sans-serif;
+      backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    }
+    #timeline[hidden] { display: none; }
+    #timeline button, #timeline select {
+      border: 0; border-radius: 999px; padding: 4px 10px; background: rgba(255,255,255,.18); color: #fff;
+      font: inherit; cursor: pointer;
+    }
+    #timeline input[type="range"] { width: 200px; }
+    #timeline output { min-width: 88px; text-align: right; font-variant-numeric: tabular-nums; }
+    #play-mode[aria-pressed="true"] { background: rgba(40,160,90,.7); }
   </style>
 </head>
 <body>
   <canvas id="ve"></canvas>
   <button id="enter-vr" hidden>Enter VR</button>
+  <button id="play-mode" aria-pressed="false" hidden>Play</button>
+  <div id="timeline" hidden role="group" aria-label="Animation timeline">
+    <button id="tl-play" type="button" aria-label="Pause animation">Pause</button>
+    <input id="tl-scrub" type="range" min="0" max="1" step="0.01" value="0" aria-label="Animation time">
+    <output id="tl-time" for="tl-scrub">0.00 / 0.00 s</output>
+    <select id="tl-speed" aria-label="Animation speed">
+      <option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option>
+    </select>
+  </div>
   <script type="module">
     import init, {
-      start, status, set_quality, set_governor, set_window_hz, xr_supported, enter_xr, exit_xr,
+      start, status, set_quality, set_shadows, set_specular_aa, set_ssao, set_bloom, set_governor, set_window_hz, xr_supported, enter_xr, exit_xr,
       viewer_configure, viewer_look, viewer_move, viewer_set_locked, viewer_reset, viewer_set_lens,
+      set_grading, set_grading_preset, grading_status, audio_sfx, audio_music, fx_explode, fx_live_particles, viewer_pose,
       doc_open, doc_reset, doc_state, doc_apply, doc_undo, doc_redo, doc_save, doc_operators,
     } from "./ve_runtime.js";
     import * as runtimeApi from "./ve_runtime.js";
@@ -36,6 +69,7 @@
     const state = {
       ready: false, bootMs: null, error: null, xrSupported: false,
       read: () => JSON.parse(status()),
+      projection: () => JSON.parse(runtimeApi.eval_projection_status()),
       enterXr: () => enter_xr("ve"),
       exitXr: () => exit_xr(),
       setQuality: (tier) => set_quality(tier),
@@ -47,6 +81,11 @@
       bindMemory(wasm.memory);
       state.wasmBytes = () => wasm.memory.buffer.byteLength;
       if (params.has("quality")) set_quality(params.get("quality"));
+      set_specular_aa(params.get("specular-aa") === "on");
+      set_ssao(params.get("ssao") === "on");
+      set_bloom(params.get("bloom") === "on");
+      if (params.get("shadows") === "off") set_shadows(false);
+      else if (params.get("shadows") === "on") set_shadows(true);
       if (params.get("governor") === "1") set_governor(true);
       if (params.has("hz")) set_window_hz(Number(params.get("hz")));
       // ?eval=1 (or ?mcp=1) evaluates the document into geometry, in an empty lit studio room.
@@ -65,27 +104,208 @@
         });
         state.doc = bridge.doc;
         state.evaluation = bridge.evaluation;
+        // Play mode (ADR 0027): the button appears when the scene has a part that reacts to being clicked or
+        // approached; while playing, clicks use the scene instead of selecting, and Stop puts everything back.
+        const playButton = document.getElementById("play-mode");
+        const paint = (playing) => {
+          playButton.setAttribute("aria-pressed", String(playing));
+          playButton.textContent = playing ? "Stop" : "Play";
+        };
+        let clickedAt = 0;
+        playButton.addEventListener("click", () => {
+          const playing = playButton.getAttribute("aria-pressed") !== "true";
+          runtimeApi.viewer_play_mode(playing);
+          paint(playing);
+          clickedAt = performance.now();
+        });
+        setInterval(() => {
+          const now = JSON.parse(runtimeApi.viewer_behaviors());
+          // Something to play: a part that reacts, or a physics prop that can fall and be thrown (ADR 0035).
+          const playable = now.parts.length > 0 || JSON.parse(runtimeApi.viewer_physics()).movable > 0;
+          playButton.hidden = !playable;
+          if (!playable && now.play) runtimeApi.viewer_play_mode(false);
+          // The engine applies a request on its next frame; do not repaint from stale state meanwhile.
+          if (performance.now() - clickedAt > 1500) paint(now.play);
+        }, 400);
+        // Timeline for the shared clock: parts that move without a behaviour play from it. Play/pause, scrub, speed.
+        const bar = document.getElementById("timeline");
+        const scrub = document.getElementById("tl-scrub");
+        const label = document.getElementById("tl-time");
+        const tlPlay = document.getElementById("tl-play");
+        const tlSpeed = document.getElementById("tl-speed");
+        let scrubbing = false;
+        scrub.addEventListener("pointerdown", () => { scrubbing = true; });
+        scrub.addEventListener("pointerup", () => { scrubbing = false; });
+        scrub.addEventListener("input", () => runtimeApi.viewer_animation(false, Number(scrub.value)));
+        tlPlay.addEventListener("click", () => {
+          const now = JSON.parse(runtimeApi.viewer_behaviors()).clock;
+          runtimeApi.viewer_animation(!now.playing, -1);
+        });
+        tlSpeed.addEventListener("change", () => runtimeApi.viewer_animation_speed(Number(tlSpeed.value)));
+        setInterval(() => {
+          const parts = (state.evaluation?.parts ?? []).filter((part) => part.animation?.length && !part.behavior);
+          const tracks = parts.flatMap((part) => part.animation);
+          const duration = Math.max(0, ...tracks.map((track) => track.keys[track.keys.length - 1].time));
+          bar.hidden = duration <= 0;
+          if (bar.hidden) return;
+          const { clock } = JSON.parse(runtimeApi.viewer_behaviors());
+          const looping = tracks.some((track) => track.looped);
+          const shown = looping ? clock.seconds % duration : Math.min(clock.seconds, duration);
+          scrub.max = String(duration);
+          if (!scrubbing) scrub.value = String(shown);
+          label.textContent = `${shown.toFixed(2)} / ${duration.toFixed(2)} s`;
+          tlPlay.textContent = clock.playing ? "Pause" : "Play";
+          tlPlay.setAttribute("aria-label", clock.playing ? "Pause animation" : "Play animation");
+          if (document.activeElement !== tlSpeed) tlSpeed.value = String(clock.speed);
+        }, 150);
       }
       const wantsPanel = params.get("doc") === "1" || params.get("viewer") === "1";
       if (wantsPanel) {
-        const { startDocPanel } = await import("./docpanel.js");
         const name = params.get("docname") ?? "default";
         state.doc.open(name);
+        const { startDocPanel } = await import("./docpanel.js");
         state.docPanel = startDocPanel({ api: state.doc, name, evaluation: state.evaluation, runtime: runtimeApi });
       } else if (evalOn) {
         state.doc.open(params.get("docname") ?? "default");
       }
+      const demo = params.get("model");
+      if (["viaduct", "physics", "physics_big", "physics_joints", "physics_walk", "animation", "scenery", "village", "village_hd", "beach_arch", "mannequin", "toon_gallery", "weathered_stone", "style_gallery", "outdoor_sky", "materials_grid", "lit_room"].includes(demo) && state.doc.state().nodes === 0) {
+        const response = await fetch(`./models/${demo}.txt`, { cache: "no-store" });
+        if (!response.ok) throw new Error(`could not load the ${demo} model (${response.status})`);
+        const result = state.doc.sendText(await response.text(), `Load ${demo}`);
+        if (!result?.committed && !result?.pending?.committed) {
+          throw new Error(`could not stage the ${demo} model: ${JSON.stringify(result)}`);
+        }
+      }
       // Desktop viewer (mouse look, wide field of view, split screen): opt in with ?viewer=1.
       if (params.get("viewer") === "1") {
         const { startViewer } = await import("./viewer.js");
+        const { insertTransformBatch, parameterHandleCommand, viewportEditConflictReason } = await import("./panels/transform-commands.js");
         const api = {
           viewer_configure, viewer_look, viewer_move, viewer_set_locked, viewer_reset, viewer_set_lens, set_quality,
+          set_shadows,
+          set_specular_aa,
+          set_ssao, set_bloom,
+          set_grading, set_grading_preset, grading_status, audio_sfx, audio_music, fx_explode, fx_live_particles, viewer_pose,
           viewer_zoom: runtimeApi.viewer_zoom, viewer_orbit: runtimeApi.viewer_orbit, viewer_frame: runtimeApi.viewer_frame,
           viewer_look_at: runtimeApi.viewer_look_at,
+          viewer_gizmo: runtimeApi.viewer_gizmo, gizmo_begin: runtimeApi.gizmo_begin,
+          viewer_gizmo_at: runtimeApi.viewer_gizmo_at,
+          viewer_project: runtimeApi.viewer_project, gizmo_begin_profile: runtimeApi.gizmo_begin_profile,
+          gizmo_begin_camera_plane: runtimeApi.gizmo_begin_camera_plane,
+          gizmo_update: runtimeApi.gizmo_update, gizmo_cancel: runtimeApi.gizmo_cancel,
+          selection_get: runtimeApi.selection_get, document_state: () => state.doc.state(),
         };
         state.viewer = startViewer({
           canvas: document.getElementById("ve"), api, params, frameBounds: () => state.evaluation?.bounds ?? null,
+          frameSelectionBounds: () => {
+            const selection = JSON.parse(runtimeApi.selection_get());
+            return state.evaluation?.boundsForNodes(selection.parts ?? []) ?? null;
+          },
+          frameSocketPivot: () => {
+            const socket = state.docPanel?.selection?.socket;
+            return socket ? state.evaluation?.socketPosition(socket.part, socket.name) ?? null : null;
+          },
+          socketFrames: () => {
+            const selection = JSON.parse(runtimeApi.selection_get());
+            return state.evaluation?.socketFrames(selection.parts ?? []) ?? [];
+          },
+          selectedSocket: () => state.docPanel?.selection?.socket ?? null,
+          pickSocket: (part, name) => state.docPanel?.selection?.selectSocket(part, name),
+          overlayGeometry: () => {
+            const selection = JSON.parse(runtimeApi.selection_get());
+            return state.evaluation?.overlayForNodes(selection.parts ?? []) ?? { wire: [], normals: [] };
+          },
+          diagnosticNodes: () => {
+            const current = state.doc.state();
+            const failure = state.evaluation?.state.failureCurrent ? state.evaluation.state.lastFailure : null;
+            const nodes = new Set([...(current.issues ?? []), ...(failure ? [failure] : [])]
+              .flatMap((issue) => [issue.node, ...(issue.related ?? [])]).filter(Boolean));
+            return [...nodes].flatMap((node) => {
+              const bounds = state.evaluation?.boundsByNode[node];
+              return bounds ? [bounds] : [];
+            });
+          },
+          parameterHandles: (nodeId) => {
+            const node = state.doc.state().document.nodes.find((candidate) => candidate.id === nodeId);
+            if (node?.op === "xform.array@1" || node?.op === "inst.array@1") return { kind: "array" };
+            if (node?.op === "inst.repeat@1") return { kind: "repeat" };
+            if (node?.op === "frame.add@1") return { kind: "frame", rotation: true };
+            if (node?.op === "solid.revolve@1") return { kind: "revolve" };
+            return null;
+          },
+          profilePoints: (nodeId) => {
+            const node = state.doc.state().document.nodes.find((candidate) => candidate.id === nodeId);
+            if (node?.op === "profile.polygon@1" && Array.isArray(node.params?.points)) {
+              return { kind: "polygon", points: node.params.points };
+            }
+            if (node?.op === "profile.circle@1" && Number.isFinite(node.params?.radius)) {
+              return { kind: "radius", radius: node.params.radius };
+            }
+            return null;
+          },
+          curveControlPoints: (nodeId) => {
+            const node = state.doc.state().document.nodes.find((candidate) => candidate.id === nodeId);
+            if (node?.op === "curve.circle@1" && Array.isArray(node.params?.center)
+              && Number.isFinite(node.params?.radius)) {
+              return { kind: "circle", center: node.params.center, radius: node.params.radius,
+                segments: node.params.segments ?? 48 };
+            }
+            if (["curve.polyline@1", "curve.bezier@1"].includes(node?.op)
+              && Array.isArray(node.params?.points)) {
+              return { kind: node.op === "curve.bezier@1" ? "bezier" : "polyline",
+                points: node.params.points, closed: node.params.closed === true };
+            }
+            return null;
+          },
+          commitTransform: ({ node, revision, pivot, axis, profileIndex, profileRadius, curveIndex, parameter, delta }) => {
+            const current = state.doc.state();
+            const selected = JSON.parse(runtimeApi.selection_get());
+            const conflict = viewportEditConflictReason(current, selected, node, revision);
+            if (conflict) {
+              state.docPanel?.render?.();
+              return { conflict };
+            }
+            if (parameter) {
+              const commands = parameterHandleCommand(current.document, node, parameter, axis, delta);
+              if (!commands) return { refused: true };
+              return state.doc.send(commands, `Edit ${parameter}`);
+            }
+            if (Number.isInteger(profileIndex)) {
+              const target = current.document.nodes.find((candidate) => candidate.id === node);
+              if (target?.op !== "profile.polygon@1" || !Array.isArray(target.params?.points)
+                || !delta || delta.kind !== "translate" || !target.params.points[profileIndex]) return { refused: true };
+              const points = target.params.points.map((point) => [...point]);
+              points[profileIndex] = [points[profileIndex][0] + delta.value[0], points[profileIndex][1] + delta.value[1]];
+              return state.doc.send([{ set_param: { node, param: "points", value: points } }], "Move profile point");
+            }
+            if (Number.isInteger(curveIndex)) {
+              const target = current.document.nodes.find((candidate) => candidate.id === node);
+              if (!["curve.polyline@1", "curve.bezier@1"].includes(target?.op)
+                || !Array.isArray(target.params?.points) || !target.params.points[curveIndex]
+                || !delta || delta.kind !== "translate") return { refused: true };
+              const points = target.params.points.map((point) => [...point]);
+              points[curveIndex] = points[curveIndex].map((value, index) => value + delta.value[index]);
+              return state.doc.send([{ set_param: { node, param: "points", value: points } }], "Move curve control point");
+            }
+            if (profileRadius === true) {
+              const target = current.document.nodes.find((candidate) => candidate.id === node);
+              if (target?.op !== "profile.circle@1" || !Number.isFinite(target.params?.radius)
+                || !delta || delta.kind !== "translate") return { refused: true };
+              const radius = target.params.radius + delta.value[0];
+              return state.doc.send([{ set_param: { node, param: "radius", value: radius } }], "Adjust profile radius");
+            }
+            const edit = delta.kind === "translate" ? { mode: "translate", delta: delta.value, pivot }
+              : delta.kind === "rotate" ? { mode: "rotate", axis, radians: delta.radians, pivot }
+                : { mode: "scale", axis, factor: delta.factor, pivot };
+            const commands = insertTransformBatch(current.document, node, edit);
+            if (!commands) return { refused: true };
+            return state.doc.send(commands, `Viewport ${delta.kind}`);
+          },
         });
+        if (params.get("toolbar") === "off") {
+          document.getElementById("viewer-gizmo-controls")?.style.setProperty("display", "none", "important");
+        }
       }
       const poll = setInterval(() => {
         if (state.read().frames > 0) {

@@ -107,6 +107,36 @@ export function createInspector({ root, api, selection, document: documentOf, pr
     return rows;
   }
 
+  /// The viewport pick mode, and (V3-09) why a feature pick stopped on a part: the evaluator does not
+  /// record which operand made a face, so the operands are listed and the user chooses one.
+  function featureRows(doc) {
+    const rows = [];
+    const label = el("label", "flag");
+    const box = el("input");
+    box.type = "checkbox";
+    box.id = "pick-feature";
+    box.checked = selection.featureMode;
+    box.addEventListener("change", () => selection.setFeatureMode(box.checked));
+    label.append(box, " Pick the authored feature when clicking a part");
+    rows.push(label);
+    const ambiguity = selection.ambiguity;
+    if (ambiguity) {
+      const names = ambiguity.candidates.map((id) => nodeName(doc.nodes.find((n) => n.id === id) ?? { op: id }));
+      const issue = el("div", "issue",
+        `selection.ambiguous: the clicked geometry could come from ${names.join(", ")}. Face provenance is not recorded; choose one.`);
+      issue.dataset.code = "selection.ambiguous";
+      rows.push(issue);
+      for (const id of ambiguity.candidates) {
+        const candidate = doc.nodes.find((n) => n.id === id);
+        const button = el("button", "candidate", `${nodeName(candidate)} · ${family(candidate.op)}`);
+        button.dataset.candidate = id;
+        button.addEventListener("click", () => selection.select(id));
+        rows.push(button);
+      }
+    }
+    return rows;
+  }
+
   function render() {
     const doc = documentOf();
     const group = doc.groups?.find((candidate) => candidate.id === selection.node);
@@ -120,15 +150,19 @@ export function createInspector({ root, api, selection, document: documentOf, pr
     // are part of what an instance or a member shows.
     const outputs=(node||group)?new Set(partsFor(doc,node?.id??group.id)):new Set();
     const sockets=(evaluation?.socketParts ?? []).filter(part=>outputs.has(part.node));
-    const signature = JSON.stringify([node ?? null, group ?? null, doc.groups ?? [], node?.instance || group ? doc.nodes.filter((n) => n.group) : null, mine,selection.instance,selection.instanceCount,selection.socket,sockets]);
+    const signature = JSON.stringify([node ?? null, group ?? null, selection.lost, doc.groups ?? [], node?.instance || group ? doc.nodes.filter((n) => n.group) : null, mine,selection.instance,selection.instanceCount,selection.socket,sockets,selection.featureMode,selection.ambiguity]);
     if (signature === lastSignature) return;
     lastSignature = signature;
+    const head = featureRows(doc);
     if (group) {
-      root.replaceChildren(...groupEditor({ doc, group, send, selection, problems: mine }),...socketRows(sockets));
+      root.replaceChildren(...head, ...groupEditor({ doc, group, send, selection, problems: mine }),...socketRows(sockets));
       return;
     }
     if (!node) {
-      root.replaceChildren(el("div", "empty", "Select a node in the outliner, or click a part in the viewport."));
+      const message = selection.lost
+        ? `selection.lost: selected node ${selection.lost} no longer exists.`
+        : "Select a node in the outliner, or click a part in the viewport.";
+      root.replaceChildren(...head, el("div", selection.lost ? "issue" : "empty", message));
       return;
     }
     const spec = specs().get(node.op);
@@ -136,7 +170,7 @@ export function createInspector({ root, api, selection, document: documentOf, pr
       ? instanceEditor({ doc, node, specs: specs(), send, selection, problems: mine })
       : operatorRows(doc, node, spec, mine);
     specific.push(...socketRows(sockets));
-    root.replaceChildren(...nodeEditor(doc, node, spec, mine, specific));
+    root.replaceChildren(...head, ...nodeEditor(doc, node, spec, mine, specific));
   }
 
   return { render };

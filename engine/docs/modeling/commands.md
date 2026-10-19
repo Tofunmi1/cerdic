@@ -40,7 +40,7 @@ real ID or an alias.
 { "doc": "d_7k2m9q4x", "base_revision": 12, "transaction": "t_01HZ...", "label": "widen opening",
   "commands": [ { "set_param": { "node": "n_a1b2c3d4", "param": "points", "value": [[0,0],[0.06,0],[0.11,0.12],[0.09,0.26],[0.07,0.30],[0,0.30]] } } ] }
 ```
-Rules: at most 200 commands and 256 KiB per batch. The batch is atomic. Validation runs on a candidate
+Rules: at most 1,000 commands and 1 MiB per batch. The batch is atomic. Validation runs on a candidate
 copy; the committed document changes only on success and a matching `base_revision`. The first
 failing command stops the batch and its index is in the diagnostic (`command`). After a connect or a
 version change the whole graph is re-checked (ports, arity, types, cycles), so every prefix of a
@@ -78,6 +78,11 @@ counter; the undone batch's key stays remembered, so re-sending it does nothing:
 Transforms are nodes (`xform.move`, `xform.rotate`, `xform.scale`), so the inspector and gizmos edit
 those nodes' parameters with `set_param`. Undo and redo are session requests (`undo`, `redo`), not
 commands: they carry a request ID and move along recorded transactions.
+
+`poly.subdivide@1(cage, levels=1)` accepts simple concave planar n-gons: each concave face is
+triangulated before Catmull-Clark and reports `poly.subdivide.concave_face_triangulated`. Convex
+faces keep their cage topology. This adds diagonal edge flow across concave faces; keep the warning
+in mind when downstream selection depends on edge layout.
 
 ## Results
 ```json

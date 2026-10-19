@@ -20,7 +20,7 @@ use ve_xr_web::{XrPlugin, apply_xr_frame};
 
 use crate::scene::{self, SceneKind};
 use crate::viewer::ViewerRig;
-use crate::{interact, mock_hmd};
+use crate::{grading, interact, mock_hmd};
 use crate::{perf, quality, status, wands};
 
 /// The clear colour the golden tests expect on the canvas (sRGB 26, 51, 102).
@@ -60,8 +60,14 @@ pub(crate) fn start(canvas_id: &str, scene: SceneKind) -> Result<(), PlatformErr
     app.insert_resource(scene);
     app.init_resource::<perf::Perf>();
     app.init_resource::<ViewerRig>();
+    app.init_resource::<scene::SceneAmbient>();
+    app.init_resource::<crate::animation::AnimationClock>();
+    app.init_resource::<crate::animation::PartPoses>();
+    app.init_resource::<crate::physics::Physics>();
     interact::plugin(&mut app);
     app.add_systems(Startup, scene::spawn_scene);
+    app.add_systems(Update, crate::fx::step);
+    app.add_systems(Startup, scene::remember_ambient.after(scene::spawn_scene));
     // The frame's order: the XR frame is applied first (`apply_xr_frame`), then everything that
     // reads head or controller poses (wands and the interaction chain) sees that same frame, and
     // the status report is written last so it describes what this frame did.
@@ -74,9 +80,31 @@ pub(crate) fn start(canvas_id: &str, scene: SceneKind) -> Result<(), PlatformErr
                 .after(wands::update_wands)
                 .after(interact::highlight_hover),
             mock_hmd::update_mock_hmd,
+            crate::studio::scale_room,
             quality::apply_requested,
+            grading::apply_requested,
             quality::sync_xr_scale.after(quality::apply_requested),
             perf::track_frame_time,
+            (
+                crate::animation::apply_requested,
+                crate::animation::advance,
+                crate::behavior::xr_toggle,
+                crate::behavior::intake,
+                crate::behavior::proximity,
+                crate::behavior::collect_grabs,
+                crate::behavior::sync_grabbable,
+                crate::behavior::run,
+                crate::physics::run,
+                crate::animation::animate,
+                crate::animation::apply_glow,
+                crate::animation::apply_visibility,
+                crate::animation::apply_color,
+                crate::animation::animate_lights,
+                crate::animation::animate_instances,
+                crate::skinning::skin_meshes,
+            )
+                .chain()
+                .after(crate::projection::update),
         ),
     );
     app.run();

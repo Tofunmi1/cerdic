@@ -31,10 +31,14 @@ ve-core = { path = "../ve-core" }
 ve-graph = { path = "../ve-graph" }
 ve-interact = { path = "../ve-interact" }
 ve-kernel = { path = "../ve-kernel" }
+ve-measure = { path = "../ve-measure" }
 ve-modeling = { path = "../ve-modeling" }
+ve-physics = { path = "../ve-physics" }
 ve-xr-math = { path = "../ve-xr-math" }
 ve-xr-web = { path = "../ve-xr-web" }
 ve-platform-web = { path = "../ve-platform-web" }
+ve-particles = { path = "../ve-particles" }
+ve-audio = { path = "../ve-audio" }
 ve-render = { path = "../ve-render" }
 serde_json.workspace = true
 wasm-bindgen.workspace = true
