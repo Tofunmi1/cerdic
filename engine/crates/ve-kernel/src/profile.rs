@@ -81,6 +81,26 @@ impl Profile {
         ffi::offset(&self.0, delta, true).map(Self)
     }
 
+    /// Rounds convex corners while preserving the outer bounds by eroding with mitered corners,
+    /// then growing with round joins.
+    ///
+    /// # Errors
+    /// Invalid distance, an eroded-away profile, oversized output or kernel failure.
+    pub fn fillet(&self, radius: f64) -> Result<Self, KernelError> {
+        if !radius.is_finite() || radius <= 0.0 || radius > crate::MAX_EXTENT {
+            return Err(KernelError::InvalidArgument(
+                "fillet radius must be finite and positive",
+            ));
+        }
+        let core = self.offset(-radius)?;
+        if core.is_empty() {
+            return Err(KernelError::InvalidArgument(
+                "fillet radius removes profile core",
+            ));
+        }
+        core.offset_round(radius)
+    }
+
     /// Removes the other profile without changing either input.
     ///
     /// # Errors

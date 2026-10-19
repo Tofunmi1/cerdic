@@ -16,6 +16,7 @@ pub struct PolyMesh {
     face_sizes: Vec<u32>,
     corners: Vec<u32>,
     attributes: BTreeMap<String, Attribute>,
+    triangulation: crate::TriangulationMode,
 }
 
 impl PolyMesh {
@@ -57,6 +58,7 @@ impl PolyMesh {
             face_sizes,
             corners,
             attributes: BTreeMap::new(),
+            triangulation: crate::TriangulationMode::PlanarOnly,
         })
     }
 
@@ -82,6 +84,17 @@ impl PolyMesh {
     #[must_use]
     pub fn attributes(&self) -> &BTreeMap<String, Attribute> {
         &self.attributes
+    }
+
+    /// Triangulation policy used when deriving a triangle mesh from this polygon mesh.
+    #[must_use]
+    pub fn triangulation_mode(&self) -> crate::TriangulationMode {
+        self.triangulation
+    }
+
+    /// Allows mildly curved quads to be triangulated for subdivision output.
+    pub fn set_triangulation_mode(&mut self, mode: crate::TriangulationMode) {
+        self.triangulation = mode;
     }
 
     /// Number of faces.

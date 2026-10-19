@@ -4,7 +4,7 @@
 //! target can hold and reports the rest ([`LossPolicy::Report`]) or refuses to lose attributes
 //! ([`LossPolicy::Reject`]); it never drops them silently.
 
-use ve_kernel::{Mesh, Solid};
+use ve_kernel::{ExecutionContext, Mesh, Solid};
 
 use crate::error::GeometryError;
 use crate::mesh::PolyMesh;
@@ -23,12 +23,46 @@ pub enum LossPolicy {
 pub struct LossReport {
     /// Attributes the target has no place for.
     pub dropped_attributes: Vec<String>,
-    /// Faces with more than three corners that were split into triangles (as a fan, which is only
-    /// right for planar convex faces).
+    /// Faces with more than three corners that were split into triangles.
     pub faces_triangulated: usize,
 }
 
 impl PolyMesh {
+    /// Maps each output triangle corner back to its source polygon corner.
+    ///
+    /// The order exactly matches [`PolyMesh::to_kernel_mesh_with_context`], so corner-domain data
+    /// such as UVs can survive triangulation without welding across seams.
+    ///
+    /// # Errors
+    /// Returns triangulation or cancellation errors under the same conditions as mesh conversion.
+    pub fn triangulated_corner_indices(
+        &self,
+        context: &ExecutionContext,
+    ) -> Result<Vec<usize>, GeometryError> {
+        let mut output = Vec::new();
+        let mut start = 0_usize;
+        for &size in self.face_sizes() {
+            let size = usize::try_from(size)
+                .map_err(|_| GeometryError::InvalidMesh("face size overflows usize"))?;
+            let face = self
+                .corners()
+                .get(start..start + size)
+                .ok_or(GeometryError::InvalidMesh("face range is outside corners"))?;
+            for triangle in
+                crate::triangulate::face(self, face, self.triangulation_mode(), context)?
+            {
+                for vertex in triangle {
+                    let local = face.iter().position(|&corner| corner == vertex).ok_or(
+                        GeometryError::InvalidMesh("triangulation returned a foreign corner"),
+                    )?;
+                    output.push(start + local);
+                }
+            }
+            start += size;
+        }
+        Ok(output)
+    }
+
     /// A polygon mesh of the kernel mesh's triangles, with no attributes.
     ///
     /// # Errors
@@ -42,12 +76,25 @@ impl PolyMesh {
         )
     }
 
-    /// The kernel mesh of this mesh, triangulating larger faces as fans.
+    /// The kernel mesh of this mesh, triangulating simple planar faces by deterministic ear clipping.
     ///
     /// # Errors
     /// [`GeometryError::AttributesWouldBeLost`] under [`LossPolicy::Reject`] when the mesh has
     /// attributes (the kernel mesh cannot hold them).
     pub fn to_kernel_mesh(&self, policy: LossPolicy) -> Result<(Mesh, LossReport), GeometryError> {
+        let context = ExecutionContext::new()?;
+        self.to_kernel_mesh_with_context(policy, &context)
+    }
+
+    /// Converts using the supplied cancellation context.
+    ///
+    /// # Errors
+    /// Returns an attribute-loss, triangulation, mesh or cancellation error.
+    pub fn to_kernel_mesh_with_context(
+        &self,
+        policy: LossPolicy,
+        context: &ExecutionContext,
+    ) -> Result<(Mesh, LossReport), GeometryError> {
         let names: Vec<String> = self.attributes().keys().cloned().collect();
         if policy == LossPolicy::Reject && !names.is_empty() {
             return Err(GeometryError::AttributesWouldBeLost(names));
@@ -56,14 +103,16 @@ impl PolyMesh {
         let mut triangulated = 0;
         let mut start = 0_usize;
         for &size in self.face_sizes() {
-            let size = size as usize;
-            let face = self.corners().get(start..start + size).unwrap_or(&[]);
-            if let Some((&first, rest)) = face.split_first() {
-                for pair in rest.windows(2) {
-                    if let [b, c] = pair {
-                        indices.extend([first, *b, *c]);
-                    }
-                }
+            let size = usize::try_from(size)
+                .map_err(|_| GeometryError::InvalidMesh("face size overflows usize"))?;
+            let face = self
+                .corners()
+                .get(start..start + size)
+                .ok_or(GeometryError::InvalidMesh("face range is outside corners"))?;
+            for triangle in
+                crate::triangulate::face(self, face, self.triangulation_mode(), context)?
+            {
+                indices.extend(triangle);
             }
             triangulated += usize::from(size > 3);
             start += size;

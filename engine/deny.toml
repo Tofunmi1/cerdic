@@ -1,4 +1,4 @@
-# Licence and supply-chain policy. GPL-family code stays out of the engine (see docs/adr/0003).
+# Licence and supply-chain policy. The GPL exclusion was removed (docs/adr/0024); add a GPL SPDX id to `allow` only when a dependency needs it.
 [graph]
 targets = [{ triple = "wasm32-unknown-unknown" }, { triple = "aarch64-apple-darwin" }]
 

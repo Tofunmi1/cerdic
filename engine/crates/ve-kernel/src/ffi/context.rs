@@ -11,6 +11,12 @@ unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
 
 impl Context {
+    pub(crate) fn as_ptr(&self) -> *const sys::VeContext {
+        self.0.as_ptr()
+    }
+    pub(crate) fn as_mut_ptr(&self) -> *mut sys::VeContext {
+        self.0.as_ptr()
+    }
     pub(crate) fn new() -> Result<Self, KernelError> {
         ensure_initialized();
         // SAFETY: constructor takes no pointers and transfers unique ownership.

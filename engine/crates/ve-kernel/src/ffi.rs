@@ -14,8 +14,11 @@ use ve_kernel_sys as sys;
 use crate::KernelError;
 
 pub(crate) mod context;
+pub(crate) mod field;
+pub(crate) mod polymesh;
 pub(crate) mod profile;
 pub(crate) mod rigid;
+pub(crate) mod subdivision;
 
 /// Runs the C++ static constructors once on `wasm32-unknown-unknown`, where nothing else does.
 /// A no-op on every other target (native and WASI start the C++ runtime themselves).
@@ -26,6 +29,13 @@ fn ensure_initialized() {
         // SAFETY: runs exactly once, before any other kernel call, on the only thread.
         INIT.call_once(|| unsafe { sys::__wasm_call_ctors() });
     }
+}
+
+/// Blender's easing curve of `kind` (0 back, 1 bounce, 2 elastic) at `fraction`.
+pub(crate) fn blender_ease(kind: i32, fraction: f32) -> f32 {
+    ensure_initialized();
+    // SAFETY: a pure function of two numbers; it takes and keeps no pointers.
+    unsafe { sys::ve_blender_ease(kind, fraction) }
 }
 
 /// Owning handle to a kernel solid.
@@ -125,6 +135,58 @@ pub(crate) fn from_mesh(positions: &[[f32; 3]], indices: &[u32]) -> Result<Handl
     Handle::from_raw(ptr, status)
 }
 
+pub(crate) fn reserve_ids(count: u32) -> u32 {
+    ensure_initialized();
+    // SAFETY: takes and returns plain integers; the kernel's counter is atomic.
+    unsafe { sys::ve_reserve_ids(count) }
+}
+
+pub(crate) fn from_mesh_runs(
+    positions: &[[f32; 3]],
+    indices: &[u32],
+    first_triangles: &[usize],
+    ids: &[u32],
+) -> Result<Handle, KernelError> {
+    ensure_initialized();
+    if first_triangles.len() != ids.len() {
+        return Err(KernelError::InvalidArgument(
+            "every run needs a first triangle and an id",
+        ));
+    }
+    let flat = positions.as_flattened();
+    let mut status = sys::VE_OK;
+    // SAFETY: `flat` holds `3 * positions.len()` floats, `indices` its length in entries, and the two
+    // run slices have equal length `ids.len()`; the kernel copies everything and validates ranges.
+    let ptr = unsafe {
+        sys::ve_solid_from_mesh_runs(
+            flat.as_ptr(),
+            positions.len(),
+            indices.as_ptr(),
+            indices.len(),
+            first_triangles.as_ptr(),
+            ids.as_ptr(),
+            ids.len(),
+            &raw mut status,
+        )
+    };
+    Handle::from_raw(ptr, status)
+}
+
+pub(crate) fn runs(s: &Handle) -> Result<(Vec<usize>, Vec<u32>), KernelError> {
+    // SAFETY: the handle is live.
+    let count = unsafe { sys::ve_solid_num_runs(s.as_ptr()) };
+    let mut first = vec![0_usize; count];
+    let mut ids = vec![0_u32; count];
+    // SAFETY: the handle is live; both buffers hold exactly `count` elements.
+    let status =
+        unsafe { sys::ve_solid_copy_runs(s.as_ptr(), first.as_mut_ptr(), ids.as_mut_ptr(), count) };
+    if status == sys::VE_OK {
+        Ok((first, ids))
+    } else {
+        Err(KernelError::from_status(status))
+    }
+}
+
 type BinaryOp = unsafe extern "C" fn(
     *const sys::VeSolid,
     *const sys::VeSolid,
@@ -148,6 +210,49 @@ pub(crate) fn difference(a: &Handle, b: &Handle) -> Result<Handle, KernelError> 
 
 pub(crate) fn intersect(a: &Handle, b: &Handle) -> Result<Handle, KernelError> {
     binary(sys::ve_solid_intersect, a, b)
+}
+
+pub(crate) fn round(solid: &Handle, radius: f64, segments: i32) -> Result<Handle, KernelError> {
+    let mut status = sys::VE_OK;
+    // SAFETY: the source handle is borrowed and live; `status` is an out-pointer for this call.
+    let ptr = unsafe { sys::ve_solid_round(solid.as_ptr(), radius, segments, &raw mut status) };
+    Handle::from_raw(ptr, status)
+}
+
+pub(crate) fn chamfer(solid: &Handle, width: f64) -> Result<Handle, KernelError> {
+    let mut status = sys::VE_OK;
+    // SAFETY: the source handle is borrowed and live; `status` is an out-pointer for this call.
+    let ptr = unsafe { sys::ve_solid_chamfer(solid.as_ptr(), width, &raw mut status) };
+    Handle::from_raw(ptr, status)
+}
+
+/// `MikkTSpace` tangents, one `[x, y, z, sign]` per index; the caller has checked the slice lengths.
+pub(crate) fn tangents(
+    positions: &[[f32; 3]],
+    normals: &[[f32; 3]],
+    uvs: &[[f32; 2]],
+    indices: &[u32],
+) -> Result<Vec<[f32; 4]>, KernelError> {
+    let mut out = vec![[0.0_f32; 4]; indices.len()];
+    // SAFETY: every pointer is valid for the length passed with it: positions and normals hold
+    // `3 * vertex_count` floats and uvs `2 * vertex_count` (the caller checked the three lengths agree),
+    // `indices` holds `index_count` entries, and `out` holds four floats per index. Nothing is retained.
+    let status = unsafe {
+        sys::ve_tangents(
+            positions.as_ptr().cast::<f32>(),
+            normals.as_ptr().cast::<f32>(),
+            uvs.as_ptr().cast::<f32>(),
+            positions.len(),
+            indices.as_ptr(),
+            indices.len(),
+            out.as_mut_ptr().cast::<f32>(),
+        )
+    };
+    if status == sys::VE_OK {
+        Ok(out)
+    } else {
+        Err(KernelError::from_status(status))
+    }
 }
 
 type TransformOp = unsafe extern "C" fn(
