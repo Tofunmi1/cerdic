@@ -1,0 +1,17 @@
+# Two boxes joined by a tunnel: delete the facing wall of each, then bridge the two open rims.
+# The enclosed volume is both boxes plus the 1 x 1 x 2 tunnel: 4.
+box = solid.box@1(size=[1, 1, 1])
+other = xform.move@1(box, by=[3, 0, 0])
+both = solid.union@1(box, other)
+triangles = poly.from_solid@1(both)
+mesh = poly.merge_coplanar@1(triangles)
+wall_a = poly.select@1(mesh, by="box", box_min=[0.4, -1, -1], box_max=[0.6, 1, 1], expect="one")
+open_a = poly.delete_faces@1(mesh, wall_a)
+wall_b = poly.select@1(open_a, by="box", box_min=[2.4, -1, -1], box_max=[2.6, 1, 1], expect="one")
+open_b = poly.delete_faces@1(open_a, wall_b)
+rims = poly.select@1(open_b, element="loop")
+bridged = poly.bridge_loops@1(open_b, rims)
+solid = poly.to_solid@1(bridged)
+lifted = xform.move@1(solid, by=[0, 0.5, 0])
+clay = solid.material@1(lifted, color=[0.75, 0.45, 0.3], metallic=0, roughness=0.6)
+output tunnel = clay

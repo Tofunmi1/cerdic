@@ -42,6 +42,7 @@ fn zero3() -> Value {
 pub(super) fn all() -> Vec<Option<OperatorSpec>> {
     let mut all = profiles();
     all.extend(primitives());
+    all.extend(edge_treatment());
     all.extend(patterns());
     all.extend(circular_patterns());
     all
@@ -136,6 +137,40 @@ fn primitives() -> Vec<Option<OperatorSpec>> {
                 ),
                 segments(24, 512),
             ],
+        ),
+    ]
+}
+
+/// Edge treatment that acts on a whole solid: the two bounded Minkowski operations.
+fn edge_treatment() -> Vec<Option<OperatorSpec>> {
+    vec![
+        spec(
+            "solid.round@1",
+            "Rounds a closed solid by eroding then expanding it with a small sphere; bounded to 20,000 input and 250,000 output triangles.",
+            vec![single("in", XFORMABLE)],
+            OutputSpec::SameAsInput("in"),
+            vec![
+                length(
+                    "radius",
+                    "Edge radius in metres; less than half the thinnest solid dimension.",
+                ),
+                ParamSpec {
+                    name: "segments",
+                    ty: ParamType::Int { min: 6, max: 24 },
+                    default: Some(Value::Int(12)),
+                    doc: "Sphere profile resolution; higher values cost more kernel time.",
+                },
+            ],
+        ),
+        spec(
+            "solid.chamfer@1",
+            "Breaks convex edges with a flat 45-degree facet by eroding then expanding the solid with an octahedron; bounded to 20,000 input and 250,000 output triangles. Concave edges stay sharp.",
+            vec![single("in", XFORMABLE)],
+            OutputSpec::SameAsInput("in"),
+            vec![length(
+                "width",
+                "Chamfer width in metres; less than half the thinnest solid dimension.",
+            )],
         ),
     ]
 }

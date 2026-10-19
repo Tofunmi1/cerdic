@@ -192,6 +192,7 @@ pub(super) fn links(spec: &OperatorSpec, name: &str, args: &[Arg], known: &Known
     for port in &spec.inputs {
         let take = match port.arity {
             Arity::One => 1,
+            Arity::Optional => usize::from(next < positional.len()),
             Arity::Variadic { .. } => positional.len().saturating_sub(next),
         };
         for (source, span) in positional.iter().skip(next).take(take) {

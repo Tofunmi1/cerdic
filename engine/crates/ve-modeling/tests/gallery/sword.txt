@@ -1,0 +1,43 @@
+# Fantasy sword: tapered, gently bent blade with a fuller, curved cross-guard, wrapped grip, jewelled pommel.
+s0 = profile.rect@1(size=[0.044, 0.009])
+s1 = profile.rect@1(size=[0.04, 0.0085])
+s2 = profile.rect@1(size=[0.034, 0.0075])
+s3 = profile.rect@1(size=[0.022, 0.006])
+s4 = profile.rect@1(size=[0.005, 0.0025])
+blade_raw = solid.loft@1(s0, s1, s2, s3, s4, spacing=0.15)
+fuller = solid.box@1(size=[0.008, 0.38, 0.003])
+fuller_f = xform.move@1(fuller, by=[0, 0.22, 0.0046])
+fuller_b = xform.move@1(fuller, by=[0, 0.22, -0.0046])
+grooves = solid.union@1(fuller_f, fuller_b)
+blade_cut = solid.difference@1(blade_raw, grooves)
+blade = xform.bend@1(blade_cut, angle=0.07rad, tolerance=0.002)
+guard_path = curve.bezier@1(points=[[-0.1,0.035,0],[-0.07,-0.025,0],[0.07,-0.025,0],[0.1,0.035,0]], steps=32)
+guard_section = profile.rect@1(size=[0.022, 0.016])
+guard = solid.sweep@1(curve=guard_path, profile=guard_section)
+grip = solid.cylinder@1(radius=0.0145, height=0.15, segments=32)
+grip_down = xform.move@1(grip, by=[0, -0.085, 0])
+wrap = solid.torus@1(major=0.0148, minor=0.0028, segments=32, tube_segments=10)
+wrap_start = xform.move@1(wrap, by=[0, -0.02, 0])
+wraps = inst.repeat@1(wrap_start, count=9, step=[0, -0.0155, 0])
+pommel = solid.sphere@1(radius=0.026, segments=32)
+pommel_down = xform.move@1(pommel, by=[0, -0.175, 0])
+gem = solid.sphere@1(radius=0.011, segments=20)
+gem_pos = xform.move@1(gem, by=[0, -0.175, 0.021])
+steel = solid.material@1(blade, color=[0.78, 0.8, 0.84], metallic=1, roughness=0.12)
+gold = solid.material@1(guard, color=[0.9, 0.68, 0.25], metallic=1, roughness=0.2)
+leather = solid.material@1(grip_down, color=[0.28, 0.14, 0.07], metallic=0, roughness=0.75)
+cord = solid.material@1(wraps, color=[0.12, 0.07, 0.04], metallic=0, roughness=0.8)
+knob = solid.material@1(pommel_down, color=[0.9, 0.68, 0.25], metallic=1, roughness=0.2)
+jewel = solid.material@1(gem_pos, color=[0.8, 0.05, 0.1], metallic=0.2, roughness=0.1, emissive=[1.2, 0, 0.1])
+steel_up = xform.move@1(steel, by=[0, 0.22, 0])
+gold_up = xform.move@1(gold, by=[0, 0.22, 0])
+leather_up = xform.move@1(leather, by=[0, 0.22, 0])
+cord_up = xform.move@1(cord, by=[0, 0.22, 0])
+knob_up = xform.move@1(knob, by=[0, 0.22, 0])
+jewel_up = xform.move@1(jewel, by=[0, 0.22, 0])
+output blade = steel_up
+output guard = gold_up
+output grip = leather_up
+output wrap = cord_up
+output pommel = knob_up
+output gem = jewel_up

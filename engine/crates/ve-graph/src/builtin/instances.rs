@@ -25,8 +25,140 @@ fn vector(name: &'static str, unit: Unit, default: bool) -> ParamSpec {
         doc: "Vector in metres or radians.",
     }
 }
+fn seed() -> ParamSpec {
+    ParamSpec {
+        name: "seed",
+        ty: ParamType::Int {
+            min: 0,
+            max: 2_147_483_647,
+        },
+        default: Some(Value::Int(0)),
+        doc: "Authored random seed; the same seed gives the same result on every platform.",
+    }
+}
+fn amount(
+    name: &'static str,
+    unit: Unit,
+    max: f64,
+    default: Option<f64>,
+    doc: &'static str,
+) -> ParamSpec {
+    ParamSpec {
+        name,
+        ty: ParamType::Num {
+            unit,
+            min: 0.0,
+            max,
+        },
+        default: default.map(Value::Num),
+        doc,
+    }
+}
+fn variation() -> [ParamSpec; 2] {
+    [
+        amount(
+            "yaw_jitter",
+            Unit::Angle,
+            std::f64::consts::PI,
+            Some(0.0),
+            "Largest random turn about Y, either way.",
+        ),
+        amount(
+            "scale_jitter",
+            Unit::Ratio,
+            0.9,
+            Some(0.0),
+            "Uniform scale varies by up to this fraction either way (0.2 means 0.8 to 1.2).",
+        ),
+    ]
+}
+fn variation_ops() -> Vec<Option<OperatorSpec>> {
+    let output = OutputSpec::Fixed(PortType::Inst);
+    let [yaw, scale] = variation();
+    let [yaw2, scale2] = variation();
+    vec![
+        spec(
+            "inst.scatter@1",
+            "Seeded scatter over a width x depth rectangle in the XZ plane centred on the origin; \
+             min_spacing keeps centres apart or the node refuses.",
+            vec![single("in", INPUT)],
+            output,
+            vec![
+                ParamSpec {
+                    name: "count",
+                    ty: ParamType::Int {
+                        min: 1,
+                        max: 16_384,
+                    },
+                    default: None,
+                    doc: "Number of placements; refused rather than reduced when the spacing cannot be met.",
+                },
+                amount("width", Unit::Length, EXTENT, None, "Extent along X."),
+                amount("depth", Unit::Length, EXTENT, None, "Extent along Z."),
+                amount(
+                    "min_spacing",
+                    Unit::Length,
+                    EXTENT,
+                    Some(0.0),
+                    "Smallest centre distance.",
+                ),
+                seed(),
+                yaw,
+                scale,
+            ],
+        ),
+        spec(
+            "inst.jitter@1",
+            "Varies each placement by a bounded random shift, turn and scale; element i depends only on the seed and i.",
+            vec![single("in", INPUT)],
+            output,
+            vec![vector("shift", Unit::Length, true), seed(), yaw2, scale2],
+        ),
+        spec(
+            "inst.drop@1",
+            "Sets every placement down onto a surface (trees, rocks and grass on a terrain; props on a table): each copy slides straight down onto the highest point of `surface` under it. Scatter over the surface's footprint first, then drop. A copy is dropped from where its own origin (the prototype's origin after placement) is, so build the prototype with its base at y=0. Copies that are not over the surface are removed.",
+            vec![single("in", INPUT), single("surface", &[PortType::Solid])],
+            output,
+            vec![
+                ParamSpec {
+                    name: "offset",
+                    ty: ParamType::Num {
+                        unit: Unit::Length,
+                        min: -100.0,
+                        max: 100.0,
+                    },
+                    default: Some(Value::Num(0.0)),
+                    doc: "Extra height above (or sink below, if negative) the surface in metres; a small negative value buries a tree trunk's base.",
+                },
+                ParamSpec {
+                    name: "align",
+                    ty: ParamType::Num {
+                        unit: Unit::Ratio,
+                        min: 0.0,
+                        max: 1.0,
+                    },
+                    default: Some(Value::Num(0.0)),
+                    doc: "0 keeps copies upright; 1 tilts each to stand square on the slope under it; in between tilts part of the way.",
+                },
+                ParamSpec {
+                    name: "outside",
+                    ty: ParamType::Choice {
+                        options: &["remove", "keep"],
+                    },
+                    default: Some(Value::Str("remove".to_owned())),
+                    doc: "What to do with copies not over the surface: remove them, or keep them where they were.",
+                },
+            ],
+        ),
+    ]
+}
 pub(super) fn all() -> Vec<Option<OperatorSpec>> {
     let output = OutputSpec::Fixed(PortType::Inst);
+    let mut ops = variation_ops();
+    ops.extend(base_ops(output));
+    ops
+}
+fn base_ops(output: OutputSpec) -> Vec<Option<OperatorSpec>> {
     vec![
         spec(
             "inst.array@1",

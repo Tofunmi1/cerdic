@@ -1,0 +1,18 @@
+# Six convex circular sections, hollowed by a raised inner loft.
+o0 = profile.circle@1(radius=0.20, segments=32)
+o1 = profile.circle@1(radius=0.25, segments=32)
+o2 = profile.circle@1(radius=0.18, segments=32)
+o3 = profile.circle@1(radius=0.20, segments=32)
+o4 = profile.circle@1(radius=0.29, segments=32)
+o5 = profile.circle@1(radius=0.32, segments=32)
+outer = solid.loft@1(o0, o1, o2, o3, o4, o5, spacing=0.12)
+i0 = profile.circle@1(radius=0.12, segments=32)
+i1 = profile.circle@1(radius=0.17, segments=32)
+i2 = profile.circle@1(radius=0.12, segments=32)
+i3 = profile.circle@1(radius=0.14, segments=32)
+i4 = profile.circle@1(radius=0.21, segments=32)
+i5 = profile.circle@1(radius=0.24, segments=32)
+inner_raw = solid.loft@1(i0, i1, i2, i3, i4, i5, spacing=0.12)
+inner = xform.move@1(inner_raw, by=[0, 0.12, 0])
+vase = solid.difference@1(outer, inner)
+output vase = vase

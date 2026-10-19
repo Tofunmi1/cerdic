@@ -6,7 +6,8 @@
     reason = "case helpers unwrap fixtures that are known to be valid and fail loudly otherwise"
 )]
 use ve_graph::{
-    CommandBatch, Document, Outcome, Session, TransactionId, builtin_registry, parse_text, to_text,
+    CommandBatch, Document, OpId, Outcome, Session, TransactionId, builtin_registry, parse_text,
+    to_text,
 };
 
 const VASE: &str = "\
@@ -314,12 +315,13 @@ fn syntax_errors_say_what_was_expected_and_where() {
 }
 
 #[test]
-fn draft_operators_are_not_accepted_from_text() {
+fn shipped_field_operators_are_ready_for_text_graphs() {
     let registry = builtin_registry();
-    assert!(
-        registry
-            .iter()
-            .all(|s| s.readiness == ve_graph::Readiness::Ready),
-        "every shipped operator is ready"
-    );
+    for name in ["field.plane@1", "field.ellipsoid@1", "field.tube@1"] {
+        let id = OpId::parse(name).unwrap();
+        assert_eq!(
+            registry.get(&id).unwrap().readiness,
+            ve_graph::Readiness::Ready
+        );
+    }
 }

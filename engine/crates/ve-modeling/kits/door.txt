@@ -1,0 +1,21 @@
+group door
+  jamb = solid.box@1(size=[0.05, 2.1, 0.14])
+  jamb_l = xform.move@1(jamb, by=[-0.475, 1.05, 0])
+  jambs = xform.array@1(jamb_l, count_x=2, spacing=[0.95, 0, 0])
+  head = solid.box@1(size=[1.0, 0.1, 0.14])
+  head_at = xform.move@1(head, by=[0, 2.05, 0])
+  frame = solid.union@1(jambs, head_at)
+  leaf = solid.box@1(size=[0.92, 1.98, 0.04])
+  handle = solid.sphere@1(radius=0.025, segments=16)
+  handle_at = xform.move@1(handle, by=[0.34, 0, 0.045])
+  fitted = solid.union@1(leaf, handle_at)
+  hinged = xform.move@1(fitted, by=[0.46, 1.0, 0])
+  swing = xform.rotate@1(hinged, angles=[0, 0, 0])
+  leaf_at = xform.move@1(swing, by=[-0.46, 0, 0])
+  all = solid.union@1(frame, leaf_at)
+  surface = solid.material@1(all, color=[0.45, 0.28, 0.16], roughness=0.6, recipe="wood")
+  expose swing = swing.angles
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

@@ -1,0 +1,20 @@
+group column
+  foot = solid.box@1(size=[0.5, 0.12, 0.5])
+  foot_at = xform.move@1(foot, by=[0, 0.06, 0])
+  plinth = solid.box@1(size=[0.4, 0.08, 0.4])
+  plinth_at = xform.move@1(plinth, by=[0, 0.16, 0])
+  shaft = solid.cone@1(height=2.0, radius=0.16, top_radius=0.12, segments=24)
+  shaft_at = xform.move@1(shaft, by=[0, 1.2, 0])
+  neck = solid.box@1(size=[0.38, 0.1, 0.38])
+  neck_at = xform.move@1(neck, by=[0, 2.25, 0])
+  capital = solid.box@1(size=[0.52, 0.1, 0.52])
+  capital_at = xform.move@1(capital, by=[0, 2.35, 0])
+  all = solid.union@1(foot_at, plinth_at, shaft_at, neck_at, capital_at)
+  surface = solid.material@1(all, color=[0.80, 0.78, 0.72], roughness=0.8, recipe="marble")
+  expose radius = shaft.radius
+  expose top_radius = shaft.top_radius
+  expose segments = shaft.segments
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

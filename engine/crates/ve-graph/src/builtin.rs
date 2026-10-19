@@ -7,12 +7,29 @@ use crate::spec::{
     Readiness,
 };
 use crate::value::{ParamType, Unit, Value};
+use ready::READY;
 
 mod assembly;
+mod curve_tools;
+mod curves;
+mod deformers;
+mod environment;
+mod fields;
 mod group_ops;
 mod instances;
+mod lights;
 mod modeling;
+mod physics;
+mod poly;
+mod poly_network;
+mod poly_network_whole;
+mod poly_output;
+mod poly_presets;
+mod poly_select;
+mod ready;
 mod shapes;
+mod terrain;
+mod water;
 
 /// The largest size or offset accepted, in metres (the kernel's own extent limit).
 const EXTENT: f64 = 1.0e6;
@@ -24,6 +41,8 @@ const PROFILE: &[PortType] = &[PortType::Profile];
 /// to nothing.
 const XFORMABLE: &[PortType] = &[PortType::Solid];
 const PLACED: &[PortType] = &[PortType::Solid, PortType::Inst];
+/// What a material can colour: solids, placement sets and polygon meshes.
+const COLOURABLE: &[PortType] = &[PortType::Solid, PortType::Inst, PortType::Poly];
 
 fn length(name: &'static str, doc: &'static str) -> ParamSpec {
     ParamSpec {
@@ -93,12 +112,25 @@ fn all_specs() -> Vec<Option<OperatorSpec>> {
     let mut all = primitives();
     all.extend(booleans());
     all.extend(transforms());
+    all.extend(deformers::all());
+    all.extend(fields::all());
     all.extend(profiles());
     all.extend(modeling::from_profiles());
+    all.extend(curves::all());
+    all.extend(curve_tools::all());
+    all.extend(terrain::all());
+    all.extend(water::all());
+    all.extend(physics::all());
     all.extend(shapes::all());
     all.extend(group_ops::all());
     all.extend(instances::all());
+    all.extend(lights::all());
+    all.extend(environment::all());
     all.extend(assembly::all());
+    all.extend(poly::all());
+    all.extend(poly_presets::all());
+    all.extend(poly_network::all());
+    all.extend(poly_output::all());
     for spec in all.iter_mut().flatten() {
         if READY.contains(&spec.id.to_string().as_str()) {
             spec.readiness = Readiness::Ready;
@@ -106,46 +138,6 @@ fn all_specs() -> Vec<Option<OperatorSpec>> {
     }
     all
 }
-
-/// Operators whose declared conformance cases pass in the modeling tests.
-const READY: &[&str] = &[
-    "solid.box@1",
-    "solid.sphere@1",
-    "solid.cylinder@1",
-    "solid.union@1",
-    "solid.difference@1",
-    "solid.intersect@1",
-    "xform.move@1",
-    "xform.rotate@1",
-    "xform.scale@1",
-    "profile.polygon@1",
-    "profile.offset@1",
-    "profile.smooth@1",
-    "profile.difference@1",
-    "solid.extrude@1",
-    "solid.revolve@1",
-    "solid.material@1",
-    "check.min_wall@1",
-    "profile.rect@1",
-    "profile.circle@1",
-    "solid.cone@1",
-    "solid.torus@1",
-    "solid.capsule@1",
-    "xform.mirror@1",
-    "xform.array@1",
-    "xform.radial@1",
-    "xform.repeat@1",
-    "group.use@1",
-    "group.input@1",
-    "inst.array@1",
-    "inst.repeat@1",
-    "inst.radial@1",
-    "inst.mirror@1",
-    "inst.realize@1",
-    "xform.align@1",
-    "frame.add@1",
-    "xform.attach@1",
-];
 
 fn primitives() -> Vec<Option<OperatorSpec>> {
     let solid = OutputSpec::Fixed(PortType::Solid);

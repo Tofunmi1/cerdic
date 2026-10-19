@@ -1,0 +1,16 @@
+group roof_gable
+  section = profile.polygon@1(points=[[-1.6, 0], [1.6, 0], [0, 1.05]])
+  prism = solid.extrude@1(section, height=4.4)
+  turned = xform.rotate@1(prism, angles=[90, 0, 0])
+  slopes = xform.move@1(turned, by=[0, 0, -2.2])
+  ridge = solid.box@1(size=[0.14, 0.1, 4.5])
+  ridge_at = xform.move@1(ridge, by=[0, 1.05, 0])
+  all = solid.union@1(slopes, ridge_at)
+  surface = solid.material@1(all, color=[0.46, 0.28, 0.20], roughness=0.75, recipe="planks")
+  expose section = section.points
+  expose length = prism.height
+  expose ridge = ridge.size
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

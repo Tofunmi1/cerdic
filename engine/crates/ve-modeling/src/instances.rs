@@ -11,8 +11,10 @@ use std::rc::Rc;
 use ve_graph::Node;
 use ve_kernel::{ExecutionContext, Mesh, Solid};
 
+mod drop;
 mod output;
 mod preflight;
+mod scatter;
 pub(crate) use output::parts;
 pub(crate) use preflight::estimate;
 pub(crate) use preflight::realization;
@@ -43,7 +45,20 @@ pub(crate) fn execute(
     if node.op.family().as_str() == "inst.realize" {
         return realize(node, &base, context);
     }
-    let transforms = placements(node).map_err(|e| kernel_fail(node, &e))?;
+    if node.op.family().as_str() == "inst.jitter" {
+        return jittered(node, base);
+    }
+    if node.op.family().as_str() == "inst.drop" {
+        let surface = inputs
+            .get(1)
+            .ok_or_else(|| fail("graph.missing_input", "inst.drop needs a surface"))?;
+        let transforms = drop::drop_onto(node, &base, &surface.mesh)?;
+        return revalued(base, transforms);
+    }
+    let transforms = match node.op.family().as_str() {
+        "inst.scatter" => scatter::scatter(node)?,
+        _ => placements(node).map_err(|e| kernel_fail(node, &e))?,
+    };
     let count = preflight::product(base.transforms.len(), transforms.len())?;
     let corners = bounds_corners(&base.prototype.mesh);
     let mut composed = Vec::with_capacity(count);
@@ -75,6 +90,42 @@ pub(crate) fn execute(
     value.instances = Some(InstanceSet {
         prototype: base.prototype,
         transforms: composed,
+    });
+    Ok(value)
+}
+
+/// `inst.jitter`: the same prototype and count with each placement varied in place.
+fn jittered(node: &Node, base: InstanceSet) -> Result<Value, Fail> {
+    let transforms = scatter::jitter(node, &base)?;
+    revalued(base, transforms)
+}
+
+/// The same prototype with new, checked placements.
+fn revalued(base: InstanceSet, transforms: Vec<DMat4>) -> Result<Value, Fail> {
+    let corners = bounds_corners(&base.prototype.mesh);
+    for matrix in &transforms {
+        if !matrix.is_finite()
+            || matrix.determinant().abs() < 1e-12
+            || corners
+                .iter()
+                .any(|p| matrix.transform_point3(*p).abs().max_element() > ve_kernel::MAX_EXTENT)
+        {
+            return Err(fail(
+                "kernel.invalid_input",
+                "jittered placement is non-finite, collapsed or outside the kernel extent",
+            ));
+        }
+    }
+    let mut value = Value::nothing();
+    value.material.clone_from(&base.prototype.material);
+    value.volume = base.prototype.volume
+        * transforms
+            .iter()
+            .map(|m| m.determinant().abs())
+            .sum::<f64>();
+    value.instances = Some(InstanceSet {
+        prototype: base.prototype,
+        transforms,
     });
     Ok(value)
 }

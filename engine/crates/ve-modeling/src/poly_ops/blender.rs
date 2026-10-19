@@ -1,0 +1,249 @@
+//! The polygon nodes that run Blender's bmesh operators: inset, extrude, solidify, poke, wireframe,
+//! subdivide, dissolve and symmetrize.
+
+use ve_geometry::{MeshOp, PokeCenter, PolyMesh};
+use ve_graph::Node;
+use ve_kernel::ExecutionContext;
+
+use super::errors::poly_fail;
+use super::params::{flag, number, text, vector};
+use super::selection::{Elements, Selection};
+use crate::Fail;
+
+/// The families this module runs.
+pub(super) fn handles(family: &str) -> bool {
+    matches!(
+        family,
+        "poly.inset_region"
+            | "poly.extrude_region"
+            | "poly.solidify"
+            | "poly.poke"
+            | "poly.wireframe"
+            | "poly.subdivide_edges"
+            | "poly.dissolve_limit"
+            | "poly.symmetrize"
+            | "poly.unwrap_uv"
+            | "poly.pack_uv"
+            | "poly.decimate"
+            | "poly.unsubdivide"
+            | "poly.triangulate"
+            | "poly.remove_doubles"
+    )
+}
+
+/// Whether the family needs no selection at all.
+pub(super) fn ignores_selection(family: &str) -> bool {
+    matches!(
+        family,
+        "poly.dissolve_limit"
+            | "poly.symmetrize"
+            | "poly.decimate"
+            | "poly.unsubdivide"
+            | "poly.triangulate"
+            | "poly.remove_doubles"
+            | "poly.pack_uv"
+    )
+}
+
+/// Whether the family takes a selection but runs on the whole mesh without one.
+pub(super) fn selection_optional(family: &str) -> bool {
+    matches!(
+        family,
+        "poly.solidify" | "poly.poke" | "poly.wireframe" | "poly.unwrap_uv"
+    )
+}
+
+pub(super) fn apply(
+    node: &Node,
+    family: &str,
+    poly: &PolyMesh,
+    selection: Option<&Selection>,
+    context: &ExecutionContext,
+) -> Result<PolyMesh, Fail> {
+    let (faces, edges) = chosen(node, family, selection)?;
+    let vertices = chosen_vertices(node, family, selection)?;
+    if family == "poly.unwrap_uv" {
+        return unwrap(node, poly, &edges, context);
+    }
+    if family == "poly.pack_uv" {
+        if !poly.attributes().contains_key("u") || !poly.attributes().contains_key("v") {
+            return Err(super::errors::refuse(
+                node,
+                "poly.uv_missing",
+                "corner UVs are missing; run poly.unwrap_uv first".to_owned(),
+            ));
+        }
+        let options = ve_kernel::UvPackOptions {
+            rotate: flag(node, "rotate")?,
+            keep_density: flag(node, "keep_density")?,
+            shape: match text(node, "shape")? {
+                "convex" => ve_kernel::UvPackShape::Convex,
+                _ => ve_kernel::UvPackShape::Aabb,
+            },
+            margin: number(node, "margin")? as f32,
+        };
+        return ve_geometry::pack_uv(poly, &options, context)
+            .map_err(|error| poly_fail(node, &error, Some(poly)));
+    }
+    let op = operator(node, family)?;
+    ve_geometry::blender_edit(poly, &faces, &edges, &vertices, &op, context)
+        .map_err(|error| poly_fail(node, &error, Some(poly)))
+}
+
+/// `poly.unwrap_uv`: the selected edges are seams.
+fn unwrap(
+    node: &Node,
+    poly: &PolyMesh,
+    seams: &[(u32, u32)],
+    context: &ExecutionContext,
+) -> Result<PolyMesh, Fail> {
+    let options = ve_geometry::UvUnwrap {
+        method: match text(node, "method")? {
+            "angle" => ve_geometry::UvMethod::AngleBased,
+            _ => ve_geometry::UvMethod::Conformal,
+        },
+        pack: flag(node, "pack")?,
+        rotate: flag(node, "rotate")?,
+        margin: number(node, "margin")?,
+    };
+    // With no seams selected, cut automatically: sharp edges, and the paths that open closed or tube-shaped pieces.
+    let automatic;
+    let seams = if seams.is_empty() && flag(node, "auto_seams")? {
+        automatic = ve_geometry::auto_seams(poly, number(node, "seam_angle")?, context)
+            .map_err(|error| poly_fail(node, &error, Some(poly)))?;
+        &automatic[..]
+    } else {
+        seams
+    };
+    ve_geometry::unwrap_uv(poly, seams, &options, context)
+        .map_err(|error| poly_fail(node, &error, Some(poly)))
+}
+
+type Chosen = (Vec<usize>, Vec<(u32, u32)>);
+
+fn chosen_vertices(
+    node: &Node,
+    family: &str,
+    selection: Option<&Selection>,
+) -> Result<Vec<u32>, Fail> {
+    if family != "poly.remove_doubles" {
+        return Ok(Vec::new());
+    }
+    match selection.map(|selection| &selection.elements) {
+        None => Ok(Vec::new()),
+        Some(Elements::Vertices(items)) => Ok(items.clone()),
+        Some(other) => Err(Box::new(
+            ve_graph::Diagnostic::error(
+                "poly.selection_kind",
+                format!(
+                    "{}: needs a selection of vertices but got {}s",
+                    node.op,
+                    other.kind()
+                ),
+            )
+            .at_node(&node.id),
+        )),
+    }
+}
+
+/// The faces or edges the family works on, from its selection.
+fn chosen(node: &Node, family: &str, selection: Option<&Selection>) -> Result<Chosen, Fail> {
+    let wrong = |wanted: &str, got: &str| -> Fail {
+        Box::new(
+            ve_graph::Diagnostic::error(
+                "poly.selection_kind",
+                format!(
+                    "{}: needs a selection of {wanted}s but got {got}s (set element on poly.select)",
+                    node.op
+                ),
+            )
+            .at_node(&node.id),
+        )
+    };
+    let Some(selection) = selection else {
+        return Ok((Vec::new(), Vec::new()));
+    };
+    if family == "poly.remove_doubles" && matches!(&selection.elements, Elements::Vertices(_)) {
+        return Ok((Vec::new(), Vec::new()));
+    }
+    match (&selection.elements, family) {
+        (Elements::Edges(items), "poly.subdivide_edges" | "poly.unwrap_uv") => {
+            Ok((Vec::new(), items.clone()))
+        }
+        (other, "poly.subdivide_edges" | "poly.unwrap_uv") => Err(wrong("edge", other.kind())),
+        (Elements::Faces(items), _) => Ok((items.clone(), Vec::new())),
+        (other, _) => Err(wrong("face", other.kind())),
+    }
+}
+
+/// The operator and its parameters for a node.
+fn operator(node: &Node, family: &str) -> Result<MeshOp, Fail> {
+    Ok(match family {
+        "poly.inset_region" => MeshOp::Inset {
+            thickness: number(node, "thickness")?,
+            depth: number(node, "depth")?,
+            even: flag(node, "even")?,
+            relative: flag(node, "relative")?,
+            boundary: flag(node, "boundary")?,
+            outset: flag(node, "outset")?,
+        },
+        "poly.extrude_region" => MeshOp::Extrude {
+            offset: vector(node, "offset")?,
+        },
+        "poly.solidify" => MeshOp::Solidify {
+            thickness: number(node, "thickness")?,
+        },
+        "poly.poke" => MeshOp::Poke {
+            offset: number(node, "offset")?,
+            center: match text(node, "center")? {
+                "weighted" => PokeCenter::Weighted,
+                "bounds" => PokeCenter::Bounds,
+                _ => PokeCenter::Median,
+            },
+            relative: flag(node, "relative")?,
+        },
+        "poly.wireframe" => MeshOp::Wireframe {
+            thickness: number(node, "thickness")?,
+            offset: number(node, "offset")?,
+            even: flag(node, "even")?,
+            relative: flag(node, "relative")?,
+            boundary: flag(node, "boundary")?,
+            replace: flag(node, "replace")?,
+        },
+        "poly.subdivide_edges" => MeshOp::Subdivide {
+            cuts: super::params::count(node, "cuts")?,
+            smooth: number(node, "smooth")?,
+            grid_fill: flag(node, "grid_fill")?,
+        },
+        "poly.dissolve_limit" => MeshOp::Dissolve {
+            angle: number(node, "angle")?,
+            boundaries: flag(node, "boundaries")?,
+        },
+        "poly.decimate" => MeshOp::Decimate {
+            ratio: number(node, "ratio")?,
+            symmetry: match text(node, "symmetry")? {
+                "x" => Some(0),
+                "y" => Some(1),
+                "z" => Some(2),
+                _ => None,
+            },
+            triangulate: flag(node, "triangulate")?,
+        },
+        "poly.unsubdivide" => MeshOp::Unsubdivide {
+            iterations: super::params::count(node, "iterations")?,
+        },
+        "poly.triangulate" => MeshOp::Triangulate,
+        "poly.remove_doubles" => MeshOp::RemoveDoubles {
+            distance: number(node, "distance")?,
+        },
+        _ => MeshOp::Symmetrize {
+            axis: match text(node, "axis")? {
+                "y" => 1,
+                "z" => 2,
+                _ => 0,
+            },
+            keep_positive: text(node, "keep")? == "positive",
+            distance: number(node, "distance")?,
+        },
+    })
+}

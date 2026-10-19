@@ -1,0 +1,19 @@
+# Ornate goblet: smooth revolved profile (foot, stem with a knop, flared bowl) and a ring of rim studs.
+outer_pts = profile.polygon@1(points=[[0,0],[0.055,0],[0.058,0.008],[0.045,0.016],[0.022,0.03],[0.014,0.055],[0.016,0.07],[0.026,0.085],[0.016,0.1],[0.013,0.125],[0.03,0.14],[0.052,0.175],[0.06,0.225],[0.056,0.27],[0.057,0.285],[0,0.285]])
+outer = profile.smooth@1(outer_pts, iterations=2, keep_axis=true)
+inner_pts = profile.polygon@1(points=[[0,0.15],[0.022,0.155],[0.045,0.185],[0.054,0.225],[0.05,0.27],[0.051,0.31],[0,0.31]])
+inner = profile.smooth@1(inner_pts, iterations=2, keep_axis=true)
+body = solid.revolve@1(outer, angle=360deg, segments=96)
+cavity = solid.revolve@1(inner, angle=360deg, segments=96)
+goblet = solid.difference@1(body, cavity)
+stud = solid.sphere@1(radius=0.0045, segments=14)
+stud_out = xform.move@1(stud, by=[0.0578, 0.282, 0])
+studs = inst.radial@1(stud_out, count=28, radius=0)
+band = solid.torus@1(major=0.0585, minor=0.003, segments=96, tube_segments=12)
+band_up = xform.move@1(band, by=[0, 0.272, 0])
+gold = solid.material@1(goblet, color=[0.9, 0.68, 0.25], metallic=1, roughness=0.18)
+ruby = solid.material@1(studs, color=[0.75, 0.05, 0.12], metallic=0.1, roughness=0.15, emissive=[0.4, 0, 0.02])
+rim = solid.material@1(band_up, color=[0.9, 0.68, 0.25], metallic=1, roughness=0.18)
+output goblet = gold
+output studs = ruby
+output band = rim

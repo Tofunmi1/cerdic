@@ -1,0 +1,9 @@
+# A building facade: a grid of cells, each inset to leave a frame, with the windows pushed out.
+# Polygon editing on an open sheet: poly.grid, individual inset, selection by the role tag, individual extrude.
+wall = poly.grid@1(width=6, height=4, columns=6, rows=4)
+cells = poly.select@1(wall)
+framed = poly.inset_faces@1(wall, cells, distance=0.12)
+windows = poly.select@1(framed, by="attribute", attribute="role", value=1)
+facade = poly.extrude_faces@1(framed, windows, offset=[0, 0, 0.12], individual=true)
+stone = solid.material@1(facade, color=[0.78, 0.72, 0.62], metallic=0, roughness=0.8)
+output facade = stone

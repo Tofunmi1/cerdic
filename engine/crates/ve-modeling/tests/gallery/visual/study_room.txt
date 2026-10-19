@@ -1,0 +1,256 @@
+# A furnished study, cutaway (front wall and ceiling left off): floor, walls with a window and a door, desk with laptop,
+# lamp and mug, chair, bookcase with books, sofa, rug, coffee table, plant and wall art. All procedural.
+# The scene is 386 typed commands and can be applied atomically in one transaction under the G9 batch cap.
+# "#--split--" comments are retained as visual section separators from the earlier chunked version.
+
+# ---------------- floor
+slab_box = solid.box@1(size=[4.2, 0.045, 3.4])
+slab = xform.move@1(slab_box, by=[0, -0.0175, 0])
+plank = solid.box@1(size=[3.94, 0.02, 0.152])
+plank_start = xform.move@1(plank, by=[0, 0.012, -1.53])
+planks = xform.array@1(plank_start, count_x=1, count_y=1, count_z=20, spacing=[0, 0, 0.16])
+
+# ---------------- walls: back (window), left (door), right
+back_box = solid.box@1(size=[4.2, 2.6, 0.12])
+back_raw = xform.move@1(back_box, by=[0, 1.3, -1.66])
+window_cut_box = solid.box@1(size=[1.3, 1.1, 0.4])
+window_cut = xform.move@1(window_cut_box, by=[0.9, 1.55, -1.66])
+back_wall = solid.difference@1(back_raw, window_cut)
+left_box = solid.box@1(size=[0.12, 2.6, 3.4])
+left_raw = xform.move@1(left_box, by=[-2.06, 1.3, 0])
+door_cut_box = solid.box@1(size=[0.4, 2.05, 0.95])
+door_cut = xform.move@1(door_cut_box, by=[-2.06, 1.025, 0.55])
+left_wall = solid.difference@1(left_raw, door_cut)
+right_box = solid.box@1(size=[0.12, 2.6, 3.4])
+right_wall = xform.move@1(right_box, by=[2.06, 1.3, 0])
+board_back = solid.box@1(size=[3.96, 0.11, 0.02])
+board_back_up = xform.move@1(board_back, by=[0, 0.055, -1.59])
+board_right = solid.box@1(size=[0.02, 0.11, 3.2])
+board_right_up = xform.move@1(board_right, by=[1.99, 0.055, 0])
+walls = solid.union@1(back_wall, left_wall, right_wall)
+boards = solid.union@1(board_back_up, board_right_up)
+
+# ---------------- window frame, glass, door
+frame_h = solid.box@1(size=[1.42, 0.07, 0.1])
+frame_top = xform.move@1(frame_h, by=[0.9, 2.12, -1.62])
+frame_bottom = xform.move@1(frame_h, by=[0.9, 0.99, -1.62])
+frame_v = solid.box@1(size=[0.07, 1.2, 0.1])
+frame_left = xform.move@1(frame_v, by=[0.215, 1.555, -1.62])
+frame_right = xform.move@1(frame_v, by=[1.585, 1.555, -1.62])
+mullion_v = solid.box@1(size=[0.04, 1.1, 0.06])
+mullion_a = xform.move@1(mullion_v, by=[0.9, 1.555, -1.62])
+mullion_h = solid.box@1(size=[1.3, 0.04, 0.06])
+mullion_b = xform.move@1(mullion_h, by=[0.9, 1.555, -1.62])
+window_frame = solid.union@1(frame_top, frame_bottom, frame_left, frame_right, mullion_a, mullion_b)
+glass_box = solid.box@1(size=[1.3, 1.1, 0.01])
+glass = xform.move@1(glass_box, by=[0.9, 1.555, -1.67])
+door_leaf = solid.box@1(size=[0.045, 2.0, 0.9])
+door_hinged = xform.move@1(door_leaf, by=[0, 1.0, 0.45])
+door_open = xform.rotate@1(door_hinged, angles=[0, 55, 0])
+door = xform.move@1(door_open, by=[-1.99, 0.02, 0.1])
+knob_ball = solid.sphere@1(radius=0.03, segments=16)
+knob_local = xform.move@1(knob_ball, by=[0.04, 1.0, 0.8])
+knob_turned = xform.rotate@1(knob_local, angles=[0, 55, 0])
+knob = xform.move@1(knob_turned, by=[-1.99, 0.02, 0.1])
+
+#--split--
+# ---------------- rug and coffee table
+rug_border_box = solid.box@1(size=[2.2, 0.01, 1.5])
+rug_border = xform.move@1(rug_border_box, by=[0.2, 0.019, 0.5])
+rug_box = solid.box@1(size=[1.95, 0.012, 1.25])
+rug = xform.move@1(rug_box, by=[0.2, 0.026, 0.5])
+ct_top = solid.box@1(size=[0.95, 0.04, 0.55])
+ct_top_round = solid.round@1(ct_top, radius=0.012, segments=10)
+ct_top_up = xform.move@1(ct_top_round, by=[0, 0.4, 0])
+ct_leg = solid.box@1(size=[0.05, 0.38, 0.05])
+ct_leg_a = xform.move@1(ct_leg, by=[0.4, 0.19, 0.22])
+ct_legs_x = xform.mirror@1(ct_leg_a, axis="x")
+ct_legs = xform.mirror@1(ct_legs_x, axis="z")
+coffee_table_raw = solid.union@1(ct_top_up, ct_legs)
+coffee_table = xform.move@1(coffee_table_raw, by=[0.35, 0, 0.55])
+
+# ---------------- desk with legs, laptop, lamp, mug, books
+desk_top = solid.box@1(size=[1.5, 0.04, 0.7])
+desk_top_round = solid.round@1(desk_top, radius=0.012, segments=10)
+desk_top_up = xform.move@1(desk_top_round, by=[0, 0.74, 0])
+desk_leg = solid.box@1(size=[0.05, 0.72, 0.05])
+desk_leg_a = xform.move@1(desk_leg, by=[0.69, 0.36, 0.3])
+desk_legs_x = xform.mirror@1(desk_leg_a, axis="x")
+desk_legs = xform.mirror@1(desk_legs_x, axis="z")
+drawers_box = solid.box@1(size=[0.42, 0.55, 0.6])
+drawers = xform.move@1(drawers_box, by=[0.5, 0.45, 0])
+desk_raw = solid.union@1(desk_top_up, desk_legs, drawers)
+desk = xform.move@1(desk_raw, by=[-1.15, 0, -1.2])
+
+laptop_base_box = solid.box@1(size=[0.34, 0.015, 0.24])
+laptop_base = xform.move@1(laptop_base_box, by=[-1.0, 0.7675, -1.12])
+laptop_screen_box = solid.box@1(size=[0.34, 0.22, 0.008])
+laptop_screen_up = xform.move@1(laptop_screen_box, by=[0, 0.11, 0])
+laptop_screen_tilt = xform.rotate@1(laptop_screen_up, angles=[-14, 0, 0])
+laptop_screen = xform.move@1(laptop_screen_tilt, by=[-1.0, 0.775, -1.24])
+
+lamp_base_box = solid.cylinder@1(radius=0.07, height=0.02, segments=32)
+lamp_base = xform.move@1(lamp_base_box, by=[-1.62, 0.77, -1.4])
+arm_path = curve.bezier@1(points=[[-1.62, 0.78, -1.4], [-1.62, 1.08, -1.4], [-1.52, 1.18, -1.4], [-1.38, 1.14, -1.4]], steps=32)
+arm_section = profile.circle@1(radius=0.008, segments=16)
+lamp_arm = solid.sweep@1(curve=arm_path, profile=arm_section)
+lamp_metal_parts = solid.union@1(lamp_base, lamp_arm)
+shade_cyl = solid.cylinder@1(radius=0.065, height=0.1, segments=32)
+shade_turn = xform.rotate@1(shade_cyl, angles=[0, 0, 55])
+lamp_shade = xform.move@1(shade_turn, by=[-1.36, 1.11, -1.4])
+bulb_ball = solid.sphere@1(radius=0.028, segments=20)
+lamp_bulb = xform.move@1(bulb_ball, by=[-1.335, 1.065, -1.4])
+
+mug_outer = solid.cylinder@1(radius=0.04, height=0.09, segments=32)
+mug_inner = solid.cylinder@1(radius=0.034, height=0.09, segments=32)
+mug_inner_up = xform.move@1(mug_inner, by=[0, 0.012, 0])
+mug_cup = solid.difference@1(mug_outer, mug_inner_up)
+mug_handle_ring = solid.torus@1(major=0.025, minor=0.006, segments=24, tube_segments=10)
+mug_handle_turn = xform.rotate@1(mug_handle_ring, angles=[90, 0, 0])
+mug_handle = xform.move@1(mug_handle_turn, by=[0.05, 0, 0])
+mug_raw = solid.union@1(mug_cup, mug_handle)
+mug = xform.move@1(mug_raw, by=[-0.62, 0.805, -1.12])
+
+book_a = solid.box@1(size=[0.24, 0.035, 0.17])
+book_a_up = xform.move@1(book_a, by=[-1.72, 0.7775, -1.0])
+book_b = solid.box@1(size=[0.21, 0.03, 0.15])
+book_b_turn = xform.rotate@1(book_b, angles=[0, 14, 0])
+book_b_up = xform.move@1(book_b_turn, by=[-1.72, 0.81, -1.0])
+desk_books = solid.union@1(book_a_up, book_b_up)
+
+# ---------------- chair
+seat = solid.box@1(size=[0.46, 0.04, 0.46])
+seat_up = xform.move@1(seat, by=[0, 0.45, 0])
+backrest = solid.box@1(size=[0.46, 0.46, 0.04])
+backrest_up = xform.move@1(backrest, by=[0, 0.72, -0.21])
+chair_leg = solid.box@1(size=[0.04, 0.43, 0.04])
+chair_leg_a = xform.move@1(chair_leg, by=[0.2, 0.215, 0.2])
+chair_legs_x = xform.mirror@1(chair_leg_a, axis="x")
+chair_legs = xform.mirror@1(chair_legs_x, axis="z")
+chair_raw = solid.union@1(seat_up, backrest_up, chair_legs)
+chair_turn = xform.rotate@1(chair_raw, angles=[0, 28, 0])
+chair = xform.move@1(chair_turn, by=[-1.0, 0, -0.55])
+
+#--split--
+# ---------------- bookcase on the right wall, with three rows of books
+side_board = solid.box@1(size=[0.34, 1.9, 0.04])
+side_a = xform.move@1(side_board, by=[1.82, 0.95, -1.0])
+side_b = xform.move@1(side_board, by=[1.82, 0.95, 0.0])
+shelf_board = solid.box@1(size=[0.34, 0.03, 1.04])
+shelf_start = xform.move@1(shelf_board, by=[1.82, 0.015, -0.5])
+shelves = xform.array@1(shelf_start, count_x=1, count_y=5, count_z=1, spacing=[0, 0.46, 0])
+case_back_box = solid.box@1(size=[0.02, 1.9, 1.04])
+case_back = xform.move@1(case_back_box, by=[1.99, 0.95, -0.5])
+bookcase = solid.union@1(side_a, side_b, shelves, case_back)
+book_blue = solid.box@1(size=[0.22, 0.27, 0.04])
+book_blue_start = xform.move@1(book_blue, by=[1.82, 0.495, -0.95])
+books_blue = xform.array@1(book_blue_start, count_x=1, count_y=1, count_z=12, spacing=[0, 0, 0.046])
+book_red = solid.box@1(size=[0.22, 0.31, 0.035])
+book_red_start = xform.move@1(book_red, by=[1.82, 0.955, -0.9])
+books_red = xform.array@1(book_red_start, count_x=1, count_y=1, count_z=10, spacing=[0, 0, 0.05])
+book_green = solid.box@1(size=[0.21, 0.23, 0.045])
+book_green_start = xform.move@1(book_green, by=[1.82, 1.4, -0.93])
+books_green = xform.array@1(book_green_start, count_x=1, count_y=1, count_z=8, spacing=[0, 0, 0.055])
+
+# ---------------- sofa against the right wall, in front of the bookcase
+sofa_seat_box = solid.box@1(size=[0.85, 0.3, 1.5])
+sofa_seat = xform.move@1(sofa_seat_box, by=[1.5, 0.22, 1.0])
+sofa_back_box = solid.box@1(size=[0.22, 0.55, 1.5])
+sofa_back = xform.move@1(sofa_back_box, by=[1.87, 0.5, 1.0])
+sofa_arm_box = solid.box@1(size=[0.85, 0.42, 0.18])
+sofa_arm_a = xform.move@1(sofa_arm_box, by=[1.5, 0.28, 0.17])
+sofa_arm_b = xform.move@1(sofa_arm_box, by=[1.5, 0.28, 1.83])
+sofa = solid.union@1(sofa_seat, sofa_back, sofa_arm_a, sofa_arm_b)
+
+# ---------------- plant, vase
+pot_profile = profile.polygon@1(points=[[0, 0], [0.09, 0], [0.12, 0.22], [0.135, 0.25], [0, 0.25]])
+pot_round = profile.smooth@1(pot_profile, iterations=2, keep_axis=true)
+pot_solid = solid.revolve@1(pot_round, angle=360deg, segments=32)
+pot = xform.move@1(pot_solid, by=[-1.6, 0, 1.2])
+leaf_ball = solid.sphere@1(radius=0.12, segments=16)
+leaf_flat = xform.scale@1(leaf_ball, by=[0.22, 1.0, 0.07])
+leaf_tilt = xform.rotate@1(leaf_flat, angles=[0, 0, -30])
+leaf_out = xform.move@1(leaf_tilt, by=[0.035, 0.42, 0])
+leaves_ring = xform.radial@1(leaf_out, count=9, radius=0)
+leaves = xform.move@1(leaves_ring, by=[-1.6, 0.15, 1.2])
+vase_profile = profile.polygon@1(points=[[0, 0], [0.035, 0], [0.055, 0.07], [0.03, 0.16], [0.04, 0.19], [0, 0.19]])
+vase_round = profile.smooth@1(vase_profile, iterations=3, keep_axis=true)
+vase_solid = solid.revolve@1(vase_round, angle=360deg, segments=40)
+vase = xform.move@1(vase_solid, by=[0.35, 0.42, 0.55])
+
+# ---------------- wall art
+art_frame_box = solid.box@1(size=[0.66, 0.5, 0.03])
+art_frame_back = xform.move@1(art_frame_box, by=[-0.45, 1.75, -1.575])
+art_canvas_box = solid.box@1(size=[0.56, 0.4, 0.012])
+art_canvas_back = xform.move@1(art_canvas_box, by=[-0.45, 1.75, -1.555])
+art_frame_side_box = solid.box@1(size=[0.03, 0.5, 0.7])
+art_frame_side = xform.move@1(art_frame_side_box, by=[1.975, 1.55, 0.9])
+art_canvas_side_box = solid.box@1(size=[0.012, 0.4, 0.6])
+art_canvas_side = xform.move@1(art_canvas_side_box, by=[1.955, 1.55, 0.9])
+frames = solid.union@1(art_frame_back, art_frame_side)
+
+#--split--
+# ---------------- materials
+m_floor_base = solid.material@1(slab, color=[0.16, 0.11, 0.08], roughness=0.9)
+m_planks = solid.material@1(planks, color=[0.52, 0.36, 0.21], roughness=0.55, recipe="planks", texture_scale=1.2)
+m_walls = solid.material@1(walls, color=[0.88, 0.84, 0.76], roughness=0.92, recipe="painted_wall", texture_scale=1.1)
+m_boards = solid.material@1(boards, color=[0.95, 0.94, 0.9], roughness=0.5)
+m_window_frame = solid.material@1(window_frame, color=[0.94, 0.94, 0.92], roughness=0.45)
+m_glass = solid.material@1(glass, color=[0.7, 0.85, 1.0], roughness=0.1, emissive=[0.8, 1.1, 1.6])
+m_door = solid.material@1(door, color=[0.42, 0.27, 0.15], roughness=0.5)
+m_knob = solid.material@1(knob, color=[0.85, 0.65, 0.25], metallic=1, roughness=0.2)
+m_rug_border = solid.material@1(rug_border, color=[0.9, 0.85, 0.7], roughness=0.95)
+m_rug = solid.material@1(rug, color=[0.12, 0.32, 0.38], roughness=0.95, recipe="fabric", texture_scale=1.0)
+m_coffee_table = solid.material@1(coffee_table, color=[0.3, 0.2, 0.12], roughness=0.45)
+m_desk = solid.material@1(desk, color=[0.46, 0.31, 0.19], roughness=0.5, recipe="wood", texture_scale=1.4)
+m_laptop_base = solid.material@1(laptop_base, color=[0.55, 0.57, 0.6], metallic=1, roughness=0.3)
+m_laptop_screen = solid.material@1(laptop_screen, color=[0.2, 0.4, 0.7], roughness=0.2, emissive=[0.25, 0.55, 1.0])
+m_lamp_metal = solid.material@1(lamp_metal_parts, color=[0.12, 0.12, 0.14], metallic=0.9, roughness=0.3)
+m_lamp_shade = solid.material@1(lamp_shade, color=[0.85, 0.3, 0.2], roughness=0.5)
+m_lamp_bulb = solid.material@1(lamp_bulb, color=[1, 0.9, 0.6], roughness=0.3, emissive=[4, 3.2, 1.6])
+m_mug = solid.material@1(mug, color=[0.92, 0.92, 0.96], roughness=0.25)
+m_desk_books = solid.material@1(desk_books, color=[0.6, 0.12, 0.12], roughness=0.7)
+m_chair = solid.material@1(chair, color=[0.2, 0.36, 0.56], roughness=0.8)
+m_bookcase = solid.material@1(bookcase, color=[0.4, 0.27, 0.17], roughness=0.55)
+m_books_blue = solid.material@1(books_blue, color=[0.18, 0.28, 0.55], roughness=0.7, recipe="fabric", texture_scale=3.0)
+m_books_red = solid.material@1(books_red, color=[0.62, 0.17, 0.15], roughness=0.7, recipe="leather", texture_scale=2.0)
+m_books_green = solid.material@1(books_green, color=[0.25, 0.48, 0.28], roughness=0.7, recipe="painted_wall", texture_scale=2.5)
+m_sofa = solid.material@1(sofa, color=[0.42, 0.44, 0.27], roughness=0.9, recipe="leather", texture_scale=1.1)
+m_pot = solid.material@1(pot, color=[0.72, 0.36, 0.22], roughness=0.8)
+m_leaves = solid.material@1(leaves, color=[0.2, 0.52, 0.22], roughness=0.6)
+m_vase = solid.material@1(vase, color=[0.18, 0.5, 0.55], metallic=0.1, roughness=0.15)
+m_frames = solid.material@1(frames, color=[0.1, 0.1, 0.11], roughness=0.5)
+m_canvas_back = solid.material@1(art_canvas_back, color=[0.85, 0.55, 0.2], roughness=0.8)
+m_canvas_side = solid.material@1(art_canvas_side, color=[0.25, 0.5, 0.65], roughness=0.8)
+
+output floor_base = m_floor_base
+output floor = m_planks
+output walls = m_walls
+output baseboards = m_boards
+output window_frame = m_window_frame
+output window_glass = m_glass
+output door = m_door
+output door_knob = m_knob
+output rug_border = m_rug_border
+output rug = m_rug
+output coffee_table = m_coffee_table
+output desk = m_desk
+output laptop = m_laptop_base
+output laptop_screen = m_laptop_screen
+output lamp = m_lamp_metal
+output lamp_shade = m_lamp_shade
+output lamp_bulb = m_lamp_bulb
+output mug = m_mug
+output desk_books = m_desk_books
+output chair = m_chair
+output bookcase = m_bookcase
+output books_blue = m_books_blue
+output books_red = m_books_red
+output books_green = m_books_green
+output sofa = m_sofa
+output plant_pot = m_pot
+output plant_leaves = m_leaves
+output vase = m_vase
+output frames = m_frames
+output art_back = m_canvas_back
+output art_side = m_canvas_side

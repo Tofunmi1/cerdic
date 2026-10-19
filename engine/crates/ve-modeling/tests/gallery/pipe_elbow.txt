@@ -1,0 +1,9 @@
+# A swept cubic elbow with an extended inner sweep so both ends stay open.
+outer_section = profile.circle@1(radius=0.08, segments=24)
+inner_section = profile.circle@1(radius=0.045, segments=24)
+outer_path = curve.bezier@1(points=[[0,0,0],[0,0.6,0],[0.4,1,0],[1,1,0]], steps=24)
+inner_path = curve.bezier@1(points=[[0,-0.2,0],[0,0.6,0],[0.4,1,0],[1.2,1,0]], steps=24)
+outer = solid.sweep@1(outer_path, outer_section)
+inner = solid.sweep@1(inner_path, inner_section)
+elbow = solid.difference@1(outer, inner)
+output pipe = elbow

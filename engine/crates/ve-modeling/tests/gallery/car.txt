@@ -1,0 +1,51 @@
+# Stylised toy car: rounded plan-view body extrusion, tapered cabin, group-built wheels, lights, glass.
+group wheel
+  tyre = solid.torus@1(major=0.11, minor=0.05, segments=48, tube_segments=20)
+  result tyre
+end
+group rim_set
+  hub = solid.cylinder@1(radius=0.085, height=0.07, segments=32)
+  cap = solid.cylinder@1(radius=0.035, height=0.095, segments=24)
+  disc = solid.union@1(hub, cap)
+  result disc
+end
+plan = profile.polygon@1(points=[[-0.9,-0.4],[0.9,-0.4],[1.0,-0.3],[1.0,0.3],[0.9,0.4],[-0.9,0.4],[-1.0,0.3],[-1.0,-0.3]])
+plan_round = profile.smooth@1(plan, iterations=2)
+hull = solid.extrude@1(plan_round, height=0.26, divisions=1, twist=0, top_scale=[0.92, 0.92])
+hull_up = xform.move@1(hull, by=[0, 0.12, 0])
+cabin_plan = profile.polygon@1(points=[[-0.45,-0.33],[0.38,-0.33],[0.5,-0.2],[0.5,0.2],[0.38,0.33],[-0.45,0.33],[-0.55,0.2],[-0.55,-0.2]])
+cabin_round = profile.smooth@1(cabin_plan, iterations=2)
+cabin = solid.extrude@1(cabin_round, height=0.24, divisions=1, twist=0, top_scale=[0.7, 0.8])
+cabin_up = xform.move@1(cabin, by=[-0.05, 0.38, 0])
+wheel_fl = wheel()
+wheel_rot = xform.rotate@1(wheel_fl, angles=[90, 0, 0])
+wheels_x = xform.move@1(wheel_rot, by=[0.62, 0.11, 0.42])
+wheels_front = xform.mirror@1(wheels_x, axis="z")
+wheels_back_a = xform.move@1(wheel_rot, by=[-0.62, 0.11, 0.42])
+wheels_back = xform.mirror@1(wheels_back_a, axis="z")
+wheels = solid.union@1(wheels_front, wheels_back)
+rim_fl = rim_set()
+rim_rot = xform.rotate@1(rim_fl, angles=[90, 0, 0])
+rims_x = xform.move@1(rim_rot, by=[0.62, 0.11, 0.42])
+rims_front = xform.mirror@1(rims_x, axis="z")
+rims_back_a = xform.move@1(rim_rot, by=[-0.62, 0.11, 0.42])
+rims_back = xform.mirror@1(rims_back_a, axis="z")
+rims = solid.union@1(rims_front, rims_back)
+chrome = solid.material@1(rims, color=[0.8, 0.82, 0.86], metallic=1, roughness=0.15)
+lamp = solid.sphere@1(radius=0.06, segments=20)
+lamp_a = xform.move@1(lamp, by=[0.98, 0.3, 0.22])
+lamps = xform.mirror@1(lamp_a, axis="z")
+tail = solid.box@1(size=[0.03, 0.06, 0.14])
+tail_a = xform.move@1(tail, by=[-1.0, 0.3, 0.26])
+tails = xform.mirror@1(tail_a, axis="z")
+paint = solid.material@1(hull_up, color=[0.85, 0.12, 0.1], metallic=0.5, roughness=0.25)
+glass = solid.material@1(cabin_up, color=[0.35, 0.55, 0.7], metallic=0.3, roughness=0.05)
+rubber = solid.material@1(wheels, color=[0.05, 0.05, 0.06], metallic=0, roughness=0.9)
+lights = solid.material@1(lamps, color=[1, 0.95, 0.7], metallic=0, roughness=0.2, emissive=[3, 2.7, 1.5])
+backlights = solid.material@1(tails, color=[0.9, 0.05, 0.05], metallic=0, roughness=0.3, emissive=[2, 0, 0])
+output body = paint
+output cabin = glass
+output wheels = rubber
+output rims = chrome
+output headlights = lights
+output taillights = backlights

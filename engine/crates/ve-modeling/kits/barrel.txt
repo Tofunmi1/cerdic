@@ -1,0 +1,19 @@
+group barrel
+  stave = solid.box@1(size=[0.06, 0.8, 0.11])
+  stave_at = xform.move@1(stave, by=[0, 0.4, 0])
+  ring = xform.radial@1(stave_at, count=16, radius=0.26)
+  cap = solid.cylinder@1(radius=0.25, height=0.04, segments=16)
+  cap_at = xform.move@1(cap, by=[0, 0.02, 0])
+  caps = xform.array@1(cap_at, count_y=2, spacing=[0, 0.76, 0])
+  hoop = solid.torus@1(major=0.30, minor=0.02, segments=24, tube_segments=8)
+  hoop_at = xform.move@1(hoop, by=[0, 0.15, 0])
+  hoops = xform.array@1(hoop_at, count_y=2, spacing=[0, 0.5, 0])
+  all = solid.union@1(ring, caps, hoops)
+  surface = solid.material@1(all, color=[0.45, 0.28, 0.16], roughness=0.7, recipe="wood")
+  expose staves = ring.count
+  expose radius = ring.radius
+  expose hoop = hoop.major
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

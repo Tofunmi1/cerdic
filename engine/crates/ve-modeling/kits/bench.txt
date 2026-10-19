@@ -1,0 +1,19 @@
+group bench
+  seat = solid.box@1(size=[1.5, 0.06, 0.45])
+  seat_at = xform.move@1(seat, by=[0, 0.45, 0])
+  leg = solid.box@1(size=[0.06, 0.43, 0.06])
+  leg_at = xform.move@1(leg, by=[-0.65, 0.215, -0.16])
+  legs = xform.array@1(leg_at, count_x=2, count_z=2, spacing=[1.3, 0, 0.32])
+  post = solid.box@1(size=[0.06, 0.52, 0.06])
+  post_at = xform.move@1(post, by=[-0.65, 0.72, -0.19])
+  posts = xform.array@1(post_at, count_x=2, spacing=[1.3, 0, 0])
+  back = solid.box@1(size=[1.4, 0.12, 0.05])
+  back_at = xform.move@1(back, by=[0, 0.85, -0.19])
+  all = solid.union@1(seat_at, legs, posts, back_at)
+  surface = solid.material@1(all, color=[0.50, 0.34, 0.20], roughness=0.65, recipe="wood")
+  expose seat = seat.size
+  expose back = back.size
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

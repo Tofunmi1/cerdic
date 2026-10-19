@@ -4,10 +4,10 @@
 pub const MAX_NODES: usize = 5_000;
 
 /// Commands in one batch.
-pub const MAX_COMMANDS: usize = 200;
+pub const MAX_COMMANDS: usize = 1_000;
 
 /// Bytes in one serialised batch.
-pub const MAX_BATCH_BYTES: usize = 256 * 1024;
+pub const MAX_BATCH_BYTES: usize = 1024 * 1024;
 
 /// Bytes in a serialised document.
 pub const MAX_DOCUMENT_BYTES: usize = 2 * 1024 * 1024;
@@ -24,8 +24,12 @@ pub(crate) const MAX_VARIADIC: usize = 64;
 /// Values in a list parameter.
 pub(crate) const MAX_LIST_VALUES: usize = 4_096;
 
-/// Bytes in a text parameter or label.
+/// Bytes in a label or a name.
 pub(crate) const MAX_STRING_BYTES: usize = 256;
+
+/// Most bytes any text parameter may declare for itself (a texture program, a list of paint stamps); each operator's spec
+/// states its own, smaller, limit.
+pub(crate) const MAX_PARAM_STRING_BYTES: usize = 16_384;
 
 /// Transaction keys remembered for idempotency.
 pub(crate) const MAX_SEEN_TRANSACTIONS: usize = 1_024;

@@ -1,0 +1,15 @@
+group desk
+  top = solid.box@1(size=[1.4, 0.04, 0.7])
+  top_at = xform.move@1(top, by=[0, 0.74, 0])
+  leg = solid.box@1(size=[0.05, 0.72, 0.05])
+  leg_at = xform.move@1(leg, by=[-0.675, 0.36, -0.325])
+  legs = inst.array@1(leg_at, count_x=2, count_z=2, spacing=[1.35, 0, 0.65])
+  legs_solid = inst.realize@1(legs)
+  drawer = solid.box@1(size=[0.38, 0.15, 0.6])
+  drawer_at = xform.move@1(drawer, by=[0.44, 0.645, 0])
+  frame = solid.union@1(top_at, legs_solid, drawer_at)
+  painted = solid.material@1(frame, color=[0.55, 0.38, 0.22], roughness=0.6)
+  expose color = painted.color
+  expose roughness = painted.roughness
+  result painted
+end

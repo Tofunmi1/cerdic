@@ -59,34 +59,49 @@ pub(crate) fn connect(ctx: &mut Ctx<'_>, from: &PortRef, to: &Target) -> Result<
     let arity = port.arity;
     if let Some(node) = ctx.doc.node_mut(&to.node) {
         let links = node.inputs.entry(to.port.clone()).or_default();
-        match arity {
-            Arity::One => {
-                if to.index.is_some_and(|i| i != 0) {
-                    return Err(port_error(
-                        "graph.port_arity",
-                        "this port takes one link; leave out the index".to_owned(),
-                        &to.node,
-                        &to.port,
-                    ));
-                }
-                *links = vec![from.clone()];
-            }
-            Arity::Variadic { .. } => {
-                let at = to.index.unwrap_or(links.len());
-                if at > links.len() || links.len() >= MAX_VARIADIC {
-                    return Err(Box::new(
-                        Diagnostic::error("graph.port_arity", "no room for that link")
-                            .at_node(&to.node)
-                            .at_port(&to.port)
-                            .with_limit(count(MAX_VARIADIC), count(links.len() + 1)),
-                    ));
-                }
-                links.insert(at, from.clone());
-            }
-        }
+        write_link(links, arity, from, to)?;
     }
     ctx.changed.insert(to.node.clone());
     check_graph(ctx)
+}
+
+fn write_link(
+    links: &mut Vec<PortRef>,
+    arity: Arity,
+    from: &PortRef,
+    to: &Target,
+) -> Result<(), Fail> {
+    match arity {
+        Arity::One | Arity::Optional => {
+            let hint = if arity == Arity::One {
+                "this port takes one link; leave out the index"
+            } else {
+                "this port takes at most one link; leave out the index"
+            };
+            if to.index.is_some_and(|index| index != 0) {
+                return Err(port_error(
+                    "graph.port_arity",
+                    hint.to_owned(),
+                    &to.node,
+                    &to.port,
+                ));
+            }
+            *links = vec![from.clone()];
+        }
+        Arity::Variadic { .. } => {
+            let at = to.index.unwrap_or(links.len());
+            if at > links.len() || links.len() >= MAX_VARIADIC {
+                return Err(Box::new(
+                    Diagnostic::error("graph.port_arity", "no room for that link")
+                        .at_node(&to.node)
+                        .at_port(&to.port)
+                        .with_limit(count(MAX_VARIADIC), count(links.len() + 1)),
+                ));
+            }
+            links.insert(at, from.clone());
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn disconnect(ctx: &mut Ctx<'_>, to: &Target) -> Result<(), Fail> {
@@ -284,7 +299,8 @@ pub(crate) fn check_graph(ctx: &Ctx<'_>) -> Result<(), Fail> {
                     port,
                 ));
             };
-            let too_many = matches!(port_spec.arity, Arity::One) && refs.len() > 1;
+            let too_many =
+                matches!(port_spec.arity, Arity::One | Arity::Optional) && refs.len() > 1;
             if too_many || refs.len() > MAX_VARIADIC {
                 return Err(port_error(
                     "graph.port_arity",

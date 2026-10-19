@@ -1,0 +1,23 @@
+# Spiral staircase: 16 oak treads, steel column, helical brass handrail swept along a path, and balusters.
+tread = solid.box@1(size=[0.55, 0.05, 0.22])
+tread_out = xform.move@1(tread, by=[0.3, 0.025, 0])
+treads = xform.repeat@1(tread_out, count=16, step=[0, 0.17, 0], rotate_step=[0, 18, 0])
+column = solid.cylinder@1(height=2.9, radius=0.08, segments=48)
+column_up = xform.move@1(column, by=[0, 1.45, 0])
+cap = solid.sphere@1(radius=0.1, segments=24)
+cap_up = xform.move@1(cap, by=[0, 2.9, 0])
+steel = solid.union@1(column_up, cap_up)
+rail_path = curve.polyline@1(points=[[0.45,0.9,0],[0.4445,0.985,-0.0704],[0.428,1.07,-0.1391],[0.401,1.155,-0.2043],[0.3641,1.24,-0.2645],[0.3182,1.325,-0.3182],[0.2645,1.41,-0.3641],[0.2043,1.495,-0.401],[0.1391,1.58,-0.428],[0.0704,1.665,-0.4445],[0,1.75,-0.45],[-0.0704,1.835,-0.4445],[-0.1391,1.92,-0.428],[-0.2043,2.005,-0.401],[-0.2645,2.09,-0.3641],[-0.3182,2.175,-0.3182],[-0.3641,2.26,-0.2645],[-0.401,2.345,-0.2043],[-0.428,2.43,-0.1391],[-0.4445,2.515,-0.0704],[-0.45,2.6,0],[-0.4445,2.685,0.0704],[-0.428,2.77,0.1391],[-0.401,2.855,0.2043],[-0.3641,2.94,0.2645],[-0.3182,3.025,0.3182],[-0.2645,3.11,0.3641],[-0.2043,3.195,0.401],[-0.1391,3.28,0.428],[-0.0704,3.365,0.4445],[0,3.45,0.45],[0.0704,3.535,0.4445],[0.1391,3.62,0.428]])
+rail_section = profile.circle@1(radius=0.022, segments=20)
+rail = solid.sweep@1(curve=rail_path, profile=rail_section)
+bal = solid.box@1(size=[0.022, 0.85, 0.022])
+bal_out = xform.move@1(bal, by=[0.45, 0.475, 0])
+balusters = inst.repeat@1(bal_out, count=16, step=[0, 0.17, 0], rotate_step=[0, 18, 0])
+oak = solid.material@1(treads, color=[0.55, 0.36, 0.2], metallic=0, roughness=0.5)
+steel_m = solid.material@1(steel, color=[0.55, 0.57, 0.6], metallic=1, roughness=0.25)
+brass = solid.material@1(rail, color=[0.85, 0.62, 0.25], metallic=1, roughness=0.2)
+iron = solid.material@1(balusters, color=[0.08, 0.08, 0.1], metallic=0.8, roughness=0.4)
+output treads = oak
+output column = steel_m
+output handrail = brass
+output balusters = iron

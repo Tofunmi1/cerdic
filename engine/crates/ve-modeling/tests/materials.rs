@@ -58,9 +58,113 @@ fn a_material_keeps_the_shape_and_sets_the_surface() {
     let material = red.parts[0].material.as_ref().unwrap();
     assert!(colour(material.color, [0.8, 0.1, 0.1]));
     assert!((material.roughness - 0.3).abs() < 1e-6);
+    assert_eq!(material.opacity, 1.0);
     assert!(colour(material.emissive, [0.0, 0.0, 0.0]));
     let text = serde_json::to_value(&red.parts[0]).unwrap();
     assert!((text["material"]["color"][0].as_f64().unwrap() - 0.8).abs() < 1e-6);
+}
+
+#[test]
+fn opacity_is_bounded_serialized_and_defaults_to_opaque() {
+    for opacity in [0.0, 1.0] {
+        let evaluated = evaluate(&[
+            ("$box", "solid.box@1", BOX(), &[]),
+            (
+                "$glass",
+                "solid.material@1",
+                json!({"opacity":opacity}),
+                &["$box"],
+            ),
+        ]);
+        assert_eq!(
+            evaluated.parts[0].material.as_ref().unwrap().opacity,
+            opacity
+        );
+    }
+    let translucent = evaluate(&[
+        ("$box", "solid.box@1", BOX(), &[]),
+        (
+            "$glass",
+            "solid.material@1",
+            json!({"color":[0.1,0.3,0.9], "opacity":0.35}),
+            &["$box"],
+        ),
+    ]);
+    assert_eq!(
+        translucent.parts[0].material.as_ref().unwrap().opacity,
+        0.35
+    );
+    let serialized = serde_json::to_value(translucent.parts[0].material.as_ref().unwrap()).unwrap();
+    assert!((serialized["opacity"].as_f64().unwrap() - 0.35).abs() < 1e-6);
+    let mut old = serialized;
+    old.as_object_mut().unwrap().remove("opacity");
+    let restored: ve_modeling::Material = serde_json::from_value(old).unwrap();
+    assert_eq!(restored.opacity, 1.0);
+    for opacity in [-0.01, 1.01] {
+        let mut session = Session::with_builtin(4);
+        let batch = json!({"doc":session.document().id,"base_revision":0,"transaction":"bad_opacity","commands":[
+            {"add_node":{"op":"solid.box@1","params":{"size":[1,1,1]},"alias":"$box"}},
+            {"add_node":{"op":"solid.material@1","params":{"opacity":opacity},"alias":"$glass"}},
+            {"connect":{"from":{"node":"$box","port":"out"},"to":{"node":"$glass","port":"in"}}}
+        ]});
+        assert!(!matches!(
+            session.apply_json(&batch.to_string()),
+            Outcome::Committed { .. }
+        ));
+    }
+}
+
+#[test]
+fn a_texture_program_attaches_without_replacing_surface_values() {
+    let textured = evaluate(&[
+        ("$box", "solid.box@1", BOX(), &[]),
+        ("$red", "solid.material@1", RED(), &["$box"]),
+        (
+            "$texture",
+            "solid.texture@1",
+            json!({"program": "albedo = fbm(1)\nroughness = constant(value=0.4)"}),
+            &["$red"],
+        ),
+    ]);
+    let material = textured.parts[0]
+        .material
+        .as_ref()
+        .expect("texture node produces a material");
+    assert!(colour(material.color, [0.8, 0.1, 0.1]));
+    assert!((material.roughness - 0.3).abs() < 1e-6);
+    assert_eq!(
+        material.texture_program.as_deref(),
+        Some("albedo = fbm(1)\nroughness = constant(value=0.4)")
+    );
+    let serialized = serde_json::to_value(material).unwrap();
+    assert_eq!(
+        serialized["texture_program"],
+        "albedo = fbm(1)\nroughness = constant(value=0.4)"
+    );
+}
+
+#[test]
+fn a_bare_texture_program_that_paints_roughness_is_not_halved() {
+    let program = |text: &str| {
+        evaluate(&[
+            ("$box", "solid.box@1", BOX(), &[]),
+            (
+                "$texture",
+                "solid.texture@1",
+                json!({ "program": text }),
+                &["$box"],
+            ),
+        ])
+        .parts[0]
+            .material
+            .clone()
+            .expect("texture node produces a material")
+    };
+    assert!(close(
+        program("albedo = fbm(1)\nroughness = fbm(2)").roughness,
+        1.0
+    ));
+    assert!(close(program("albedo = fbm(1)").roughness, 0.5));
 }
 
 fn close(a: f32, b: f32) -> bool {

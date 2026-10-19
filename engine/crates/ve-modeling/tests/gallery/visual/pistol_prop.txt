@@ -1,0 +1,94 @@
+# Pistol-shaped prop (visual geometry only, about 200 mm long): slide with serrations and sights, polymer frame.
+# Side silhouettes are polygons extruded along Y then turned upright; muzzle points along +X.
+
+# --- slide: body, top chamfers, serrations, ejection port, bore
+slide_box = solid.box@1(size=[0.186, 0.030, 0.028])
+slide_rounded = solid.round@1(slide_box, radius=0.002, segments=12)
+slide_rough = xform.move@1(slide_rounded, by=[0, 0.117, 0])
+# The bounded Minkowski round keeps the slide's outer dimensions and softens its long edges.
+chamfer = solid.box@1(size=[0.2, 0.012, 0.012])
+chamfer_turned = xform.rotate@1(chamfer, angles=[45, 0, 0])
+chamfer_a = xform.move@1(chamfer_turned, by=[0, 0.1325, 0.0145])
+chamfer_b = xform.move@1(chamfer_turned, by=[0, 0.1325, -0.0145])
+chamfers = solid.union@1(chamfer_a, chamfer_b)
+cut_rear = solid.box@1(size=[0.0024, 0.040, 0.036])
+cut_rear_start = xform.move@1(cut_rear, by=[-0.086, 0.117, 0])
+serrations_rear = xform.array@1(cut_rear_start, count_x=7, count_y=1, count_z=1, spacing=[0.0048, 0, 0])
+cut_front = xform.move@1(cut_rear, by=[0.046, 0.117, 0])
+serrations_front = xform.array@1(cut_front, count_x=5, count_y=1, count_z=1, spacing=[0.0048, 0, 0])
+port_box = solid.box@1(size=[0.044, 0.016, 0.018])
+port = xform.move@1(port_box, by=[0.012, 0.131, 0.011])
+bore_tube = solid.cylinder@1(radius=0.0045, height=0.05, segments=32)
+bore_turned = xform.rotate@1(bore_tube, angles=[0, 0, 90])
+bore = xform.move@1(bore_turned, by=[0.085, 0.119, 0])
+cutters = solid.union@1(chamfers, serrations_rear, serrations_front, port, bore)
+slide_e = solid.difference@1(slide_rough, cutters)
+
+# --- barrel tip and sights
+barrel_tube = solid.cylinder@1(radius=0.0098, height=0.016, segments=32)
+barrel_turned = xform.rotate@1(barrel_tube, angles=[0, 0, 90])
+barrel_tip = xform.move@1(barrel_turned, by=[0.096, 0.119, 0])
+barrel_bore = solid.difference@1(barrel_tip, bore)
+sight_front = solid.box@1(size=[0.007, 0.007, 0.0045])
+sight_front_up = xform.move@1(sight_front, by=[0.082, 0.1355, 0])
+sight_rear = solid.box@1(size=[0.008, 0.007, 0.0065])
+sight_rear_a = xform.move@1(sight_rear, by=[-0.082, 0.1355, 0.0058])
+sight_rear_b = xform.move@1(sight_rear, by=[-0.082, 0.1355, -0.0058])
+sights = solid.union@1(sight_front_up, sight_rear_a, sight_rear_b)
+
+# --- frame: grip silhouette, dust cover, trigger guard with its opening
+grip_profile = profile.polygon@1(points=[[-0.098, 0.0], [-0.044, 0.0], [-0.014, 0.100], [-0.014, 0.113], [-0.092, 0.113], [-0.088, 0.092], [-0.074, 0.040]])
+grip_prism = solid.extrude@1(grip_profile, height=0.030)
+grip_up = xform.rotate@1(grip_prism, angles=[90, 0, 0])
+grip_rough = xform.move@1(grip_up, by=[0, 0, -0.015])
+grip_tri = poly.from_solid@1(grip_rough)
+grip_edges = poly.select@1(grip_tri, element="edge", by="sharp", angle=0.5)
+grip_soft = poly.subdivide@1(grip_tri, creases=grip_edges, levels=2, sharpness=2.2)
+grip_solid = poly.to_solid@1(grip_soft)
+rail_box = solid.box@1(size=[0.115, 0.016, 0.026])
+rail = xform.move@1(rail_box, by=[0.034, 0.098, 0])
+guard_profile = profile.polygon@1(points=[[-0.016, 0.100], [0.052, 0.100], [0.052, 0.082], [0.040, 0.062], [-0.004, 0.062], [-0.020, 0.080]])
+guard_prism = solid.extrude@1(guard_profile, height=0.020)
+guard_up = xform.rotate@1(guard_prism, angles=[90, 0, 0])
+guard_solid = xform.move@1(guard_up, by=[0, 0, -0.010])
+opening_profile = profile.polygon@1(points=[[-0.003, 0.095], [0.044, 0.095], [0.044, 0.084], [0.034, 0.069], [0.002, 0.069], [-0.008, 0.082]])
+opening_prism = solid.extrude@1(opening_profile, height=0.040)
+opening_up = xform.rotate@1(opening_prism, angles=[90, 0, 0])
+opening = xform.move@1(opening_up, by=[0, 0, -0.020])
+groove = solid.cylinder@1(radius=0.0068, height=0.05, segments=24)
+groove_turned = xform.rotate@1(groove, angles=[90, 0, 0])
+groove_a = xform.move@1(groove_turned, by=[-0.0215, 0.070, 0])
+groove_b = xform.move@1(groove_turned, by=[-0.0275, 0.050, 0])
+groove_c = xform.move@1(groove_turned, by=[-0.0335, 0.030, 0])
+grooves = solid.union@1(groove_a, groove_b, groove_c)
+frame_a = solid.union@1(grip_solid, rail, guard_solid)
+frame_b = solid.difference@1(frame_a, opening)
+frame = solid.difference@1(frame_b, grooves)
+
+# --- magazine floor plate, trigger, controls
+plate_box = solid.box@1(size=[0.058, 0.012, 0.034])
+plate_turned = xform.rotate@1(plate_box, angles=[0, 0, -16])
+plate = xform.move@1(plate_turned, by=[-0.0715, 0.001, 0])
+trigger_box = solid.box@1(size=[0.006, 0.030, 0.008])
+trigger_turned = xform.rotate@1(trigger_box, angles=[0, 0, 14])
+trigger = xform.move@1(trigger_turned, by=[0.012, 0.081, 0])
+lever_box = solid.box@1(size=[0.026, 0.005, 0.003])
+lever = xform.move@1(lever_box, by=[-0.004, 0.096, 0.0145])
+button_box = solid.box@1(size=[0.007, 0.012, 0.004])
+button = xform.move@1(button_box, by=[-0.024, 0.084, 0.0152])
+controls = solid.union@1(lever, button)
+
+slide_metal = solid.material@1(slide_e, color=[0.14, 0.15, 0.17], metallic=0.85, roughness=0.38, recipe="brushed_metal", texture_scale=2.5)
+barrel_steel = solid.material@1(barrel_bore, color=[0.42, 0.43, 0.46], metallic=1, roughness=0.22)
+sight_paint = solid.material@1(sights, color=[0.92, 0.92, 0.86], metallic=0, roughness=0.5)
+polymer = solid.material@1(frame, color=[0.045, 0.047, 0.052], metallic=0, roughness=0.72, recipe="leather", texture_scale=5.0)
+plate_polymer = solid.material@1(plate, color=[0.06, 0.06, 0.065], metallic=0, roughness=0.6)
+trigger_metal = solid.material@1(trigger, color=[0.3, 0.31, 0.34], metallic=0.9, roughness=0.3)
+control_metal = solid.material@1(controls, color=[0.2, 0.21, 0.23], metallic=0.9, roughness=0.35)
+output slide = slide_metal
+output barrel = barrel_steel
+output sights = sight_paint
+output frame = polymer
+output mag_plate = plate_polymer
+output trigger = trigger_metal
+output controls = control_metal

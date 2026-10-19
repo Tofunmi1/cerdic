@@ -1,0 +1,25 @@
+group fence
+  post = solid.box@1(size=[0.08, 1.2, 0.08])
+  post_at = xform.move@1(post, by=[0, 0.6, 0])
+  row = xform.array@1(post_at, count_x=3, spacing=[0.75, 0, 0])
+  posts = xform.mirror@1(row, axis="x")
+  rail = solid.box@1(size=[1.5, 0.08, 0.04])
+  rail_at = xform.move@1(rail, by=[0.75, 0.9, 0])
+  rails = xform.array@1(rail_at, count_y=2, spacing=[0, -0.6, 0])
+  braces = xform.mirror@1(rails, axis="x")
+  board = solid.box@1(size=[0.14, 1.0, 0.04])
+  board_at = xform.move@1(board, by=[0.075, 0.5, 0])
+  boarded = inst.array@1(board_at, count_x=10, spacing=[0.15, 0, 0])
+  varied = inst.jitter@1(boarded, shift=[0, 0, 0.006], yaw_jitter=2deg, seed=0)
+  half = inst.realize@1(varied)
+  slats = xform.mirror@1(half, axis="x")
+  all = solid.union@1(posts, braces, slats)
+  surface = solid.material@1(all, color=[0.52, 0.40, 0.26], roughness=0.7, recipe="planks")
+  expose posts = row.count_x
+  expose boards = boarded.count_x
+  expose spacing = row.spacing
+  expose seed = varied.seed
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

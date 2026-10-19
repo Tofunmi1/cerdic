@@ -16,12 +16,22 @@ pub(crate) fn run(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
         "profile.offset" => offset(node, inputs),
         "profile.difference" => difference(inputs),
         "profile.smooth" => smooth(node, inputs),
+        "profile.fillet" => fillet(node, inputs),
         "profile.rect" | "profile.circle" => shapes::profile(node),
         _ => return min_wall(node, inputs),
     };
     result
         .map(Value::profile)
         .map_err(|e| kernel_fail(node, &e))
+}
+
+fn fillet(node: &Node, inputs: &[Rc<Value>]) -> Result<Vec<Vec<[f64; 2]>>, KernelError> {
+    let input = inputs
+        .first()
+        .ok_or(KernelError::InvalidArgument("missing profile"))?;
+    Profile::from_loops(&input.loops)?
+        .fillet(number(node, "radius")?)?
+        .loops()
 }
 
 /// `solid.extrude` and `solid.revolve`: one profile in, one solid out.

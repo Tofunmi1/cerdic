@@ -1,0 +1,13 @@
+# A unit box with a raised panel on its top: merge the top's triangles into a face, inset it, push the
+# inner cap out, and turn the result back into a solid (volume 1 + 0.8 x 0.8 x 0.2).
+box = solid.box@1(size=[1, 1, 1])
+triangles = poly.from_solid@1(box)
+mesh = poly.merge_coplanar@1(triangles)
+top = poly.select@1(mesh, by="normal", direction=[0, 1, 0], angle=0.05, expect="one")
+inset = poly.inset_faces@1(mesh, top, distance=0.1)
+cap = poly.select@1(inset, by="attribute", attribute="role", value=1)
+raised = poly.extrude_faces@1(inset, cap, offset=[0, 0.2, 0])
+solid = poly.to_solid@1(raised)
+lifted = xform.move@1(solid, by=[0, 0.5, 0])
+oak = solid.material@1(lifted, color=[0.55, 0.36, 0.2], metallic=0, roughness=0.5)
+output panel = oak

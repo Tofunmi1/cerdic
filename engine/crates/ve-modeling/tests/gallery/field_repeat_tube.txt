@@ -1,0 +1,4 @@
+tube = field.tube@1(points=[[-0.35, 0, 0], [0, 0.5, 0], [0.35, 0, 0]], radius=0.08)
+repeated = field.repeat@1(tube, period=[0.8, 1, 1], count=[1, 0, 0])
+solid = field.to_solid@1(repeated, min=[-1.4, -0.2, -0.5], max=[1.4, 0.8, 0.5], edge_length=0.12)
+output solid

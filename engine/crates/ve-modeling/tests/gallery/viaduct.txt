@@ -1,0 +1,91 @@
+# A detailed stone aqueduct: six repeated arch bays, paired facades, piers, cornices and towers.
+base_raw = solid.box@1(size=[8.8, 0.24, 3.8])
+base = xform.move@1(base_raw, by=[0, -0.12, 0])
+base_edge = solid.chamfer@1(base, width=0.055)
+
+arch_path = curve.bezier@1(points=[[-0.6,0.18,0],[-0.6,3.75,0],[0.6,3.75,0],[0.6,0.18,0]], steps=512)
+arch_profile = profile.circle@1(radius=0.08, segments=16)
+arch_raw = solid.sweep@1(curve=arch_path, profile=arch_profile)
+arch_front_start = xform.move@1(arch_raw, by=[-3.0, 0, -1.28])
+arch_front = inst.repeat@1(arch_front_start, count=6, step=[1.2, 0, 0], rotate_step=[0, 0, 0])
+arch_back_start = xform.move@1(arch_raw, by=[-3.0, 0, 1.28])
+arch_back = inst.repeat@1(arch_back_start, count=6, step=[1.2, 0, 0], rotate_step=[0, 0, 0])
+
+pier_raw = solid.box@1(size=[0.48, 3.04, 0.48])
+pier_front_start = xform.move@1(pier_raw, by=[-3.6, 1.5, -1.28])
+pier_front = inst.array@1(pier_front_start, count_x=7, spacing=[1.2, 0, 0])
+pier_back_start = xform.move@1(pier_raw, by=[-3.6, 1.5, 1.28])
+pier_back = inst.array@1(pier_back_start, count_x=7, spacing=[1.2, 0, 0])
+cross_tie_raw = solid.box@1(size=[0.36, 0.32, 2.65])
+cross_tie_start = xform.move@1(cross_tie_raw, by=[-3.6, 2.55, 0])
+cross_ties = inst.array@1(cross_tie_start, count_x=7, spacing=[1.2, 0, 0])
+
+deck_raw = solid.box@1(size=[8.25, 0.4, 3.2])
+deck = xform.move@1(deck_raw, by=[0, 3.2, 0])
+fascia_raw = solid.box@1(size=[7.55, 0.24, 0.24])
+fascia_front = xform.move@1(fascia_raw, by=[0, 2.91, -1.62])
+fascia_back = xform.move@1(fascia_raw, by=[0, 2.91, 1.62])
+
+parapet_raw = solid.box@1(size=[7.8, 0.4, 0.2])
+parapet_front = xform.move@1(parapet_raw, by=[0, 3.58, -1.47])
+parapet_back = xform.move@1(parapet_raw, by=[0, 3.58, 1.47])
+coping_raw = solid.box@1(size=[8.0, 0.14, 0.3])
+coping_front = xform.move@1(coping_raw, by=[0, 3.84, -1.47])
+coping_back = xform.move@1(coping_raw, by=[0, 3.84, 1.47])
+
+baluster_raw = solid.box@1(size=[0.13, 0.38, 0.13])
+baluster_front_start = xform.move@1(baluster_raw, by=[-3.75, 3.64, -1.47])
+balusters_front = inst.array@1(baluster_front_start, count_x=20, spacing=[0.4, 0, 0])
+baluster_back_start = xform.move@1(baluster_raw, by=[-3.75, 3.64, 1.47])
+balusters_back = inst.array@1(baluster_back_start, count_x=20, spacing=[0.4, 0, 0])
+
+tower_raw = solid.box@1(size=[0.52, 0.92, 0.52])
+tower_start = xform.move@1(tower_raw, by=[-3.62, 4.1, -1.36])
+towers_x = inst.array@1(tower_start, count_x=2, spacing=[7.24, 0, 0])
+towers = inst.array@1(towers_x, count_z=2, spacing=[0, 0, 2.72])
+roof_raw = solid.cone@1(height=0.42, radius=0.34, top_radius=0.035, segments=8)
+roof_start = xform.move@1(roof_raw, by=[-3.62, 4.73, -1.36])
+roofs_x = inst.array@1(roof_start, count_x=2, spacing=[7.24, 0, 0])
+roofs = inst.array@1(roofs_x, count_z=2, spacing=[0, 0, 2.72])
+finial_raw = solid.sphere@1(radius=0.085, segments=12)
+finial_start = xform.move@1(finial_raw, by=[-3.62, 5.01, -1.36])
+finials_x = inst.array@1(finial_start, count_x=2, spacing=[7.24, 0, 0])
+finials = inst.array@1(finials_x, count_z=2, spacing=[0, 0, 2.72])
+
+stone_arch = solid.material@1(arch_front, color=[0.62,0.59,0.53], roughness=0.88)
+stone_arch_back = solid.material@1(arch_back, color=[0.62,0.59,0.53], roughness=0.88)
+stone_piers = solid.material@1(pier_front, color=[0.67,0.64,0.58], roughness=0.9)
+stone_piers_back = solid.material@1(pier_back, color=[0.67,0.64,0.58], roughness=0.9)
+stone_ties = solid.material@1(cross_ties, color=[0.57,0.55,0.51], roughness=0.92)
+stone_base = solid.material@1(base_edge, color=[0.45,0.46,0.44], roughness=0.94)
+stone_deck = solid.material@1(deck, color=[0.72,0.69,0.62], roughness=0.82)
+stone_fascia = solid.material@1(fascia_front, color=[0.73,0.70,0.64], roughness=0.82)
+stone_fascia_back = solid.material@1(fascia_back, color=[0.73,0.70,0.64], roughness=0.82)
+slate_front = solid.material@1(parapet_front, color=[0.29,0.34,0.36], roughness=0.72)
+slate_back = solid.material@1(parapet_back, color=[0.29,0.34,0.36], roughness=0.72)
+slate_cap_front = solid.material@1(coping_front, color=[0.22,0.27,0.30], roughness=0.66)
+slate_cap_back = solid.material@1(coping_back, color=[0.22,0.27,0.30], roughness=0.66)
+stone_balusters_front = solid.material@1(balusters_front, color=[0.66,0.63,0.57], roughness=0.9)
+stone_balusters_back = solid.material@1(balusters_back, color=[0.66,0.63,0.57], roughness=0.9)
+stone_towers = solid.material@1(towers, color=[0.61,0.58,0.53], roughness=0.86)
+slate_roofs = solid.material@1(roofs, color=[0.24,0.29,0.33], roughness=0.58)
+bronze_finials = solid.material@1(finials, color=[0.62,0.42,0.18], metallic=0.72, roughness=0.28)
+
+output foundation = stone_base
+output arch_front = stone_arch
+output arch_back = stone_arch_back
+output piers_front = stone_piers
+output piers_back = stone_piers_back
+output cross_ties = stone_ties
+output roadway = stone_deck
+output fascia_front = stone_fascia
+output fascia_back = stone_fascia_back
+output parapet_front = slate_front
+output parapet_back = slate_back
+output coping_front = slate_cap_front
+output coping_back = slate_cap_back
+output balusters_front = stone_balusters_front
+output balusters_back = stone_balusters_back
+output towers = stone_towers
+output tower_roofs = slate_roofs
+output finials = bronze_finials

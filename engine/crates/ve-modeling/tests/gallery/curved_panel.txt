@@ -1,0 +1,5 @@
+# A thin convex strip swept along a cubic path, kept deliberately within the sweep subset.
+section = profile.rect@1(size=[0.7,0.025])
+path = curve.bezier@1(points=[[-0.5,0,0],[-0.2,0.1,0.2],[0.2,0.1,0.2],[0.5,0,0]], steps=24)
+panel = solid.sweep@1(path, section)
+output panel = panel
