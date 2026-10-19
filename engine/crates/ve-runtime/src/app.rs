@@ -76,6 +76,7 @@ pub(crate) fn start(canvas_id: &str, scene: SceneKind) -> Result<(), PlatformErr
         (
             wands::update_wands.after(apply_xr_frame),
             crate::projection::update.before(interact::run_interaction),
+            crate::projection::gi::step.after(crate::projection::update),
             status::publish
                 .after(wands::update_wands)
                 .after(interact::highlight_hover),

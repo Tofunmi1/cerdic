@@ -22,6 +22,7 @@ use ve_render::{VeAmbientLight, VeMaterial, mesh_ready};
 const MAX_CHUNK_BYTES: usize = 64 * 1024;
 const MAX_QUEUED_BYTES: usize = 8 * 1024 * 1024;
 pub(crate) mod environment;
+pub(crate) mod gi;
 pub(crate) mod lights;
 mod maps;
 mod placements;

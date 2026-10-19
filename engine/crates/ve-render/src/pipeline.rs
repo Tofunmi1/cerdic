@@ -9,7 +9,7 @@ use bevy_mesh::{Mesh, MeshVertexBufferLayoutRef, VertexBufferLayout};
 use bevy_render::mesh::RenderMesh;
 use bevy_render::render_asset::RenderAssets;
 use bevy_render::render_resource::binding_types::{
-    sampler, texture_2d, texture_depth_2d, uniform_buffer,
+    sampler, texture_2d, texture_3d, texture_depth_2d, uniform_buffer,
 };
 use bevy_render::render_resource::{
     BindGroupLayoutDescriptor, BindGroupLayoutEntries, BlendState, CachedRenderPipelineId,
@@ -100,6 +100,12 @@ impl ForwardPipelines {
                     uniform_buffer::<LightsUniform>(false),
                     texture_depth_2d(),
                     sampler(SamplerBindingType::Comparison),
+                    // The light probes (see `probes.rs`): four coefficient textures and the trilinear sampler that reads them.
+                    texture_3d(TextureSampleType::Float { filterable: true }),
+                    texture_3d(TextureSampleType::Float { filterable: true }),
+                    texture_3d(TextureSampleType::Float { filterable: true }),
+                    texture_3d(TextureSampleType::Float { filterable: true }),
+                    sampler(SamplerBindingType::Filtering),
                 ),
             ),
         );

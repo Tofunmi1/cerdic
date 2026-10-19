@@ -39,7 +39,7 @@ fn intensity() -> ParamSpec {
 fn environment() -> Option<OperatorSpec> {
     spec(
         "scene.environment@1",
-        "Sky and ground ambient irradiance, approximated as a low-order hemisphere (not global illumination).",
+        "Sky and ground ambient irradiance, approximated as a low-order hemisphere; set gi=true for traced light probes (global illumination) instead.",
         vec![],
         OutputSpec::Fixed(PortType::Environment),
         vec![
@@ -149,6 +149,56 @@ fn sky() -> Option<OperatorSpec> {
     )
 }
 
+/// The settings that turn on light probes (global illumination). Both nodes set the scene's lighting, so both take them.
+fn probe_params() -> Vec<ParamSpec> {
+    let whole = |name, min, max, default, doc| ParamSpec {
+        name,
+        ty: ParamType::Int { min, max },
+        default: Some(Value::Int(default)),
+        doc,
+    };
+    vec![
+        ParamSpec {
+            name: "gi",
+            ty: ParamType::Bool,
+            default: Some(Value::Bool(false)),
+            doc: "Light the scene with traced light probes (global illumination) instead of the constant sky ambient: the sky as each place sees it (sheltered corners are darker), and sun and glowing surfaces bounced off other surfaces, so walls pick up the colour of what is next to them. It is calculated a little at a time after each edit, and the scene looks as before until it is done. Not seen by anything that is not drawn in the viewer.",
+        },
+        ParamSpec {
+            name: "gi_spacing",
+            ty: ParamType::Num {
+                unit: Unit::Length,
+                min: 0.0,
+                max: 64.0,
+            },
+            default: Some(Value::Num(0.0)),
+            doc: "Distance between light probes in metres: 0 sizes it from the scene (about 24 probes across its longest side). Smaller captures finer light and takes longer; at most 64 probes along an axis.",
+        },
+        whole(
+            "gi_bounces",
+            1,
+            4,
+            2,
+            "How many times light bounces between surfaces: 1 is sky, sun and glow bounced once, 2 or more also light bounced off bounced light.",
+        ),
+        whole(
+            "gi_rays",
+            32,
+            512,
+            128,
+            "Rays traced per probe for each bounce: more is smoother and slower.",
+        ),
+    ]
+}
+
+fn with_probe_params(mut spec: OperatorSpec) -> OperatorSpec {
+    spec.params.extend(probe_params());
+    spec
+}
+
 pub(super) fn all() -> Vec<Option<OperatorSpec>> {
-    vec![environment(), sky()]
+    [environment(), sky()]
+        .into_iter()
+        .map(|spec| spec.map(with_probe_params))
+        .collect()
 }

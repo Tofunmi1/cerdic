@@ -4,6 +4,7 @@ pub(crate) fn update(
     mut ambient: ResMut<VeAmbientLight>,
     mut sky_background: ResMut<ve_render::SkyBackground>,
     mut textures: ResMut<ve_render::MaterialTextures>,
+    mut probes: ResMut<ve_render::ProbeVolume>,
     baseline: Res<crate::scene::SceneAmbient>,
     old: Query<(Entity, &Mesh3d), With<Authored>>,
     gallery: Query<(Entity, &Mesh3d), With<GalleryObject>>,
@@ -77,6 +78,10 @@ pub(crate) fn update(
                 })
                 .unwrap_or_default();
             state.environment.clone_from(&candidate.environment);
+            // Light probes are traced from the geometry collected below; until they finish the scene keeps the sky ambient.
+            gi::clear(&mut probes);
+            let mut collector =
+                gi::Collector::new(candidate.environment.as_ref(), gi::sun(&candidate.lights));
             state.parts.clear();
             state.instance_sets.clear();
             candidate.count_instance_sets(&mut state.instance_sets);
@@ -99,6 +104,14 @@ pub(crate) fn update(
                 });
                 surface.map_layers = layers.get(&key).copied().unwrap_or([-1; 4]);
                 let placements = candidate.placements.get(&item.group);
+                if let Some(collector) = collector.as_mut() {
+                    collector.add(
+                        &item,
+                        &surface,
+                        placements.map(|p| p.matrices.as_slice()),
+                        &meshes,
+                    );
+                }
                 let mut motion = candidate.motion(&item.node, &item.name);
                 motion.body = bodies.get(&item.node);
                 animated += usize::from(motion.moves() && placements.is_none());
@@ -110,6 +123,9 @@ pub(crate) fn update(
                     placements,
                     &motion,
                 );
+            }
+            if let Some(collector) = collector {
+                collector.start();
             }
             state.animated_parts = animated;
             state.committed = Some(candidate.token);
@@ -126,7 +142,7 @@ pub(crate) fn status() -> String {
         "queued_bytes":state.candidate.as_ref().map_or(0, |c| c.queued_bytes),
         "staging_meshes":state.candidate.as_ref().map_or(0, |c| c.uploaded.len()),
         "live_meshes":state.parts.len(), "live_lights":state.light_count, "animated_parts":state.animated_parts, "selection_map":state.parts,
-        "live_environment":state.environment,
+        "live_environment":state.environment, "gi_progress":gi::progress(),
         "instance_sets":state.instance_sets,
         "upload_frames":state.upload_frames,"max_frame_bytes":state.max_frame_bytes,
         "last_upload_ms":state.last_ms,"max_upload_ms":state.max_ms})

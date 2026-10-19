@@ -184,7 +184,7 @@ pub struct SceneLight {
 /// A bounded, serializable scene environment produced by a `scene.environment` graph operator.
 ///
 /// The sky and ground colours are consumed as a first-order hemisphere: an approximation of an
-/// environment, deliberately not global illumination.
+/// environment with no inter-surface light. Setting `gi` replaces it with traced light probes.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SceneEnvironment {
@@ -205,6 +205,21 @@ pub struct SceneEnvironment {
     /// Optional procedural sky background; a separate scene.environment may override its ambient terms.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sky: Option<SceneSky>,
+    /// Light the scene with traced light probes (global illumination) instead of the constant ambient above.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gi: Option<LightProbes>,
+}
+
+/// Settings of the traced light probes (`gi` on a `scene.environment` or `scene.sky`).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LightProbes {
+    /// Distance between probes in metres; 0 sizes it from the scene.
+    pub spacing: f32,
+    /// How many times light bounces between surfaces (1 to 4).
+    pub bounces: u32,
+    /// Rays traced per probe, per bounce (32 to 512): more is smoother and slower.
+    pub rays: u32,
 }
 
 /// Analytic procedural sky authored by `scene.sky`.

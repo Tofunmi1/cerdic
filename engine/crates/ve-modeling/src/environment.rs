@@ -32,6 +32,27 @@ fn cast(vector: [f64; 3]) -> [f32; 3] {
     }
 }
 
+/// The light-probe settings a node asks for with `gi` (and `gi_spacing`, `gi_bounces`, `gi_rays`), or `None` when it does not.
+pub(crate) fn probes(node: &Node) -> Option<crate::LightProbes> {
+    if !matches!(node.params.get("gi"), Some(Param::Bool(true))) {
+        return None;
+    }
+    let whole = |name: &str, default: u32, range: std::ops::RangeInclusive<u32>| {
+        let value = match node.params.get(name) {
+            Some(Param::Int(n)) => u32::try_from(*n).unwrap_or(default),
+            _ => default,
+        };
+        value.clamp(*range.start(), *range.end())
+    };
+    #[expect(clippy::cast_possible_truncation, reason = "the spacing is a few metres")]
+    let spacing = scalar(node, "gi_spacing", 0.0).clamp(0.0, 64.0) as f32;
+    Some(crate::LightProbes {
+        spacing,
+        bounces: whole("gi_bounces", 2, 1..=4),
+        rays: whole("gi_rays", 128, 32..=512),
+    })
+}
+
 pub(crate) fn execute(node: &Node) -> Result<Value, Fail> {
     let sky =
         vector(node, "sky_color").ok_or_else(|| fail("param.type", "sky_color must be a vec3"))?;
@@ -56,5 +77,6 @@ pub(crate) fn execute(node: &Node) -> Result<Value, Fail> {
         #[expect(clippy::cast_possible_truncation, reason = "bounce is bounded to 0..1")]
         bounce: scalar(node, "bounce", 0.0) as f32,
         sky: None,
+        gi: probes(node),
     }))
 }
