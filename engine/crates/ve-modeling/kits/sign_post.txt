@@ -1,0 +1,13 @@
+group sign_post
+  post = solid.box@1(size=[0.08, 2.0, 0.08])
+  post_at = xform.move@1(post, by=[0, 1.0, 0])
+  board = solid.box@1(size=[0.8, 0.4, 0.04])
+  board_at = xform.move@1(board, by=[0, 1.6, 0])
+  all = solid.union@1(post_at, board_at)
+  surface = solid.material@1(all, color=[0.52, 0.38, 0.22], roughness=0.7, recipe="planks")
+  expose post = post.size
+  expose sign = board.size
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

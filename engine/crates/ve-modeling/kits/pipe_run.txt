@@ -1,0 +1,19 @@
+group pipe_run
+  main = solid.cylinder@1(radius=0.05, height=1.0, segments=16)
+  main_turned = xform.rotate@1(main, angles=[0, 0, 90])
+  main_at = xform.move@1(main_turned, by=[0, 0.06, -0.375])
+  branch = solid.cylinder@1(radius=0.05, height=0.8, segments=16)
+  branch_turned = xform.rotate@1(branch, angles=[90, 0, 0])
+  branch_at = xform.move@1(branch_turned, by=[0.5, 0.06, 0.025])
+  elbow = solid.sphere@1(radius=0.06, segments=16)
+  elbow_at = xform.move@1(elbow, by=[0.5, 0.06, -0.375])
+  all = solid.union@1(main_at, branch_at, elbow_at)
+  centred = xform.move@1(all, by=[-0.03, 0, 0.005])
+  surface = solid.material@1(centred, color=[0.42, 0.45, 0.48], roughness=0.35, metallic=0.8, recipe="brushed_metal")
+  expose main_radius = main.radius
+  expose branch_radius = branch.radius
+  expose elbow = elbow.radius
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

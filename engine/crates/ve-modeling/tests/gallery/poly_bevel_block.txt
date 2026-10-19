@@ -1,0 +1,11 @@
+# A block with its four vertical edges rounded: merge the triangles into flat faces, choose the four
+# disjoint vertical edges by where their centres are, bevel them with three segments.
+box = solid.box@1(size=[1, 1, 1])
+triangles = poly.from_solid@1(box)
+mesh = poly.merge_coplanar@1(triangles)
+uprights = poly.select@1(mesh, element="edge", by="box", box_min=[-1, -0.1, -1], box_max=[1, 0.1, 1])
+rounded = poly.bevel_edges@1(mesh, uprights, width=0.15, segments=3)
+solid = poly.to_solid@1(rounded)
+lifted = xform.move@1(solid, by=[0, 0.5, 0])
+paint = solid.material@1(lifted, color=[0.2, 0.45, 0.7], metallic=0.3, roughness=0.35)
+output block = paint

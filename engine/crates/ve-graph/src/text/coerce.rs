@@ -16,6 +16,7 @@ pub(super) fn describe(ty: &ParamType) -> String {
         ParamType::Vec2 { unit, .. } => format!("[x, y] ({})", unit_name(*unit)),
         ParamType::Vec3 { unit, .. } => format!("[x, y, z] ({})", unit_name(*unit)),
         ParamType::Points2 { .. } => "a list of [x, y] points (metres)".to_owned(),
+        ParamType::Points3 { .. } => "a list of [x, y, z] points (metres)".to_owned(),
     }
 }
 
@@ -95,7 +96,7 @@ fn coerce(ty: &ParamType, lit: &Lit) -> Result<Value, Fail> {
             .map(|i| number(i, *unit).map(Value::Num))
             .collect::<Result<_, _>>()
             .map(Value::List),
-        (ParamType::Points2 { .. }, Lit::List(items, _)) => items
+        (ParamType::Points2 { .. } | ParamType::Points3 { .. }, Lit::List(items, _)) => items
             .iter()
             .map(|point| match point {
                 Lit::List(parts, _) => parts
@@ -103,7 +104,7 @@ fn coerce(ty: &ParamType, lit: &Lit) -> Result<Value, Fail> {
                     .map(|p| number(p, Unit::Length).map(Value::Num))
                     .collect::<Result<_, _>>()
                     .map(Value::List),
-                other => Err(fail("param.type", other.span(), "expected a [x, y] point")),
+                other => Err(fail("param.type", other.span(), "expected a point")),
             })
             .collect::<Result<_, _>>()
             .map(Value::List),

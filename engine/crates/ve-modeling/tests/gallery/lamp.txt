@@ -1,0 +1,35 @@
+# Table lamp: weighted revolved base, curved swept neck, hollow lofted twisted shade, glowing bulb.
+base_profile = profile.polygon@1(points=[[0,0],[0.1,0],[0.105,0.01],[0.09,0.03],[0.04,0.05],[0.014,0.07],[0,0.07]])
+base_round = profile.smooth@1(base_profile, iterations=2, keep_axis=true)
+base = solid.revolve@1(base_round, angle=360deg, segments=64)
+neck_path = curve.bezier@1(points=[[0,0.06,0],[0,0.22,0],[0.1,0.26,0],[0.1,0.4,0]], steps=40)
+neck_section = profile.circle@1(radius=0.009, segments=24)
+neck = solid.sweep@1(curve=neck_path, profile=neck_section)
+outer_a = profile.circle@1(radius=0.12, segments=48)
+outer_b = profile.circle@1(radius=0.135, segments=48)
+outer_c = profile.circle@1(radius=0.11, segments=48)
+outer_d = profile.circle@1(radius=0.075, segments=48)
+shade_out = solid.loft@1(outer_a, outer_b, outer_c, outer_d, spacing=0.06)
+inner_a = profile.circle@1(radius=0.116, segments=48)
+inner_b = profile.circle@1(radius=0.131, segments=48)
+inner_c = profile.circle@1(radius=0.106, segments=48)
+inner_d = profile.circle@1(radius=0.071, segments=48)
+shade_in = solid.loft@1(inner_a, inner_b, inner_c, inner_d, spacing=0.0675)
+shade_in_low = xform.move@1(shade_in, by=[0, -0.0075, 0])
+shell = solid.difference@1(shade_out, shade_in_low)
+shell_twist = xform.twist@1(shell, angle=0.45rad, tolerance=0.004)
+shade = xform.move@1(shell_twist, by=[0.1, 0.34, 0])
+bulb = solid.sphere@1(radius=0.04, segments=32)
+bulb_up = xform.move@1(bulb, by=[0.1, 0.44, 0])
+socket = solid.cylinder@1(radius=0.016, height=0.04, segments=24)
+socket_up = xform.move@1(socket, by=[0.1, 0.405, 0])
+base_m = solid.material@1(base, color=[0.12, 0.12, 0.14], metallic=0.9, roughness=0.3)
+neck_m = solid.material@1(neck, color=[0.85, 0.62, 0.25], metallic=1, roughness=0.2)
+shade_m = solid.material@1(shade, color=[0.95, 0.88, 0.72], metallic=0, roughness=0.8)
+bulb_m = solid.material@1(bulb_up, color=[1, 0.9, 0.6], metallic=0, roughness=0.4, emissive=[4, 3.2, 1.6])
+socket_m = solid.material@1(socket_up, color=[0.85, 0.62, 0.25], metallic=1, roughness=0.2)
+output base = base_m
+output neck = neck_m
+output shade = shade_m
+output bulb = bulb_m
+output socket = socket_m

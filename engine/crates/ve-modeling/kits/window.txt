@@ -1,0 +1,16 @@
+group window
+  outer = solid.box@1(size=[1.0, 1.2, 0.12])
+  hole = solid.box@1(size=[0.84, 1.04, 0.2])
+  rim = solid.difference@1(outer, hole)
+  rim_lit = solid.material@1(rim, color=[0.92, 0.9, 0.85], roughness=0.5)
+  bar_v = solid.box@1(size=[0.04, 1.04, 0.06])
+  bar_h = solid.box@1(size=[0.84, 0.04, 0.06])
+  bars = solid.union@1(bar_v, bar_h)
+  bars_lit = solid.material@1(bars, color=[0.92, 0.9, 0.85], roughness=0.5)
+  pane = solid.box@1(size=[0.84, 1.04, 0.01])
+  glass = solid.material@1(pane, color=[0.62, 0.8, 0.95], roughness=0.05)
+  window = solid.union@1(rim_lit, bars_lit, glass)
+  expose frame_color = rim_lit.color
+  expose glass_color = glass.color
+  result window
+end

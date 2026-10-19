@@ -1,6 +1,6 @@
 //! Incremental evaluator. One step executes one node, allowing the worker to yield between calls.
 use crate::{
-    Evaluation, Fail, Quality, budget,
+    Evaluation, EvaluationWarning, Fail, Quality, SceneEnvironment, budget,
     cache::{Cache, Value},
     fail, operations, plan,
 };
@@ -31,6 +31,7 @@ struct Job {
 /// Evaluates immutable documents with a bounded mesh cache; it never owns authoring history.
 pub struct Evaluator {
     cache: Cache,
+    ao_cache: crate::ao::Cache,
     job: Option<Job>,
     last_executed: usize,
 }
@@ -47,6 +48,7 @@ impl Evaluator {
     pub fn with_cache_limit(bytes: usize) -> Self {
         Self {
             cache: Cache::new(bytes),
+            ao_cache: crate::ao::Cache::default(),
             job: None,
             last_executed: 0,
         }
@@ -109,7 +111,7 @@ impl Evaluator {
             self.job = Some(job);
             return Ok(None);
         }
-        let result = finish(&job)?;
+        let result = finish(&job, &mut self.ao_cache)?;
         for (key, value) in job.staged {
             self.cache.insert(key, value);
         }
@@ -178,7 +180,12 @@ impl Evaluator {
                 .iter()
                 .map(|(_, value)| Rc::clone(value))
                 .collect();
-            let value = Rc::new(operations::execute(node, &inputs, &job.context)?);
+            let value = Rc::new(operations::execute(
+                node,
+                &inputs,
+                &job.context,
+                job.quality,
+            )?);
             job.executed += 1;
             if value.mesh.triangle_count() > job.quality.triangles() {
                 return Err(budget::exceeded(
@@ -226,14 +233,68 @@ fn remap(mut failure: Fail, origins: &BTreeMap<NodeId, Origin>) -> Fail {
     failure
 }
 
-fn finish(job: &Job) -> Result<Evaluation, Fail> {
+fn finish(job: &Job, ao_cache: &mut crate::ao::Cache) -> Result<Evaluation, Fail> {
     let mut parts = Vec::new();
+    let mut lights = Vec::new();
+    let mut environment: Option<SceneEnvironment> = None;
+    let mut authored_environment = false;
+    let mut authored_sky = false;
     let mut triangles = 0_usize;
     for output in &job.plan.outputs {
         let (_, value) = job
             .values
             .get(&output.from.node)
             .ok_or_else(|| fail("graph.unknown_node", output.from.node.to_string()))?;
+        if let Some(light) = &value.light {
+            let mut light = light.clone();
+            light.name.clone_from(&output.name);
+            light.node.clone_from(&output.from.node);
+            lights.push(light);
+            continue;
+        }
+        if let Some(scene) = &value.environment {
+            if let Some(sky) = &scene.sky {
+                if authored_sky {
+                    return Err(fail(
+                        "scene.sky.duplicate",
+                        "only one scene.sky output is allowed",
+                    ));
+                }
+                authored_sky = true;
+                let mut sun = crate::SceneLight {
+                    node: sky.node.clone(),
+                    name: output.name.clone(),
+                    kind: crate::SceneLightKind::Sun,
+                    position: [0.0; 3],
+                    direction: sky.sun_direction,
+                    color: crate::environment::sky::sun_colour(sky.sun_direction),
+                    intensity: sky.sun_intensity,
+                    range: 0.0,
+                    inner_angle: 0.0,
+                    outer_angle: 0.0,
+                };
+                sun.name.clone_from(&output.name);
+                lights.push(sun);
+                if let Some(existing) = &mut environment {
+                    existing.sky = Some(sky.clone());
+                } else {
+                    environment = Some(scene.clone());
+                }
+            } else {
+                if authored_environment {
+                    return Err(fail(
+                        "scene.environment.duplicate",
+                        "only one scene.environment output is allowed",
+                    ));
+                }
+                authored_environment = true;
+                let sky = environment.as_ref().and_then(|current| current.sky.clone());
+                let mut authored = scene.clone();
+                authored.sky = sky;
+                environment = Some(authored);
+            }
+            continue;
+        }
         let generated = crate::instances::parts(output, value)?;
         let drawn = generated
             .iter()
@@ -249,12 +310,42 @@ fn finish(job: &Job) -> Result<Evaluation, Fail> {
         }
         parts.extend(generated);
     }
+    crate::ao::bake(&mut parts, job.quality, ao_cache)?;
+    let mut hierarchy_warnings = crate::hierarchy::resolve(&mut parts);
+    hierarchy_warnings.extend(crate::rig::weigh(&mut parts));
+    hierarchy_warnings.extend(crate::rig::resolve_ik(&mut parts));
+    hierarchy_warnings.extend(crate::physics::check(&mut parts));
+    lights.extend(crate::emitters::from_parts(&parts));
+    if lights.len() > crate::MAX_SCENE_LIGHTS {
+        return Err(budget::exceeded(
+            "budget.lights",
+            crate::MAX_SCENE_LIGHTS,
+            lights.len(),
+        ));
+    }
     Ok(Evaluation {
         parts,
+        lights,
+        environment,
         evaluated_nodes: job.executed,
         cache_hits: job.hits,
         cache_bytes: 0,
+        warnings: collect_warnings(
+            job.values
+                .values()
+                .flat_map(|(_, value)| value.warnings.iter().cloned())
+                .chain(hierarchy_warnings),
+        ),
     })
+}
+
+fn collect_warnings(
+    warnings: impl IntoIterator<Item = EvaluationWarning>,
+) -> Vec<EvaluationWarning> {
+    let mut warnings: Vec<_> = warnings.into_iter().collect();
+    warnings.sort();
+    warnings.dedup();
+    warnings
 }
 
 fn digest(bytes: &[u8]) -> String {
@@ -268,4 +359,23 @@ fn digest(bytes: &[u8]) -> String {
         hash(0xcbf2_9ce4_8422_2325),
         hash(0x8422_2325_cbf2_9ce4)
     )
+}
+
+#[cfg(test)]
+mod warning_tests {
+    use super::collect_warnings;
+    use crate::EvaluationWarning;
+
+    #[test]
+    fn warnings_from_multiple_nodes_are_kept_and_duplicates_are_removed() {
+        let first = EvaluationWarning::attribute_dropped("n_0123abcd", "material");
+        let second = EvaluationWarning {
+            node: "n_89abcdef".to_owned(),
+            ..first.clone()
+        };
+        let result = collect_warnings([first.clone(), second.clone(), first]);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].node, "n_0123abcd");
+        assert_eq!(result[1], second);
+    }
 }

@@ -1,0 +1,16 @@
+group table
+  top = solid.box@1(size=[1.2, 0.05, 0.7])
+  top_at = xform.move@1(top, by=[0, 0.755, 0])
+  leg = solid.cylinder@1(radius=0.035, height=0.74, segments=12)
+  leg_at = xform.move@1(leg, by=[-0.55, 0.37, -0.3])
+  legs = inst.array@1(leg_at, count_x=2, count_z=2, spacing=[1.1, 0, 0.6])
+  frame = inst.realize@1(legs)
+  all = solid.union@1(top_at, frame)
+  surface = solid.material@1(all, color=[0.48, 0.31, 0.18], roughness=0.6, recipe="wood")
+  expose top = top.size
+  expose radius = leg.radius
+  expose segments = leg.segments
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

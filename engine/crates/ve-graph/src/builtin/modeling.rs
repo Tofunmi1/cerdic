@@ -1,6 +1,6 @@
 //! Operators that edit profiles, build solids from them, and constrain the result.
 
-use super::{EXTENT, PROFILE, SOLID, length, single, spec, variadic};
+use super::{COLOURABLE, EXTENT, PROFILE, length, single, spec, variadic};
 use crate::spec::{OperatorSpec, OutputSpec, ParamSpec, PortType};
 use crate::value::{ParamType, Unit, Value};
 
@@ -86,6 +86,16 @@ fn profile_edits() -> Vec<Option<OperatorSpec>> {
             ],
         ),
         spec(
+            "profile.fillet@1",
+            "Rounds convex corners of a planar profile while preserving its original outer bounds.",
+            vec![single("in", PROFILE)],
+            profile,
+            vec![length(
+                "radius",
+                "Corner radius in metres; the eroded core must remain nonempty.",
+            )],
+        ),
+        spec(
             "profile.difference@1",
             "The first profile minus all the others.",
             vec![variadic("in", PROFILE)],
@@ -131,50 +141,19 @@ fn solids_from_profiles() -> Vec<Option<OperatorSpec>> {
     )]
 }
 
+mod animation;
+mod appearance;
+mod behavior;
+mod rig;
+
 fn appearance() -> Vec<Option<OperatorSpec>> {
-    let solid = OutputSpec::Fixed(PortType::Solid);
-    vec![spec(
-        "solid.material@1",
-        "Gives a solid a surface: colour, metal, roughness and glow. The shape is unchanged.",
-        vec![single("in", SOLID)],
-        solid,
-        vec![
-            ParamSpec {
-                name: "color",
-                ty: ParamType::Vec3 {
-                    unit: Unit::None,
-                    min: 0.0,
-                    max: 1.0,
-                },
-                default: Some(triple(0.8, 0.8, 0.8)),
-                doc: "Base colour [r, g, b], each 0 to 1, as picked in a colour chooser (sRGB).",
-            },
-            number(
-                "metallic",
-                Unit::None,
-                (0.0, 1.0),
-                0.0,
-                "0 for plastic, wood, stone, paint; 1 for bare metal.",
-            ),
-            number(
-                "roughness",
-                Unit::None,
-                (0.0, 1.0),
-                0.5,
-                "0 is a mirror, 1 is fully matte.",
-            ),
-            ParamSpec {
-                name: "emissive",
-                ty: ParamType::Vec3 {
-                    unit: Unit::None,
-                    min: 0.0,
-                    max: 100.0,
-                },
-                default: Some(triple(0.0, 0.0, 0.0)),
-                doc: "Light given off, [r, g, b] in linear colour; values above 1 glow (a flame is about [3, 1.6, 0.4]).",
-            },
-        ],
-    )]
+    [
+        appearance::specs(),
+        animation::specs(),
+        rig::specs(),
+        behavior::specs(),
+    ]
+    .concat()
 }
 
 fn constraints() -> Vec<Option<OperatorSpec>> {

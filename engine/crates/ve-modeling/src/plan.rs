@@ -1,5 +1,9 @@
 //! Preflight completes before any kernel call or geometry allocation.
+mod estimate;
+mod fields;
+
 use crate::{Fail, Quality, budget, fail};
+use estimate::estimate;
 use std::collections::{BTreeMap, BTreeSet};
 use ve_graph::{
     Arity, Document, Node, NodeId, Output, OutputSpec, PortRef, PortType, builtin_registry,
@@ -41,6 +45,7 @@ fn plan_nodes(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
     let mut done = BTreeSet::new();
     let mut types = BTreeMap::new();
     let mut sizes = BTreeMap::new();
+    let mut field_complexities = BTreeMap::new();
     let mut placements = BTreeMap::new();
     let mut frames = BTreeMap::new();
     let mut order = Vec::new();
@@ -70,25 +75,14 @@ fn plan_nodes(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
             } else {
                 0
             };
-            let triangles = if node.op.family().as_str() == "inst.realize" {
-                let input = node
-                    .inputs
-                    .values()
-                    .flatten()
-                    .next()
-                    .ok_or_else(|| fail("graph.missing_input", "instance set"))?;
-                crate::instances::realization(
-                    *sizes.get(&input.node).unwrap_or(&0),
-                    *placements.get(&input.node).unwrap_or(&0),
-                )?
-            } else {
-                estimate(node, &sizes)?
-            };
+            let triangles =
+                estimated_triangles(node, quality, &sizes, &placements, &field_complexities)?;
             if triangles > quality.triangles() {
                 let issue = budget::exceeded("budget.triangles", quality.triangles(), triangles);
                 return Err(Box::new((*issue).at_node(&node.id)));
             }
             live_bytes = live_bytes.saturating_add(triangles.saturating_mul(96));
+            live_bytes = live_bytes.saturating_add(estimate::auxiliary_bytes(node));
             live_bytes = live_bytes.saturating_add(instances.saturating_mul(128));
             live_bytes = live_bytes.saturating_add(sockets.saturating_mul(256));
             if live_bytes > 256 * 1024 * 1024 {
@@ -100,6 +94,9 @@ fn plan_nodes(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
             }
             types.insert(node.id.clone(), kind);
             sizes.insert(node.id.clone(), triangles);
+            if let Some(complexity) = fields::complexity(node, &field_complexities) {
+                field_complexities.insert(node.id.clone(), complexity);
+            }
             placements.insert(node.id.clone(), instances);
             frames.insert(node.id.clone(), sockets);
             done.insert(node.id.clone());
@@ -115,6 +112,41 @@ fn plan_nodes(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
     let outputs = outputs(doc, &types);
     validate_outputs(&outputs, &types, &sizes, &placements, quality)?;
     Ok(Plan { order, outputs })
+}
+
+fn estimated_triangles(
+    node: &Node,
+    quality: Quality,
+    sizes: &BTreeMap<NodeId, usize>,
+    placements: &BTreeMap<NodeId, usize>,
+    fields: &BTreeMap<NodeId, fields::Complexity>,
+) -> Result<usize, Fail> {
+    match node.op.family().as_str() {
+        "field.to_solid" => {
+            let complexity = node
+                .inputs
+                .get("field")
+                .and_then(|links| links.first())
+                .and_then(|link| fields.get(&link.node))
+                .copied()
+                .ok_or_else(|| fail("graph.missing_input", "field.to_solid source cost"))?;
+            fields::mesh_estimate(node, complexity, quality)
+                .map_err(|issue| Box::new((*issue).at_node(&node.id)))
+        }
+        "inst.realize" => {
+            let input = node
+                .inputs
+                .values()
+                .flatten()
+                .next()
+                .ok_or_else(|| fail("graph.missing_input", "instance set"))?;
+            crate::instances::realization(
+                *sizes.get(&input.node).unwrap_or(&0),
+                *placements.get(&input.node).unwrap_or(&0),
+            )
+        }
+        _ => estimate(node, sizes),
+    }
 }
 
 fn output_kind(
@@ -143,16 +175,38 @@ fn validate_outputs(
 ) -> Result<(), Fail> {
     let mut total = 0_usize;
     let mut instances = 0_usize;
+    let mut lights = 0_usize;
     for output in outputs {
+        let output_kind = types.get(&output.from.node);
         if !matches!(
-            types.get(&output.from.node),
-            Some(PortType::Solid | PortType::Inst)
+            output_kind,
+            Some(
+                PortType::Solid
+                    | PortType::Inst
+                    | PortType::Poly
+                    | PortType::Light
+                    | PortType::Environment
+            )
         ) || output.from.port != "out"
         {
             return Err(fail(
                 "graph.port_type",
-                "render outputs must name a solid output",
+                "scene outputs must name geometry, a light or the environment",
             ));
+        }
+        if output_kind == Some(&PortType::Light) {
+            lights += 1;
+            if lights > crate::MAX_SCENE_LIGHTS {
+                return Err(budget::exceeded(
+                    "budget.lights",
+                    crate::MAX_SCENE_LIGHTS,
+                    lights,
+                ));
+            }
+            continue;
+        }
+        if output_kind == Some(&PortType::Environment) {
+            continue;
         }
         let count = placements
             .get(&output.from.node)
@@ -220,6 +274,7 @@ fn validate(
         let links = node.inputs.get(port.name).map_or(&[][..], Vec::as_slice);
         let valid = match port.arity {
             Arity::One => links.len() == 1,
+            Arity::Optional => links.len() <= 1,
             Arity::Variadic { min } => (usize::from(min)..=64).contains(&links.len()),
         };
         if !valid {
@@ -244,122 +299,6 @@ fn validate(
     Ok(())
 }
 
-fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usize, Fail> {
-    let inputs = node
-        .inputs
-        .values()
-        .flatten()
-        .map(|r| *sizes.get(&r.node).unwrap_or(&0));
-    let segments = node
-        .params
-        .get("segments")
-        .and_then(ve_graph::Value::as_f64)
-        .unwrap_or(24.0);
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "registry bounds segments to 3..512 before estimation"
-    )]
-    let segments = segments as usize;
-    let divisions = node
-        .params
-        .get("divisions")
-        .and_then(ve_graph::Value::as_f64)
-        .unwrap_or(1.0);
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "registry bounds divisions to 1..256 before estimation"
-    )]
-    let divisions = divisions as usize;
-    // Profile nodes count points instead of triangles; they feed the solids built from them.
-    match node.op.family().as_str() {
-        "profile.polygon" | "profile.offset" | "profile.difference" | "profile.smooth" => {
-            profile_estimate(node, inputs.sum(), segments)
-        }
-        "xform.mirror" => Ok(inputs.sum::<usize>().saturating_mul(2)),
-        "check.min_wall" => Ok(0),
-        "profile.rect" => Ok(4),
-        "profile.circle" => Ok(segments),
-        "solid.torus" => Ok(segments
-            .saturating_mul(count(node, "tube_segments"))
-            .saturating_mul(2)),
-        // Copies are counted before any is built, so a pattern over the budget is refused cheaply.
-        "xform.array" => Ok(inputs.sum::<usize>().saturating_mul(
-            count(node, "count_x")
-                .saturating_mul(count(node, "count_y"))
-                .saturating_mul(count(node, "count_z")),
-        )),
-        "xform.radial" | "xform.repeat" => {
-            Ok(inputs.sum::<usize>().saturating_mul(count(node, "count")))
-        }
-        "solid.extrude" => Ok(inputs
-            .sum::<usize>()
-            .saturating_mul(divisions.saturating_mul(4).saturating_add(2))),
-        "solid.revolve" => Ok(inputs
-            .sum::<usize>()
-            .saturating_mul(segments)
-            .saturating_mul(2)),
-        "solid.box" => Ok(12),
-        "solid.sphere" | "solid.capsule" => Ok(segments.saturating_mul(segments).saturating_mul(2)),
-        "solid.cylinder" | "solid.cone" => Ok(segments.saturating_mul(4)),
-        "solid.union" | "solid.difference" | "solid.intersect" => {
-            Ok(inputs.sum::<usize>().saturating_mul(4))
-        }
-        "xform.attach" => Ok(node
-            .inputs
-            .get("in")
-            .into_iter()
-            .flatten()
-            .map(|r| sizes.get(&r.node).copied().unwrap_or(0))
-            .sum()),
-        "xform.move" | "xform.rotate" | "xform.scale" | "xform.align" | "frame.add"
-        | "solid.material" | "inst.array" | "inst.radial" | "inst.repeat" | "inst.mirror" => {
-            Ok(inputs.sum())
-        }
-        _ => Err(fail(
-            "geometry.unsupported_case",
-            format!("{} has no evaluator yet", node.op),
-        )),
-    }
-}
-
-fn profile_estimate(node: &Node, inputs: usize, segments: usize) -> Result<usize, Fail> {
-    match node.op.family().as_str() {
-        "profile.polygon" => Ok(match node.params.get("points") {
-            Some(ve_graph::Value::List(points)) => points.len(),
-            _ => 0,
-        }),
-        "profile.offset" => {
-            let round =
-                matches!(node.params.get("join"),Some(ve_graph::Value::Str(j)) if j=="round");
-            Ok(inputs.saturating_mul(2) + if round { 256 } else { 0 })
-        }
-        "profile.difference" => Ok(inputs.saturating_mul(2)),
-        "profile.smooth" => {
-            let rounds = match node.params.get("iterations") {
-                Some(ve_graph::Value::Int(n)) => (*n).clamp(0, 5),
-                _ => 2,
-            };
-            Ok(inputs.saturating_mul(1_usize << rounds))
-        }
-        "profile.rect" => Ok(4),
-        "profile.circle" => Ok(segments),
-        _ => Err(fail(
-            "geometry.unsupported_case",
-            format!("{} has no profile estimate", node.op),
-        )),
-    }
-}
-
-/// A whole-number parameter as a size; the registry has already bounded it, a missing one counts as 1.
-fn count(node: &Node, name: &str) -> usize {
-    match node.params.get(name) {
-        Some(ve_graph::Value::Int(n)) => usize::try_from(*n).unwrap_or(1),
-        _ => 1,
-    }
-}
-
 fn outputs(doc: &Document, types: &BTreeMap<NodeId, PortType>) -> Vec<Output> {
     if !doc.outputs.is_empty() {
         return doc.outputs.clone();
@@ -373,7 +312,16 @@ fn outputs(doc: &Document, types: &BTreeMap<NodeId, PortType>) -> Vec<Output> {
         .iter()
         .filter(|node| {
             !consumed.contains(&node.id)
-                && matches!(types.get(&node.id), Some(PortType::Solid | PortType::Inst))
+                && matches!(
+                    types.get(&node.id),
+                    Some(
+                        PortType::Solid
+                            | PortType::Inst
+                            | PortType::Poly
+                            | PortType::Light
+                            | PortType::Environment
+                    )
+                )
         })
         .map(|node| Output {
             name: node.label.clone().unwrap_or_else(|| node.id.to_string()),

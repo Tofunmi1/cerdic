@@ -1,5 +1,6 @@
 //! Operators consume immutable mesh values. Native solids exist only while one node executes.
-use crate::{Fail, appearance, cache::Value, fail, instances, profile_ops, shapes};
+use crate::regions::{self, Labels};
+use crate::{Fail, Quality, appearance, cache::Value, fail, instances, profile_ops, shapes};
 use std::rc::Rc;
 use ve_graph::{Node, Value as Param};
 use ve_kernel::{ExecutionContext, KernelError, Mesh, Solid};
@@ -8,6 +9,7 @@ pub(crate) fn execute(
     node: &Node,
     inputs: &[Rc<Value>],
     context: &ExecutionContext,
+    quality: Quality,
 ) -> Result<Value, Fail> {
     if context.is_cancelled() {
         return Err(fail("eval.cancelled", "evaluation was cancelled"));
@@ -21,32 +23,10 @@ pub(crate) fn execute(
             .ok_or_else(|| fail("graph.missing_input", "bypass requires an input"))?;
         return Ok((**input).clone());
     }
+    if let Some(result) = execute_special(node, inputs, context, quality) {
+        return result;
+    }
     let family = node.op.family().as_str();
-    if family == "frame.add" {
-        return crate::frames::add(
-            node,
-            inputs
-                .first()
-                .ok_or_else(|| fail("graph.missing_input", "frame source"))?,
-        );
-    }
-    if family == "xform.attach" {
-        return crate::frames::attach(node, inputs);
-    }
-    if family.starts_with("inst.") || inputs.first().is_some_and(|v| v.instances.is_some()) {
-        return instances::execute(node, inputs, context).map_err(|mut error| {
-            if error.node.is_none() {
-                error.node = Some(node.id.clone());
-            }
-            error
-        });
-    }
-    if family == "solid.material" {
-        return appearance::material(node, inputs);
-    }
-    if family.starts_with("profile.") || family == "check.min_wall" {
-        return profile_ops::run(node, inputs);
-    }
     let first_empty = inputs.first().is_some_and(|input| input.mesh.is_empty());
     if ((family == "solid.difference" || family.starts_with("xform.")) && first_empty)
         || (family == "solid.intersect" && inputs.iter().any(|input| input.mesh.is_empty()))
@@ -59,10 +39,13 @@ pub(crate) fn execute(
         .filter(|input| !input.mesh.is_empty())
         .map(Rc::clone)
         .collect();
+    // Inputs of two or more different materials are labelled so the result keeps each one's surface.
+    let mut labels = Labels::default();
+    let tracking = tracks_materials(family) && regions::needed(&nonempty);
     let built = if matches!(family, "solid.extrude" | "solid.revolve") {
         profile_ops::to_solid(node, inputs)
     } else {
-        solid(node, &nonempty, context)
+        solid(node, &nonempty, context, tracking.then_some(&mut labels))
     };
     let result = built.map_err(|error| kernel_fail(node, &error))?;
     if context.is_cancelled() {
@@ -75,10 +58,153 @@ pub(crate) fn execute(
             .to_mesh()
             .map_err(|e| fail("kernel.failed", e.to_string()))?
     };
-    inherited(node, inputs, Value::solid(mesh, result.volume()))
+    let mut value = inherited(node, inputs, Value::solid(mesh, result.volume()))?;
+    if tracking && !result.is_empty() {
+        let found = labels
+            .regions(&result, value.material.as_ref())
+            .map_err(|e| fail("kernel.failed", e.to_string()))?;
+        regions::apply(&mut value, found);
+    }
+    Ok(value)
 }
 
-fn inherited(node: &Node, inputs: &[Rc<Value>], mut value: Value) -> Result<Value, Fail> {
+fn execute_special(
+    node: &Node,
+    inputs: &[Rc<Value>],
+    context: &ExecutionContext,
+    quality: Quality,
+) -> Option<Result<Value, Fail>> {
+    let family = node.op.family().as_str();
+    if family == "frame.add" {
+        let Some(input) = inputs.first() else {
+            return Some(Err(fail("graph.missing_input", "frame source")));
+        };
+        return Some(crate::frames::add(node, input));
+    }
+    if family.starts_with("light.") {
+        return Some(crate::lights::execute(node));
+    }
+    if let Some(result) = execute_scene_environment(node) {
+        return Some(result);
+    }
+    if family == "xform.attach" {
+        return Some(crate::frames::attach(node, inputs));
+    }
+    if family.starts_with("field.") {
+        return Some(
+            crate::field_ops::execute(family, node, inputs, context, quality)
+                .map_err(|error| at_node(error, node)),
+        );
+    }
+    if let Some(result) = crate::curves::run(node, inputs, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::deform::run(node, inputs, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::terrain::run(node, inputs, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::terrain::water::run(node, inputs, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::poly_ops::run(node, inputs, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if family == "solid.material" {
+        return Some(appearance::material(node, inputs));
+    }
+    if family == "anim.track" {
+        return Some(crate::anim::track(node, inputs));
+    }
+    if family == "phys.body" {
+        return Some(crate::physics::body(node, inputs));
+    }
+    if family == "phys.world" {
+        return Some(crate::physics::world(node, inputs));
+    }
+    if family == "phys.joint" {
+        return Some(crate::physics::joint(node, inputs));
+    }
+    if let Some(result) = execute_rig(node, inputs) {
+        return Some(result);
+    }
+    if family == "anim.wave" {
+        return Some(crate::wave::wave(node, inputs));
+    }
+    if family == "anim.parent" {
+        return Some(crate::hierarchy::parent(node, inputs));
+    }
+    if family == "behavior.on" {
+        return Some(crate::reaction::behavior(node, inputs));
+    }
+    if family == "solid.texture" {
+        return Some(appearance::texture(node, inputs));
+    }
+    if family == "solid.toon" {
+        return Some(appearance::toon(node, inputs));
+    }
+    if family == "solid.style" {
+        return Some(crate::style::style(node, inputs));
+    }
+    if family.starts_with("inst.") || inputs.first().is_some_and(|v| v.instances.is_some()) {
+        return Some(
+            instances::execute(node, inputs, context).map_err(|error| at_node(error, node)),
+        );
+    }
+    if family.starts_with("profile.") || family == "check.min_wall" {
+        return Some(profile_ops::run(node, inputs));
+    }
+    None
+}
+
+fn execute_scene_environment(node: &Node) -> Option<Result<Value, Fail>> {
+    match node.op.family().as_str() {
+        "scene.environment" => Some(crate::environment::execute(node)),
+        "scene.sky" => Some(crate::environment::sky::execute(node)),
+        _ => None,
+    }
+}
+
+fn execute_rig(node: &Node, inputs: &[Rc<Value>]) -> Option<Result<Value, Fail>> {
+    match node.op.family().as_str() {
+        "rig.bone" => Some(crate::rig::bone(node, inputs)),
+        "rig.ik" => Some(crate::rig::ik(node, inputs)),
+        "rig.skin" => Some(crate::rig::skin(node, inputs)),
+        _ => None,
+    }
+}
+
+/// Operations that carry each input's material through to the faces of their result.
+fn tracks_materials(family: &str) -> bool {
+    matches!(
+        family,
+        "solid.union"
+            | "solid.difference"
+            | "solid.intersect"
+            | "xform.move"
+            | "xform.rotate"
+            | "xform.scale"
+            | "xform.align"
+            | "xform.mirror"
+            | "xform.array"
+            | "xform.radial"
+            | "xform.repeat"
+    )
+}
+
+fn at_node(mut error: Fail, node: &Node) -> Fail {
+    if error.node.is_none() {
+        error.node = Some(node.id.clone());
+    }
+    error
+}
+
+pub(crate) fn inherited(
+    node: &Node,
+    inputs: &[Rc<Value>],
+    mut value: Value,
+) -> Result<Value, Fail> {
     let family = node.op.family().as_str();
     // Moving, turning, scaling or combining keeps the first input's surface.
     if family.starts_with("xform.")
@@ -114,8 +240,13 @@ fn solid(
     node: &Node,
     inputs: &[Rc<Value>],
     context: &ExecutionContext,
+    mut labels: Option<&mut Labels>,
 ) -> Result<Solid, KernelError> {
     let kind = node.op.family().as_str();
+    let mut convert = |input: &Value| match labels.as_deref_mut() {
+        Some(labels) => labels.solid(input),
+        None => Solid::from_mesh(&input.mesh),
+    };
     let number = |name| {
         node.params
             .get(name)
@@ -146,13 +277,13 @@ fn solid(
             let input = inputs
                 .first()
                 .ok_or(KernelError::InvalidArgument("missing input"))?;
-            shapes::pattern(node, input, context)
+            shapes::pattern(node, input, context, labels)
         }
         _ => {
             if kind == "solid.union" && inputs.len() >= 2 {
                 let solids: Vec<_> = inputs
                     .iter()
-                    .map(|input| Solid::from_mesh(&input.mesh))
+                    .map(|input| convert(input))
                     .collect::<Result<_, _>>()?;
                 let borrowed: Vec<_> = solids.iter().collect();
                 return Solid::union_all_with_context(&borrowed, context);
@@ -160,15 +291,17 @@ fn solid(
             let input = inputs
                 .first()
                 .ok_or(KernelError::InvalidArgument("missing input"))?;
-            let mut value = Solid::from_mesh(&input.mesh)?;
+            let mut value = convert(input)?;
             match kind {
                 "xform.move" => value.translate(vector(node, "by")?),
                 "xform.rotate" => value.rotate(vector(node, "angles")?.map(f64::to_degrees)),
                 "xform.scale" => value.scale(vector(node, "by")?),
                 "xform.align" => value.transform(crate::assembly::alignment(node)?),
+                "solid.round" => value.round(number("radius")?, segments()?),
+                "solid.chamfer" => value.chamfer(number("width")?),
                 _ => {
                     for input in inputs.iter().skip(1) {
-                        let next = Solid::from_mesh(&input.mesh)?;
+                        let next = convert(input)?;
                         value = match kind {
                             "solid.union" => value.union_with_context(&next, context)?,
                             "solid.difference" => value.difference_with_context(&next, context)?,

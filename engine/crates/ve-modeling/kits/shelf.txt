@@ -1,0 +1,23 @@
+group shelf
+  side = solid.box@1(size=[0.025, 1.8, 0.3])
+  side_at = xform.move@1(side, by=[-0.4125, 0.9, 0])
+  sides = inst.repeat@1(side_at, count=2, step=[0.825, 0, 0])
+  sides_solid = inst.realize@1(sides)
+  board = solid.box@1(size=[0.8, 0.02, 0.3])
+  board_at = xform.move@1(board, by=[0, 0.01, 0])
+  boards = inst.array@1(board_at, count_y=6, spacing=[0, 0.34, 0])
+  boards_solid = inst.realize@1(boards)
+  carcass = solid.union@1(sides_solid, boards_solid)
+  wood = solid.material@1(carcass, color=[0.5, 0.33, 0.18], roughness=0.65)
+  book = solid.box@1(size=[0.03, 0.2, 0.2])
+  book_at = xform.move@1(book, by=[-0.3, 0.46, 0])
+  row = inst.array@1(book_at, count_x=12, spacing=[0.05, 0, 0])
+  leaning = inst.jitter@1(row, shift=[0.004, 0, 0.02], yaw_jitter=4deg, seed=0)
+  books_solid = inst.realize@1(leaning)
+  books = solid.material@1(books_solid, color=[0.2, 0.32, 0.6], roughness=0.5)
+  stocked = solid.union@1(wood, books)
+  expose wood_color = wood.color
+  expose book_color = books.color
+  expose arrangement = leaning.seed
+  result stocked
+end

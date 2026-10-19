@@ -1,0 +1,37 @@
+# Stone arch bridge over a stream: swept rectangular arch, deck, parapets with repeated posts, banks and water.
+arch_path = curve.bezier@1(points=[[-1.5,-0.1,0],[-1.5,1.6,0],[1.5,1.6,0],[1.5,-0.1,0]], steps=48)
+arch_section = profile.rect@1(size=[0.9, 0.22])
+arch = solid.sweep@1(curve=arch_path, profile=arch_section)
+deck = solid.box@1(size=[3.6, 0.28, 1.0])
+deck_up = xform.move@1(deck, by=[0, 1.34, 0])
+post = solid.box@1(size=[0.07, 0.4, 0.07])
+post_a = xform.move@1(post, by=[-1.65, 1.68, 0.44])
+posts_front = inst.array@1(post_a, count_x=12, spacing=[0.3, 0, 0])
+post_b = xform.move@1(post, by=[-1.65, 1.68, -0.44])
+posts_back = inst.array@1(post_b, count_x=12, spacing=[0.3, 0, 0])
+rail = solid.box@1(size=[3.6, 0.07, 0.11])
+rail_a = xform.move@1(rail, by=[0, 1.92, 0.44])
+rail_b = xform.move@1(rail, by=[0, 1.92, -0.44])
+bank = solid.box@1(size=[1.4, 0.9, 1.6])
+bank_l = xform.move@1(bank, by=[-2.5, 0.35, 0])
+bank_r = xform.move@1(bank, by=[2.5, 0.35, 0])
+water = solid.box@1(size=[3.4, 0.05, 1.6])
+water_low = xform.move@1(water, by=[0, -0.02, 0])
+stone = solid.material@1(arch, color=[0.55, 0.53, 0.5], metallic=0, roughness=0.9)
+deck_m = solid.material@1(deck_up, color=[0.66, 0.63, 0.58], metallic=0, roughness=0.85)
+posts_m = solid.material@1(posts_front, color=[0.5, 0.48, 0.45], metallic=0, roughness=0.9)
+posts_m2 = solid.material@1(posts_back, color=[0.5, 0.48, 0.45], metallic=0, roughness=0.9)
+rail_m = solid.material@1(rail_a, color=[0.42, 0.55, 0.3], metallic=0, roughness=0.95)
+rail_m2 = solid.material@1(rail_b, color=[0.42, 0.55, 0.3], metallic=0, roughness=0.95)
+grass_l = solid.material@1(bank_l, color=[0.25, 0.5, 0.2], metallic=0, roughness=0.95)
+grass_r = solid.material@1(bank_r, color=[0.25, 0.5, 0.2], metallic=0, roughness=0.95)
+river = solid.material@1(water_low, color=[0.1, 0.35, 0.6], metallic=0.2, roughness=0.1)
+output arch = stone
+output deck = deck_m
+output posts_front = posts_m
+output posts_back = posts_m2
+output rail_front = rail_m
+output rail_back = rail_m2
+output bank_left = grass_l
+output bank_right = grass_r
+output water = river

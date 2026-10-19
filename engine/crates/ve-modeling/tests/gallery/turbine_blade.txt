@@ -1,0 +1,7 @@
+# A short, convex twisted loft blade. Sections rotate gradually around the Y axis.
+s0 = profile.polygon@1(points=[[-0.12,-0.03],[0.12,-0.03],[0.12,0.03],[-0.12,0.03]])
+s1 = profile.polygon@1(points=[[-0.123,-0.001],[0.108,-0.061],[0.123,0.001],[-0.108,0.061]])
+s2 = profile.polygon@1(points=[[-0.119,0.034],[0.089,-0.086],[0.119,-0.034],[-0.089,0.086]])
+s3 = profile.polygon@1(points=[[-0.104,0.06],[0.06,-0.104],[0.104,-0.06],[-0.06,0.104]])
+blade = solid.loft@1(s0, s1, s2, s3, spacing=0.16)
+output blade = blade

@@ -1,0 +1,21 @@
+group arch
+  wall = solid.box@1(size=[1.6, 1.6, 0.3])
+  wall_at = xform.move@1(wall, by=[0, 0.8, 0])
+  portal = solid.box@1(size=[0.8, 0.7, 0.4])
+  portal_at = xform.move@1(portal, by=[0, 0.35, 0])
+  crown = solid.cylinder@1(radius=0.4, height=0.4, segments=32)
+  crown_turned = xform.rotate@1(crown, angles=[90, 0, 0])
+  crown_at = xform.move@1(crown_turned, by=[0, 0.7, 0])
+  opening = solid.union@1(portal_at, crown_at)
+  body = solid.difference@1(wall_at, opening)
+  keystone = solid.box@1(size=[0.12, 0.22, 0.34])
+  keystone_at = xform.move@1(keystone, by=[0, 1.14, 0])
+  all = solid.union@1(body, keystone_at)
+  surface = solid.material@1(all, color=[0.72, 0.68, 0.60], roughness=0.85, recipe="concrete")
+  expose wall = wall.size
+  expose portal = portal.size
+  expose keystone = keystone.size
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

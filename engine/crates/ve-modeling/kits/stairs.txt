@@ -1,0 +1,11 @@
+group stairs
+  step = solid.box@1(size=[1.0, 0.18, 0.42])
+  step_at = xform.move@1(step, by=[0, 0.09, -0.70])
+  flight = xform.repeat@1(step_at, count=6, step=[0, 0.18, 0.28])
+  surface = solid.material@1(flight, color=[0.55, 0.50, 0.42], roughness=0.75, recipe="concrete")
+  expose steps = flight.count
+  expose size = step.size
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

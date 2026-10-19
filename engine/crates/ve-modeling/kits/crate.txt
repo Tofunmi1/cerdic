@@ -1,0 +1,18 @@
+group crate
+  body = solid.box@1(size=[0.6, 0.6, 0.6])
+  body_at = xform.move@1(body, by=[0, 0.3, 0])
+  post = solid.box@1(size=[0.06, 0.64, 0.06])
+  post_at = xform.move@1(post, by=[-0.29, 0.32, -0.29])
+  posts = xform.array@1(post_at, count_x=2, count_z=2, spacing=[0.58, 0, 0.58])
+  band = solid.box@1(size=[0.64, 0.06, 0.64])
+  band_at = xform.move@1(band, by=[0, 0.12, 0])
+  bands = xform.array@1(band_at, count_y=2, spacing=[0, 0.4, 0])
+  all = solid.union@1(body_at, posts, bands)
+  surface = solid.material@1(all, color=[0.55, 0.40, 0.24], roughness=0.75, recipe="planks")
+  expose body = body.size
+  expose post = post.size
+  expose band = band.size
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

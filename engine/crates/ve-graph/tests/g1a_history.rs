@@ -216,14 +216,14 @@ fn g1a_15_renaming_keeps_the_id_and_the_evaluation_hash() {
 }
 
 #[test]
-fn g1a_16_two_hundred_commands_pass_and_two_hundred_and_one_do_not() {
+fn g1a_16_one_thousand_commands_pass_and_one_thousand_and_one_do_not() {
     let mut s = Session::with_builtin(1);
-    commit(&mut s, vec![add_box(); 200]);
-    assert_eq!(s.document().nodes.len(), 200);
-    let d = reject(&mut s, vec![add_box(); 201]);
+    commit(&mut s, vec![add_box(); 1_000]);
+    assert_eq!(s.document().nodes.len(), 1_000);
+    let d = reject(&mut s, vec![add_box(); 1_001]);
     assert_eq!(d[0].code, "budget.commands");
-    assert_eq!((d[0].limit, d[0].observed), (Some(200.0), Some(201.0)));
-    assert_eq!(s.document().nodes.len(), 200);
+    assert_eq!((d[0].limit, d[0].observed), (Some(1_000.0), Some(1_001.0)));
+    assert_eq!(s.document().nodes.len(), 1_000);
 }
 
 #[test]

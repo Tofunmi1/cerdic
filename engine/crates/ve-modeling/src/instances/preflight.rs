@@ -39,7 +39,7 @@ pub(crate) fn estimate(node: &Node, placements: &BTreeMap<NodeId, usize>) -> Res
             product(count(node, "count_x"), count(node, "count_y"))?,
             count(node, "count_z"),
         )?,
-        "inst.radial" | "inst.repeat" => count(node, "count"),
+        "inst.radial" | "inst.repeat" | "inst.scatter" => count(node, "count"),
         "inst.mirror" => 2,
         _ => 1,
     };

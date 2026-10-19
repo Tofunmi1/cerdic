@@ -1,0 +1,16 @@
+group lamp_floor
+  base = solid.cylinder@1(radius=0.16, height=0.04, segments=24)
+  base_at = xform.move@1(base, by=[0, 0.02, 0])
+  pole = solid.cylinder@1(radius=0.015, height=1.52, segments=16)
+  pole_at = xform.move@1(pole, by=[0, 0.79, 0])
+  shade = solid.cone@1(height=0.26, radius=0.18, top_radius=0.09, segments=24)
+  shade_at = xform.move@1(shade, by=[0, 1.52, 0])
+  all = solid.union@1(base_at, pole_at, shade_at)
+  surface = solid.material@1(all, color=[0.72, 0.62, 0.40], roughness=0.35, metallic=0.7, recipe="brushed_metal")
+  expose base_radius = base.radius
+  expose pole_radius = pole.radius
+  expose shade_radius = shade.radius
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

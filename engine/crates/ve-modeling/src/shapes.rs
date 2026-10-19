@@ -83,8 +83,13 @@ pub(crate) fn pattern(
     node: &Node,
     input: &Rc<Value>,
     context: &ExecutionContext,
+    labels: Option<&mut crate::regions::Labels>,
 ) -> Result<Solid, KernelError> {
-    let original = Solid::from_mesh(&input.mesh)?;
+    // Copies share the input's origin ids, so each keeps the input's colours.
+    let original = match labels {
+        Some(labels) => labels.solid(input)?,
+        None => Solid::from_mesh(&input.mesh)?,
+    };
     let mut copies = Vec::new();
     // The solid the copies are made from: the input itself, or for a radial pattern the input moved out.
     let mut base = None;

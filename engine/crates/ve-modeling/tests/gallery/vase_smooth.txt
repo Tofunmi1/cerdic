@@ -1,0 +1,23 @@
+# The same four-section hollow vase, straight (left) and smooth (right, steps=6).
+b0 = profile.circle@1(radius=0.05, segments=64)
+b1 = profile.circle@1(radius=0.12, segments=64)
+b2 = profile.circle@1(radius=0.06, segments=64)
+b3 = profile.circle@1(radius=0.09, segments=64)
+i0 = profile.circle@1(radius=0.04, segments=64)
+i1 = profile.circle@1(radius=0.11, segments=64)
+i2 = profile.circle@1(radius=0.05, segments=64)
+i3 = profile.circle@1(radius=0.08, segments=64)
+straight_out = solid.loft@1(b0, b1, b2, b3, spacing=0.1)
+straight_in = solid.loft@1(i0, i1, i2, i3, spacing=0.1)
+straight_in_up = xform.move@1(straight_in, by=[0, 0.01, 0])
+straight_cut = solid.difference@1(straight_out, straight_in_up)
+straight_left = xform.move@1(straight_cut, by=[-0.2, 0, 0])
+smooth_out = solid.loft@1(b0, b1, b2, b3, spacing=0.1, steps=6)
+smooth_in = solid.loft@1(i0, i1, i2, i3, spacing=0.1, steps=6)
+smooth_in_up = xform.move@1(smooth_in, by=[0, 0.01, 0])
+smooth_cut = solid.difference@1(smooth_out, smooth_in_up)
+smooth_right = xform.move@1(smooth_cut, by=[0.2, 0, 0])
+clay = solid.material@1(straight_left, color=[0.75, 0.45, 0.3], metallic=0, roughness=0.6)
+glaze = solid.material@1(smooth_right, color=[0.2, 0.45, 0.6], metallic=0.1, roughness=0.15)
+output straight = clay
+output smooth = glaze

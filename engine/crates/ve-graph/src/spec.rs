@@ -23,10 +23,20 @@ pub enum PortType {
     Curve,
     /// An implicit surface (signed distance field).
     Sdf,
+    /// A composable spatial scalar field which has not been meshed into a solid.
+    Field,
     /// A set of instances.
     Inst,
+    /// A scene light (point, spot, or sun).
+    Light,
+    /// Authored scene environment: sky/ground ambient irradiance and optional ground bounce.
+    Environment,
     /// The verdict of a constraint node; carries no geometry.
     Check,
+    /// An editable polygon mesh (faces of any size, open or closed). Not necessarily a solid.
+    Poly,
+    /// A set of faces, edges, vertices or boundary loops of one polygon mesh, chosen by a rule.
+    Selection,
 }
 
 /// How many links an input port takes.
@@ -35,6 +45,8 @@ pub enum PortType {
 pub enum Arity {
     /// Exactly one link (a new link replaces the old one).
     One,
+    /// Zero or one link.
+    Optional,
     /// A list of links, at least `min` for a complete graph.
     Variadic {
         /// Fewest links for a complete graph.

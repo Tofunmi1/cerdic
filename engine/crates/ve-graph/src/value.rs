@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::limits::{MAX_LIST_VALUES, MAX_STRING_BYTES};
+use crate::limits::{MAX_LIST_VALUES, MAX_PARAM_STRING_BYTES};
 
 /// A parameter value as it appears in a document or a command.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -109,6 +109,17 @@ pub enum ParamType {
         /// Largest accepted coordinate.
         max: f64,
     },
+    /// A list of `[x, y, z]` points, each coordinate within `min..=max`.
+    Points3 {
+        /// Fewest points accepted.
+        min_points: usize,
+        /// Most points accepted.
+        max_points: usize,
+        /// Smallest accepted coordinate.
+        min: f64,
+        /// Largest accepted coordinate.
+        max: f64,
+    },
 }
 
 /// Why a value was refused.
@@ -195,7 +206,9 @@ impl ParamType {
                 _ => Err(ParamIssue::wrong_type("true or false")),
             },
             Self::Str { max_len } => match value {
-                Value::Str(s) if s.len() <= max_len.min(MAX_STRING_BYTES) => Ok(value.clone()),
+                Value::Str(s) if s.len() <= max_len.min(MAX_PARAM_STRING_BYTES) => {
+                    Ok(value.clone())
+                }
                 #[expect(clippy::cast_precision_loss, reason = "lengths are far below 2^53")]
                 Value::Str(s) => Err(ParamIssue::range(0.0, max_len as f64, s.len() as f64)),
                 _ => Err(ParamIssue::wrong_type("text")),
@@ -217,119 +230,45 @@ impl ParamType {
                 max_points,
                 min,
                 max,
-            } => points(value, min_points, max_points, min, max),
+            } => points(value, 2, (min_points, max_points), (min, max)),
+            Self::Points3 {
+                min_points,
+                max_points,
+                min,
+                max,
+            } => points(value, 3, (min_points, max_points), (min, max)),
         }
     }
 }
 
+/// A bounded list of points with `dims` coordinates each; `count` and `range` are `(min, max)`.
 fn points(
     value: &Value,
-    min_points: usize,
-    max_points: usize,
-    min: f64,
-    max: f64,
+    dims: usize,
+    count: (usize, usize),
+    range: (f64, f64),
 ) -> Result<Value, ParamIssue> {
     let Value::List(items) = value else {
-        return Err(ParamIssue::wrong_type("a list of [x, y] points"));
+        return Err(ParamIssue::wrong_type(&format!(
+            "a list of {dims}-number points"
+        )));
     };
-    let cap = max_points.min(MAX_LIST_VALUES);
-    if items.len() < min_points || items.len() > cap {
+    let cap = count.1.min(MAX_LIST_VALUES);
+    if items.len() < count.0 || items.len() > cap {
         #[expect(clippy::cast_precision_loss, reason = "counts are far below 2^53")]
         return Err(ParamIssue::range(
-            min_points as f64,
+            count.0 as f64,
             cap as f64,
             items.len() as f64,
         ));
     }
     items
         .iter()
-        .map(|item| components(item, 2, min, max).map(Value::List))
+        .map(|item| components(item, dims, range.0, range.1).map(Value::List))
         .collect::<Result<Vec<_>, _>>()
         .map(Value::List)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    const LEN: ParamType = ParamType::Num {
-        unit: Unit::Length,
-        min: 0.0,
-        max: 10.0,
-    };
-
-    #[test]
-    fn numbers_are_canonicalised_and_bounded() {
-        assert_eq!(LEN.check(&Value::Int(3)), Ok(Value::Num(3.0)));
-        assert_eq!(LEN.check(&Value::Num(3.0)), Ok(Value::Num(3.0)));
-        assert_eq!(
-            LEN.check(&Value::Num(-1.0)).unwrap_err().code,
-            "param.range"
-        );
-        assert_eq!(
-            LEN.check(&Value::Num(f64::NAN)).unwrap_err().code,
-            "param.non_finite"
-        );
-        assert_eq!(
-            LEN.check(&Value::Num(f64::INFINITY)).unwrap_err().code,
-            "param.non_finite"
-        );
-        assert_eq!(
-            LEN.check(&Value::Str("1".into())).unwrap_err().code,
-            "param.type"
-        );
-    }
-
-    #[test]
-    fn integers_do_not_accept_fractions() {
-        let t = ParamType::Int { min: 3, max: 512 };
-        assert_eq!(t.check(&Value::Int(24)), Ok(Value::Int(24)));
-        assert_eq!(t.check(&Value::Int(2)).unwrap_err().code, "param.range");
-        assert_eq!(t.check(&Value::Num(24.5)).unwrap_err().code, "param.type");
-    }
-
-    #[test]
-    fn vectors_and_point_lists_are_checked_per_component() {
-        let v3 = ParamType::Vec3 {
-            unit: Unit::Length,
-            min: -1.0,
-            max: 1.0,
-        };
-        let ok = Value::List(vec![Value::Int(0), Value::Num(0.5), Value::Num(-1.0)]);
-        assert!(v3.check(&ok).is_ok());
-        let short = Value::List(vec![Value::Int(0)]);
-        assert_eq!(v3.check(&short).unwrap_err().code, "param.type");
-        let big = Value::List(vec![Value::Int(0), Value::Int(0), Value::Int(9)]);
-        assert_eq!(v3.check(&big).unwrap_err().code, "param.range");
-
-        let pts = ParamType::Points2 {
-            min_points: 3,
-            max_points: 4,
-            min: -1.0,
-            max: 1.0,
-        };
-        let pt = |x: f64, y: f64| Value::List(vec![Value::Num(x), Value::Num(y)]);
-        assert!(
-            pts.check(&Value::List(vec![pt(0.0, 0.0), pt(1.0, 0.0), pt(0.0, 1.0)]))
-                .is_ok()
-        );
-        assert_eq!(
-            pts.check(&Value::List(vec![pt(0.0, 0.0)]))
-                .unwrap_err()
-                .code,
-            "param.range"
-        );
-        let five = Value::List((0..5).map(|_| pt(0.0, 0.0)).collect());
-        assert_eq!(pts.check(&five).unwrap_err().code, "param.range");
-    }
-
-    #[test]
-    fn text_is_bounded_in_bytes() {
-        let t = ParamType::Str { max_len: 4 };
-        assert!(t.check(&Value::Str("abcd".into())).is_ok());
-        assert_eq!(
-            t.check(&Value::Str("abcde".into())).unwrap_err().code,
-            "param.range"
-        );
-    }
-}
+#[path = "value_tests.rs"]
+mod tests;

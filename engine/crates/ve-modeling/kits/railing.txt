@@ -1,0 +1,18 @@
+group railing
+  post = solid.box@1(size=[0.06, 0.9, 0.06])
+  post_at = xform.move@1(post, by=[0, 0.45, 0])
+  row = xform.array@1(post_at, count_x=3, spacing=[0.5, 0, 0])
+  posts = xform.mirror@1(row, axis="x")
+  rail = solid.box@1(size=[1.0, 0.06, 0.06])
+  rail_at = xform.move@1(rail, by=[0.5, 0.9, 0])
+  rails = xform.array@1(rail_at, count_y=2, spacing=[0, -0.65, 0])
+  both = xform.mirror@1(rails, axis="x")
+  all = solid.union@1(posts, both)
+  surface = solid.material@1(all, color=[0.34, 0.22, 0.13], roughness=0.6, recipe="wood")
+  expose posts = row.count_x
+  expose spacing = row.spacing
+  expose span = rail.size
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end
