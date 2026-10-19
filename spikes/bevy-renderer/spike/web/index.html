@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Bevy spike</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; }
+  canvas { width: 100vw; height: 100vh; display: block; }
+</style>
+</head>
+<body>
+<canvas id="bevy"></canvas>
+<script type="module">
+  import init from './pkg/spike.js';
+  window.__spike = { frames: 0, error: null };
+  init().catch((error) => {
+    // Bevy exits its winit loop with a thrown "Using exceptions for control flow" message; anything else is a real failure.
+    if (!String(error).includes('control flow')) window.__spike.error = String(error);
+  });
+</script>
+</body>
+</html>

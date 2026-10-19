@@ -1,0 +1,22 @@
+{"backend":"webgl","fx":"(baseline)","verdict":"ok","frames":30,"mean":107.4,"seconds":6.2,"messages":["warning: [.WebGL-0x10c00446800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels","warning: [.WebGL-0x10c00446800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"]}
+{"backend":"webgl","fx":"hdr","verdict":"ok","frames":30,"mean":108.3,"seconds":6.2,"messages":[]}
+{"backend":"webgl","fx":"tonemap=agx","verdict":"ok","frames":30,"mean":114.3,"seconds":6.2,"messages":[]}
+{"backend":"webgl","fx":"tonemap=aces","verdict":"ok","frames":30,"mean":104.7,"seconds":7.4,"messages":[]}
+{"backend":"webgl","fx":"tonemap=neutral","verdict":"ok","frames":30,"mean":113,"seconds":6.6,"messages":[]}
+{"backend":"webgl","fx":"bloom","verdict":"ok","frames":30,"mean":110.6,"seconds":8,"messages":[]}
+{"backend":"webgl","fx":"taa","verdict":"FAIL","frames":0,"mean":0.6,"seconds":121.6,"messages":["warning: [.WebGL-0x10c00446200] GL_INVALID_FRAMEBUFFER_OPERATION: glCopyTexSubImage2D: Framebuffer is incomplete: Depth stencil texture in color attachment."]}
+{"backend":"webgl","fx":"smaa","verdict":"ok","frames":30,"mean":107.5,"seconds":7.7,"messages":[]}
+{"backend":"webgl","fx":"fxaa","verdict":"ok","frames":30,"mean":107.5,"seconds":7.2,"messages":[]}
+{"backend":"webgl","fx":"cas","verdict":"FAIL","frames":0,"mean":0.6,"seconds":121.6,"messages":[]}
+{"backend":"webgl","fx":"ssao","verdict":"ok","frames":30,"mean":107.4,"seconds":5.5,"messages":["warning: [.WebGL-0x11c00446e00] GL_INVALID_FRAMEBUFFER_OPERATION: glCopyTexSubImage2D: Framebuffer is incomplete: Depth stencil texture in color attachment."]}
+{"backend":"webgl","fx":"ssr","verdict":"ok","frames":30,"mean":107.4,"seconds":7.6,"messages":["warning: [.WebGL-0x12c00446200] GL_INVALID_FRAMEBUFFER_OPERATION: glCopyTexSubImage2D: Framebuffer is incomplete: Depth stencil texture in color attachment."]}
+{"backend":"webgl","fx":"dof","verdict":"ok","frames":30,"mean":107.4,"seconds":5.2,"messages":["warning: [.WebGL-0x11c00445c00] GL_INVALID_FRAMEBUFFER_OPERATION: glCopyTexSubImage2D: Framebuffer is incomplete: Depth stencil texture in color attachment."]}
+{"backend":"webgl","fx":"mb","verdict":"ok","frames":30,"mean":107.4,"seconds":5.7,"messages":["warning: [.WebGL-0x10c00445600] GL_INVALID_FRAMEBUFFER_OPERATION: glCopyTexSubImage2D: Framebuffer is incomplete: Depth stencil texture in color attachment."]}
+{"backend":"webgl","fx":"exposure","verdict":"ok","frames":30,"mean":108.3,"seconds":6.2,"messages":[]}
+{"backend":"webgl","fx":"atmo","verdict":"FAIL","frames":0,"mean":0.6,"seconds":121.6,"messages":[]}
+{"backend":"webgl","fx":"atmo,atmoenv","verdict":"FAIL","frames":0,"mean":0.6,"seconds":121.5,"messages":[]}
+{"backend":"webgl","fx":"point","verdict":"ok","frames":30,"mean":111.2,"seconds":7.2,"messages":[]}
+{"backend":"webgl","fx":"spot","verdict":"ok","frames":30,"mean":107.9,"seconds":7.1,"messages":[]}
+{"backend":"webgl","fx":"point,spot","verdict":"ok","frames":30,"mean":111.5,"seconds":8.1,"messages":[]}
+{"backend":"webgl","fx":"stereo","verdict":"ok","frames":30,"mean":105.3,"seconds":9.4,"messages":[]}
+{"backend":"webgl","fx":"stereo,taa,bloom","verdict":"FAIL","frames":0,"mean":0.6,"seconds":121.6,"messages":["warning: [.WebGL-0x10400445600] GL_INVALID_FRAMEBUFFER_OPERATION: glCopyTexSubImage2D: Framebuffer is incomplete: Depth stencil texture in color attachment."]}

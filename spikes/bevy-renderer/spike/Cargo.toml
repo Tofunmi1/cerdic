@@ -1,0 +1,43 @@
+[package]
+name = "spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+default = ["webgl"]
+webgl = ["bevy_internal/webgl"]
+webgpu = ["bevy_internal/webgpu"]
+
+[dependencies]
+bevy_internal = { path = "../crates/bevy_internal", default-features = false, features = [
+  "std",
+  "web",
+  "bevy_log",
+  "bevy_asset",
+  "bevy_window",
+  "bevy_winit",
+  "bevy_render",
+  "bevy_core_pipeline",
+  "bevy_pbr",
+  "bevy_post_process",
+  "bevy_anti_alias",
+  "bevy_light",
+  "bevy_mesh",
+  "bevy_image",
+  "bevy_camera",
+  "bevy_color",
+  "bevy_shader",
+  "bevy_material",
+  "tonemapping_luts",
+  "smaa_luts",
+  "ktx2",
+  "zstd_rust",
+  "png",
+] }
+bevy_ecs = { path = "../crates/bevy_ecs" }
+wasm-bindgen = "=0.2.129"
+web-sys = { version = "0.3.106", features = ["Window", "Location"] }
