@@ -81,6 +81,9 @@ pub fn suggestion(code: &str) -> Option<&'static str> {
         "poly.vertex_unknown" | "poly.edge_unknown" | "selection.stale" => {
             "the selection was made on a different mesh: select again with poly.select on the mesh this edit receives"
         }
+        "poly.not_closed" => {
+            "close the open edges (poly.bridge_loops, or delete the loose faces); after a poly.spin use a full turn (angle 6.283185307179586) with merge=true, and after a poly.bisect keep fill=true"
+        }
         "selection.lost" => {
             "nothing matched: loosen the rule (a larger tolerance or box, a lower angle) or check element and by"
         }
@@ -91,6 +94,7 @@ pub fn suggestion(code: &str) -> Option<&'static str> {
             "set element on poly.select to the kind this edit needs (face, edge, vertex or loop)"
         }
         "poly.bisect_normal_zero" => "choose a non-zero plane normal",
+        "poly.spin_axis_zero" => "choose a non-zero rotation axis",
         "poly.bisect_empty" => "move the plane or choose the other side to keep",
         "poly.select_rule_unsupported" => {
             "that rule does not apply to this element kind: faces take normal, box, attribute, height, extreme; edges take sharp, box, height, extreme; vertices take box, attribute, height, extreme; loops take box, height, extreme"

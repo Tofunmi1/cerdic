@@ -86,6 +86,10 @@ fn estimate_default(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usiz
         "solid.round" | "solid.chamfer" => {
             Ok(inputs.sum::<usize>().saturating_mul(12).min(250_000))
         }
+        // A hull of at most `max_vertices` points has at most 2 * points - 4 triangles.
+        "solid.hull" => Ok(bounded_count(node, "max_vertices", 256, 4, 2000).saturating_mul(2)),
+        // An oriented box is 12 triangles; a capsule revolved from a 10-point profile is under 512.
+        "solid.collision_boxes" => Ok(512),
         "solid.union" | "solid.difference" | "solid.intersect" => {
             Ok(estimate_boolean(inputs.sum()))
         }
@@ -232,6 +236,9 @@ fn estimate_poly(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> usize {
         | "poly.solidify"
         | "poly.symmetrize"
         | "poly.wireframe" => input.saturating_add(POLY_GROWTH),
+        "poly.spin" => input
+            .saturating_mul(count(node, "steps").clamp(2, 256))
+            .min(250_000),
         _ => input,
     }
 }

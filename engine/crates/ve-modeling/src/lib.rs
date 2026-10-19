@@ -17,6 +17,7 @@ mod field_ops;
 pub mod flags;
 mod frames;
 pub mod hierarchy;
+mod hulls;
 pub mod ik;
 mod instances;
 mod job;

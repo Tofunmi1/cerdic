@@ -142,6 +142,21 @@ pub enum MeshOp {
         /// Fill the cut boundary when a side is removed.
         fill: bool,
     },
+    /// Revolves selected mesh geometry around an axis.
+    Spin {
+        /// Point on the rotation axis.
+        center: [f64; 3],
+        /// Rotation axis direction.
+        axis: [f64; 3],
+        /// Total rotation in radians.
+        angle: f64,
+        /// Number of rotation segments.
+        steps: u32,
+        /// Weld the seam for a full turn.
+        merge: bool,
+        /// Maximum distance between vertices to merge.
+        distance: f64,
+    },
 }
 
 impl MeshOp {
@@ -242,6 +257,7 @@ impl MeshOp {
             Self::Triangulate => (10, [0.0; 4], 0),
             Self::RemoveDoubles { distance } => (11, [distance, 0.0, 0.0, 0.0], 0),
             Self::Bisect { .. } => (12, [0.0; 4], 0),
+            Self::Spin { .. } => (13, [0.0; 4], 0),
         }
     }
 }
@@ -267,7 +283,22 @@ pub fn edit_mesh(
     // Most operators use the first four numbers; the interface carries twelve for those that need more (a plane, a transform).
     let mut wide = [0.0; 12];
     wide[..4].copy_from_slice(&params);
-    let (code, flags) = if let MeshOp::Bisect {
+    let (code, flags) = if let MeshOp::Spin {
+        center,
+        axis,
+        angle,
+        steps,
+        merge,
+        distance,
+    } = *op
+    {
+        wide[0..3].copy_from_slice(&center);
+        wide[3..6].copy_from_slice(&axis);
+        wide[6] = angle;
+        wide[7] = f64::from(steps);
+        wide[8] = distance;
+        (13, i32::from(merge))
+    } else if let MeshOp::Bisect {
         point,
         normal,
         distance,

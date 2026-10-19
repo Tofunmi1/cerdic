@@ -570,6 +570,7 @@ const TOOLS = [
   { name: 'apply_commands', description: 'Applies typed commands, for example [{"set_param":{"node":"n_abc12345","param":"segments","value":96}}]. Commands: add_node, remove_node, connect, disconnect, set_param, set_label, set_flags, set_output, and for groups set_instance_param, clear_instance_param, upgrade_group, expose_param, unexpose_param, set_group_output. Atomic. Limit: 1,000 commands and 1 MiB per transaction.', inputSchema: object({ commands: { type: 'array', items: { type: 'object' } }, label: { type: 'string' } }, ['commands']) },
   { name: 'undo', description: 'Undoes the last committed edit.', inputSchema: object({}) },
   { name: 'redo', description: 'Redoes the last undone edit.', inputSchema: object({}) },
+  { name: 'snapshot', description: 'Looks at the view: returns a small picture (JPEG, up to 512 px wide) of what the editor shows, plus what changed since the last snapshot with the same name (share of the view that changed, where, and a box around it). Take one after an edit to check it did what you meant; pass image=false to get only the comparison, the cheapest way to ask whether an edit changed anything on screen. Frame or set the view first so the same angle is compared.', inputSchema: object({ name: { type: 'string', description: 'Which earlier snapshot to compare with (default "last"); use different names to keep separate baselines.' }, image: { type: 'boolean', description: 'false returns only the comparison, without the picture.' }, width: { type: 'number', description: 'Picture width in pixels, 64 to 512 (default 512).' } }) },
   { name: 'frame_view', description: 'Moves the editor camera so the whole model fills the view, from a three-quarter angle. Call it after building something so the person watching sees it.', inputSchema: object({}) },
   { name: 'set_view', description: 'Moves the editor camera: position and target as [x, y, z] metres, so the person watching can see the result.', inputSchema: object({ position: { type: 'array', items: { type: 'number' } }, target: { type: 'array', items: { type: 'number' } } }, ['position', 'target']) },
 ];
@@ -595,6 +596,12 @@ async function callTool(name, args) {
   if (name === 'export_glb') return exportGlb(args ?? {});
   const reply = await callPage(name, args ?? {});
   if (reply.error) return content(reply.error, true);
+  if (name === 'snapshot') {
+    // The picture goes back as an image block and everything else as text, so the model sees it instead of reading base64.
+    const { jpegBase64, ...rest } = reply.result ?? {};
+    const text = { type: 'text', text: JSON.stringify(rest, null, 2) };
+    return { content: jpegBase64 ? [{ type: 'image', data: jpegBase64, mimeType: 'image/jpeg' }, text] : [text], isError: rest.ok === false };
+  }
   if (name === 'list_operators' && Array.isArray(reply.result)) {
     const kits = KITS.map(kit => ({
       id: `kit.${kit.name}`, readiness: 'ready', category: 'kit', doc: kit.doc,

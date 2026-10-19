@@ -1,5 +1,7 @@
 /// Polygon editing: every operator family, identical natively and in WASI.
 fn polygon_cases() -> Result<(), Box<dyn std::error::Error>> {
+    // G10-10: a grid revolved into a closed ring, included in native/WASI parity.
+    text_case("strip = poly.grid@1(width=0.2, height=1.0, columns=1, rows=4)\nspun = poly.spin@1(strip, center=[-1,0,0], axis=[0,1,0], angle=6.283185307179586, steps=64, merge=true)\nsolid = poly.to_solid@1(spun)\noutput solid")?;
     text_case(
         "box = solid.box@1(size=[1,1,1])\nmesh = poly.from_solid@1(box)\ncut = poly.bisect@1(mesh, point=[0,0.2,0], normal=[0,1,0], keep=\"below\")\nsolid = poly.to_solid@1(cut)\noutput solid",
     )?;

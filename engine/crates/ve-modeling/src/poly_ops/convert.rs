@@ -82,7 +82,18 @@ pub(super) fn to_solid(
     let (kernel, _) = poly
         .to_kernel_mesh_with_context(LossPolicy::Report, context)
         .map_err(|e| poly_fail(node, &e, Some(poly)))?;
-    let solid = Solid::from_mesh(&kernel).map_err(|e| kernel_fail(node, &e))?;
+    let solid = Solid::from_mesh(&kernel).map_err(|e| {
+        // An open or pinched mesh is the usual refusal here, and the usual cause is an edit that left a seam or a hole.
+        if e.to_string().contains("closed manifold") {
+            super::errors::refuse(
+                node,
+                "poly.not_closed",
+                "the mesh is not closed: every edge must join exactly two faces".to_owned(),
+            )
+        } else {
+            kernel_fail(node, &e)
+        }
+    })?;
     let mut value = Value::solid(kernel, solid.volume());
     value.material.clone_from(&input.material);
     value.uvs = corner_uvs(poly, context)?;

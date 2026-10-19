@@ -7,6 +7,7 @@ import type { documentBridge, Runtime } from './bridge';
 import type { EvaluationHost } from './evaluation';
 import type { MeshPart } from './worker-types';
 import { buildGlbWithTextures } from './gltf';
+import { snapshotView } from './snapshot';
 import { loadBrowserTextureLibrary } from './texture/browser-library';
 import { describe as describeTextureNode, nodeInfo, search as searchTextureNodes, summary as textureNodeSummary } from './texture/catalog';
 
@@ -185,6 +186,7 @@ async function run(host: Host, method: string, params: Record<string, unknown>) 
     }
     case 'undo': return edit(host, () => { const moved = doc.undo(); return moved ? { pending: { committed: { revision: (moved as { revision: number }).revision } } } : { nothing: 'there is nothing to undo' }; });
     case 'redo': return edit(host, () => { const moved = doc.redo(); return moved ? { pending: { committed: { revision: (moved as { revision: number }).revision } } } : { nothing: 'there is nothing to redo' }; });
+    case 'snapshot': return snapshotView(params);
     case 'frame_view': {
       const bounds = host.evaluation.bounds;
       if (!bounds) return { ok: false, reason: 'there is no model to frame yet' };
