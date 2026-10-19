@@ -111,12 +111,8 @@ pub(crate) fn apply_requested(
     if let Some(enabled) = REQUESTED_BLOOM.with(Cell::take) {
         quality.bloom_enabled = enabled;
     }
-    let samples = if quality.ssao_enabled || quality.bloom_enabled {
-        1
-    } else {
-        quality.msaa_samples
-    };
-    let wanted = Msaa::from_samples(samples);
+    // Occlusion reads its own single-sample depth texture (`ve_render::ao_depth`), so it does not limit the sample count.
+    let wanted = Msaa::from_samples(quality.msaa_samples);
     for mut msaa in &mut cameras {
         if *msaa != wanted {
             *msaa = wanted;

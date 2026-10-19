@@ -43,11 +43,12 @@ fn xr_view_info(cameras: &Query<&StereoViews, With<XrCamera>>) -> serde_json::Va
 }
 
 /// What the renderer submitted last frame: draw calls and triangles per pass. The main pass counts
-/// every view, so a stereo frame shows twice the draws of a mono one; the shadow pass is extra.
+/// every view, so a stereo frame shows twice the draws of a mono one; the shadow pass and the depth pass (only while
+/// screen-space occlusion is on) are extra.
 fn render_counts() -> serde_json::Value {
     let counts = ve_render::last_frame_counts();
     let pass = |c: ve_render::PassCounts| json!({ "draws": c.draws, "triangles": c.triangles });
-    json!({ "main": pass(counts.main), "shadow": pass(counts.shadow) })
+    json!({ "main": pass(counts.main), "shadow": pass(counts.shadow), "depth": pass(counts.depth) })
 }
 
 /// The controllers as the app sees them, with where each hand's wand ended up in the world.

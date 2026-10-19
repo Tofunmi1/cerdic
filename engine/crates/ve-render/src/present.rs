@@ -10,9 +10,7 @@ use std::collections::HashMap;
 
 use bevy_asset::Handle;
 use bevy_ecs::prelude::*;
-use bevy_render::render_resource::binding_types::{
-    sampler, texture_2d, texture_depth_2d, uniform_buffer,
-};
+use bevy_render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer};
 use bevy_render::render_resource::{
     BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntries, BindingResource,
     CachedRenderPipelineId, ColorTargetState, ColorWrites, FilterMode, FragmentState,
@@ -21,9 +19,10 @@ use bevy_render::render_resource::{
     TextureFormat, TextureSampleType, VertexState,
 };
 use bevy_render::renderer::{RenderContext, RenderDevice, ViewQuery};
-use bevy_render::view::{ViewDepthStencilTexture, ViewTarget};
+use bevy_render::view::ViewTarget;
 use bevy_shader::Shader;
 
+use crate::ao_depth::ViewAoDepth;
 use crate::lens::{LensGpu, LensUniform, LensWarp};
 use crate::prepare::{ViewSlots, ViewUniform, ViewUniforms};
 use crate::quality::RenderQuality;
@@ -78,8 +77,11 @@ impl PresentPipelines {
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     sampler(SamplerBindingType::Filtering),
                     uniform_buffer::<LensUniform>(false),
-                    texture_depth_2d(),
+                    // The depth pass's float colour texture: the GL backend cannot read a real depth texture (see `ao_depth`).
+                    texture_2d(TextureSampleType::Float { filterable: false }),
                     uniform_buffer::<ViewUniform>(true),
+                    // The `ao` pass's occlusion texture.
+                    texture_2d(TextureSampleType::Float { filterable: false }),
                 ),
             ),
         );
@@ -192,7 +194,7 @@ pub(crate) fn present_pass(
     view: ViewQuery<(
         &ViewTarget,
         &ViewOffscreen,
-        Option<&ViewDepthStencilTexture>,
+        Option<&ViewAoDepth>,
         &ViewSlots,
     )>,
     pipelines: Res<PresentPipelines>,
@@ -281,7 +283,7 @@ fn build_present_bind_group(
     offscreen: &ViewOffscreen,
     sampler: &Sampler,
     lens_gpu: &LensGpu,
-    depth: Option<&ViewDepthStencilTexture>,
+    depth: Option<&ViewAoDepth>,
     view_uniforms: &ViewUniforms,
     warped: bool,
     post: bool,
@@ -305,12 +307,16 @@ fn build_present_bind_group(
         let depth = depth?;
         entries.push(BindGroupEntry {
             binding: 3,
-            resource: BindingResource::TextureView(&depth.attachment.texture.default_view),
+            resource: BindingResource::TextureView(&depth.color.default_view),
         });
         let view_uniform = view_uniforms.buffer.binding()?;
         entries.push(BindGroupEntry {
             binding: 4,
             resource: view_uniform,
+        });
+        entries.push(BindGroupEntry {
+            binding: 5,
+            resource: BindingResource::TextureView(&depth.occlusion.default_view),
         });
         &pipelines.post_layout
     } else if warped {

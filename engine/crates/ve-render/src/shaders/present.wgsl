@@ -34,7 +34,7 @@ struct Lens {
     params: vec4<f32>,
 };
 @group(0) @binding(2) var<uniform> lens: Lens;
-@group(0) @binding(3) var depth_source: texture_depth_2d;
+@group(0) @binding(3) var depth_source: texture_2d<f32>;
 
 struct View {
     clip_from_world: mat4x4<f32>,
@@ -52,6 +52,12 @@ struct View {
     cloud: vec4<f32>,
 };
 @group(0) @binding(4) var<uniform> view: View;
+@group(0) @binding(5) var occlusion_source: texture_2d<f32>;
+
+// The reverse-Z depth at a pixel (1 is the near plane, 0 the far plane and the sky), from the depth pass's float texture.
+fn depth_at(pixel: vec2<i32>) -> f32 {
+    return textureLoad(depth_source, pixel, 0).x;
+}
 
 const PI: f32 = 3.14159265;
 // The headset's barrel coefficients (the common two-term radial model).
@@ -121,6 +127,29 @@ fn warp(uv: vec2<f32>) -> vec4<f32> {
     return textureSampleLevel(source, source_sampler, w.uv, 0.0);
 }
 
+// ---- Ambient occlusion from the `ao` pass (see ao.wgsl) ----
+// How much the occlusion darkens the picture (1 would black out a fully closed-in pixel).
+const AO_STRENGTH: f32 = 0.9;
+
+// The occlusion at a pixel: the average of the 4 by 4 pixels around it. The `ao` pass jitters its samples with a 4 by 4
+// pattern, and this average cancels it. A neighbour is weighted down where its depth differs from the centre's (relative
+// to the centre's distance), so occlusion does not bleed across a silhouette.
+fn occlusion_at(center: vec2<i32>, center_depth: f32, vmin: vec2<i32>, vmax: vec2<i32>) -> f32 {
+    var sum = 0.0;
+    var total = 0.0;
+    for (var y = -2; y < 2; y += 1) {
+        for (var x = -2; x < 2; x += 1) {
+            let pos = clamp(center + vec2<i32>(x, y), vmin, vmax);
+            let d = depth_at(pos);
+            // Reverse-Z depth is inversely proportional to distance, so the ratio is the relative distance.
+            let weight = select(0.0, clamp(1.0 - abs(center_depth / d - 1.0) * 20.0, 0.0, 1.0), d > 0.0);
+            sum += textureLoad(occlusion_source, pos, 0).x * weight;
+            total += weight;
+        }
+    }
+    return select(1.0, sum / total, total > 0.0);
+}
+
 fn post_color(output_uv: vec2<f32>) -> vec4<f32> {
     let warped = warp_source(output_uv);
     if (!warped.valid) {
@@ -133,22 +162,10 @@ fn post_color(output_uv: vec2<f32>) -> vec4<f32> {
     var color = textureSampleLevel(source, source_sampler, warped.uv, 0.0);
 
     if (view.effects.y > 0.5) {
-        let center_depth = textureLoad(depth_source, center, 0);
+        let center_depth = depth_at(center);
         if (center_depth > 0.0) {
-            let offsets = array<vec2<i32>, 8>(
-                vec2<i32>(-2, -2), vec2<i32>(0, -2), vec2<i32>(2, -2),
-                vec2<i32>(-2, 0),                         vec2<i32>(2, 0),
-                vec2<i32>(-2, 2),  vec2<i32>(0, 2),  vec2<i32>(2, 2)
-            );
-            var occlusion = 0.0;
-            for (var i = 0u; i < 8u; i += 1u) {
-                let sample_coord = clamp(center + offsets[i], viewport_min, viewport_max);
-                let sample_depth = textureLoad(depth_source, sample_coord, 0);
-                // Reverse-Z: a larger depth is a nearer surface. Nearby depth discontinuities
-                // approximate creases and contacts; flat open surfaces contribute zero.
-                occlusion += smoothstep(0.001, 0.025, sample_depth - center_depth);
-            }
-            color = vec4<f32>(color.rgb * (1.0 - min(occlusion * 0.055, 0.44)), color.a);
+            let visibility = occlusion_at(center, center_depth, viewport_min, viewport_max);
+            color = vec4<f32>(color.rgb * mix(1.0, visibility, AO_STRENGTH), color.a);
         }
     }
 
