@@ -42,6 +42,17 @@ impl ViewUniform {
         self.effects.z = if quality.bloom_enabled { 1.0 } else { 0.0 };
     }
 
+    /// Writes how much of the exposure correction this frame applies and the brightness it aims for (both zero when off).
+    pub(crate) fn set_auto_exposure(&mut self, quality: &RenderQuality, delta: f32) {
+        let on = quality.auto_exposure_enabled;
+        self.exposure.y = if on {
+            crate::exposure::adaptation(delta)
+        } else {
+            0.0
+        };
+        self.exposure.z = if on { crate::exposure::TARGET } else { 0.0 };
+    }
+
     pub(super) fn set_sky(&mut self, sky: &SkyBackground, viewport: [u32; 4]) {
         #[expect(
             clippy::cast_precision_loss,

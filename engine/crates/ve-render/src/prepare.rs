@@ -8,7 +8,7 @@ use bevy_math::{Mat4, Vec4};
 use bevy_mesh::Mesh;
 use bevy_render::render_resource::{
     BindGroup, BindGroupEntry, BindingResource, BufferUsages, DynamicUniformBuffer, PipelineCache,
-    RawBufferVec, ShaderType, UniformBuffer,
+    RawBufferVec, ShaderType,
 };
 use bevy_render::renderer::{RenderDevice, RenderQueue};
 use bevy_render::view::ExtractedView;
@@ -16,12 +16,13 @@ use bytemuck::{Pod, Zeroable};
 
 use crate::extract::{ExtractedMesh, ExtractedMeshes};
 use crate::grade::Grading;
-use crate::light::{ExtractedLights, LightsUniform, pack_lights};
 use crate::pipeline::ForwardPipelines;
 use crate::quality::RenderQuality;
-use crate::shadow::{ShadowMap, ShadowState};
-use crate::stereo::{StereoViews, viewer_position};
+use crate::stereo::StereoViews;
 
+#[path = "prepare/lights_gpu.rs"]
+mod lights_gpu;
+pub(crate) use lights_gpu::{LightsGpu, prepare_lights};
 #[path = "prepare/view_uniform.rs"]
 mod view_uniform;
 
@@ -182,6 +183,8 @@ pub(crate) fn prepare_view_uniforms(
     grading: Res<Grading>,
     quality: Res<RenderQuality>,
     sky: Res<crate::SkyBackground>,
+    delta: Res<crate::exposure::FrameDelta>,
+    exposure: Res<crate::exposure::ExposureState>,
     pipelines: Res<ForwardPipelines>,
     pipeline_cache: Res<PipelineCache>,
     device: Res<RenderDevice>,
@@ -197,6 +200,7 @@ pub(crate) fn prepare_view_uniforms(
                     let mut uniform = ViewUniform::new(eye.world_from_view, eye.clip_from_view);
                     uniform.set_grading(&grading);
                     uniform.set_quality(&quality);
+                    uniform.set_auto_exposure(&quality, delta.0);
                     uniform.set_sky(&sky, eye.viewport);
                     ViewSlot {
                         offset: uniforms.buffer.push(&uniform),
@@ -212,6 +216,7 @@ pub(crate) fn prepare_view_uniforms(
             }
             uniform.set_grading(&grading);
             uniform.set_quality(&quality);
+            uniform.set_auto_exposure(&quality, delta.0);
             uniform.set_sky(&sky, view.viewport.to_array());
             vec![ViewSlot {
                 offset: uniforms.buffer.push(&uniform),
@@ -221,79 +226,29 @@ pub(crate) fn prepare_view_uniforms(
         commands.entity(entity).insert(ViewSlots(slots));
     }
     uniforms.buffer.write_buffer(&device, &queue);
-    uniforms.bind_group = uniforms.buffer.binding().map(|binding| {
-        let layout = pipeline_cache.get_bind_group_layout(&pipelines.view_layout);
-        device.create_bind_group(
-            "ve_view_bind_group",
-            &layout,
-            &[BindGroupEntry {
-                binding: 0,
-                resource: binding,
-            }],
-        )
-    });
-}
-
-/// The lights uniform for this frame plus its bind group.
-#[derive(Resource, Default)]
-pub(crate) struct LightsGpu {
-    pub(crate) buffer: UniformBuffer<LightsUniform>,
-    pub(crate) bind_group: Option<BindGroup>,
-}
-
-/// Packs the extracted lights (capped by the quality tier) and rebuilds the lights bind group.
-pub(crate) fn prepare_lights(
-    lights: Res<ExtractedLights>,
-    quality: Res<RenderQuality>,
-    views: Query<(&ExtractedView, Option<&StereoViews>)>,
-    shadow: Res<ShadowState>,
-    shadow_map: Res<ShadowMap>,
-    mut gpu: ResMut<LightsGpu>,
-    pipelines: Res<ForwardPipelines>,
-    pipeline_cache: Res<PipelineCache>,
-    device: Res<RenderDevice>,
-    queue: Res<RenderQueue>,
-) {
-    let viewer = viewer_position(
-        views
-            .iter()
-            .map(|(view, stereo)| (view.world_from_view.translation(), stereo)),
-    );
-    gpu.buffer.set(pack_lights(
-        &lights,
-        viewer,
-        quality.max_point_lights,
-        quality.max_spot_lights,
-        &shadow.params,
-    ));
-    gpu.buffer.write_buffer(&device, &queue);
-    let (Some(binding), Some(map_view), Some(map_sampler)) = (
-        gpu.buffer.binding(),
-        shadow_map.sampled_view(),
-        shadow_map.sampler(),
-    ) else {
-        gpu.bind_group = None;
-        return;
-    };
-    let layout = pipeline_cache.get_bind_group_layout(&pipelines.lights_layout);
-    gpu.bind_group = Some(device.create_bind_group(
-        "ve_lights_bind_group",
-        &layout,
-        &[
-            BindGroupEntry {
-                binding: 0,
-                resource: binding,
-            },
-            BindGroupEntry {
-                binding: 1,
-                resource: BindingResource::TextureView(map_view),
-            },
-            BindGroupEntry {
-                binding: 2,
-                resource: BindingResource::Sampler(map_sampler),
-            },
-        ],
-    ));
+    // The bind group carries the view uniform and the exposure now in use (a 1 by 1 float texture), for every pass.
+    uniforms.bind_group =
+        uniforms
+            .buffer
+            .binding()
+            .zip(exposure.current_view())
+            .map(|(binding, exposure_view)| {
+                let layout = pipeline_cache.get_bind_group_layout(&pipelines.view_layout);
+                device.create_bind_group(
+                    "ve_view_bind_group",
+                    &layout,
+                    &[
+                        BindGroupEntry {
+                            binding: 0,
+                            resource: binding,
+                        },
+                        BindGroupEntry {
+                            binding: 1,
+                            resource: BindingResource::TextureView(exposure_view),
+                        },
+                    ],
+                )
+            });
 }
 
 #[cfg(test)]

@@ -59,6 +59,8 @@ struct Lights {
 };
 
 @group(0) @binding(0) var<uniform> view: View;
+// The automatic exposure now in use: a 1 by 1 float texture, 1 while auto exposure is off (see exposure.rs).
+@group(0) @binding(1) var exposure_state: texture_2d<f32>;
 @group(1) @binding(0) var<uniform> lights: Lights;
 @group(1) @binding(1) var shadow_map: texture_depth_2d;
 @group(1) @binding(2) var shadow_sampler: sampler_comparison;
@@ -628,5 +630,6 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
         // The baked ambient occlusion is a smooth gradient, which a cel look does not have: it is left out here.
         color = toon + emitted;
     }
-    return vec4<f32>(grade(tonemap_aces(color * view.exposure.x)), input.base_color.a);
+    let auto_exposure = textureLoad(exposure_state, vec2<i32>(0, 0), 0).x;
+    return vec4<f32>(grade(tonemap_aces(color * view.exposure.x * auto_exposure)), input.base_color.a);
 }

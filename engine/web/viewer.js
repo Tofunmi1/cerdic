@@ -692,6 +692,7 @@ export function startViewer({ canvas, api, params, frameBounds = () => null, fra
     <label><input id="v-specular-aa" type="checkbox"> Specular anti-aliasing</label>
     <label><input id="v-ssao" type="checkbox"> Screen-space ambient occlusion</label>
     <label><input id="v-bloom" type="checkbox"> Bloom</label>
+    <label><input id="v-auto-exposure" type="checkbox"> Auto exposure</label>
     <label>Exposure <span id="v-exposure-text"></span></label><input id="v-exposure" type="range" min="0.25" max="4" step="0.05">
     <label>Grade</label><select id="v-grade">
       <option value="neutral">Neutral</option>
@@ -807,6 +808,10 @@ export function startViewer({ canvas, api, params, frameBounds = () => null, fra
   bloom.checked = params.get("bloom") === "on";
   api.set_bloom(bloom.checked);
   bloom.addEventListener("change", () => api.set_bloom(bloom.checked));
+  const autoExposure = hud.querySelector("#v-auto-exposure");
+  autoExposure.checked = params.get("autoexposure") === "on";
+  api.set_auto_exposure(autoExposure.checked);
+  autoExposure.addEventListener("change", () => api.set_auto_exposure(autoExposure.checked));
   quality.addEventListener("change", () => {
     api.set_quality(quality.value);
     api.set_shadows(shadows.checked);

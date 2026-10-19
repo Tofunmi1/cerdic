@@ -29,7 +29,11 @@ pub(crate) fn needs_blit(output_format: TextureFormat) -> bool {
 /// Whether a view with this output format renders offscreen: its output needs the present pass, or
 /// the lens warp is on and the present pass resamples every view.
 pub(crate) fn blits(output_format: TextureFormat, lens: LensWarp, quality: RenderQuality) -> bool {
-    needs_blit(output_format) || lens.active() || quality.ssao_enabled || quality.bloom_enabled
+    needs_blit(output_format)
+        || lens.active()
+        || quality.ssao_enabled
+        || quality.bloom_enabled
+        || quality.auto_exposure_enabled
 }
 
 /// The format the forward pass renders in for a view with this output format.

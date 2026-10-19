@@ -8,13 +8,15 @@ use bevy_log::warn_once;
 use bevy_mesh::{Mesh, MeshVertexBufferLayoutRef, VertexBufferLayout};
 use bevy_render::mesh::RenderMesh;
 use bevy_render::render_asset::RenderAssets;
-use bevy_render::render_resource::binding_types::{sampler, texture_depth_2d, uniform_buffer};
+use bevy_render::render_resource::binding_types::{
+    sampler, texture_2d, texture_depth_2d, uniform_buffer,
+};
 use bevy_render::render_resource::{
     BindGroupLayoutDescriptor, BindGroupLayoutEntries, BlendState, CachedRenderPipelineId,
     ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Face,
     FragmentState, FrontFace, MultisampleState, PipelineCache, PrimitiveState, PrimitiveTopology,
     RenderPipelineDescriptor, SamplerBindingType, ShaderStages, StencilState, TextureFormat,
-    VertexAttribute, VertexFormat, VertexState, VertexStepMode,
+    TextureSampleType, VertexAttribute, VertexFormat, VertexState, VertexStepMode,
 };
 use bevy_render::view::{Msaa, ViewTarget};
 use bevy_shader::Shader;
@@ -61,13 +63,30 @@ pub(crate) struct ForwardPipelines {
     cache: HashMap<PipelineKey, CachedRenderPipelineId>,
 }
 
+/// A view layout with only the view uniform: for passes that build their own bind group and have no use for the exposure texture
+/// the shared view layout carries.
+pub(crate) fn uniform_only_view_layout() -> BindGroupLayoutDescriptor {
+    BindGroupLayoutDescriptor::new(
+        "ve_uniform_only_view_layout",
+        &BindGroupLayoutEntries::single(
+            ShaderStages::VERTEX_FRAGMENT,
+            uniform_buffer::<ViewUniform>(true),
+        ),
+    )
+}
+
 impl ForwardPipelines {
     pub(crate) fn new(shader: Handle<Shader>, shader_without_uv: Handle<Shader>) -> Self {
         let view_layout = BindGroupLayoutDescriptor::new(
             "ve_view_layout",
-            &BindGroupLayoutEntries::single(
+            &BindGroupLayoutEntries::sequential(
                 ShaderStages::VERTEX_FRAGMENT,
-                uniform_buffer::<ViewUniform>(true),
+                (
+                    uniform_buffer::<ViewUniform>(true),
+                    // The exposure now in use (a 1 by 1 float texture, see `exposure.rs`), read by the fragment stages.
+                    texture_2d(TextureSampleType::Float { filterable: false })
+                        .visibility(ShaderStages::FRAGMENT),
+                ),
             ),
         );
         // Lights, then the sun's shadow map and the comparison sampler that reads it.

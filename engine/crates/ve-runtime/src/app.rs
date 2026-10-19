@@ -82,6 +82,7 @@ pub(crate) fn start(canvas_id: &str, scene: SceneKind) -> Result<(), PlatformErr
             mock_hmd::update_mock_hmd,
             crate::studio::scale_room,
             quality::apply_requested,
+            quality::publish_frame_delta,
             grading::apply_requested,
             quality::sync_xr_scale.after(quality::apply_requested),
             perf::track_frame_time,
