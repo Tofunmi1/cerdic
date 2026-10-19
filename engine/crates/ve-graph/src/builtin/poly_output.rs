@@ -8,6 +8,7 @@ const POLY: &[PortType] = &[PortType::Poly];
 
 pub(super) fn all() -> Vec<Option<OperatorSpec>> {
     vec![
+        spin_spec(),
         bisect_spec(),
         spec(
             "poly.pack_uv@1",
@@ -76,6 +77,57 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
             ],
         ),
     ]
+}
+
+fn spin_spec() -> Option<OperatorSpec> {
+    spec(
+        "poly.spin@1",
+        "Revolves selected faces or edges, or the whole mesh, around an axis.",
+        vec![
+            single("in", POLY),
+            super::poly_network::optional_selection(),
+        ],
+        OutputSpec::Fixed(PortType::Poly),
+        vec![
+            default_vec3(
+                "center",
+                Unit::Length,
+                [0.0, 0.0, 0.0],
+                "Point on the axis in metres.",
+            ),
+            default_vec3(
+                "axis",
+                Unit::None,
+                [0.0, 1.0, 0.0],
+                "Axis direction; must be non-zero.",
+            ),
+            number(
+                "angle",
+                Unit::None,
+                (0.001, std::f64::consts::TAU),
+                Some(std::f64::consts::TAU),
+                "Rotation angle in radians.",
+            ),
+            ParamSpec {
+                name: "steps",
+                ty: ParamType::Int { min: 2, max: 256 },
+                default: Some(Value::Int(32)),
+                doc: "Number of rotation segments.",
+            },
+            flag(
+                "merge",
+                true,
+                "Weld the seam for a full turn and vertices within distance.",
+            ),
+            number(
+                "distance",
+                Unit::Length,
+                (1.0e-9, 1.0e3),
+                Some(0.0001),
+                "Maximum merge distance in metres.",
+            ),
+        ],
+    )
 }
 
 fn bisect_spec() -> Option<OperatorSpec> {

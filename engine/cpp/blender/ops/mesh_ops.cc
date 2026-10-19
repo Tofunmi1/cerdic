@@ -229,11 +229,76 @@ bool run_bisect(BMesh* bm, const ve_mesh_op_input& in) {
   return filled;
 }
 
+// Revolves the selection around an axis. Faces are swept by their boundary edges only: Blender's own face
+// sweep leaves a copy of the region at every step (inside the result), which would make a ring non-manifold.
+// Blender splices the first and last copy itself when `use_merge` is set, but only the caller knows the turn
+// is a full one, so merge is passed on a full turn only; `distance` then merges vertices that land together.
+bool run_spin(BMesh* bm, const ve_mesh_op_input& in) {
+  const bool full_turn = std::fabs(in.params[6] - 6.283185307179586) < 1.0e-6;
+  const bool merge = flag(in, 1) && full_turn;
+  // The faces whose boundary is swept: after a closed ring is made they would sit inside it.
+  std::vector<BMFace*> region;
+  if (in.edge_count == 0) {
+    BMIter region_iter;
+    BMFace* region_face;
+    BM_ITER_MESH(region_face, &region_iter, bm, BM_FACES_OF_MESH) {
+      if (BM_elem_flag_test(region_face, BM_ELEM_SELECT)) region.push_back(region_face);
+    }
+    BMIter edge_iter;
+    BMEdge* edge;
+    BM_ITER_MESH(edge, &edge_iter, bm, BM_EDGES_OF_MESH) {
+      BMIter face_iter;
+      BMFace* face;
+      int selected_faces = 0;
+      BM_ITER_ELEM(face, &face_iter, edge, BM_FACES_OF_EDGE) {
+        if (BM_elem_flag_test(face, BM_ELEM_SELECT)) ++selected_faces;
+      }
+      BM_elem_flag_set(edge, BM_ELEM_SELECT, selected_faces == 1);
+    }
+    BMFace* face;
+    BMIter all_faces;
+    BM_ITER_MESH(face, &all_faces, bm, BM_FACES_OF_MESH) { BM_elem_flag_disable(face, BM_ELEM_SELECT); }
+    BMVert* vert;
+    BMIter vert_iter;
+    BM_ITER_MESH(vert, &vert_iter, bm, BM_VERTS_OF_MESH) {
+      bool on_boundary = false;
+      BMIter around;
+      BMEdge* e;
+      BM_ITER_ELEM(e, &around, vert, BM_EDGES_OF_VERT) {
+        if (BM_elem_flag_test(e, BM_ELEM_SELECT)) on_boundary = true;
+      }
+      BM_elem_flag_set(vert, BM_ELEM_SELECT, on_boundary);
+    }
+  }
+  const float center[3] = {static_cast<float>(in.params[0]), static_cast<float>(in.params[1]),
+                           static_cast<float>(in.params[2])};
+  const float axis[3] = {static_cast<float>(in.params[3]), static_cast<float>(in.params[4]),
+                         static_cast<float>(in.params[5])};
+  const float delta[3] = {0.0F, 0.0F, 0.0F};
+  BMOperator spin;
+  if (!BMO_op_initf(bm, &spin, BMO_FLAG_DEFAULTS,
+                    "spin geom=%hef cent=%v axis=%v dvec=%v angle=%f steps=%i use_merge=%b "
+                    "use_normal_flip=%b use_duplicate=%b",
+                    BM_ELEM_SELECT, center, axis, delta, in.params[6], static_cast<int>(in.params[7]),
+                    merge, false, false)) {
+    return false;
+  }
+  BMO_op_exec(bm, &spin);
+  BMO_op_finish(bm, &spin);
+  if (!merge) return true;
+  for (BMFace* inside : region) BM_face_kill(bm, inside);
+  BMIter vert_iter;
+  BMVert* vert;
+  BM_ITER_MESH(vert, &vert_iter, bm, BM_VERTS_OF_MESH) { BM_elem_flag_enable(vert, BM_ELEM_SELECT); }
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "remove_doubles verts=%hv dist=%f", BM_ELEM_SELECT,
+                      in.params[8]);
+}
+
 // Checks the numbers an operator takes and what it selects; returns VE_OK when the call may
 // proceed.
 ve_status validate_params(const ve_mesh_op_input& in) {
   const double* p = in.params;
-  const int param_count = in.op == VE_MESH_OP_BISECT ? 7 : 4;
+  const int param_count = in.op == VE_MESH_OP_SPIN ? 9 : in.op == VE_MESH_OP_BISECT ? 7 : 4;
   for (int i = 0; i < param_count; ++i) {
     if (!finite_within(p[i])) {
       return VE_ERR_NON_FINITE;
@@ -274,6 +339,11 @@ ve_status validate_params(const ve_mesh_op_input& in) {
     case VE_MESH_OP_BISECT:
       return p[6] >= 0.0 && (p[3] != 0.0 || p[4] != 0.0 || p[5] != 0.0) ? VE_OK
                                                                         : VE_ERR_INVALID_ARG;
+    case VE_MESH_OP_SPIN:
+      return p[6] >= 0.001 && p[6] <= 6.283185307179586 && p[7] >= 2.0 && p[7] <= 256.0 &&
+                     p[7] == static_cast<int>(p[7]) && p[8] > 0.0 &&
+                     (p[3] != 0.0 || p[4] != 0.0 || p[5] != 0.0)
+                 ? VE_OK : VE_ERR_INVALID_ARG;
     default:
       return VE_ERR_INVALID_ARG;
   }
@@ -291,6 +361,9 @@ ve_status select_for(const ve_mesh_op_input& in, const LoadedMesh& mesh) {
       return select_faces(in, mesh, true);
     case VE_MESH_OP_SUBDIVIDE:
       return select_edges(in, mesh);
+    case VE_MESH_OP_SPIN:
+      if (in.edge_count > 0) return select_edges(in, mesh);
+      return select_faces(in, mesh, true);
     case VE_MESH_OP_TRIANGULATE:
       return select_faces(in, mesh, true);
     case VE_MESH_OP_REMOVE_DOUBLES:
@@ -335,6 +408,8 @@ bool run_op(BMesh* bm, const ve_mesh_op_input& in, const LoadedMesh& mesh, const
       return run_remove_doubles(bm, in);
     case VE_MESH_OP_BISECT:
       return run_bisect(bm, in);
+    case VE_MESH_OP_SPIN:
+      return run_spin(bm, in);
     default:
       return run_symmetrize(bm, in);
   }

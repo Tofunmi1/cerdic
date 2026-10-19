@@ -111,6 +111,9 @@ fn execute_special(
     if let Some(result) = crate::poly_ops::run(node, inputs, context) {
         return Some(result.map_err(|error| at_node(error, node)));
     }
+    if let Some(result) = crate::hulls::run(node, inputs) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
     if family == "solid.material" {
         return Some(appearance::material(node, inputs));
     }

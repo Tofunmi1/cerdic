@@ -3436,6 +3436,7 @@ dependencies = [
  "ve-geometry",
  "ve-graph",
  "ve-kernel",
+ "ve-measure",
 ]
 
 [[package]]

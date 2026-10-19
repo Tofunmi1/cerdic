@@ -29,6 +29,7 @@ pub(super) fn handles(family: &str) -> bool {
             | "poly.triangulate"
             | "poly.remove_doubles"
             | "poly.bisect"
+            | "poly.spin"
     )
 }
 
@@ -51,7 +52,7 @@ pub(super) fn ignores_selection(family: &str) -> bool {
 pub(super) fn selection_optional(family: &str) -> bool {
     matches!(
         family,
-        "poly.solidify" | "poly.poke" | "poly.wireframe" | "poly.unwrap_uv"
+        "poly.solidify" | "poly.poke" | "poly.wireframe" | "poly.unwrap_uv" | "poly.spin"
     )
 }
 
@@ -115,6 +116,13 @@ pub(super) fn apply(
                 "plane removes the entire mesh".to_owned(),
             ));
         }
+    }
+    if family == "poly.spin" && vector(node, "axis")?.iter().all(|value| *value == 0.0) {
+        return Err(super::errors::refuse(
+            node,
+            "poly.spin_axis_zero",
+            "axis must be non-zero".to_owned(),
+        ));
     }
     let op = operator(node, family)?;
     ve_geometry::blender_edit(poly, &faces, &edges, &vertices, &op, context)
@@ -198,7 +206,7 @@ fn chosen(node: &Node, family: &str, selection: Option<&Selection>) -> Result<Ch
         return Ok((Vec::new(), Vec::new()));
     }
     match (&selection.elements, family) {
-        (Elements::Edges(items), "poly.subdivide_edges" | "poly.unwrap_uv") => {
+        (Elements::Edges(items), "poly.subdivide_edges" | "poly.unwrap_uv" | "poly.spin") => {
             Ok((Vec::new(), items.clone()))
         }
         (other, "poly.subdivide_edges" | "poly.unwrap_uv") => Err(wrong("edge", other.kind())),
@@ -279,6 +287,14 @@ fn operator(node: &Node, family: &str) -> Result<MeshOp, Fail> {
                 fill: flag(node, "fill")?,
             }
         }
+        "poly.spin" => MeshOp::Spin {
+            center: vector(node, "center")?,
+            axis: vector(node, "axis")?,
+            angle: number(node, "angle")?,
+            steps: super::params::count(node, "steps")? as u32,
+            merge: flag(node, "merge")?,
+            distance: number(node, "distance")?,
+        },
         _ => MeshOp::Symmetrize {
             axis: match text(node, "axis")? {
                 "y" => 1,

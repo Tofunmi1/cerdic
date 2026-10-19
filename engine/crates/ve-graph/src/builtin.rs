@@ -16,6 +16,7 @@ mod deformers;
 mod environment;
 mod fields;
 mod group_ops;
+mod hulls;
 mod instances;
 mod lights;
 mod modeling;
@@ -122,6 +123,7 @@ fn all_specs() -> Vec<Option<OperatorSpec>> {
     all.extend(water::all());
     all.extend(physics::all());
     all.extend(shapes::all());
+    all.extend(hulls::all());
     all.extend(group_ops::all());
     all.extend(instances::all());
     all.extend(lights::all());
