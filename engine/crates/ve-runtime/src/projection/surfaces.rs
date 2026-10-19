@@ -51,6 +51,10 @@ pub(super) fn parse(text: &str, node: &str) -> Option<VeMaterial> {
         None | Some(serde_json::Value::Null) => ve_render::ToonStyle::default(),
         Some(toon) => parse_toon(toon)?,
     };
+    let foliage = match value.get("foliage") {
+        None | Some(serde_json::Value::Null) => ve_render::FoliageStyle::default(),
+        Some(foliage) => parse_foliage(foliage)?,
+    };
     Some(VeMaterial {
         base_color: Color::srgb(color[0], color[1], color[2]),
         opacity,
@@ -65,6 +69,24 @@ pub(super) fn parse(text: &str, node: &str) -> Option<VeMaterial> {
         texture_scale,
         map_layers: [-1; 4],
         toon,
+        foliage,
+    })
+}
+
+/// A material's `foliage` object: the cutoff, sway and flutter, each 0 to 1, or the whole material is refused.
+fn parse_foliage(foliage: &serde_json::Value) -> Option<ve_render::FoliageStyle> {
+    let number = |name: &str| -> Option<f32> {
+        let value = foliage
+            .get(name)?
+            .as_f64()
+            .filter(|v| (0.0..=1.0).contains(v))?;
+        #[expect(clippy::cast_possible_truncation, reason = "bounded foliage factors")]
+        Some(value as f32)
+    };
+    Some(ve_render::FoliageStyle {
+        alpha_cutoff: number("alpha_cutoff")?,
+        sway: number("sway")?,
+        flutter: number("flutter")?,
     })
 }
 

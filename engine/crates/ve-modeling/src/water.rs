@@ -64,6 +64,7 @@ fn build(node: &Node, context: &ExecutionContext) -> Result<Value, Fail> {
         toon: None,
         texture_program: None,
         texture_style: None,
+        foliage: None,
     });
     Ok(value)
 }

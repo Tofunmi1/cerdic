@@ -86,6 +86,18 @@ impl Default for ToonStyle {
     }
 }
 
+/// Leaf-like behaviour of a surface: cut away where its albedo map is transparent, and moving in the wind. All zero is an
+/// ordinary surface.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct FoliageStyle {
+    /// Pixels whose albedo-map alpha is below this are discarded (0 keeps everything).
+    pub alpha_cutoff: f32,
+    /// How far the whole shape bends with the wind, 0 to 1 (more the higher a point is above the shape's origin).
+    pub sway: f32,
+    /// How much the surface trembles at a small scale, 0 to 1.
+    pub flutter: f32,
+}
+
 /// Metallic-roughness surface parameters of a mesh instance.
 ///
 /// Parameters are plain numbers (no textures yet): the material language in a later track will
@@ -115,6 +127,8 @@ pub struct VeMaterial {
     pub map_layers: [i32; 4],
     /// Cel shading, or none when its `bands` is 0.
     pub toon: ToonStyle,
+    /// Cutout and wind, or none when all of it is 0.
+    pub foliage: FoliageStyle,
 }
 
 impl Default for VeMaterial {
@@ -131,6 +145,7 @@ impl Default for VeMaterial {
             texture_scale: 1.0,
             map_layers: [-1; 4],
             toon: ToonStyle::default(),
+            foliage: FoliageStyle::default(),
         }
     }
 }
@@ -150,6 +165,8 @@ pub(crate) struct PackedMaterial {
     pub(crate) toon_b: [f32; 4],
     /// rgb: outline colour (linear), w: outline width in screen pixels (0 is none).
     pub(crate) toon_c: [f32; 4],
+    /// x: alpha cutoff (0 keeps every pixel), y: sway, z: flutter, w unused.
+    pub(crate) foliage: [f32; 4],
 }
 
 impl VeMaterial {
@@ -217,6 +234,12 @@ impl VeMaterial {
                     self.toon.outline_width.clamp(0.0, 16.0),
                 ]
             },
+            foliage: [
+                self.foliage.alpha_cutoff.clamp(0.0, 1.0),
+                self.foliage.sway.clamp(0.0, 1.0),
+                self.foliage.flutter.clamp(0.0, 1.0),
+                0.0,
+            ],
         }
     }
 }
@@ -239,6 +262,7 @@ mod tests {
             texture_scale: 1.0,
             map_layers: [-1; 4],
             toon: ToonStyle::default(),
+            foliage: FoliageStyle::default(),
         };
         let packed = material.pack_for_instance(0);
         assert!((packed.base_color[0] - 1.0).abs() < 1e-6);

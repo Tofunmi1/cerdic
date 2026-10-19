@@ -114,7 +114,7 @@ fn estimate_default(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usiz
             .map(|r| sizes.get(&r.node).copied().unwrap_or(0))
             .sum()),
         "xform.move" | "xform.rotate" | "xform.scale" | "xform.align" | "frame.add"
-        | "solid.material" | "solid.texture" | "solid.toon" | "solid.style" | "anim.track" | "anim.wave" | "phys.body" | "phys.joint" | "phys.world" | "rig.bone" | "rig.skin" | "rig.ik" | "anim.parent" | "behavior.on" | "inst.array" | "inst.radial" | "inst.repeat" | "inst.mirror"
+        | "solid.material" | "solid.texture" | "solid.toon" | "solid.style" | "solid.foliage" | "anim.track" | "anim.wave" | "phys.body" | "phys.joint" | "phys.world" | "rig.bone" | "rig.skin" | "rig.ik" | "anim.parent" | "behavior.on" | "inst.array" | "inst.radial" | "inst.repeat" | "inst.mirror"
         | "inst.scatter" | "inst.jitter"
         // These deform vertex positions without changing mesh topology.
         | "xform.twist" | "xform.taper" | "xform.bend" | "xform.shear" | "xform.wave" | "xform.noise" | "xform.lattice" => Ok(inputs.sum()),

@@ -210,7 +210,12 @@ fn draw_opaque_with_outlines<'a>(
     slots: &ViewSlots,
 ) {
     for batch in batches.batches.iter().filter(|batch| !batch.transparent) {
-        draw_batch(pass, gpu, batch, slots, PassKind::Opaque);
+        let kind = if batch.foliage {
+            PassKind::TwoSided
+        } else {
+            PassKind::Opaque
+        };
+        draw_batch(pass, gpu, batch, slots, kind);
     }
     for batch in batches
         .batches

@@ -8,6 +8,7 @@
 mod ao;
 mod ao_depth;
 mod counters;
+mod cutout;
 mod exposure;
 pub use exposure::FrameDelta;
 mod extract;
@@ -30,6 +31,7 @@ mod schedule;
 mod shader_tests;
 mod shadow;
 mod shadow_math;
+mod shadow_pipelines;
 mod sky;
 mod stereo;
 mod targets;
@@ -56,7 +58,7 @@ pub use light::{
     MAX_POINT_LIGHTS, MAX_SPOT_LIGHTS, VeAmbientLight, VeDirectionalLight, VePointLight,
     VeSpotLight,
 };
-pub use material::{ProceduralRecipe, ToonStyle, VeMaterial};
+pub use material::{FoliageStyle, ProceduralRecipe, ToonStyle, VeMaterial};
 pub use quality::{QualityTier, RenderQuality};
 pub use readiness::mesh_ready;
 pub use sky::SkyBackground;
@@ -139,6 +141,11 @@ impl Plugin for VeRenderPlugin {
             let forward = pipeline::ForwardPipelines::new(forward, forward_without_uv);
             let sky_pipelines = sky::SkyPipelines::new(sky_shader, forward.view_layout.clone());
             render_app
+                .insert_resource(cutout::CutoutPipelines::new(
+                    shadow.clone(),
+                    ao_depth_shader.clone(),
+                    forward.view_layout.clone(),
+                ))
                 .insert_resource(shadow::ShadowPipelines::new(shadow))
                 .insert_resource(exposure::ExposurePipeline::new(
                     exposure_shader,
@@ -223,6 +230,7 @@ fn add_render_systems(render_app: &mut SubApp) {
                 pipeline::queue_forward_pipelines,
                 present::queue_present_pipelines,
                 shadow::queue_shadow_pipelines,
+                cutout::queue_cutout_pipelines,
                 ao_depth::queue_ao_depth_pipelines,
                 ao::queue_ao_pipeline,
                 exposure::queue_exposure_pipeline,

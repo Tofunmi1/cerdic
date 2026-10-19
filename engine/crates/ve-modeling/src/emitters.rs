@@ -110,6 +110,7 @@ mod tests {
             toon: None,
             texture_program: None,
             texture_style: None,
+            foliage: None,
         }
     }
 

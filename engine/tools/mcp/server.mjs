@@ -417,6 +417,12 @@ sqrt exp log pow min max clamp mix step smoothstep mod length distance dot cross
 snoise(vec2) -1..1, fbm(vec2) 0..1, hsv(h, s, v), rot(vec2, angle). Loops: for i in 0..N { ... } with a whole-number N up to 64,
 two deep at most (256 passes in all). No if, while, comparisons or texture reads (use step, mix and smoothstep). At most 600
 characters. Variables first set inside a loop stay inside it. A mistake names the line, column and the fix.
+Cut-outs: solid.foliage@1(shape, alpha_cutoff=0.5, sway=0, flutter=0) after solid.material and solid.texture cuts the surface away
+where its albedo's alpha is under the cutoff, in the picture, in its shadow and in the exported glTF (alphaMode MASK), and draws it
+two-sided. End the expr code with a vec4 whose last number is the alpha to draw the shape: out = vec4(0.1, 0.5, 0.1, 1.0 - step(0.8,
+length(q * vec2(1.0, 1.4)))) is a leaf. The shape needs UVs over the whole surface (poly.grid gives one quad with them, or unwrap a
+mesh with poly.unwrap_uv); a solid.box has its six faces in one atlas, so a shape drawn into it is split across them. Wind: sway
+bends the whole shape (tall parts more), flutter trembles the surface; both 0 is an ordinary surface.
 Export glTF bakes these in the browser, requires WebGL2 plus EXT_color_buffer_float, and embeds PNG maps.
 The viewport shows these baked maps on the model (up to 64 maps in all; later parts lose emissive, then
 metallic-roughness, then normal maps first, with a warning). Give a part UVs with poly.unwrap_uv before

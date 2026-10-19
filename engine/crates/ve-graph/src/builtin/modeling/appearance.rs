@@ -211,5 +211,37 @@ pub(super) fn specs() -> Vec<Option<OperatorSpec>> {
                 ),
             ],
         ),
+        spec(
+            "solid.foliage@1",
+            "Makes a surface behave like leaves, grass, a fence or any thin cut-out card. It is cut away wherever its albedo map's alpha is under alpha_cutoff, so a leaf shape drawn into a texture (a texture program or an expr node \
+                     that ends in a vec4 whose last number is the alpha) becomes a leaf-shaped silhouette in the picture, in its shadow and in the exported glTF (alphaMode MASK). It also moves in the wind: sway bends the whole shape \
+                     (more the higher a point is above the shape's base) and flutter makes the surface itself tremble. The wind's direction and strength come from scene.environment. Colours, roughness and textures are kept: put it \
+                     after solid.material and solid.texture. All three at 0 makes it an ordinary surface again. Without a texture map there is no alpha to cut, so only the wind has an effect.",
+            vec![single("in", COLOURABLE)],
+            OutputSpec::SameAsInput("in"),
+            vec![
+                number(
+                    "alpha_cutoff",
+                    Unit::None,
+                    (0.0, 1.0),
+                    0.5,
+                    "Pixels whose albedo alpha is below this are cut away: 0 keeps everything, 0.5 is the usual leaf edge, near 1 keeps only fully opaque pixels.",
+                ),
+                number(
+                    "sway",
+                    Unit::None,
+                    (0.0, 1.0),
+                    0.0,
+                    "How far the whole shape bends with the wind, 0 still to 1 strongly; a tree swings from its base, so tall parts move more.",
+                ),
+                number(
+                    "flutter",
+                    Unit::None,
+                    (0.0, 1.0),
+                    0.0,
+                    "How much the surface trembles at a small scale (leaves in a breeze), 0 to 1.",
+                ),
+            ],
+        ),
     ]
 }
