@@ -1,0 +1,14 @@
+[package]
+name = "ve-gi"
+version = "0.0.0"
+description = "Deterministic diffuse irradiance probe baking."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+ve-measure = { path = "../ve-measure" }
+thiserror.workspace = true
+
+[lints]
+workspace = true
