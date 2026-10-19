@@ -25,12 +25,16 @@ mod probes;
 pub use probes::{MAX_PROBES, MAX_PROBES_PER_AXIS, ProbeVolume};
 mod wind;
 pub use wind::WindField;
+mod frustum;
+mod instance_sets;
 mod pipeline;
 mod prepare;
 mod present;
 mod quality;
 mod readiness;
 mod schedule;
+mod set_chunks;
+mod set_visibility;
 #[cfg(test)]
 mod shader_tests;
 mod shadow;
@@ -54,10 +58,11 @@ use bevy_render::view::Msaa;
 use bevy_render::{ExtractSchedule, Render, RenderApp, RenderSystems};
 use bevy_shader::Shader;
 
-pub use counters::{FrameCounts, PassCounts, last_frame_counts};
+pub use counters::{FrameCounts, PassCounts, last_frame_counts, last_set_stats};
 pub use grade::{
     CONTRAST_RANGE, EXPOSURE_RANGE, GradePreset, Grading, SATURATION_RANGE, TINT_RANGE,
 };
+pub use instance_sets::{SetMesh, SetStats, VeInstanceSet};
 pub use lens::{LensMode, LensWarp};
 pub use light::{
     MAX_POINT_LIGHTS, MAX_SPOT_LIGHTS, VeAmbientLight, VeDirectionalLight, VePointLight,
@@ -179,6 +184,7 @@ impl Plugin for VeRenderPlugin {
 fn add_render_systems(render_app: &mut SubApp) {
     render_app
         .init_resource::<extract::ExtractedMeshes>()
+        .init_resource::<instance_sets::ExtractedSets>()
         .init_resource::<light::ExtractedLights>()
         .init_resource::<prepare::InstanceBatches>()
         .init_resource::<prepare::ViewUniforms>()
@@ -202,6 +208,7 @@ fn add_render_systems(render_app: &mut SubApp) {
             ExtractSchedule,
             (
                 extract::extract_meshes,
+                instance_sets::extract_instance_sets,
                 light::extract_lights,
                 quality::extract_quality,
                 grade::extract_grading,
@@ -214,6 +221,7 @@ fn add_render_systems(render_app: &mut SubApp) {
             Render,
             (
                 prepare::prepare_instances,
+                instance_sets::prepare_sets.after(prepare::prepare_instances),
                 readiness::publish,
                 // The view bind group carries the exposure texture, so that is settled first.
                 (
@@ -229,6 +237,10 @@ fn add_render_systems(render_app: &mut SubApp) {
                     prepare::prepare_lights,
                 )
                     .chain(),
+                // Which chunks of the instance sets each view draws: after the views and the cascades are known.
+                set_visibility::cull_sets
+                    .after(instance_sets::prepare_sets)
+                    .after(shadow::prepare_shadow_state),
                 targets::prepare_depth_textures,
                 targets::prepare_msaa_targets,
                 targets::prepare_offscreen_targets,

@@ -56,6 +56,27 @@ pub(crate) enum Pass {
     Depth,
 }
 
+thread_local! {
+    static SETS: Cell<crate::instance_sets::SetStats> = const { Cell::new(crate::instance_sets::SetStats {
+        sets: 0,
+        copies: 0,
+        chunks: 0,
+        chunks_visible: 0,
+        copies_visible: 0,
+    }) };
+}
+
+/// How the instance sets fared in the last frame's culling.
+#[must_use]
+pub fn last_set_stats() -> crate::instance_sets::SetStats {
+    SETS.with(Cell::get)
+}
+
+/// Stores this frame's instance-set culling result.
+pub(crate) fn record_sets(stats: crate::instance_sets::SetStats) {
+    SETS.with(|cell| cell.set(stats));
+}
+
 /// Records one draw call of `triangles` triangles.
 pub(crate) fn record(pass: Pass, triangles: u64) {
     CURRENT.with(|current| {

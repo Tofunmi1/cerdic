@@ -184,7 +184,7 @@ pub(crate) fn queue_ao_depth_pipelines(
     if !quality.ssao_enabled {
         return;
     }
-    for batch in batches.batches.iter().filter(|batch| !batch.transparent) {
+    for batch in batches.queue_batches().filter(|batch| !batch.transparent) {
         let Some(render_mesh) = render_meshes.get(batch.mesh) else {
             continue;
         };
@@ -222,9 +222,7 @@ pub(crate) fn ao_depth_pass(
         return;
     }
     let (targets, slots) = view.into_inner();
-    let (Some(view_bind_group), Some(instance_buffer)) =
-        (view_uniforms.bind_group.as_ref(), batches.buffer.buffer())
-    else {
+    let Some(view_bind_group) = view_uniforms.bind_group.as_ref() else {
         return;
     };
     let color_attachments = [Some(RenderPassColorAttachment {
@@ -251,7 +249,7 @@ pub(crate) fn ao_depth_pass(
         occlusion_query_set: None,
         multiview_mask: None,
     });
-    for batch in batches.batches.iter().filter(|batch| !batch.transparent) {
+    for batch in batches.main_batches().filter(|batch| !batch.transparent) {
         let Some(render_mesh) = render_meshes.get(batch.mesh) else {
             continue;
         };
@@ -273,6 +271,9 @@ pub(crate) fn ao_depth_pass(
             continue;
         };
         pass.set_render_pipeline(pipeline);
+        let Some(instance_buffer) = batches.instance_buffer(batch) else {
+            continue;
+        };
         let Some(call) = bind_geometry(&mut pass, &allocator, render_mesh, batch, instance_buffer)
         else {
             continue;

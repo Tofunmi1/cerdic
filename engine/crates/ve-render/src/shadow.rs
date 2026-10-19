@@ -161,11 +161,9 @@ pub(crate) fn shadow_pass(
     if !state.params.enabled {
         return;
     }
-    let (Some(target), Some(view_bind_group), Some(instance_buffer)) = (
-        map.target.as_ref(),
-        pipelines.view_bind_group.as_ref(),
-        batches.buffer.buffer(),
-    ) else {
+    let (Some(target), Some(view_bind_group)) =
+        (map.target.as_ref(), pipelines.view_bind_group.as_ref())
+    else {
         return;
     };
     let mut pass = ctx.begin_tracked_render_pass(RenderPassDescriptor {
@@ -183,7 +181,8 @@ pub(crate) fn shadow_pass(
         occlusion_query_set: None,
         multiview_mask: None,
     });
-    // Every cascade draws the same batches from its own sun camera into its own tile of the atlas.
+    // Every cascade draws the entity batches and the instance-set chunks inside its own box, from its own sun camera, into its own
+    // tile of the atlas.
     for (index, offset) in pipelines.offsets.iter().enumerate() {
         let tile = u32::try_from(index).unwrap_or(0) * target.resolution;
         #[expect(
@@ -200,7 +199,7 @@ pub(crate) fn shadow_pass(
         );
         pass.set_scissor_rect(tile, 0, target.resolution, target.resolution);
         pass.set_bind_group(0, view_bind_group, &[*offset]);
-        for batch in &batches.batches {
+        for batch in batches.cascade_batches(index) {
             let Some(render_mesh) = render_meshes.get(batch.mesh) else {
                 continue;
             };
@@ -222,6 +221,9 @@ pub(crate) fn shadow_pass(
                 continue;
             };
             pass.set_render_pipeline(pipeline);
+            let Some(instance_buffer) = batches.instance_buffer(batch) else {
+                continue;
+            };
             if let Some(call) =
                 bind_geometry(&mut pass, &allocator, render_mesh, batch, instance_buffer)
             {

@@ -2,7 +2,9 @@
 
 use glam::{Mat4, Quat, Vec3};
 mod affine;
+mod box_set;
 pub use affine::ray_affine_box;
+pub use box_set::BoxSet;
 
 use crate::pose::{Decomposed, decompose};
 

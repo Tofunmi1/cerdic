@@ -165,6 +165,8 @@ struct SceneWorld<'a, 'w, 's> {
             Option<&'static ve_render::VeInstanceTransform>,
         ),
     >,
+    /// Retained instance sets, picked copy by copy through [`ve_interact::BoxSet`] (and left out of `objects`).
+    bulk: &'a Query<'w, 's, (Entity, &'static crate::projection::bulk::BulkInstances)>,
     hook: &'a SnapHook,
 }
 
@@ -178,8 +180,17 @@ fn placement_of(transform: &Transform) -> Placement3 {
 
 impl World for SceneWorld<'_, '_, '_> {
     fn pick(&self, ray: &Ray, max_distance: f32) -> Option<Hit> {
+        let sets = self.bulk.iter().filter_map(|(entity, set)| {
+            let (distance, _) = set.0.pick(ray)?;
+            (distance <= max_distance).then(|| Hit {
+                target: target_of(entity),
+                distance,
+                point: ray.at(distance),
+            })
+        });
         self.objects
             .iter()
+            .filter(|(entity, ..)| !self.bulk.contains(*entity))
             .filter_map(|(entity, interactable, transform, placement)| {
                 // An object whose transform a box cannot represent (collapsed, mirrored, sheared)
                 // is not pickable until it is placed validly again.
@@ -205,6 +216,7 @@ impl World for SceneWorld<'_, '_, '_> {
                     point: ray.at(distance),
                 })
             })
+            .chain(sets)
             .min_by(|a, b| a.distance.total_cmp(&b.distance))
     }
 

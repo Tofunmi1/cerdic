@@ -15,7 +15,7 @@ mod machine;
 mod pointer;
 mod pose;
 
-pub use geometry::{Ray, Shape, ray_affine_box};
+pub use geometry::{BoxSet, Ray, Shape, ray_affine_box};
 pub use gesture::{PinchConfig, PinchRecognizer, PinchState, gaze_pointer, hand_pointer};
 pub use gizmo::{
     CameraView, Constraint as GizmoConstraint, Delta as GizmoDelta, GizmoDrag, Mode as GizmoMode,
