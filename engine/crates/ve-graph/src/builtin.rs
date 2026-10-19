@@ -43,7 +43,8 @@ const PROFILE: &[PortType] = &[PortType::Profile];
 /// instances join the list when their transforms exist, so a draft graph cannot silently evaluate
 /// to nothing.
 const XFORMABLE: &[PortType] = &[PortType::Solid];
-const PLACED: &[PortType] = &[PortType::Solid, PortType::Inst];
+/// What move, rotate and scale accept: solids, placement sets, and polygon meshes (open ones too: a leaf card moves like a box).
+const PLACED: &[PortType] = &[PortType::Solid, PortType::Inst, PortType::Poly];
 /// What a material can colour: solids, placement sets and polygon meshes.
 const COLOURABLE: &[PortType] = &[PortType::Solid, PortType::Inst, PortType::Poly];
 

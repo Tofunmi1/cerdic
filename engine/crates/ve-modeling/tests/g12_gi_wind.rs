@@ -31,7 +31,9 @@ fn evaluate(source: &str) -> Evaluation {
 }
 
 fn environment(source: &str) -> SceneEnvironment {
-    evaluate(source).environment.expect("an environment")
+    evaluate(source)
+        .environment
+        .unwrap_or_else(|| panic!("the document made no environment"))
 }
 
 #[test]

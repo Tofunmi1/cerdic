@@ -40,7 +40,10 @@ fn material_of(size_param: &str) -> Material {
         "b = solid.box@1(size=[1, 1, 1])\nt = solid.texture@1(b, program=\"{PROGRAM}\"{size_param})\noutput t = t"
     );
     let result = evaluate(&source);
-    result.parts[0].material.clone().expect("a textured part")
+    result.parts[0]
+        .material
+        .clone()
+        .unwrap_or_else(|| panic!("a textured part: {:?}", result.parts[0].name))
 }
 
 #[test]

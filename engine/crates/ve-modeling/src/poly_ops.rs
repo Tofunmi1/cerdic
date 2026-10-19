@@ -10,6 +10,7 @@ mod edit;
 mod errors;
 mod lod;
 mod params;
+mod place;
 mod round;
 mod select;
 mod selection;
@@ -43,6 +44,10 @@ pub(crate) fn run(
     context: &ExecutionContext,
 ) -> Option<Result<Value, Fail>> {
     let family = node.op.family().as_str();
+    // A polygon mesh moved, turned or scaled by a plain transform keeps its faces (the solid kernel would refuse an open one).
+    if place::applies(family, inputs) {
+        return Some(place::run(node, family, inputs, context));
+    }
     family
         .starts_with("poly.")
         .then(|| dispatch(node, family, inputs, context))
