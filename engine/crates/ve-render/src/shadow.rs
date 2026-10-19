@@ -28,7 +28,10 @@ pub(crate) use crate::shadow_pipelines::{
 };
 
 /// Source of the shadow shader.
-pub(crate) const SHADOW_SHADER: &str = include_str!("shaders/shadow.wgsl");
+pub(crate) const SHADOW_SHADER: &str = concat!(
+    include_str!("shaders/wind.wgsl"),
+    include_str!("shaders/shadow.wgsl")
+);
 
 /// The shadow shader's asset name.
 pub(crate) const SHADOW_SHADER_NAME: &str = "ve_shadow.wgsl";
