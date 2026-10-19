@@ -74,7 +74,11 @@ enum Destination<'a> {
 }
 
 /// Points the pass at one view slot: its uniform, and (for stereo) its part of the target.
-fn bind_slot<'a>(pass: &mut TrackedRenderPass<'a>, bind_group: &'a BindGroup, slot: &ViewSlot) {
+pub(crate) fn bind_slot<'a>(
+    pass: &mut TrackedRenderPass<'a>,
+    bind_group: &'a BindGroup,
+    slot: &ViewSlot,
+) {
     pass.set_bind_group(0, bind_group, &[slot.offset]);
     if let Some([x, y, width, height]) = slot.viewport {
         #[expect(

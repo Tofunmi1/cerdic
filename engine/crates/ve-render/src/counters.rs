@@ -20,16 +20,20 @@ pub struct FrameCounts {
     pub shadow: PassCounts,
     /// The main forward pass, summed over its views (both eyes in stereo).
     pub main: PassCounts,
+    /// The depth pass for screen-space occlusion, which draws the opaque batches again (zero while occlusion is off).
+    pub depth: PassCounts,
 }
 
 thread_local! {
     static CURRENT: Cell<FrameCounts> = const { Cell::new(FrameCounts {
         shadow: PassCounts { draws: 0, triangles: 0 },
         main: PassCounts { draws: 0, triangles: 0 },
+        depth: PassCounts { draws: 0, triangles: 0 },
     }) };
     static LAST: Cell<FrameCounts> = const { Cell::new(FrameCounts {
         shadow: PassCounts { draws: 0, triangles: 0 },
         main: PassCounts { draws: 0, triangles: 0 },
+        depth: PassCounts { draws: 0, triangles: 0 },
     }) };
 }
 
@@ -49,6 +53,7 @@ pub(crate) fn begin_frame() {
 pub(crate) enum Pass {
     Shadow,
     Main,
+    Depth,
 }
 
 /// Records one draw call of `triangles` triangles.
@@ -58,6 +63,7 @@ pub(crate) fn record(pass: Pass, triangles: u64) {
         let target = match pass {
             Pass::Shadow => &mut counts.shadow,
             Pass::Main => &mut counts.main,
+            Pass::Depth => &mut counts.depth,
         };
         target.draws = target.draws.saturating_add(1);
         target.triangles = target.triangles.saturating_add(triangles);

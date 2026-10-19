@@ -153,13 +153,8 @@ pub(crate) fn apply_quality_to_cameras(
     quality: Res<RenderQuality>,
     mut cameras: Query<(Ref<Camera3d>, &mut Msaa)>,
 ) {
-    // The post pass samples resolved depth. Use single-sample depth while AO or bloom is active;
-    // this also bounds the headset cost of the extra pass.
-    let wanted = Msaa::from_samples(if quality.ssao_enabled || quality.bloom_enabled {
-        1
-    } else {
-        quality.msaa_samples
-    });
+    // Occlusion reads its own single-sample depth texture (the `ao_depth` pass), so post effects do not limit the sample count.
+    let wanted = Msaa::from_samples(quality.msaa_samples);
     for (camera, mut msaa) in &mut cameras {
         if (quality.is_changed() || camera.is_added()) && *msaa != wanted {
             *msaa = wanted;
@@ -256,12 +251,14 @@ mod tests {
         app.update();
         assert_eq!(app.world().get::<Msaa>(camera), Some(&Msaa::Off));
 
+        // Occlusion and bloom read their own single-sample targets, so they do not take multisampling away.
         app.insert_resource(RenderQuality {
             ssao_enabled: true,
+            bloom_enabled: true,
             ..RenderQuality::for_tier(QualityTier::High)
         });
         app.update();
-        assert_eq!(app.world().get::<Msaa>(camera), Some(&Msaa::Off));
+        assert_eq!(app.world().get::<Msaa>(camera), Some(&Msaa::Sample4));
         app.insert_resource(RenderQuality::for_tier(QualityTier::High));
         app.update();
         assert_eq!(app.world().get::<Msaa>(camera), Some(&Msaa::Sample4));

@@ -5,6 +5,8 @@
 //! instance-batched meshes with a metallic-roughness PBR shader, a sun, point lights, MSAA and
 //! tonemapping; shadows and quality tiers come next (M6).
 
+mod ao;
+mod ao_depth;
 mod counters;
 mod extract;
 mod placement;
@@ -112,12 +114,26 @@ impl Plugin for VeRenderPlugin {
                         shadow::SHADOW_SHADER_NAME,
                     )),
                     shaders.add(Shader::from_wgsl(sky::SHADER, "ve_sky.wgsl")),
+                    shaders.add(Shader::from_wgsl(
+                        ao_depth::SHADER,
+                        ao_depth::SHADER_NAME,
+                    )),
+                    shaders.add(Shader::from_wgsl(ao::SHADER, ao::SHADER_NAME)),
                 )
             });
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
-        if let Some((forward, forward_without_uv, present, shadow, sky_shader)) = shaders {
+        if let Some((
+            forward,
+            forward_without_uv,
+            present,
+            shadow,
+            sky_shader,
+            ao_depth_shader,
+            ao_shader,
+        )) = shaders
+        {
             let forward = pipeline::ForwardPipelines::new(forward, forward_without_uv);
             let sky_pipelines = sky::SkyPipelines::new(sky_shader, forward.view_layout.clone());
             render_app
@@ -125,6 +141,11 @@ impl Plugin for VeRenderPlugin {
                     shadow,
                     forward.view_layout.clone(),
                 ))
+                .insert_resource(ao_depth::AoDepthPipelines::new(
+                    ao_depth_shader,
+                    forward.view_layout.clone(),
+                ))
+                .insert_resource(ao::AoPipeline::new(ao_shader))
                 .insert_resource(forward)
                 .insert_resource(sky_pipelines)
                 .insert_resource(present::PresentPipelines::new(present));
@@ -178,6 +199,7 @@ fn add_render_systems(render_app: &mut SubApp) {
                 targets::prepare_depth_textures,
                 targets::prepare_msaa_targets,
                 targets::prepare_offscreen_targets,
+                ao_depth::prepare_ao_depth_targets,
                 present::prepare_present_sampler,
                 textures::prepare_textures,
                 lens::prepare_lens,
@@ -190,6 +212,8 @@ fn add_render_systems(render_app: &mut SubApp) {
                 pipeline::queue_forward_pipelines,
                 present::queue_present_pipelines,
                 shadow::queue_shadow_pipelines,
+                ao_depth::queue_ao_depth_pipelines,
+                ao::queue_ao_pipeline,
                 sky::queue,
             )
                 .in_set(RenderSystems::Queue),
@@ -198,6 +222,10 @@ fn add_render_systems(render_app: &mut SubApp) {
             Forward3d,
             (
                 pass::forward_pass.in_set(Forward3dSystems::MainPass),
+                ao_depth::ao_depth_pass.in_set(Forward3dSystems::MainPass),
+                ao::ao_pass
+                    .in_set(Forward3dSystems::MainPass)
+                    .after(ao_depth::ao_depth_pass),
                 present::present_pass.in_set(Forward3dSystems::Present),
             ),
         )
