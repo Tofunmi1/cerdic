@@ -3386,6 +3386,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ve-gi"
+version = "0.0.0"
+dependencies = [
+ "thiserror 2.0.21",
+ "ve-measure",
+]
+
+[[package]]
 name = "ve-graph"
 version = "0.0.0"
 dependencies = [
