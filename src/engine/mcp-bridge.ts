@@ -127,7 +127,7 @@ export function measureParts(host: Host, params: Record<string, unknown>) {
 }
 
 /** Bake selected maps from an evaluated high part onto the UVs of a low part. */
-export function bakeParts(host: Host, params: Record<string, unknown>) {
+export async function bakeParts(host: Host, params: Record<string, unknown>) {
   const evaluation = host.evaluation!, runtime = host.runtime!;
   const pick = (value: unknown) => typeof value === 'string' ? value.trim() : '';
   const lowName = pick(params.low), highName = pick(params.high);
@@ -159,7 +159,7 @@ export function bakeParts(host: Host, params: Record<string, unknown>) {
   for (const [name, item] of [['normal', result.normal], ['ao', result.ao]] as const) if (item) {
     const binary = atob(item.rgbaBase64), rgba = Uint8Array.from(binary, c => c.charCodeAt(0));
     if (rgba.length !== size * size * 4) return { ok: false, error: `${name} map has ${rgba.length} RGBA bytes; expected ${size * size * 4}` };
-    const png = rgbaPng(rgba, size); let encoded = ''; for (let i = 0; i < png.length; i += 0x8000) encoded += String.fromCharCode(...png.subarray(i, i + 0x8000));
+    const png = await rgbaPng(rgba, size); let encoded = ''; for (let i = 0; i < png.length; i += 0x8000) encoded += String.fromCharCode(...png.subarray(i, i + 0x8000));
     maps[name] = btoa(encoded);
   }
   return { ok: true, size, covered: Math.max(result.normal?.covered ?? 0, result.ao?.covered ?? 0), maps };
