@@ -59,4 +59,7 @@ pub enum MeasureError {
     /// The input has no interior (too few, collinear or coplanar points).
     #[error("degenerate input: {0}")]
     Degenerate(&'static str),
+    /// A bake setting or its low-poly UVs are not acceptable.
+    #[error("bake: {0}")]
+    Bake(&'static str),
 }

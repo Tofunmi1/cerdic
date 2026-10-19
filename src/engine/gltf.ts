@@ -7,8 +7,7 @@
 // surface recipes are shader-side in the viewer and are not exported. Instanced parts become one node
 // per instance sharing one mesh.
 import type { AnimationTrack, MeshPart, PartMaterial } from './worker-types';
-import { cornerNormals } from './mesh-upload';
-import { boxChartUvs } from './texture/uv';
+import { weld } from './gltf-mesh';
 import { sampleClip, sampleLook, type SampledClip } from './animation';
 import { Baker, encodePng } from './texture/bake';
 import { bakeMaterialMaps } from './texture/apply';
@@ -62,100 +61,6 @@ function materialJson(material: PartMaterial | null | undefined, maps: Partial<R
   return json;
 }
 
-/** Welds triangle corners with identical position and normal into an indexed mesh. */
-function weld(part: MeshPart, creaseDegrees: number, needTangents = false, mikkTangents?: GlbOptions['mikkTangents']) {
-  const normals = cornerNormals(part.positions, part.indices, creaseDegrees);
-  const vertexColors = (part as MeshPart & { vertexColors?: Float32Array }).vertexColors;
-  if (vertexColors && vertexColors.length !== part.positions.length / 3 * 4) throw new Error('vertex colours must contain four floats per vertex');
-  const cornerUvs = part.uvs?.length ? part.uvs : boxChartUvs(part.positions, part.indices);
-  if (cornerUvs.length !== part.indices.length * 2) throw new Error('mesh UVs must contain two floats per triangle corner');
-  if (cornerUvs.some(value => !Number.isFinite(value))) throw new Error('mesh UVs must be finite');
-  const seen = new Map<string, number>();
-  const positions: number[] = [], outNormals: number[] = [], outUvs: number[] = [], outColors: number[] = [], indices: number[] = [], sourceOf: number[] = [];
-  const bits = new Uint32Array(1), view = new Float32Array(bits.buffer);
-  const key = (values: number[]) => values.map(v => { view[0] = v; return bits[0].toString(16); }).join('.');
-  for (let corner = 0; corner < part.indices.length; corner++) {
-    const p = part.indices[corner] * 3;
-    const source = part.indices[corner];
-    const colors = vertexColors?.subarray(source * 4, source * 4 + 4);
-    const values = [part.positions[p], part.positions[p + 1], part.positions[p + 2], normals[corner * 3], normals[corner * 3 + 1], normals[corner * 3 + 2], cornerUvs[corner * 2], cornerUvs[corner * 2 + 1], ...(colors ?? [])];
-    const id = key(values);
-    let index = seen.get(id);
-    if (index === undefined) {
-      index = positions.length / 3;
-      seen.set(id, index);
-      positions.push(values[0], values[1], values[2]);
-      outNormals.push(values[3], values[4], values[5]);
-      outUvs.push(values[6], values[7]);
-      if (colors) outColors.push(...colors);
-      sourceOf.push(source); // the part's own vertex, which skin weights belong to
-    }
-    indices.push(index);
-  }
-  const mesh = { positions: new Float32Array(positions), normals: new Float32Array(outNormals), uvs: new Float32Array(outUvs), ...(vertexColors ? { colors: new Float32Array(outColors) } : {}), indices: new Uint32Array(indices), sources: new Uint32Array(sourceOf) };
-  if (!needTangents) return { ...mesh, tangents: undefined };
-  // glTF's v runs down the image (row 0 is v = 0) but a normal map's +Y is up, and the tangent basis must
-  // have its bitangent along +Y: generate it on (u, 1 - v), as exporters of v-up tools do.
-  const upwardUvs = Float32Array.from(mesh.uvs, (value, i) => (i % 2 === 1 ? 1 - value : value));
-  if (!mikkTangents) return { ...mesh, tangents: tangents(mesh.positions, mesh.normals, upwardUvs, mesh.indices) };
-  const corners = mikkTangents(mesh.positions, mesh.normals, upwardUvs, mesh.indices);
-  if (corners.length !== mesh.indices.length * 4 || corners.some(value => !Number.isFinite(value))) throw new Error('MikkTSpace returned invalid tangent data');
-  const split = new Map<string, number>();
-  const splitPositions: number[] = [], splitNormals: number[] = [], splitUvs: number[] = [], splitColors: number[] = [], outTangents: number[] = [], splitIndices: number[] = [], splitSources: number[] = [];
-  for (let corner = 0; corner < mesh.indices.length; corner++) {
-    const source = mesh.indices[corner], t = Array.from(corners.subarray(corner * 4, corner * 4 + 4));
-    const key = `${source}:${t.join(',')}`;
-    let target = split.get(key);
-    if (target === undefined) {
-      target = splitPositions.length / 3; split.set(key, target);
-      splitPositions.push(...mesh.positions.subarray(source * 3, source * 3 + 3));
-      splitNormals.push(...mesh.normals.subarray(source * 3, source * 3 + 3));
-      splitUvs.push(...mesh.uvs.subarray(source * 2, source * 2 + 2)); outTangents.push(...t);
-      if (mesh.colors) splitColors.push(...mesh.colors.subarray(source * 4, source * 4 + 4));
-      splitSources.push(mesh.sources[source]);
-    }
-    splitIndices.push(target);
-  }
-  return { positions: new Float32Array(splitPositions), normals: new Float32Array(splitNormals), uvs: new Float32Array(splitUvs), ...(mesh.colors ? { colors: new Float32Array(splitColors) } : {}), indices: new Uint32Array(splitIndices), tangents: new Float32Array(outTangents), sources: new Uint32Array(splitSources) };
-}
-
-function tangents(positions: Float32Array, normals: Float32Array, uvs: Float32Array, indices: Uint32Array): Float32Array {
-  const tan = new Float64Array(positions.length), bitan = new Float64Array(positions.length);
-  for (let i = 0; i < indices.length; i += 3) {
-    const ids = [indices[i], indices[i + 1], indices[i + 2]];
-    const p = ids.map(index => index * 3), t = ids.map(index => index * 2);
-    const e1 = [positions[p[1]] - positions[p[0]], positions[p[1] + 1] - positions[p[0] + 1], positions[p[1] + 2] - positions[p[0] + 2]];
-    const e2 = [positions[p[2]] - positions[p[0]], positions[p[2] + 1] - positions[p[0] + 1], positions[p[2] + 2] - positions[p[0] + 2]];
-    const du1 = uvs[t[1]] - uvs[t[0]], dv1 = uvs[t[1] + 1] - uvs[t[0] + 1];
-    const du2 = uvs[t[2]] - uvs[t[0]], dv2 = uvs[t[2] + 1] - uvs[t[0] + 1];
-    const determinant = du1 * dv2 - du2 * dv1;
-    if (Math.abs(determinant) < 1e-12) continue;
-    const reciprocal = 1 / determinant;
-    const s = [(e1[0] * dv2 - e2[0] * dv1) * reciprocal, (e1[1] * dv2 - e2[1] * dv1) * reciprocal, (e1[2] * dv2 - e2[2] * dv1) * reciprocal];
-    const b = [(e2[0] * du1 - e1[0] * du2) * reciprocal, (e2[1] * du1 - e1[1] * du2) * reciprocal, (e2[2] * du1 - e1[2] * du2) * reciprocal];
-    for (const id of ids) for (let axis = 0; axis < 3; axis++) { tan[id * 3 + axis] += s[axis]; bitan[id * 3 + axis] += b[axis]; }
-  }
-  const out = new Float32Array((positions.length / 3) * 4);
-  for (let i = 0; i < positions.length / 3; i++) {
-    const at = i * 3, outAt = i * 4;
-    const n = [normals[at], normals[at + 1], normals[at + 2]];
-    let x = tan[at], y = tan[at + 1], z = tan[at + 2];
-    const projection = x * n[0] + y * n[1] + z * n[2];
-    x -= projection * n[0]; y -= projection * n[1]; z -= projection * n[2];
-    let length = Math.hypot(x, y, z);
-    if (length < 1e-12) {
-      const axis = Math.abs(n[0]) < 0.8 ? [1, 0, 0] : [0, 1, 0];
-      [x, y, z] = [n[1] * axis[2] - n[2] * axis[1], n[2] * axis[0] - n[0] * axis[2], n[0] * axis[1] - n[1] * axis[0]];
-      length = Math.hypot(x, y, z) || 1;
-    }
-    x /= length; y /= length; z /= length;
-    const cross = [n[1] * z - n[2] * y, n[2] * x - n[0] * z, n[0] * y - n[1] * x];
-    const handed = cross[0] * bitan[at] + cross[1] * bitan[at + 1] + cross[2] * bitan[at + 2] < 0 ? -1 : 1;
-    out.set([x, y, z, handed], outAt);
-  }
-  return out;
-}
-
 const pad4 = (n: number) => (n + 3) & ~3;
 
 /** Builds a binary glTF 2.0 file for the parts. Parts with no triangles are skipped. */
@@ -179,6 +84,35 @@ export function buildGlb(parts: MeshPart[], options: GlbOptions = {}): Uint8Arra
   const isJoint = (p: MeshPart) => Boolean(p.bone) && !p.skin && !p.transforms?.length && jointNames.has(p.name || p.node);
   // Parts that get a node: a skin may only name bones that exist in the file.
   const drawn = new Set(parts.filter(p => isJoint(p) || (p.indices.length >= 3 && p.positions.length >= 9 && !p.transforms?.length)).map(p => p.name || p.node));
+  const lodPattern = /^(.*)_lod([0-7])$/i;
+  const lodParts = new Map<number, { base: string; level: number; count: number }>();
+  const lodGroups = new Map<string, { index: number; level: number; node: number; skinned: boolean; bones: string[] }[]>();
+  for (const [index, part] of parts.entries()) {
+    if (part.transforms?.length || part.indices.length < 3 || part.positions.length < 9) continue;
+    const match = lodPattern.exec(part.name || part.node);
+    if (!match) continue;
+    const base = match[1], level = Number(match[2]);
+    const entries = lodGroups.get(base) ?? [];
+    entries.push({ index, level, node: -1, skinned: Boolean(part.skin), bones: part.skin?.bones ?? [] });
+    lodGroups.set(base, entries);
+  }
+  for (const [base, entries] of lodGroups) {
+    const count = entries.length;
+    for (const entry of entries) lodParts.set(entry.index, { base, level: entry.level, count });
+  }
+  const lodOrder = new Map<number, number[]>();
+  for (const entries of lodGroups.values()) {
+    const ordered = [...entries].sort((a, b) => a.level - b.level || a.index - b.index).map(entry => entry.index);
+    for (const entry of entries) lodOrder.set(entry.index, ordered);
+  }
+  const orderedIndices: number[] = [], emitted = new Set<number>();
+  for (let index = 0; index < parts.length; index++) {
+    const group = lodOrder.get(index);
+    if (group) {
+      for (const member of group) if (!emitted.has(member)) { orderedIndices.push(member); emitted.add(member); }
+    } else orderedIndices.push(index);
+  }
+  const lodWarnings: string[] = [];
   const push = (bytes: Uint8Array, target?: number) => {
     const offset = length;
     chunks.push(bytes);
@@ -197,7 +131,8 @@ export function buildGlb(parts: MeshPart[], options: GlbOptions = {}): Uint8Arra
     textures.push({ sampler: 0, source: image });
     return { index };
   };
-  for (const [partIndex, part] of parts.entries()) {
+  for (const partIndex of orderedIndices) {
+    const part = parts[partIndex];
     if (isJoint(part)) {
       nodes.push({ name: part.name || part.node });
       placed.push({ part, node: nodes.length - 1 });
@@ -316,7 +251,11 @@ export function buildGlb(parts: MeshPart[], options: GlbOptions = {}): Uint8Arra
         }
       }
     } else {
-      nodes.push({ name: part.name || part.node, mesh: meshIndex });
+      const lod = lodParts.get(partIndex);
+      const node: Json = { name: lod ? `${lod.base}_LOD${lod.level}` : part.name || part.node, mesh: meshIndex };
+      if (lod) node.extras = { lod: { base: lod.base, level: lod.level, levels: lod.count, triangles: mesh.indices.length / 3 } };
+      nodes.push(node);
+      if (lod) lodGroups.get(lod.base)?.find(entry => entry.index === partIndex) && (lodGroups.get(lod.base)!.find(entry => entry.index === partIndex)!.node = nodes.length - 1);
       placed.push({ part, node: nodes.length - 1 });
       if (skinned && part.skin) skinnedNodes.push({ node: nodes.length - 1, bones: part.skin.bones });
       if (part.animation?.some(track => track.property === 'visible')) {
@@ -331,6 +270,21 @@ export function buildGlb(parts: MeshPart[], options: GlbOptions = {}): Uint8Arra
       const motion = part.animation?.filter(track => !['glow', 'visible', 'color'].includes(track.property)) ?? [];
       for (const name of clipsIn(motion)) animated.push({ node: nodes.length - 1, clip: sampleClip(inClip(motion, name)), name });
     }
+  }
+  const lodRoots: number[] = [];
+  for (const [base, entries] of lodGroups) {
+    const levels = entries.map(entry => entry.level);
+    if (new Set(levels).size !== levels.length) lodWarnings.push(`LOD group ${base} has duplicate levels`);
+    const unique = [...new Set(levels)].sort((a, b) => a - b);
+    if (unique.some((level, i) => i > 0 && level !== unique[i - 1] + 1)) lodWarnings.push(`LOD group ${base} is missing one or more levels`);
+    const root = entries.find(entry => entry.level === 0);
+    if (!root) continue;
+    lodRoots.push(root.node);
+    const sameSkin = entries.every(entry => entry.skinned === root.skinned && (!entry.skinned || JSON.stringify(entry.bones) === JSON.stringify(root.bones)));
+    const lod = (nodes[root.node].extras as Json).lod as Json;
+    lod.screenCoverage = unique.map(level => 0.5 ** level); // Hint for engines that choose a level by projected screen coverage.
+    if (sameSkin) nodes[root.node].extensions = { ...((nodes[root.node].extensions as Json | undefined) ?? {}), MSFT_lod: { ids: entries.filter(entry => entry.level !== 0).map(entry => entry.node) } };
+    else lodWarnings.push(`LOD group ${base} has incompatible skinning`);
   }
   // A part that follows another becomes its child node: the child's own channels act first and the parent's
   // carry it along, which is how the viewer composes them. Only parentless nodes are scene roots.
@@ -428,12 +382,14 @@ export function buildGlb(parts: MeshPart[], options: GlbOptions = {}): Uint8Arra
     nodes, meshes, materials, accessors, bufferViews,
     buffers: [{ byteLength: length }],
   };
+  if (lodWarnings.length) (json.asset as Json).extras = { warnings: lodWarnings };
   if (animations.length) json.animations = animations;
   if (skins.length) json.skins = skins;
   const used: string[] = [];
   if (lookAnimated.length > 0 || visibilityAnimated.length > 0) used.push('KHR_animation_pointer');
   if (lookAnimated.some(entry => entry.glow) || materials.some(material => Boolean((material.extensions as Json | undefined)?.KHR_materials_emissive_strength))) used.push('KHR_materials_emissive_strength');
   if (visibilityAnimated.length > 0) used.push('KHR_node_visibility');
+  if (lodRoots.some(node => Boolean((nodes[node].extensions as Json | undefined)?.MSFT_lod))) used.push('MSFT_lod');
   if (used.length) json.extensionsUsed = used;
   if (images.length) {
     json.images = images;
