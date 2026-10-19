@@ -2,6 +2,8 @@
 use serde::{Deserialize, Serialize};
 use ve_graph::NodeId;
 
+pub use crate::scene_settings::{LightProbes, Wind};
+
 const PREVIEW_FIELD_EDGE_SCALE: f64 = 2.0;
 
 /// Maximum number of explicit and emissive-derived light outputs in one evaluated scene.
@@ -26,13 +28,27 @@ impl Quality {
         }
     }
 
+    /// Triangles a result may store: each part's mesh counted once, however many placements share it.
     pub(crate) fn triangles(self) -> usize {
         match self {
             Self::Preview => 200_000,
             Self::Final => 2_000_000,
         }
     }
+
+    /// Triangles a result may draw at full detail, every placement of a shared mesh counted. A sanity bound on what an
+    /// edit can ask the viewer for (the viewer's own culling and detail levels decide what it really draws): stored geometry
+    /// is limited by [`Quality::triangles`], and a scene heavier than [`DRAWN_TRIANGLES_WARNING`] gets a warning.
+    pub(crate) fn drawn_triangles(self) -> usize {
+        match self {
+            Self::Preview => 20_000_000,
+            Self::Final => 200_000_000,
+        }
+    }
 }
+
+/// Past this many triangles drawn at full detail, an evaluation warns that the scene is heavy (`budget.drawn_heavy`).
+pub(crate) const DRAWN_TRIANGLES_WARNING: usize = 4_000_000;
 
 /// A bounded procedural shader recipe; no image assets or UVs are required.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -215,38 +231,6 @@ pub struct SceneEnvironment {
     /// The wind that bends foliage (see `solid.foliage`).
     #[serde(default)]
     pub wind: Wind,
-}
-
-/// The scene's wind: where it blows and how hard.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Wind {
-    /// Direction it blows toward on the ground plane, in degrees around the vertical axis: 0 is +x, 90 is +z.
-    pub direction: f32,
-    /// 0 is still air, 1 a strong breeze, 2 a gale.
-    pub strength: f32,
-}
-
-impl Default for Wind {
-    /// A gentle breeze toward +x.
-    fn default() -> Self {
-        Self {
-            direction: 0.0,
-            strength: 0.5,
-        }
-    }
-}
-
-/// Settings of the traced light probes (`gi` on a `scene.environment` or `scene.sky`).
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct LightProbes {
-    /// Distance between probes in metres; 0 sizes it from the scene.
-    pub spacing: f32,
-    /// How many times light bounces between surfaces (1 to 4).
-    pub bounces: u32,
-    /// Rays traced per probe, per bounce (32 to 512): more is smoother and slower.
-    pub rays: u32,
 }
 
 /// Analytic procedural sky authored by `scene.sky`.

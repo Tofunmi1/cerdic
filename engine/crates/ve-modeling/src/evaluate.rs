@@ -249,7 +249,7 @@ fn finish(job: &Job, ao_cache: &mut crate::ao::Cache) -> Result<Evaluation, Fail
     let mut environment: Option<SceneEnvironment> = None;
     let mut authored_environment = false;
     let mut authored_sky = false;
-    let mut triangles = 0_usize;
+    let mut triangles = budget::Triangles::default();
     for output in &job.plan.outputs {
         let (_, value) = job
             .values
@@ -303,18 +303,7 @@ fn finish(job: &Job, ao_cache: &mut crate::ao::Cache) -> Result<Evaluation, Fail
             continue;
         }
         let generated = crate::instances::parts(output, value)?;
-        let drawn = generated
-            .iter()
-            .map(|part| (part.indices.len() / 3) * part.transforms.as_ref().map_or(1, Vec::len))
-            .sum::<usize>();
-        triangles = triangles.saturating_add(drawn);
-        if triangles > job.quality.triangles() {
-            return Err(budget::exceeded(
-                "budget.triangles",
-                job.quality.triangles(),
-                triangles,
-            ));
-        }
+        triangles.add(&output.from.node, &generated, job.quality)?;
         parts.extend(generated);
     }
     crate::ao::bake(&mut parts, job.quality, ao_cache)?;
@@ -322,6 +311,7 @@ fn finish(job: &Job, ao_cache: &mut crate::ao::Cache) -> Result<Evaluation, Fail
     hierarchy_warnings.extend(crate::rig::weigh(&mut parts));
     hierarchy_warnings.extend(crate::rig::resolve_ik(&mut parts));
     hierarchy_warnings.extend(crate::physics::check(&mut parts));
+    hierarchy_warnings.extend(triangles.heavy_warning());
     lights.extend(crate::emitters::from_parts(&parts));
     if lights.len() > crate::MAX_SCENE_LIGHTS {
         return Err(budget::exceeded(
