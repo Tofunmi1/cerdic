@@ -97,6 +97,22 @@ impl PolyMesh {
         self.triangulation = mode;
     }
 
+    /// The same faces with every position moved by `map` (a move, turn or stretch, say). Attributes and the triangulation policy
+    /// carry over unchanged, so a vertex attribute that holds directions (normals) is not turned with the positions.
+    ///
+    /// # Errors
+    /// [`GeometryError::InvalidMesh`] when `map` makes a position not finite.
+    pub fn transformed(&self, map: impl Fn([f32; 3]) -> [f32; 3]) -> Result<Self, GeometryError> {
+        let mut moved = Self::new(
+            self.positions.iter().map(|p| map(*p)).collect(),
+            self.face_sizes.clone(),
+            self.corners.clone(),
+        )?;
+        moved.attributes.clone_from(&self.attributes);
+        moved.triangulation = self.triangulation;
+        Ok(moved)
+    }
+
     /// Number of faces.
     #[must_use]
     pub fn face_count(&self) -> usize {
@@ -243,5 +259,43 @@ mod tests {
             m.set_attribute("", weights(8)),
             Err(GeometryError::BadAttributeName(_))
         ));
+    }
+
+    #[test]
+    #[expect(
+        clippy::float_cmp,
+        reason = "the positions are small whole numbers, exact in f32"
+    )]
+    fn transforming_moves_positions_and_keeps_faces_attributes_and_policy() {
+        let mut m = cube();
+        m.set_attribute(
+            "weight",
+            Attribute {
+                domain: Domain::Point,
+                data: AttrData::F32((0..8_u8).map(f32::from).collect()),
+            },
+        )
+        .unwrap();
+        m.set_triangulation_mode(crate::TriangulationMode::CurvedQuads);
+        let moved = m
+            .transformed(|[x, y, z]| [x * 2.0 + 10.0, y, z - 1.0])
+            .unwrap();
+        assert_eq!(
+            moved.positions()[6],
+            [12.0, 1.0, 0.0],
+            "(1, 1, 1) is stretched and moved"
+        );
+        assert_eq!(moved.face_sizes(), m.face_sizes());
+        assert_eq!(moved.corners(), m.corners());
+        assert_eq!(moved.attributes(), m.attributes());
+        assert_eq!(moved.triangulation_mode(), m.triangulation_mode());
+        // The original is untouched.
+        assert_eq!(m.positions()[6], [1.0, 1.0, 1.0]);
+    }
+
+    #[test]
+    fn a_transform_that_makes_a_position_infinite_is_refused() {
+        let error = cube().transformed(|[x, y, z]| [x / 0.0, y, z]).unwrap_err();
+        assert!(matches!(error, GeometryError::InvalidMesh(_)), "{error:?}");
     }
 }

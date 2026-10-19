@@ -1,7 +1,8 @@
 //! Shared instances; unioning patterns remain separate operators.
 use super::{EXTENT, single, spec};
 use crate::{OperatorSpec, OutputSpec, ParamSpec, ParamType, PortType, Unit, Value};
-const INPUT: &[PortType] = &[PortType::Solid, PortType::Inst];
+/// What can be placed: solids, other sets, and polygon meshes (open ones, like leaf cards, are placed without ever being unioned).
+const INPUT: &[PortType] = &[PortType::Solid, PortType::Inst, PortType::Poly];
 fn count(name: &'static str, default: Option<i64>) -> ParamSpec {
     ParamSpec {
         name,
