@@ -9,6 +9,7 @@
 // Subgraphs, generic nodes, buffers and switches are expanded first (`flatten.ts`). Inputs flagged `function`
 // become GLSL functions. Not supported (a clear error): attributes such as `.texture`, buffers that need a
 // render pass, iteration, polygons, splines, pixel and lattice parameters.
+import { expandExpressions } from './expr/node';
 import { flatten, type FlatNode, type FlatRef } from './flatten';
 import type { InputDef, Library, TexGraph } from './types';
 
@@ -426,8 +427,10 @@ class Compiler {
  * (0 to 1) and writes the output node's colour.
  */
 export function compileTexture(library: Library, graph: TexGraph, functions: string): Compiled {
-  const flat = flatten(library, graph);
-  return new Compiler(library, flat.nodes).assemble(functions, flat.root);
+  // `expr` nodes (shader expressions) become ordinary nodes of an extended library, with their helper functions added once.
+  const expressions = expandExpressions(library, graph);
+  const flat = flatten(expressions.library, expressions.graph);
+  return new Compiler(expressions.library, flat.nodes).assemble(expressions.helpers ? `${functions}\n${expressions.helpers}\n` : functions, flat.root);
 }
 
 /** The helper code from a `shader_functions.tres` file. */
