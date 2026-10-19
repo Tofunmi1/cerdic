@@ -35,6 +35,7 @@ mod reaction;
 mod regions;
 mod result;
 pub mod rig;
+mod scene_settings;
 mod shapes;
 mod style;
 mod terrain;

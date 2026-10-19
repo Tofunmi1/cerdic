@@ -69,15 +69,29 @@ fn g4c_01_group_prototype_and_radial_set_share_evaluation() {
 
 #[test]
 fn g4c_draw_work_budget_counts_placements_before_geometry() {
+    // What the placements would draw is bounded in preflight, before any node runs: a 32,000-triangle sphere ten thousand
+    // times is over the preview drawn limit.
     let doc = document(
-        "b = solid.sphere(radius=1, segments=24)\ns = inst.repeat(b, count=10000, step=[2,0,0])\noutput s",
+        "b = solid.sphere(radius=1, segments=256)\ns = inst.repeat(b, count=10000, step=[2,0,0])\noutput s",
     );
     let mut evaluator = Evaluator::default();
     assert_eq!(
         evaluator.begin(&doc, Quality::Preview).unwrap_err().code,
-        "budget.triangles"
+        "budget.drawn_triangles"
     );
     assert_eq!(evaluator.evaluated_nodes(), 0);
+}
+
+#[test]
+fn g4c_placed_copies_count_once_against_the_stored_budget() {
+    // A light shape placed many times is fine: its mesh is stored once (see ADR 0053), whatever the copies add up to.
+    let doc = document(
+        "b = solid.sphere(radius=1, segments=24)\ns = inst.repeat(b, count=10000, step=[2,0,0])\noutput s",
+    );
+    let result = Evaluator::default()
+        .evaluate(&doc, Quality::Preview)
+        .unwrap();
+    assert_eq!(result.parts[0].transforms.as_ref().unwrap().len(), 10000);
 }
 
 #[test]

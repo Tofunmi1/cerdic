@@ -179,7 +179,9 @@ fn validate_outputs(
     placements: &BTreeMap<NodeId, usize>,
     quality: Quality,
 ) -> Result<(), Fail> {
+    // Stored triangles count a placed shape once; drawn ones count every placement (see `budget::Triangles`).
     let mut total = 0_usize;
+    let mut total_drawn = 0_usize;
     let mut instances = 0_usize;
     let mut lights = 0_usize;
     for output in outputs {
@@ -220,15 +222,16 @@ fn validate_outputs(
             .copied()
             .unwrap_or(0)
             .max(1);
-        let drawn = sizes
-            .get(&output.from.node)
-            .copied()
-            .unwrap_or(0)
+        let stored = sizes.get(&output.from.node).copied().unwrap_or(0);
+        let drawn = stored
             .checked_mul(count)
-            .ok_or_else(|| fail("budget.triangles", "draw triangle product overflow"))?;
+            .ok_or_else(|| fail("budget.drawn_triangles", "draw triangle product overflow"))?;
         total = total
-            .checked_add(drawn)
+            .checked_add(stored)
             .ok_or_else(|| fail("budget.triangles", "result triangle sum overflow"))?;
+        total_drawn = total_drawn
+            .checked_add(drawn)
+            .ok_or_else(|| fail("budget.drawn_triangles", "result triangle sum overflow"))?;
         instances = instances
             .checked_add(*placements.get(&output.from.node).unwrap_or(&0))
             .ok_or_else(|| fail("budget.instances", "result placement sum overflow"))?;
@@ -245,6 +248,13 @@ fn validate_outputs(
             "budget.triangles",
             quality.triangles(),
             total,
+        ));
+    }
+    if total_drawn > quality.drawn_triangles() {
+        return Err(budget::exceeded(
+            "budget.drawn_triangles",
+            quality.drawn_triangles(),
+            total_drawn,
         ));
     }
     Ok(())

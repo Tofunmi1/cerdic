@@ -38,7 +38,8 @@ diagnostic naming the limit and the observed value; the document stays unchanged
 | Refine factor | 16, and the predicted triangle count must pass the geometry limit |
 | Field grid samples | 2,000,000; additionally limited to 2,097,152 padded Manifold voxel slots; checked during graph preflight |
 | Field tape instructions / sample-instruction work | 4,096 / 64,000,000 |
-| Triangles per result | 2,000,000 final, 200,000 preview |
+| Triangles per result (stored) | 2,000,000 final, 200,000 preview. A shape placed many times (`inst.*` sets) is stored once and counts once |
+| Triangles per result (drawn at full detail) | 200,000,000 final, 20,000,000 preview: every placement counted, a sanity bound (`budget.drawn_triangles`, refused in preflight before any node runs). Above 4,000,000 an evaluation succeeds with the warning `budget.drawn_heavy` on the heaviest output |
 | Subdivision output vertices / faces / corners | 2,000,000 / 2,000,000 / 8,000,000 (kernel cap; performance-based retuning pending) |
 | Subdivision levels | 1–4; graph preflight bounds output at 6 × input triangles × 4^(levels−1), using at most three input corners per triangle |
 | Subdivision attributes | Face attributes copy by parent face; integer point attributes are omitted with a typed evaluation warning; float point, corner UV/FVar and edge attributes refuse with typed diagnostics. Float point primvars need an interleaved channel ABI and channel-aware growth/memory preflight; UV FVar additionally needs per-corner value indices and output corner remapping. F64 point/UV values are refused rather than rounded through the kernel's f32 API |
