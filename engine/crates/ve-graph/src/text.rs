@@ -11,6 +11,7 @@
 
 mod build;
 mod coerce;
+mod expr;
 mod group;
 mod instance;
 mod lex;

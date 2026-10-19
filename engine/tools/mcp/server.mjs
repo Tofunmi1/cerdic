@@ -68,7 +68,10 @@ const GUIDE = `The document is a graph of operators, written one node per line:
 Inputs are earlier node names, positional in port order (or port=name). Parameters are key=value.
 Lengths are metres (suffixes mm and cm work); angles are degrees unless you write rad (for example
 angle=90deg or 1.57rad). Numbers, "text", true/false and [lists] are the only values. Lines starting
-with # are comments. Only operators from list_operators can be used. Y is up. Profiles live in the XY
+with # are comments. Constants and arithmetic: "let w = 1.5" defines one, and {w * 2} (or {w / 2 + 0.1}) in
+any value is replaced by its number; units go after the brace ({w * 1000}mm). Functions: min, max, abs,
+sqrt, floor, ceil, round, clamp, sin, cos, radians; constants pi and tau. Only operators from
+list_operators can be used. Y is up. Profiles live in the XY
 plane: solid.revolve spins one (x >= 0) about Y, solid.extrude stands one up from y=0.
 
 Example (a vase, with a 3 mm minimum wall that the engine enforces):

@@ -10,6 +10,7 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
     vec![
         spin_spec(),
         bisect_spec(),
+        mirror_spec(),
         spec(
             "poly.pack_uv@1",
             "Packs existing corner UV islands into the 0..1 square; UV discontinuities define island boundaries.",
@@ -77,6 +78,41 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
             ],
         ),
     ]
+}
+
+fn mirror_spec() -> Option<OperatorSpec> {
+    spec(
+        "poly.mirror@1",
+        "Adds the mesh reflected across a plane and welds vertices near the plane.",
+        vec![single("in", POLY)],
+        OutputSpec::Fixed(PortType::Poly),
+        vec![
+            default_vec3(
+                "point",
+                Unit::Length,
+                [0.0, 0.0, 0.0],
+                "Point on the plane in metres.",
+            ),
+            default_vec3(
+                "normal",
+                Unit::None,
+                [1.0, 0.0, 0.0],
+                "Plane normal; must be non-zero.",
+            ),
+            flag(
+                "merge",
+                true,
+                "Weld original and reflected vertices within distance.",
+            ),
+            number(
+                "distance",
+                Unit::Length,
+                (0.0, 1.0e3),
+                Some(0.0001),
+                "Maximum merge distance in metres.",
+            ),
+        ],
+    )
 }
 
 fn spin_spec() -> Option<OperatorSpec> {

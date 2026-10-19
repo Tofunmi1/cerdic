@@ -157,6 +157,17 @@ pub enum MeshOp {
         /// Maximum distance between vertices to merge.
         distance: f64,
     },
+    /// Adds a reflected copy of the entire mesh across a plane.
+    Mirror {
+        /// Point on the reflection plane.
+        point: [f64; 3],
+        /// Plane normal.
+        normal: [f64; 3],
+        /// Weld vertices within `distance` of the plane.
+        merge: bool,
+        /// Maximum merge distance.
+        distance: f64,
+    },
 }
 
 impl MeshOp {
@@ -258,6 +269,7 @@ impl MeshOp {
             Self::RemoveDoubles { distance } => (11, [distance, 0.0, 0.0, 0.0], 0),
             Self::Bisect { .. } => (12, [0.0; 4], 0),
             Self::Spin { .. } => (13, [0.0; 4], 0),
+            Self::Mirror { .. } => (14, [0.0; 4], 0),
         }
     }
 }
@@ -314,6 +326,17 @@ pub fn edit_mesh(
             12,
             i32::from(clear_inner) | (i32::from(clear_outer) << 1) | (i32::from(fill) << 2),
         )
+    } else if let MeshOp::Mirror {
+        point,
+        normal,
+        distance,
+        merge,
+    } = *op
+    {
+        wide[..3].copy_from_slice(&point);
+        wide[3..6].copy_from_slice(&normal);
+        wide[6] = distance;
+        (14, i32::from(merge))
     } else {
         (code, flags)
     };

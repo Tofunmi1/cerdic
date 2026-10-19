@@ -38,7 +38,49 @@ own module hooked the same way), `crates/ve-modeling/src/plan/estimate.rs` (add 
 `cargo xtask rules`.
 
 ## Status (DeepSeek: fill in with real numbers for each of the nine tests, then stop)
-- State: not started
+- State: complete. `solid.hull@1` and `solid.collision_boxes@1` are specified, registered, estimated, dispatched
+  and tested; 9/9 tests pass. Nothing was committed by me. (Commit `861043e`, made by another party, happens to
+  contain this work along with `poly.spin`; one rustfmt-only edit to `src/hulls.rs` was made after it and is
+  uncommitted.)
 - Per test: pass/fail and the measured value:
+  1. PASS `one_hull_of_a_box_is_that_box`: hull volume `6.0` (within `1e-6`); bounds equal the input box on all axes.
+  2. PASS `two_hull_of_an_l_is_between_the_l_and_its_box`: L `3.0`, hull `3.5`, bounding box `4.0`
+     (`3.0 < 3.5 <= 4.0`).
+  3. PASS `three_hull_of_a_sphere_keeps_its_volume`: sphere `0.5119025125985383`, hull `0.5119024938664052`
+     (relative error ≈ `3.65e-8`, well under 0.5%). Evaluated with `max_vertices=2000` because a Manifold sphere
+     at `segments=32` has 258 points, above the default 256; this does not weaken the volume assertion.
+  4. PASS `four_hull_of_a_hull_is_idempotent`: hull `6.0`, hull of hull `6.0` (difference `0`, under `1e-9`).
+  5. PASS `five_box_shape_of_a_turned_box_is_axis_aligned_and_larger`: bounding volume
+     `14.660253808141306`, box shape volume `14.660253808141306`; 36 indices (12 triangles); both above `6.0`.
+  6. PASS `six_oriented_box_shape_recovers_the_turned_box`: oriented box volume `6.000000708005757`
+     (relative error ≈ `1.2e-7`, under 1%).
+  7. PASS `seven_best_shape_of_a_thin_cylinder_is_within_half_again`: capsule chosen; ratio
+     `0.9503586570786882` (≤ 1.5); warning contains `capsule` and `volume ratio`.
+  8. PASS `eight_a_solid_with_more_points_than_max_vertices_is_refused`: sphere(64) refuses with
+     `solid.hull_too_many_points`, suggestion
+     "raise max_vertices (up to 2000) or decimate the mesh (poly.decimate) before hulling it"; a box with
+     `max_vertices=4` is refused the same way.
+  9. PASS `nine_two_hulls_have_bit_identical_positions`: 66 hull vertices, bitwise identical between two
+     evaluations.
 - Commands run and results:
+  - `cargo test -p ve-modeling --test g11_hulls -- --nocapture`: 9 passed, 0 failed.
+  - `cargo test -p ve-modeling -p ve-graph -p ve-measure --no-fail-fast`: all suites pass; no `FAILED` lines.
+  - `cargo clippy -p ve-modeling -p ve-graph --tests`: no diagnostic points at `src/hulls.rs`,
+    `tests/g11_hulls.rs` or `builtin/hulls.rs`. Other warnings are pre-existing; the `operations.rs`
+    "too many lines (85/80)" one predates the 3-line dispatch hook (the function was already 82 lines).
+  - `cargo xtask rules`: pass.
+  - `cargo xtask quick ve-modeling ve-graph`: not green, for reasons outside this change. Its workspace
+    `cargo fmt --all --check` stage stops on pre-existing unformatted files
+    `crates/ve-measure/tests/{query,symmetry,uv}.rs`; its `clippy -- -D warnings` stage stops on pre-existing
+    warnings in `ve-graph` and `ve-kernel`. My three new/edited files pass
+    `rustfmt --edition 2024 --config-path rustfmt.toml --check`. The strict gate is still pending.
 - Open questions or things you chose not to do:
+  - `max_vertices` is enforced as an input-point bound (`input.mesh.positions.len()`), matching test 8's
+    "more points than max_vertices allows"; `ve-measure`'s own point budget remains the hard cap.
+  - `solid.collision_boxes` builds the box/oriented-box shape as the hull of its 8 corners and the capsule by
+    revolving a quarter-circle profile, then reports the fit as a warning (`solid.collision_boxes.fit`,
+    "… volume ratio {:.1}").
+  - No changes to `ve-measure`; no bug was found there.
+  - Did not run `cargo fmt`/`cargo fmt --all` (per this handoff), and did not fix pre-existing warnings or
+    formatting in files owned by other work.
+  - Did not commit.

@@ -112,6 +112,7 @@ pub(super) const READY: &[&str] = &[
     "poly.pack_uv@1",
     "poly.bisect@1",
     "poly.spin@1",
+    "poly.mirror@1",
     "poly.lod@1",
     "poly.unsubdivide@1",
     "field.sphere@1",
