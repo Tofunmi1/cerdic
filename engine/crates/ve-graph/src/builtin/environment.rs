@@ -191,8 +191,35 @@ fn probe_params() -> Vec<ParamSpec> {
     ]
 }
 
+/// The wind that bends foliage (`solid.foliage` with sway or flutter).
+fn wind_params() -> Vec<ParamSpec> {
+    vec![
+        ParamSpec {
+            name: "wind_direction",
+            ty: ParamType::Num {
+                unit: Unit::None,
+                min: -360.0,
+                max: 360.0,
+            },
+            default: Some(Value::Num(0.0)),
+            doc: "Direction the wind blows toward, in degrees around the vertical axis: 0 is +x, 90 is +z.",
+        },
+        ParamSpec {
+            name: "wind_strength",
+            ty: ParamType::Num {
+                unit: Unit::None,
+                min: 0.0,
+                max: 2.0,
+            },
+            default: Some(Value::Num(0.5)),
+            doc: "How hard the wind blows: 0 is still air, 0.5 a gentle breeze, 1 a strong breeze, 2 a gale. It moves only foliage with sway or flutter (solid.foliage); the viewer shows it, an exported glTF does not.",
+        },
+    ]
+}
+
 fn with_probe_params(mut spec: OperatorSpec) -> OperatorSpec {
     spec.params.extend(probe_params());
+    spec.params.extend(wind_params());
     spec
 }
 

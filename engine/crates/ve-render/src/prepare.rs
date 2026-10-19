@@ -166,6 +166,8 @@ pub(crate) struct ViewUniform {
     pub(crate) ground: Vec4,
     pub(crate) sun: Vec4,
     pub(crate) cloud: Vec4,
+    /// x, y: unit wind direction on the ground plane (x, z), z: strength, w: seconds on the animation clock (see `wind.rs`).
+    pub(crate) wind: Vec4,
 }
 
 /// One drawing of the scene from a viewpoint: where its uniform lives in the shared dynamic buffer
@@ -197,6 +199,7 @@ pub(crate) fn prepare_view_uniforms(
     sky: Res<crate::SkyBackground>,
     delta: Res<crate::exposure::FrameDelta>,
     exposure: Res<crate::exposure::ExposureState>,
+    wind: Res<crate::WindField>,
     pipelines: Res<ForwardPipelines>,
     pipeline_cache: Res<PipelineCache>,
     device: Res<RenderDevice>,
@@ -214,6 +217,7 @@ pub(crate) fn prepare_view_uniforms(
                     uniform.set_quality(&quality);
                     uniform.set_auto_exposure(&quality, delta.0);
                     uniform.set_sky(&sky, eye.viewport);
+                    uniform.set_wind(&wind);
                     ViewSlot {
                         offset: uniforms.buffer.push(&uniform),
                         viewport: Some(eye.viewport),
@@ -230,6 +234,7 @@ pub(crate) fn prepare_view_uniforms(
             uniform.set_quality(&quality);
             uniform.set_auto_exposure(&quality, delta.0);
             uniform.set_sky(&sky, view.viewport.to_array());
+            uniform.set_wind(&wind);
             vec![ViewSlot {
                 offset: uniforms.buffer.push(&uniform),
                 viewport: None,

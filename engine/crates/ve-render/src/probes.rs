@@ -12,8 +12,8 @@ use bevy_render::RenderApp;
 use bevy_render::extract_resource::ExtractResource;
 use bevy_render::render_resource::{
     AddressMode, Extent3d, FilterMode, Origin3d, Sampler, SamplerDescriptor, TexelCopyBufferLayout,
-    TexelCopyTextureInfo, Texture, TextureAspect, TextureDescriptor, TextureDimension,
-    TextureFormat, TextureUsages, TextureView, TextureViewDescriptor,
+    TexelCopyTextureInfo, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat,
+    TextureUsages, TextureView, TextureViewDescriptor,
 };
 use bevy_render::renderer::{RenderDevice, RenderQueue};
 
@@ -62,39 +62,39 @@ impl ProbeVolume {
 #[must_use]
 pub(crate) fn f32_to_f16(value: f32) -> u16 {
     let bits = value.to_bits();
-    let sign = ((bits >> 16) & 0x8000) as u16;
-    let exponent = ((bits >> 23) & 0xff) as i32;
+    let sign = u16::try_from((bits >> 16) & 0x8000).unwrap_or(0);
+    // The single's biased exponent (127 is 1.0) and mantissa.
+    let exponent = (bits >> 23) & 0xff;
     let mantissa = bits & 0x007f_ffff;
     if exponent == 0xff {
         // Infinity, or a NaN (kept a NaN by setting a mantissa bit).
         return sign | 0x7c00 | if mantissa != 0 { 0x0200 } else { 0 };
     }
-    let unbiased = exponent - 127;
-    if unbiased > 15 {
+    // A half's exponent bias is 15, so its biased exponent is the single's minus 112; the half's range is 113 to 142 here.
+    if exponent > 142 {
         return sign | 0x7c00;
     }
-    if unbiased >= -14 {
+    if exponent >= 113 {
         // A normal half: 10 mantissa bits, round to nearest even on the 13 dropped ones.
-        let half_exponent = ((unbiased + 15) as u32) << 10;
-        let mut half = half_exponent | (mantissa >> 13);
+        let mut half = ((exponent - 112) << 10) | (mantissa >> 13);
         let dropped = mantissa & 0x1fff;
         if dropped > 0x1000 || (dropped == 0x1000 && half & 1 == 1) {
             half += 1;
         }
         // A carry out of the mantissa bumps the exponent, which is right (and reaches infinity at the top).
-        return sign | half as u16;
+        return sign | u16::try_from(half).unwrap_or(0x7c00);
     }
-    if unbiased >= -25 {
-        // A denormal half: the implicit leading bit becomes explicit and the value is shifted right.
+    if exponent >= 102 {
+        // A denormal half: the implicit leading bit becomes explicit and the value is shifted right (by 14 to 24).
         let full = mantissa | 0x0080_0000;
-        let shift = (-unbiased - 1) as u32;
+        let shift = 126 - exponent;
         let mut half = full >> shift;
         let dropped = full & ((1 << shift) - 1);
         let halfway = 1 << (shift - 1);
         if dropped > halfway || (dropped == halfway && half & 1 == 1) {
             half += 1;
         }
-        return sign | half as u16;
+        return sign | u16::try_from(half).unwrap_or(0);
     }
     sign
 }
@@ -118,8 +118,7 @@ pub(crate) fn texture_bytes(volume: &ProbeVolume) -> [Vec<u8>; 4] {
 /// The probe textures in use, their sampler, and what the shader needs to find a position in them.
 #[derive(Resource, Default)]
 pub(crate) struct ProbeGpu {
-    // Held so the textures outlive their views.
-    _textures: Vec<Texture>,
+    // The views keep their textures alive.
     views: Vec<TextureView>,
     sampler: Option<Sampler>,
     /// xyz: world position of probe zero, w: spacing.
@@ -177,7 +176,6 @@ pub(crate) fn prepare_probes(
         height: dims[1],
         depth_or_array_layers: dims[2],
     };
-    let mut textures = Vec::with_capacity(4);
     let mut views = Vec::with_capacity(4);
     for data in &bytes {
         let texture = device.create_texture(&TextureDescriptor {
@@ -206,9 +204,7 @@ pub(crate) fn prepare_probes(
             size,
         );
         views.push(texture.create_view(&TextureViewDescriptor::default()));
-        textures.push(texture);
     }
-    gpu._textures = textures;
     gpu.views = views;
     if active {
         let origin = volume.origin;

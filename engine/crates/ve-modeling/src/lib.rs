@@ -48,7 +48,7 @@ pub use kits::{KITS, Kit};
 pub use poly_ops::suggestion as poly_suggestion;
 pub use result::{
     BakedMaps, Evaluation, EvaluationWarning, Foliage, LightProbes, MAX_SCENE_LIGHTS, Material,
-    MaterialRecipe, Part, Quality, SceneEnvironment, SceneLight, SceneLightKind,
+    MaterialRecipe, Part, Quality, SceneEnvironment, SceneLight, SceneLightKind, Wind,
 };
 
 pub(crate) type Fail = Box<ve_graph::Diagnostic>;

@@ -119,5 +119,6 @@ pub(crate) fn execute(node: &Node) -> Result<Value, Fail> {
         bounce: 0.2,
         sky: Some(sky),
         gi: super::probes(node),
+        wind: super::wind(node),
     }))
 }

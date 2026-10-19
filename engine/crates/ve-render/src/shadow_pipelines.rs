@@ -99,6 +99,7 @@ pub(crate) fn prepare_shadow_state(
     views: Query<(&ExtractedView, Option<&StereoViews>)>,
     mut state: ResMut<ShadowState>,
     mut pipelines: ResMut<ShadowPipelines>,
+    wind: Res<crate::WindField>,
     pipeline_cache: Res<PipelineCache>,
     device: Res<RenderDevice>,
     queue: Res<RenderQueue>,
@@ -142,6 +143,8 @@ pub(crate) fn prepare_shadow_state(
             // The depth-only shadow pass does not grade; keep the fields neutral but present.
             grading: Vec4::new(1.0, 1.0, 0.0, 0.0),
             tint: Vec4::new(1.0, 1.0, 1.0, 0.0),
+            // Foliage sways in its shadow as it does on screen.
+            wind: wind.uniform(),
             ..ViewUniform::default()
         };
         let offset = pipelines.view_buffer.push(&uniform);

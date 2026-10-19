@@ -23,6 +23,8 @@ mod material;
 mod pass;
 mod probes;
 pub use probes::{MAX_PROBES, MAX_PROBES_PER_AXIS, ProbeVolume};
+mod wind;
+pub use wind::WindField;
 mod pipeline;
 mod prepare;
 mod present;
@@ -89,6 +91,7 @@ impl Plugin for VeRenderPlugin {
             .init_resource::<MaterialTextures>()
             .init_resource::<SkyBackground>()
             .init_resource::<ProbeVolume>()
+            .init_resource::<WindField>()
             .register_required_components_with::<Camera3d, CameraRenderGraph>(|| {
                 CameraRenderGraph::new(Forward3d)
             })
@@ -99,6 +102,7 @@ impl Plugin for VeRenderPlugin {
                 ExtractComponentPlugin::<StereoViews>::default(),
                 ExtractResourcePlugin::<SkyBackground>::default(),
                 ExtractResourcePlugin::<ProbeVolume>::default(),
+                ExtractResourcePlugin::<WindField>::default(),
             ));
 
         let shaders = app
@@ -181,6 +185,7 @@ fn add_render_systems(render_app: &mut SubApp) {
         .init_resource::<exposure::ExposureState>()
         .init_resource::<probes::ProbeGpu>()
         .init_resource::<ProbeVolume>()
+        .init_resource::<WindField>()
         .init_resource::<grade::Grading>()
         .init_resource::<lens::LensWarp>()
         .init_resource::<lens::LensGpu>()

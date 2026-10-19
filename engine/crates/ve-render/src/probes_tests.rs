@@ -1,3 +1,8 @@
+#![expect(
+    clippy::cast_precision_loss,
+    clippy::float_cmp,
+    reason = "the fixtures hold small whole numbers, and half floats hold those exactly"
+)]
 use super::{MAX_PROBES_PER_AXIS, ProbeVolume, f32_to_f16, texture_bytes};
 
 /// A half float's value, for checking the conversion back against the original.
@@ -133,8 +138,8 @@ fn the_four_textures_hold_one_coefficient_each_in_probe_order() {
         let at = probe * 8 + channel * 2;
         half_value(u16::from_le_bytes([bytes[k][at], bytes[k][at + 1]]))
     };
-    for k in 0..4 {
-        assert_eq!(bytes[k].len(), 16, "two probes of four half floats");
+    for (k, plane) in bytes.iter().enumerate() {
+        assert_eq!(plane.len(), 16, "two probes of four half floats");
         for channel in 0..3 {
             assert_eq!(texel(k, 0, channel), (3 * k + channel + 1) as f32);
             assert_eq!(texel(k, 1, channel), (3 * k + channel + 101) as f32);
