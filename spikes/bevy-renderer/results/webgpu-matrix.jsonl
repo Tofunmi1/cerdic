@@ -1,0 +1,22 @@
+{"backend":"webgpu","fx":"(baseline)","verdict":"ok","frames":30,"mean":105.6,"seconds":3,"messages":[]}
+{"backend":"webgpu","fx":"hdr","verdict":"ok","frames":30,"mean":106.4,"seconds":3.4,"messages":[]}
+{"backend":"webgpu","fx":"tonemap=agx","verdict":"ok","frames":30,"mean":112.1,"seconds":3.6,"messages":[]}
+{"backend":"webgpu","fx":"tonemap=aces","verdict":"ok","frames":30,"mean":102.6,"seconds":3.4,"messages":[]}
+{"backend":"webgpu","fx":"tonemap=neutral","verdict":"ok","frames":30,"mean":110.7,"seconds":3.5,"messages":[]}
+{"backend":"webgpu","fx":"bloom","verdict":"ok","frames":30,"mean":108.9,"seconds":3.2,"messages":[]}
+{"backend":"webgpu","fx":"taa","verdict":"ok","frames":30,"mean":105.4,"seconds":3.8,"messages":[]}
+{"backend":"webgpu","fx":"smaa","verdict":"ok","frames":30,"mean":105.6,"seconds":3.3,"messages":[]}
+{"backend":"webgpu","fx":"fxaa","verdict":"ok","frames":30,"mean":105.7,"seconds":3,"messages":[]}
+{"backend":"webgpu","fx":"cas","verdict":"ok","frames":30,"mean":105.6,"seconds":3,"messages":[]}
+{"backend":"webgpu","fx":"ssao","verdict":"ok","frames":30,"mean":105.4,"seconds":4,"messages":[]}
+{"backend":"webgpu","fx":"ssr","verdict":"ok","frames":30,"mean":105.6,"seconds":4.4,"messages":[]}
+{"backend":"webgpu","fx":"dof","verdict":"ok","frames":30,"mean":105.6,"seconds":3.7,"messages":[]}
+{"backend":"webgpu","fx":"mb","verdict":"FAIL","frames":0,"mean":0.6,"seconds":91.6,"messages":["warning: [Invalid ShaderModule (unlabeled)] is invalid due to a previous error.\n - While validating fragment stage ([Invalid ShaderModule (unlabeled)], entryPoint: [undefined]).\n - While validating fragment state.\n - While calling [Device].CreateRenderPipeline([RenderPipelineDescriptor \"\"motion_blur_pipeline","warning: [Invalid RenderPipeline \"motion_blur_pipeline\"] is invalid due to a previous error.\n - While encoding [RenderPassEncoder \"motion_blur\"].SetPipeline([Invalid RenderPipeline \"motion_blur_pipeline\"]).\n - While finishing [CommandEncoder \"<Enable the debug feature to see the name>\"].\n","warning: [Invalid CommandBuffer \"<Enable the debug feature to see the name>\" from CommandEncoder \"<Enable the debug feature to see the name>\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[CommandBuffer \"<Enable the debug feature to see the name>\" from CommandEncoder \"<Enable the debu"]}
+{"backend":"webgpu","fx":"exposure","verdict":"ok","frames":30,"mean":106.4,"seconds":3,"messages":[]}
+{"backend":"webgpu","fx":"atmo","verdict":"ok","frames":30,"mean":67.5,"seconds":3.7,"messages":[]}
+{"backend":"webgpu","fx":"atmo,atmoenv","verdict":"ok","frames":30,"mean":95.6,"seconds":3.5,"messages":[]}
+{"backend":"webgpu","fx":"point","verdict":"ok","frames":30,"mean":109.5,"seconds":2.9,"messages":[]}
+{"backend":"webgpu","fx":"spot","verdict":"ok","frames":30,"mean":106,"seconds":2.9,"messages":[]}
+{"backend":"webgpu","fx":"point,spot","verdict":"ok","frames":30,"mean":109.8,"seconds":2.8,"messages":[]}
+{"backend":"webgpu","fx":"stereo","verdict":"ok","frames":30,"mean":103,"seconds":2.8,"messages":[]}
+{"backend":"webgpu","fx":"stereo,taa,bloom","verdict":"ok","frames":30,"mean":77.8,"seconds":3.6,"messages":[]}
