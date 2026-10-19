@@ -155,6 +155,19 @@ impl Evaluator {
                     .ok_or_else(|| fail("graph.unknown_node", r.node.to_string()))
             })
             .collect::<Result<_, _>>()?;
+        // Number sockets fill the node's parameters; only geometry links are inputs to the operator.
+        let resolved = crate::values::resolve(node, &job.values)?;
+        let geometry: Vec<_> = node
+            .inputs
+            .iter()
+            .filter(|(port, _)| !crate::values::is_socket(node, port))
+            .flat_map(|(_, links)| links)
+            .map(|r| {
+                job.values
+                    .get(&r.node)
+                    .ok_or_else(|| fail("graph.unknown_node", r.node.to_string()))
+            })
+            .collect::<Result<_, _>>()?;
         let hashes: Vec<_> = dependencies.iter().map(|(key, _)| key).collect();
         let key = digest(
             serde_json::json!([
@@ -176,12 +189,9 @@ impl Evaluator {
             job.hits += 1;
             value
         } else {
-            let inputs: Vec<_> = dependencies
-                .iter()
-                .map(|(_, value)| Rc::clone(value))
-                .collect();
+            let inputs: Vec<_> = geometry.iter().map(|(_, value)| Rc::clone(value)).collect();
             let value = Rc::new(operations::execute(
-                node,
+                &resolved,
                 &inputs,
                 &job.context,
                 job.quality,

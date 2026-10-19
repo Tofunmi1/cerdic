@@ -11,6 +11,7 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
         spin_spec(),
         bisect_spec(),
         mirror_spec(),
+        loop_cut_spec(),
         spec(
             "poly.pack_uv@1",
             "Packs existing corner UV islands into the 0..1 square; UV discontinuities define island boundaries.",
@@ -110,6 +111,36 @@ fn mirror_spec() -> Option<OperatorSpec> {
                 (0.0, 1.0e3),
                 Some(0.0001),
                 "Maximum merge distance in metres.",
+            ),
+        ],
+    )
+}
+
+fn loop_cut_spec() -> Option<OperatorSpec> {
+    spec(
+        "poly.loop_cut@1",
+        "Cuts a closed ring of quad faces with evenly spaced parallel edges.",
+        vec![single("in", POLY)],
+        OutputSpec::Fixed(PortType::Poly),
+        vec![
+            default_vec3(
+                "at",
+                Unit::Length,
+                [0.0, 0.0, 0.0],
+                "Point in metres used to choose the nearest edge.",
+            ),
+            ParamSpec {
+                name: "cuts",
+                ty: ParamType::Int { min: 1, max: 32 },
+                default: Some(Value::Int(1)),
+                doc: "Number of parallel cuts.",
+            },
+            number(
+                "smooth",
+                Unit::None,
+                (0.0, 1.0),
+                Some(0.0),
+                "Smoothness passed to subdivision.",
             ),
         ],
     )

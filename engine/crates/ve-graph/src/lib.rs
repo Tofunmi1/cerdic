@@ -41,7 +41,7 @@ pub use limits::{
 pub use session::{History, HistoryItem, Moved, Session};
 pub use spec::{
     Arity, OpId, OpIdError, OperatorRegistry, OperatorSpec, OutputSpec, ParamSpec, PortSpec,
-    PortType, Readiness,
+    PortType, Readiness, Socket,
 };
 pub use store::{Backend, BackendError, DocStore, Loaded, MemoryBackend, MigrationStep, Migrator};
 pub use text::{TextBatch, parse_text, parse_text_in, to_text};

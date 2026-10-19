@@ -9,7 +9,7 @@ use crate::command::{Alias, Command, InputRef, NodeRef, OutRef};
 use crate::diag::{Diagnostic, Span};
 use crate::id::NodeId;
 use crate::spec::{Arity, OperatorSpec};
-use crate::value::Value;
+use crate::value::{ParamType, Value};
 
 /// Commands with the span of the text they came from, and the problems found while building them.
 pub(super) type Built = (Vec<(Command, Span)>, Vec<Diagnostic>);
@@ -75,6 +75,28 @@ fn read_params(spec: &OperatorSpec, args: &[Arg]) -> Params {
     out
 }
 
+/// Whether the statement links a number node into parameter `name` (`name=node`) or a component of it (`name.x=node`).
+fn is_socketed(name: &str, args: &[Arg]) -> bool {
+    args.iter().any(|arg| {
+        matches!(arg, Arg::Input { port: Some(port), .. }
+            if port == name || port.strip_prefix(name).is_some_and(|rest| rest.starts_with('.')))
+    })
+}
+
+/// A value of the right shape that passes the parameter's range, standing in until a link supplies the real one.
+fn placeholder(ty: &ParamType) -> Value {
+    let one = |min: f64, max: f64| Value::Num(1.0_f64.clamp(min, max));
+    match *ty {
+        ParamType::Num { min, max, .. } => one(min, max),
+        ParamType::Int { min, max } => Value::Int(1_i64.clamp(min, max)),
+        ParamType::Vec2 { min, max, .. } => Value::List(vec![one(min, max), one(min, max)]),
+        ParamType::Vec3 { min, max, .. } => {
+            Value::List(vec![one(min, max), one(min, max), one(min, max)])
+        }
+        _ => Value::Num(0.0),
+    }
+}
+
 /// `add_node` (and `set_flags` when `muted` or `bypass` were written) for one statement.
 pub(super) fn node_commands(
     spec: &OperatorSpec,
@@ -83,9 +105,21 @@ pub(super) fn node_commands(
     name_span: Span,
 ) -> Built {
     let mut read = read_params(spec, args);
-    for param in spec.params.iter().filter(|p| {
-        p.default.is_none() && !read.values.contains_key(p.name) && !read.bad.contains(p.name)
-    }) {
+    let missing: Vec<_> = spec
+        .params
+        .iter()
+        .filter(|p| {
+            p.default.is_none() && !read.values.contains_key(p.name) && !read.bad.contains(p.name)
+        })
+        .collect();
+    for param in missing {
+        // A parameter filled by a number link (`radius=r`, `size.y=h`) needs no typed value, but the node must be
+        // creatable first: it starts at a valid placeholder, which the link replaces when the node is evaluated.
+        if is_socketed(param.name, args) {
+            read.values
+                .insert(param.name.to_owned(), placeholder(&param.ty));
+            continue;
+        }
         read.errors.push(error(
             "parse.missing_param",
             name_span,
@@ -178,14 +212,20 @@ pub(super) fn links(spec: &OperatorSpec, name: &str, args: &[Arg], known: &Known
         else {
             continue;
         };
-        if spec.input(port).is_some() {
+        // A number parameter (`width=w`) or one component of a vector (`size.y=h`) takes a number node as a socket.
+        if spec.input(port).is_some() || spec.socket(port).is_some() {
             commands.extend(connect(name, port, source, known, *span));
         } else {
-            errors.push(error(
-                "graph.unknown_port",
-                *span,
-                format!("{} has no input {port}", spec.id),
-            ));
+            let mut valid: Vec<String> = spec.inputs.iter().map(|p| p.name.to_owned()).collect();
+            valid.extend(spec.socket_names());
+            errors.push(Diagnostic {
+                suggestion: Some(format!("{} takes: {}", spec.id, valid.join(", "))),
+                ..error(
+                    "graph.unknown_port",
+                    *span,
+                    format!("{} has no input {port}", spec.id),
+                )
+            });
         }
     }
     let mut next = 0;

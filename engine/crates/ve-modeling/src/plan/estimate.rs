@@ -18,7 +18,7 @@ pub(super) fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<u
             return Ok(crate::curves::estimate_tool(node, input));
         }
         // A drop only reads its surface: the copies are the prototype's triangles, not the surface's.
-        "inst.drop" => {
+        "inst.drop" | "inst.scatter_on" => {
             return Ok(node
                 .inputs
                 .get("in")
@@ -40,6 +40,8 @@ pub(super) fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<u
         // The evaluator enforces the measured kernel work cap and the final result's triangle cap.
         family if family.starts_with("field.") => return Ok(0),
         family if family.starts_with("light.") => return Ok(0),
+        // A number makes no triangles.
+        family if family.starts_with("value.") => return Ok(0),
         "scene.environment" | "scene.sky" => return Ok(0),
         family if family.starts_with("poly.") => return Ok(estimate_poly(node, sizes)),
         _ => {}
@@ -240,6 +242,7 @@ fn estimate_poly(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> usize {
             .saturating_mul(count(node, "steps").clamp(2, 256))
             .min(250_000),
         "poly.mirror" => input.saturating_mul(2),
+        "poly.loop_cut" => input.saturating_mul(1 + count(node, "cuts").clamp(1, 32)),
         _ => input,
     }
 }

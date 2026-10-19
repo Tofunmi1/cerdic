@@ -112,11 +112,24 @@ fn flag_args(node: &Node, args: &mut Vec<String>) {
 
 fn statement(node: &Node, spec: &OperatorSpec, names: &BTreeMap<String, String>) -> String {
     let mut args = inputs(node, spec, names);
+    // Number sockets (`width=w`, `size.y=h`): a number node linked into a parameter, written by port name.
+    for (port, links) in &node.inputs {
+        if spec.input(port).is_some() || spec.socket(port).is_none() {
+            continue;
+        }
+        args.extend(
+            links
+                .iter()
+                .filter_map(|link| names.get(link.node.as_str()))
+                .map(|source| format!("{port}={source}")),
+        );
+    }
     for param in &spec.params {
         let Some(value) = node.params.get(param.name) else {
             continue;
         };
-        if param.default.as_ref() == Some(value) {
+        // A whole parameter filled by a link has no literal worth writing.
+        if param.default.as_ref() == Some(value) || node.inputs.contains_key(param.name) {
             continue;
         }
         args.push(format!(

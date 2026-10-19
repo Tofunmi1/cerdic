@@ -269,9 +269,25 @@ fn validate(
             return Err(fail("parse.missing_param", param.name));
         }
     }
-    for name in node.inputs.keys() {
-        if spec.input(name).is_none() {
+    for (name, links) in &node.inputs {
+        if spec.input(name).is_some() {
+            continue;
+        }
+        // A number socket: a link into a number parameter, which must come from a value node.
+        if spec.socket(name).is_none() {
             return Err(fail("graph.unknown_port", name));
+        }
+        for link in links {
+            if link.port != "out" || types.get(&link.node) != Some(&PortType::Number) {
+                return Err(fail_suggest(
+                    "graph.port_type",
+                    format!(
+                        "{} gets {name} from a node that does not produce a number",
+                        node.id
+                    ),
+                    "link a value.number, value.math or value.size node, or type the number in the parameter",
+                ));
+            }
         }
     }
     if node.op.family().as_str() == "xform.align" {

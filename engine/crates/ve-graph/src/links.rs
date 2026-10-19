@@ -150,6 +150,7 @@ pub(crate) struct PortRule {
 }
 
 const SOLID_ONLY: &[PortType] = &[PortType::Solid];
+const NUMBER_ONLY: &[PortType] = &[PortType::Number];
 
 /// The rule for the named input of `node`. An instance's inputs are its group's `group.input`
 /// members, bound by name; each takes one solid.
@@ -169,9 +170,17 @@ pub(crate) fn port_rule(
                 arity: Arity::One,
             });
     }
-    reg.get(&node.op)?.input(port).map(|spec| PortRule {
-        accepts: spec.accepts,
-        arity: spec.arity,
+    let spec = reg.get(&node.op)?;
+    if let Some(input) = spec.input(port) {
+        return Some(PortRule {
+            accepts: input.accepts,
+            arity: input.arity,
+        });
+    }
+    // A number parameter is also a socket: a value node's output can be linked into it.
+    spec.socket(port).map(|_| PortRule {
+        accepts: NUMBER_ONLY,
+        arity: Arity::One,
     })
 }
 
@@ -185,7 +194,11 @@ fn port_names(doc: &Document, reg: &OperatorRegistry, node: &Node) -> Vec<String
             .collect();
     }
     reg.get(&node.op)
-        .map(|spec| spec.inputs.iter().map(|p| p.name.to_owned()).collect())
+        .map(|spec| {
+            let mut names: Vec<String> = spec.inputs.iter().map(|p| p.name.to_owned()).collect();
+            names.extend(spec.socket_names());
+            names
+        })
         .unwrap_or_default()
 }
 

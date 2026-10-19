@@ -4,9 +4,15 @@ fn polygon_cases() -> Result<(), Box<dyn std::error::Error>> {
         "box = solid.box@1(size=[1,1,1])\ntris = poly.from_solid@1(box)\nm = poly.mirror@1(tris, point=[0,0,0], normal=[1,0,0])\nsolid = poly.to_solid@1(m)\noutput solid",
     )?;
     // G10-10: a grid revolved into a closed ring, included in native/WASI parity.
-    text_case("strip = poly.grid@1(width=0.2, height=1.0, columns=1, rows=4)\nspun = poly.spin@1(strip, center=[-1,0,0], axis=[0,1,0], angle=6.283185307179586, steps=64, merge=true)\nsolid = poly.to_solid@1(spun)\noutput solid")?;
+    text_case(
+        "strip = poly.grid@1(width=0.2, height=1.0, columns=1, rows=4)\nspun = poly.spin@1(strip, center=[-1,0,0], axis=[0,1,0], angle=6.283185307179586, steps=64, merge=true)\nsolid = poly.to_solid@1(spun)\noutput solid",
+    )?;
     text_case(
         "box = solid.box@1(size=[1,1,1])\nmesh = poly.from_solid@1(box)\ncut = poly.bisect@1(mesh, point=[0,0.2,0], normal=[0,1,0], keep=\"below\")\nsolid = poly.to_solid@1(cut)\noutput solid",
+    )?;
+    // G11-11: loop cut a closed ring of merged box quads.
+    text_case(
+        "box = solid.box@1(size=[1,1,1])\ntris = poly.from_solid@1(box)\nmesh = poly.merge_coplanar@1(tris)\ncut = poly.loop_cut@1(mesh, at=[0.5,0,0.5], cuts=1)\noutput cut",
     )?;
     // G10-09: UV packing an automatically unwrapped cube, included in native/WASI parity.
     text_case(

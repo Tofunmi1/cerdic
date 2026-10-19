@@ -30,6 +30,7 @@ mod poly_select;
 mod ready;
 mod shapes;
 mod terrain;
+mod values;
 mod water;
 
 /// The largest size or offset accepted, in metres (the kernel's own extent limit).
@@ -124,6 +125,7 @@ fn all_specs() -> Vec<Option<OperatorSpec>> {
     all.extend(physics::all());
     all.extend(shapes::all());
     all.extend(hulls::all());
+    all.extend(values::all());
     all.extend(group_ops::all());
     all.extend(instances::all());
     all.extend(lights::all());

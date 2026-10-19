@@ -34,6 +34,10 @@ pub(super) fn poly_fail(node: &Node, error: &GeometryError, mesh: Option<&PolyMe
 #[must_use]
 pub fn suggestion(code: &str) -> Option<&'static str> {
     Some(match code {
+        "poly.loop_cut_non_quad" => {
+            "the ring must run through quads only; merge triangles with poly.merge_coplanar first"
+        }
+        "poly.loop_cut_at_far" => "move at closer to an edge of the mesh",
         "poly.nonmanifold" | "poly.subdivide.nonmanifold" => {
             "an edge is shared by more than two faces or a vertex pinches two surfaces: split the mesh there, or rebuild from a solid with poly.from_solid"
         }
