@@ -61,6 +61,7 @@ fn build(node: &Node, context: &ExecutionContext) -> Result<Value, Fail> {
         recipe: MaterialRecipe::Water,
         texture_scale: params.ripple_speed,
         texture_tile: 0.0,
+        texture_size: 0,
         toon: None,
         texture_program: None,
         texture_style: None,

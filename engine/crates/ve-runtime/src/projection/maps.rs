@@ -6,11 +6,13 @@ use std::collections::{HashMap, HashSet};
 pub(super) type Maps = [Option<Vec<u8>>; 4];
 
 /// Stages the baked maps (albedo, normal, metallic-roughness, emissive; an empty slice is absent) of one
-/// material region. Each must be a full layer of RGBA8 pixels; a wrong size refuses all of them.
+/// material region. Each must be a square RGBA8 image of one of the renderer's map sizes (1024, 512 or 256 texels); a wrong
+/// size refuses all of them.
 pub(crate) fn maps(text: &str, node: &str, region: u32, maps: [&[u8]; 4]) -> bool {
-    let layer_bytes = (ve_render::LAYER_SIZE * ve_render::LAYER_SIZE * 4) as usize;
     if ve_graph::NodeId::parse(node).is_err()
-        || maps.iter().any(|m| !m.is_empty() && m.len() != layer_bytes)
+        || maps
+            .iter()
+            .any(|m| !m.is_empty() && ve_render::tier_of_len(m.len()).is_none())
     {
         return false;
     }
@@ -28,10 +30,12 @@ pub(crate) fn maps(text: &str, node: &str, region: u32, maps: [&[u8]; 4]) -> boo
             .map(Vec::as_slice)
             .collect();
         distinct.extend(maps.iter().copied().filter(|m| !m.is_empty()));
+        // The renderer's budget is bytes on the GPU (mip chains included), so a scene of small maps holds many more.
+        let cost: usize = distinct.iter().filter_map(|m| ve_render::map_cost(m.len())).sum();
         if serde_json::to_string(&candidate.token).ok().as_deref() != Some(text)
             || !staging::current(&candidate.token)
             || candidate.finished
-            || distinct.len() > ve_render::MAX_LAYERS
+            || cost > ve_render::BUDGET_BYTES
         {
             return false;
         }

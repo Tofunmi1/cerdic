@@ -76,8 +76,23 @@ fn fragment(@builtin(position) position: vec4<f32>) -> @location(0) f32 {
 
 // Cut-out surfaces (leaves, fences): the same depth, but a pixel whose albedo alpha is under the instance's cutoff leaves the
 // depth as it was, so the occlusion pass sees the leaf shape and not its whole card (see the forward pass and shadow.wgsl).
-@group(1) @binding(0) var material_maps: texture_2d_array<f32>;
-@group(1) @binding(1) var material_sampler: sampler;
+@group(1) @binding(0) var maps_large: texture_2d_array<f32>;
+@group(1) @binding(1) var maps_medium: texture_2d_array<f32>;
+@group(1) @binding(2) var maps_small: texture_2d_array<f32>;
+@group(1) @binding(3) var material_sampler: sampler;
+
+// The alpha of a baked map by id (tier * 4096 + layer; tier 0 is the 1024 array, 1 the 512 one, 2 the 256 one), at the top level.
+fn map_alpha(id: f32, uv: vec2<f32>) -> f32 {
+    let tier = floor(id / 4096.0);
+    let layer = i32(id - tier * 4096.0);
+    if (tier < 0.5) {
+        return textureSampleLevel(maps_large, material_sampler, uv, layer, 0.0).a;
+    }
+    if (tier < 1.5) {
+        return textureSampleLevel(maps_medium, material_sampler, uv, layer, 0.0).a;
+    }
+    return textureSampleLevel(maps_small, material_sampler, uv, layer, 0.0).a;
+}
 
 struct CutoutInput {
     @location(0) position: vec3<f32>,
@@ -113,7 +128,7 @@ fn vertex_cutout(input: CutoutInput) -> CutoutOutput {
 @fragment
 fn fragment_cutout(input: CutoutOutput) -> @location(0) f32 {
     if (input.cutoff > 0.0 && input.albedo_layer >= 0.0) {
-        let alpha = textureSampleLevel(material_maps, material_sampler, input.uv, i32(input.albedo_layer), 0.0).a;
+        let alpha = map_alpha(input.albedo_layer, input.uv);
         if (alpha < input.cutoff) {
             discard;
         }

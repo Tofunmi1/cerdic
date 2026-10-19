@@ -125,6 +125,10 @@ pub struct Material {
     /// over the part).
     #[serde(default)]
     pub texture_tile: f32,
+    /// Side in texels of the maps the viewer bakes for this surface (256, 512 or 1024); 0 leaves it to the viewer (1024). Smaller
+    /// maps leave room in the viewer's texture memory for more surfaces.
+    #[serde(default)]
+    pub texture_size: u32,
     /// Cel shading from a `solid.toon` node; `None` keeps the surface physically based.
     #[serde(default)]
     pub toon: Option<Toon>,

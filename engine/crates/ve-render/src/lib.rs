@@ -40,6 +40,7 @@ mod sky;
 mod stereo;
 mod targets;
 mod textures;
+mod textures_gpu;
 
 use bevy_app::{App, Plugin, SubApp, Update};
 use bevy_asset::Assets;
@@ -66,7 +67,9 @@ pub use material::{FoliageStyle, ProceduralRecipe, ToonStyle, VeMaterial};
 pub use quality::{QualityTier, RenderQuality};
 pub use readiness::mesh_ready;
 pub use sky::SkyBackground;
-pub use textures::{LAYER_SIZE, MAX_LAYERS, MaterialTextures};
+pub use textures::{
+    BUDGET_BYTES, LAYER_SIZE, MaterialTextures, TIER_SIZES, TIER_STRIDE, map_cost, tier_of_len,
+};
 /// Per-vertex baked ambient visibility, stored as one float from zero to one.
 pub const ATTRIBUTE_OCCLUSION: bevy_mesh::MeshVertexAttribute = bevy_mesh::MeshVertexAttribute::new(
     "Vertex_Occlusion",

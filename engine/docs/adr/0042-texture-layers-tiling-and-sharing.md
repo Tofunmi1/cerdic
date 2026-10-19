@@ -8,6 +8,8 @@ The viewport needs baked maps on many surfaces while retaining one shared textur
 
 ## Decision
 
+*(The fixed 1024 size and the cap of 32 maps below were replaced by three map sizes under a byte budget in [ADR 0052](0052-texture-memory-budget.md); the rest of this record stands.)*
+
 `ve-render/src/textures.rs` stores 1024-by-1024 RGBA8 layers with an 11-level mip chain and caps the array at 32 maps. Each complete textured surface may consume albedo, normal, metallic-roughness, and emissive layers. `allocated_layers` allocates at least two layers and adds one spare when the requested count is a multiple of six: the source documents that wgpu's GL backend infers an incompatible view dimension for a one-layer texture or a multiple-of-six layer count. The maps share one 2D-array binding and sampler.
 
 `solid.texture@1` carries the program and optional `tile` through modeling material data. In `src/engine/texture/uv.ts`, `worldTileUvs` projects triangles along their dominant normal and divides world coordinates by `tile`, making the repeating map scale correspond to metres. The viewport sampler repeats. When the author has not requested world tiling, the texture pipeline can use the provided UVs or a box-chart fallback.

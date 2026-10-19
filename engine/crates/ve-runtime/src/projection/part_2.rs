@@ -99,6 +99,8 @@ pub(crate) fn update(
             let materials = std::mem::take(&mut candidate.materials);
             // The new scene's maps replace the old ones; each region keeps the layers it was given.
             let layers = assign_layers(&mut textures, std::mem::take(&mut candidate.maps));
+            state.texture_maps = textures.len();
+            state.texture_bytes = textures.bytes();
             let mut animated = 0_usize;
             let uploaded = std::mem::take(&mut candidate.uploaded);
             let bodies = candidate.body_specs(&uploaded);
@@ -153,6 +155,7 @@ pub(crate) fn status() -> String {
         "staging_meshes":state.candidate.as_ref().map_or(0, |c| c.uploaded.len()),
         "live_meshes":state.parts.len(), "live_lights":state.light_count, "animated_parts":state.animated_parts, "selection_map":state.parts,
         "live_environment":state.environment, "gi_progress":gi::progress(),
+        "texture_maps":state.texture_maps, "texture_bytes":state.texture_bytes,
         "instance_sets":state.instance_sets,
         "upload_frames":state.upload_frames,"max_frame_bytes":state.max_frame_bytes,
         "last_upload_ms":state.last_ms,"max_upload_ms":state.max_ms})

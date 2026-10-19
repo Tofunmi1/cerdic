@@ -67,6 +67,7 @@ pub(crate) fn material(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail>
         recipe,
         texture_scale,
         texture_tile: 0.0,
+        texture_size: 0,
         toon: None,
         texture_program: None,
         texture_style: None,
@@ -124,16 +125,43 @@ pub(crate) fn texture(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> 
         return Err(fail("param.range", "solid.texture program cannot be empty"));
     }
     let tile = scalar(node, "tile").unwrap_or(0.0).max(0.0);
+    let size = match node.params.get("size") {
+        Some(Param::Str(word)) if word != "auto" => match word.parse::<u32>() {
+            Ok(side @ (256 | 512 | 1024)) => side,
+            _ => return Err(fail("param.range", "size must be auto, 256, 512 or 1024")),
+        },
+        _ => 0,
+    };
     let mut value = (**input).clone();
-    value.material = Some(textured_surface(value.material.as_ref(), program, tile));
+    value.material = Some(textured_surface(
+        value.material.as_ref(),
+        program,
+        tile,
+        size,
+    ));
     for region in &mut value.regions {
-        region.material = Some(textured_surface(region.material.as_ref(), program, tile));
+        region.material = Some(textured_surface(
+            region.material.as_ref(),
+            program,
+            tile,
+            size,
+        ));
     }
     if let Some(set) = &input.instances {
         let mut prototype = (*set.prototype).clone();
-        prototype.material = Some(textured_surface(prototype.material.as_ref(), program, tile));
+        prototype.material = Some(textured_surface(
+            prototype.material.as_ref(),
+            program,
+            tile,
+            size,
+        ));
         for region in &mut prototype.regions {
-            region.material = Some(textured_surface(region.material.as_ref(), program, tile));
+            region.material = Some(textured_surface(
+                region.material.as_ref(),
+                program,
+                tile,
+                size,
+            ));
         }
         value.instances = Some(InstanceSet {
             prototype: Rc::new(prototype),
@@ -143,7 +171,7 @@ pub(crate) fn texture(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> 
     Ok(value)
 }
 
-fn textured_surface(existing: Option<&Material>, program: &str, tile: f32) -> Material {
+fn textured_surface(existing: Option<&Material>, program: &str, tile: f32, size: u32) -> Material {
     let mut material = existing.cloned().unwrap_or(Material {
         color: [0.8; 3],
         opacity: 1.0,
@@ -160,6 +188,7 @@ fn textured_surface(existing: Option<&Material>, program: &str, tile: f32) -> Ma
         recipe: MaterialRecipe::None,
         texture_scale: 1.0,
         texture_tile: 0.0,
+        texture_size: 0,
         toon: None,
         texture_program: None,
         texture_style: None,
@@ -167,6 +196,7 @@ fn textured_surface(existing: Option<&Material>, program: &str, tile: f32) -> Ma
     });
     material.texture_program = Some(program.to_owned());
     material.texture_tile = tile;
+    material.texture_size = size;
     material
 }
 
@@ -244,6 +274,7 @@ pub(crate) fn textured_surface_default(existing: Option<&Material>) -> Material 
         recipe: MaterialRecipe::None,
         texture_scale: 1.0,
         texture_tile: 0.0,
+        texture_size: 0,
         toon: None,
         texture_program: None,
         texture_style: None,

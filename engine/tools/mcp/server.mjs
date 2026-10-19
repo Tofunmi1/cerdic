@@ -408,6 +408,11 @@ Attach a bounded semicolon-separated DSL program with solid.texture@1. Example:
   textured = solid.texture@1(painted, program="grain = fbm(scale_x=5, scale_y=5); albedo = colorize(grain, gradient=[0:#553322, 1:#d6a15b]); roughness = grain")
   output textured
 The channels are albedo, roughness, metallic, height (converted to tangent-space normals), and emissive.
+Texture memory: the viewer holds a fixed amount (192 MiB) of baked maps, 1024, 512 or 256 pixels square. solid.texture@1 takes
+size="auto"|"256"|"512"|"1024" (auto is 1024): give small or distant things (a leaf, a pebble, a prop) 256 or 512 and a scene can
+hold hundreds of textured parts, where 1024 maps fit about 36 in all. When the memory still runs out the viewer shrinks the biggest
+maps first (warning texture.viewport_shrunk), and only at 256 does it drop channels (glow, then shininess, then bumps; warning
+texture.viewport_budget). Identical programs share one map. The exported .glb is not affected.
 Shader expressions: the expr node draws a texture from a few lines of code, and composes with any other node. In the graph text
 write the program string with escaped quotes (\" inside program="..."):
   program="n = expr(code=\"w = p; for i in 0..6 { w = rot(w, 0.7) * 1.9 + snoise(w * 2) * 0.4 }; out = hsv(w.x, 0.6, 0.8)\"); albedo = n"
