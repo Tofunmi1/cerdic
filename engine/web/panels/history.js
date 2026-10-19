@@ -71,7 +71,7 @@ export function createProblems({ root, details, selection, list }) {
     details.querySelector("summary").textContent = `Problems (${problems.length})`;
     root.replaceChildren(
       ...problems.map((problem) => {
-        const row = el("button", "prow");
+        const row = el("button", problem.code === "poly.subdivide.attribute_dropped" ? "prow report" : "prow");
         row.append(el("b", "", problem.code), ` ${problem.message}`);
         const id = problem.node ?? problem.related?.[0];
         if (id) {

@@ -21,6 +21,7 @@ const ENGINE_AGNOSTIC: &[&str] = &[
     "ve-kernel",
     "ve-kernel-sys",
     "ve-modeling",
+    "ve-physics",
     "ve-provider",
     "ve-xr-math",
 ];

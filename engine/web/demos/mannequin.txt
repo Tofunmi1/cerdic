@@ -1,0 +1,247 @@
+# A procedurally built character: one skinned body (swept limbs, ellipsoid torso and head) on an 11-bone skeleton with a looping
+# walk cycle, plus eyes and hair attached to the head bone. No imported assets: every shape here is a line of text.
+
+day = scene.sky@1(sun_elevation=38, sun_azimuth=30, sun_intensity=6, turbidity=2.6, ground_color=[0.5, 0.46, 0.4], clouds=true, cloud_cover=0.3, seed=4)
+output sky = day
+fill = scene.environment@1(sky_color=[0.65, 0.76, 0.95], ground_color=[0.7, 0.64, 0.55], intensity=0.8, reflection=0.1, bounce=0.35, bounce_color=[0.8, 0.72, 0.6])
+output fill = fill
+
+floor_box = solid.box@1(size=[3.2, 0.2, 3.2])
+floor_low = xform.move@1(floor_box, by=[0, -0.1, 0])
+floor_tile = solid.texture@1(floor_low, tile=1, program="b = bricks(rows=4, columns=4, mortar=0.03, bevel=0.1, round=0.05, row_offset=0); g = fbm(scale_x=3, scale_y=3); albedo = colorize(g, gradient=[0:#8f8a82, 0.5:#aaa59b, 1:#c4bfb3]); roughness = colorize(g, gradient=[0:#c0c0c0, 1:#e8e8e8]); height = b")
+floor_body = phys.body@1(floor_tile, kind="static", shape="box", friction=0.9)
+stage = phys.world@1(floor_body, gravity=[0, -9.81, 0])
+output stage = stage
+
+# ---- Body shapes ----
+leg_path_l = curve.spline@1(points=[[0.1, 0.95, 0], [0.1, 0.52, 0.015], [0.1, 0.1, 0]], steps=8)
+leg_path_r = curve.spline@1(points=[[-0.1, 0.95, 0], [-0.1, 0.52, 0.015], [-0.1, 0.1, 0]], steps=8)
+leg_ring = profile.circle@1(radius=0.078, segments=16)
+leg_l = solid.sweep@1(leg_path_l, leg_ring, scale_end=0.52)
+leg_r = solid.sweep@1(leg_path_r, leg_ring, scale_end=0.52)
+arm_path_l = curve.spline@1(points=[[0.25, 1.43, 0], [0.27, 1.15, 0.01], [0.27, 0.9, 0]], steps=8)
+arm_path_r = curve.spline@1(points=[[-0.25, 1.43, 0], [-0.27, 1.15, 0.01], [-0.27, 0.9, 0]], steps=8)
+arm_ring = profile.circle@1(radius=0.048, segments=14)
+arm_l = solid.sweep@1(arm_path_l, arm_ring, scale_end=0.7)
+arm_r = solid.sweep@1(arm_path_r, arm_ring, scale_end=0.7)
+ball = solid.sphere@1(radius=1, segments=20)
+torso_shape = xform.scale@1(ball, by=[0.165, 0.29, 0.1])
+torso = xform.move@1(torso_shape, by=[0, 1.27, 0])
+shoulder_shape = xform.scale@1(ball, by=[0.06, 0.06, 0.06])
+shoulder_l = xform.move@1(shoulder_shape, by=[0.225, 1.41, 0])
+shoulder_r = xform.move@1(shoulder_shape, by=[-0.225, 1.41, 0])
+pelvis_shape = xform.scale@1(ball, by=[0.16, 0.13, 0.11])
+pelvis_at = xform.move@1(pelvis_shape, by=[0, 0.98, 0])
+neck_shape = solid.cylinder@1(radius=0.05, height=0.14, segments=14)
+neck = xform.move@1(neck_shape, by=[0, 1.55, 0])
+head_shape = xform.scale@1(ball, by=[0.125, 0.15, 0.135])
+head_at = xform.move@1(head_shape, by=[0, 1.71, 0.005])
+hand_shape = xform.scale@1(ball, by=[0.04, 0.05, 0.04])
+hand_l = xform.move@1(hand_shape, by=[0.27, 0.86, 0])
+hand_r = xform.move@1(hand_shape, by=[-0.27, 0.86, 0])
+foot_shape = xform.scale@1(ball, by=[0.05, 0.045, 0.11])
+foot_l = xform.move@1(foot_shape, by=[0.1, 0.06, 0.05])
+foot_r = xform.move@1(foot_shape, by=[-0.1, 0.06, 0.05])
+body_union = solid.union@1(leg_l, leg_r, arm_l, arm_r, shoulder_l, shoulder_r, torso, pelvis_at, neck, head_at, hand_l, hand_r, foot_l, foot_r)
+
+# ---- Skeleton: pelvis > spine > head and arms; pelvis > thighs > shins ----
+knot = solid.box@1(size=[0.02, 0.02, 0.02])
+pelvis_k = xform.move@1(knot, by=[0, 0.95, 0])
+pelvis_b = rig.bone@1(pelvis_k, head=[0, 0.95, 0], tail=[0, 1.05, 0])
+pelvis_bob = anim.track@1(pelvis_b, property="position", keys="0:0,0,0; 0.25:0,-0.025,0; 0.5:0,0,0; 0.75:0,-0.025,0; 1:0,0,0", interpolation="bezier")
+output pelvis = pelvis_bob
+
+spine_k = xform.move@1(knot, by=[0, 1.05, 0])
+spine_b = rig.bone@1(spine_k, head=[0, 1.05, 0], tail=[0, 1.45, 0])
+spine_p = anim.parent@1(spine_b, parent="pelvis")
+spine_sway = anim.track@1(spine_p, property="rotation", keys="0:0,4,0; 0.5:0,-4,0; 1:0,4,0", interpolation="bezier", pivot=[0, 1.05, 0])
+output spine = spine_sway
+
+head_k = xform.move@1(knot, by=[0, 1.5, 0])
+head_b = rig.bone@1(head_k, head=[0, 1.5, 0], tail=[0, 1.84, 0])
+head_p = anim.parent@1(head_b, parent="spine")
+output head = head_p
+
+thigh_l_k = xform.move@1(knot, by=[0.1, 0.95, 0])
+thigh_l_b = rig.bone@1(thigh_l_k, head=[0.1, 0.95, 0], tail=[0.1, 0.52, 0])
+thigh_l_p = anim.parent@1(thigh_l_b, parent="pelvis")
+thigh_l_walk = anim.track@1(thigh_l_p, property="rotation", keys="0:-28,0,0; 0.5:28,0,0; 1:-28,0,0", interpolation="bezier", pivot=[0.1, 0.95, 0])
+output thigh_l = thigh_l_walk
+shin_l_k = xform.move@1(knot, by=[0.1, 0.52, 0])
+shin_l_b = rig.bone@1(shin_l_k, head=[0.1, 0.52, 0], tail=[0.1, 0.1, 0])
+shin_l_p = anim.parent@1(shin_l_b, parent="thigh_l")
+shin_l_walk = anim.track@1(shin_l_p, property="rotation", keys="0:4,0,0; 0.25:6,0,0; 0.5:8,0,0; 0.7:55,0,0; 0.85:20,0,0; 1:4,0,0", interpolation="bezier", pivot=[0.1, 0.52, 0])
+output shin_l = shin_l_walk
+
+thigh_r_k = xform.move@1(knot, by=[-0.1, 0.95, 0])
+thigh_r_b = rig.bone@1(thigh_r_k, head=[-0.1, 0.95, 0], tail=[-0.1, 0.52, 0])
+thigh_r_p = anim.parent@1(thigh_r_b, parent="pelvis")
+thigh_r_walk = anim.track@1(thigh_r_p, property="rotation", keys="0:28,0,0; 0.5:-28,0,0; 1:28,0,0", interpolation="bezier", pivot=[-0.1, 0.95, 0])
+output thigh_r = thigh_r_walk
+shin_r_k = xform.move@1(knot, by=[-0.1, 0.52, 0])
+shin_r_b = rig.bone@1(shin_r_k, head=[-0.1, 0.52, 0], tail=[-0.1, 0.1, 0])
+shin_r_p = anim.parent@1(shin_r_b, parent="thigh_r")
+shin_r_walk = anim.track@1(shin_r_p, property="rotation", keys="0:8,0,0; 0.2:55,0,0; 0.35:20,0,0; 0.5:4,0,0; 0.75:6,0,0; 1:8,0,0", interpolation="bezier", pivot=[-0.1, 0.52, 0])
+output shin_r = shin_r_walk
+
+arm_l_k = xform.move@1(knot, by=[0.25, 1.43, 0])
+arm_l_b = rig.bone@1(arm_l_k, head=[0.25, 1.43, 0], tail=[0.27, 1.15, 0])
+arm_l_p = anim.parent@1(arm_l_b, parent="spine")
+arm_l_swing = anim.track@1(arm_l_p, property="rotation", keys="0:26,0,0; 0.5:-26,0,0; 1:26,0,0", interpolation="bezier", pivot=[0.25, 1.43, 0])
+output arm_l = arm_l_swing
+fore_l_k = xform.move@1(knot, by=[0.27, 1.15, 0])
+fore_l_b = rig.bone@1(fore_l_k, head=[0.27, 1.15, 0], tail=[0.27, 0.9, 0])
+fore_l_p = anim.parent@1(fore_l_b, parent="arm_l")
+fore_l_swing = anim.track@1(fore_l_p, property="rotation", keys="0:-10,0,0; 0.5:-40,0,0; 1:-10,0,0", interpolation="bezier", pivot=[0.27, 1.15, 0])
+output fore_l = fore_l_swing
+
+arm_r_k = xform.move@1(knot, by=[-0.25, 1.43, 0])
+arm_r_b = rig.bone@1(arm_r_k, head=[-0.25, 1.43, 0], tail=[-0.27, 1.15, 0])
+arm_r_p = anim.parent@1(arm_r_b, parent="spine")
+arm_r_swing = anim.track@1(arm_r_p, property="rotation", keys="0:-26,0,0; 0.5:26,0,0; 1:-26,0,0", interpolation="bezier", pivot=[-0.25, 1.43, 0])
+output arm_r = arm_r_swing
+fore_r_k = xform.move@1(knot, by=[-0.27, 1.15, 0])
+fore_r_b = rig.bone@1(fore_r_k, head=[-0.27, 1.15, 0], tail=[-0.27, 0.9, 0])
+fore_r_p = anim.parent@1(fore_r_b, parent="arm_r")
+fore_r_swing = anim.track@1(fore_r_p, property="rotation", keys="0:-40,0,0; 0.5:-10,0,0; 1:-40,0,0", interpolation="bezier", pivot=[-0.27, 1.15, 0])
+output fore_r = fore_r_swing
+
+# ---- Skinned body, outfit colours and head details ----
+skinned = rig.skin@1(body_union, bones="pelvis; spine; head; thigh_l; shin_l; thigh_r; shin_r; arm_l; fore_l; arm_r; fore_r", influences=2, falloff=3)
+skin_tone = solid.material@1(skinned, color=[1.0, 0.87, 0.79], roughness=0.55)
+skin_toon = solid.toon@1(skin_tone, bands=2, feather=0.05, shade_color=[0.93, 0.7, 0.72], rim=0.2, outline=1.6, outline_color=[0.5, 0.26, 0.26])
+output body = skin_toon
+
+# ---- Outfit: each garment is its own skinned shell that follows the same bones as the body ----
+shirt_shape = xform.scale@1(ball, by=[0.176, 0.30, 0.112])
+shirt_core = xform.move@1(shirt_shape, by=[0, 1.265, 0])
+sleeve_path_l = curve.spline@1(points=[[0.25, 1.43, 0], [0.262, 1.32, 0.005], [0.268, 1.2, 0]], steps=6)
+sleeve_path_r = curve.spline@1(points=[[-0.25, 1.43, 0], [-0.262, 1.32, 0.005], [-0.268, 1.2, 0]], steps=6)
+sleeve_ring = profile.circle@1(radius=0.062, segments=14)
+sleeve_l = solid.sweep@1(sleeve_path_l, sleeve_ring, scale_end=0.9)
+sleeve_r = solid.sweep@1(sleeve_path_r, sleeve_ring, scale_end=0.9)
+shirt_union = solid.union@1(shirt_core, sleeve_l, sleeve_r)
+shirt_skin = rig.skin@1(shirt_union, bones="pelvis; spine; head; thigh_l; shin_l; thigh_r; shin_r; arm_l; fore_l; arm_r; fore_r", influences=2, falloff=3)
+shirt_mat = solid.material@1(shirt_skin, color=[0.97, 0.97, 1.0], roughness=0.7)
+shirt_toon = solid.toon@1(shirt_mat, bands=2, feather=0.05, shade_color=[0.72, 0.78, 0.96], rim=0.15, outline=1.6, outline_color=[0.28, 0.3, 0.5])
+output shirt = shirt_toon
+
+skirt_path = curve.spline@1(points=[[0, 1.08, 0], [0, 0.9, 0], [0, 0.74, 0]], steps=6)
+skirt_ring = profile.circle@1(radius=0.17, segments=24)
+skirt_sweep = solid.sweep@1(skirt_path, skirt_ring, scale_end=1.55)
+skirt_skin = rig.skin@1(skirt_sweep, bones="pelvis; spine", influences=1, falloff=3)
+skirt_mat = solid.material@1(skirt_skin, color=[0.18, 0.24, 0.52], roughness=0.7)
+skirt_toon = solid.toon@1(skirt_mat, bands=2, feather=0.05, shade_color=[0.1, 0.12, 0.34], rim=0.1, outline=1.6, outline_color=[0.06, 0.07, 0.2])
+output skirt = skirt_toon
+
+boot_path_l = curve.spline@1(points=[[0.1, 0.4, 0], [0.1, 0.25, 0], [0.1, 0.09, 0]], steps=6)
+boot_path_r = curve.spline@1(points=[[-0.1, 0.4, 0], [-0.1, 0.25, 0], [-0.1, 0.09, 0]], steps=6)
+boot_ring = profile.circle@1(radius=0.066, segments=14)
+boot_l = solid.sweep@1(boot_path_l, boot_ring, scale_end=0.85)
+boot_r = solid.sweep@1(boot_path_r, boot_ring, scale_end=0.85)
+shoe_shape = xform.scale@1(ball, by=[0.058, 0.05, 0.125])
+shoe_l = xform.move@1(shoe_shape, by=[0.1, 0.055, 0.045])
+shoe_r = xform.move@1(shoe_shape, by=[-0.1, 0.055, 0.045])
+boots_union = solid.union@1(boot_l, boot_r, shoe_l, shoe_r)
+boots_skin = rig.skin@1(boots_union, bones="thigh_l; shin_l; thigh_r; shin_r", influences=2, falloff=3)
+boots_mat = solid.material@1(boots_skin, color=[0.5, 0.3, 0.28], roughness=0.6)
+boots_toon = solid.toon@1(boots_mat, bands=2, feather=0.05, shade_color=[0.3, 0.17, 0.2], spec=0.3, rim=0.15, outline=1.6, outline_color=[0.16, 0.08, 0.1])
+output boots = boots_toon
+
+# Anime face: each eye is four flat toon layers (white, iris, pupil, highlight) stacked just proud of the head; brows, mouth and blush are
+# flat ellipsoids. Colours match their shade colour so they stay flat.
+eye_ball = solid.sphere@1(radius=1, segments=16)
+white_shape = xform.scale@1(eye_ball, by=[0.034, 0.042, 0.012])
+iris_shape = xform.scale@1(eye_ball, by=[0.026, 0.035, 0.012])
+pupil_shape = xform.scale@1(eye_ball, by=[0.012, 0.02, 0.01])
+spark_shape = xform.scale@1(eye_ball, by=[0.0075, 0.0075, 0.006])
+spark_small = xform.scale@1(eye_ball, by=[0.004, 0.004, 0.004])
+white_mat = solid.material@1(white_shape, color=[0.98, 0.97, 1.0], roughness=0.6)
+white_toon = solid.toon@1(white_mat, bands=1, feather=0.05, shade_color=[0.9, 0.88, 0.98])
+iris_mat = solid.material@1(iris_shape, color=[0.2, 0.55, 0.9], roughness=0.5)
+iris_toon = solid.toon@1(iris_mat, bands=1, feather=0.05, shade_color=[0.2, 0.55, 0.9])
+pupil_mat = solid.material@1(pupil_shape, color=[0.04, 0.05, 0.16], roughness=0.5)
+pupil_toon = solid.toon@1(pupil_mat, bands=1, feather=0.05, shade_color=[0.04, 0.05, 0.16])
+spark_mat = solid.material@1(spark_shape, color=[1, 1, 1], roughness=0.5, emissive=[1, 1, 1])
+spark_toon = solid.toon@1(spark_mat, bands=1, feather=0.05, shade_color=[1, 1, 1])
+small_mat = solid.material@1(spark_small, color=[1, 1, 1], roughness=0.5, emissive=[1, 1, 1])
+small_toon = solid.toon@1(small_mat, bands=1, feather=0.05, shade_color=[1, 1, 1])
+
+white_l_at = xform.move@1(white_toon, by=[0.052, 1.70, 0.121])
+white_l = anim.parent@1(white_l_at, parent="head")
+iris_l_at = xform.move@1(iris_toon, by=[0.052, 1.695, 0.128])
+iris_l = anim.parent@1(iris_l_at, parent="head")
+pupil_l_at = xform.move@1(pupil_toon, by=[0.052, 1.693, 0.1355])
+pupil_l = anim.parent@1(pupil_l_at, parent="head")
+spark_l_at = xform.move@1(spark_toon, by=[0.060, 1.708, 0.1405])
+spark_l = anim.parent@1(spark_l_at, parent="head")
+small_l_at = xform.move@1(small_toon, by=[0.046, 1.682, 0.1405])
+small_l = anim.parent@1(small_l_at, parent="head")
+output eye_l = white_l
+output iris_l = iris_l
+output pupil_l = pupil_l
+output spark_l = spark_l
+output small_l = small_l
+white_r_at = xform.move@1(white_toon, by=[-0.052, 1.70, 0.121])
+white_r = anim.parent@1(white_r_at, parent="head")
+iris_r_at = xform.move@1(iris_toon, by=[-0.052, 1.695, 0.128])
+iris_r = anim.parent@1(iris_r_at, parent="head")
+pupil_r_at = xform.move@1(pupil_toon, by=[-0.052, 1.693, 0.1355])
+pupil_r = anim.parent@1(pupil_r_at, parent="head")
+spark_r_at = xform.move@1(spark_toon, by=[-0.044, 1.708, 0.1405])
+spark_r = anim.parent@1(spark_r_at, parent="head")
+small_r_at = xform.move@1(small_toon, by=[-0.058, 1.682, 0.1405])
+small_r = anim.parent@1(small_r_at, parent="head")
+output eye_r = white_r
+output iris_r = iris_r
+output pupil_r = pupil_r
+output spark_r = spark_r
+output small_r = small_r
+
+brow_shape = xform.scale@1(eye_ball, by=[0.03, 0.0055, 0.006])
+brow_mat = solid.material@1(brow_shape, color=[0.2, 0.14, 0.45], roughness=0.5)
+brow_toon = solid.toon@1(brow_mat, bands=1, feather=0.05, shade_color=[0.2, 0.14, 0.45])
+brow_l_at = xform.move@1(brow_toon, by=[0.054, 1.752, 0.118])
+brow_l = anim.parent@1(brow_l_at, parent="head")
+brow_r_at = xform.move@1(brow_toon, by=[-0.054, 1.752, 0.118])
+brow_r = anim.parent@1(brow_r_at, parent="head")
+output brow_l = brow_l
+output brow_r = brow_r
+
+mouth_shape = xform.scale@1(eye_ball, by=[0.013, 0.0045, 0.006])
+mouth_mat = solid.material@1(mouth_shape, color=[0.75, 0.22, 0.3], roughness=0.5)
+mouth_toon = solid.toon@1(mouth_mat, bands=1, feather=0.05, shade_color=[0.75, 0.22, 0.3])
+mouth_at = xform.move@1(mouth_toon, by=[0, 1.648, 0.128])
+mouth_p = anim.parent@1(mouth_at, parent="head")
+output mouth = mouth_p
+
+blush_shape = xform.scale@1(eye_ball, by=[0.022, 0.011, 0.006])
+blush_mat = solid.material@1(blush_shape, color=[1.0, 0.55, 0.62], roughness=0.5)
+blush_toon = solid.toon@1(blush_mat, bands=1, feather=0.05, shade_color=[1.0, 0.55, 0.62])
+blush_l_at = xform.move@1(blush_toon, by=[0.075, 1.668, 0.108])
+blush_l = anim.parent@1(blush_l_at, parent="head")
+blush_r_at = xform.move@1(blush_toon, by=[-0.075, 1.668, 0.108])
+blush_r = anim.parent@1(blush_r_at, parent="head")
+output blush_l = blush_l
+output blush_r = blush_r
+
+hair_ball = xform.scale@1(ball, by=[0.135, 0.125, 0.145])
+hair_at = xform.move@1(hair_ball, by=[0, 1.78, -0.015])
+back_shape = xform.scale@1(ball, by=[0.15, 0.25, 0.1])
+back_at = xform.move@1(back_shape, by=[0, 1.62, -0.075])
+bang_shape = xform.scale@1(ball, by=[0.042, 0.032, 0.02])
+bang_c = xform.move@1(bang_shape, by=[0, 1.793, 0.12])
+bang_l = xform.move@1(bang_shape, by=[0.045, 1.793, 0.113])
+bang_r = xform.move@1(bang_shape, by=[-0.045, 1.793, 0.113])
+bang_ll = xform.move@1(bang_shape, by=[0.09, 1.785, 0.075])
+bang_rr = xform.move@1(bang_shape, by=[-0.09, 1.785, 0.075])
+lock_path_l = curve.spline@1(points=[[0.128, 1.77, 0.03], [0.132, 1.65, 0.05], [0.12, 1.5, 0.045]], steps=6)
+lock_path_r = curve.spline@1(points=[[-0.128, 1.77, 0.03], [-0.132, 1.65, 0.05], [-0.12, 1.5, 0.045]], steps=6)
+lock_ring = profile.circle@1(radius=0.032, segments=10)
+lock_l = solid.sweep@1(lock_path_l, lock_ring, scale_end=0.25)
+lock_r = solid.sweep@1(lock_path_r, lock_ring, scale_end=0.25)
+hair_union = solid.union@1(hair_at, back_at, bang_c, bang_l, bang_r, bang_ll, bang_rr, lock_l, lock_r)
+hair_mat = solid.material@1(hair_union, color=[0.36, 0.42, 0.9], roughness=0.4)
+hair_toon = solid.toon@1(hair_mat, bands=2, feather=0.05, shade_color=[0.2, 0.22, 0.62], spec=0.6, rim=0.25, outline=1.8, outline_color=[0.08, 0.08, 0.3])
+hair_p = anim.parent@1(hair_toon, parent="head")
+output hair = hair_p

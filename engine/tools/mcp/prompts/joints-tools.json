@@ -1,0 +1,26 @@
+[
+  {
+    "name": "swinging-door",
+    "prompt": "Make a door that swings: a doorframe post (fixed) and a wooden door 1 m wide and 1.9 m tall hinged on the post's edge so it swings open and shut about a vertical axis, limited to 100 degrees either way. In play mode I can grab and swing it. Put it on a floor.",
+    "uses": ["phys.body", "phys.joint"],
+    "physics": { "dynamic": 1, "static": 2, "joints": 1, "kinds": ["hinge"] }
+  },
+  {
+    "name": "pendulum",
+    "prompt": "Make a pendulum: a horizontal ceiling beam (fixed) 3 m up, a thin rod hanging from it on a hinge so it swings in one vertical plane, and a heavy ball welded to the rod's lower end. Start it pulled out to the side so it swings when I press play.",
+    "uses": ["phys.body", "phys.joint"],
+    "physics": { "dynamic": 2, "static": 1, "joints": 2, "kinds": ["hinge", "fixed"] }
+  },
+  {
+    "name": "bouncing-spring",
+    "prompt": "Make a weight hanging on a spring: a fixed hook up high and a 0.4 m cube hanging below it on a spring (rest length 1 m) that starts stretched, so it bounces up and down when I press play.",
+    "uses": ["phys.joint"],
+    "physics": { "dynamic": 1, "static": 1, "joints": 1, "kinds": ["spring"] }
+  },
+  {
+    "name": "doorbell-lamp",
+    "prompt": "Make a doorbell: a gold bell (fixed) with a ball above it that falls on it when I press play; when the ball touches the bell a lamp beside it lights up (a glowing sphere that turns on). Use a collision trigger and a flag.",
+    "uses": ["phys.body", "behavior.on"],
+    "physics": { "dynamic": 1, "static": 1, "collide": true }
+  }
+]

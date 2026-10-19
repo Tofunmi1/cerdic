@@ -29,6 +29,12 @@ output attached`;
   await socket.click();
   assert.deepEqual(await page.evaluate(()=>window.__ve.docPanel.selection.socket),{part:child,name:'foot'});
   assert((await socket.getAttribute('class')).includes('selected'),'socket selection is visible');
+  assert.deepEqual(await page.evaluate(()=>window.__ve.evaluation.socketPosition('n_missing','foot')),null);
+  const socketPosition=await page.evaluate(()=>window.__ve.evaluation.socketPosition(window.__ve.docPanel.selection.socket.part,'foot'));
+  assert(socketPosition.every((value,index)=>Math.abs(value-[2,1.5,0][index])<1e-5),'the selected frame provides a world-space pivot');
+  await page.selectOption('#gizmo-pivot','socket');
+  await page.waitForFunction(()=>document.querySelector('#viewer-gizmo [data-axis="0"]'),null,{timeout:10000});
+  await page.selectOption('#gizmo-pivot','center');
 
   await page.evaluate(t=>window.__ve.doc.sendText(t,'Define a grouped socket'),`group wheel
 body = solid.box(size=[0.4,0.2,0.4])

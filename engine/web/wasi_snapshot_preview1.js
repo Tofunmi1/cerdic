@@ -15,6 +15,24 @@ export const fd_seek = () => EBADF;
 export const fd_write = () => EBADF;
 export const fd_read = () => EBADF;
 export const fd_fdstat_get = () => EBADF;
+// libc start-up asks for pre-opened directories; there are none, so the enumeration ends at once.
+export const fd_prestat_get = () => EBADF;
+export const fd_prestat_dir_name = () => EBADF;
+
+// The vendored Blender code reads environment variables (`getenv`); the page has none.
+export function environ_sizes_get(count, size) {
+  if (!memory) return EBADF;
+  const view = new DataView(memory.buffer);
+  view.setUint32(count, 0, true);
+  view.setUint32(size, 0, true);
+  return 0;
+}
+export const environ_get = () => 0;
+
+/** The vendored Blender code can reach `abort()` on a broken invariant; surface it as an exception. */
+export function proc_exit(code) {
+  throw new Error(`wasm module exited (code ${code})`);
+}
 
 export function clock_time_get(_clockId, _precision, out) {
   if (!memory) return EBADF;

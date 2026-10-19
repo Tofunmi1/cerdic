@@ -9,6 +9,8 @@ const SPECS = {
   bench1: { instances: 45, triangles: 50_000 },
   bench2: { instances: 155, triangles: 200_000 },
   bench3: { instances: 305, triangles: 400_000 },
+  bench4: { instances: 605, triangles: 1_000_000 },
+  bench5: { instances: 1005, triangles: 2_000_000 },
 };
 const failures = [];
 const check = (ok, message) => { if (!ok) failures.push(message); };
@@ -41,7 +43,10 @@ try {
     // The renderer's own counts must reconcile with the scene: a mono view draws every instance once
     // (nothing is batched here) and rasterises exactly the scene's triangles; the shadow pass repeats
     // them when shadows are on.
-    await page.waitForFunction(() => window.__ve.read().render.main.draws > 0, null, { timeout: 60000 });
+    // A big room takes longer to finish spawning; wait for every prop to be submitted (a wrong count
+    // still fails the check below once the wait times out).
+    await page.waitForFunction((count) => window.__ve.read().render.main.draws >= count, spec.instances, { timeout: 120000 })
+      .catch(() => {});
     const counted = (await page.evaluate(() => window.__ve.read())).render;
     check(counted.main.draws === spec.instances, `[${scene}] main pass submitted ${counted.main.draws} draws, expected ${spec.instances}`);
     check(counted.main.triangles === status.scene.triangles, `[${scene}] main pass drew ${counted.main.triangles} triangles, scene has ${status.scene.triangles}`);

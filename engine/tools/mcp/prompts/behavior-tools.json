@@ -1,0 +1,26 @@
+[
+  {
+    "name": "click-door",
+    "prompt": "Make a door 0.9 m wide, 2 m tall and 0.05 m thick, hinged at its left edge. When someone clicks it, it should swing open 90 degrees over one second, and clicking it again should close it.",
+    "uses": ["anim.track", "behavior.on"],
+    "size": [0.9, 2, 0.05], "sizeTolerance": 0.05,
+    "animation": { "properties": ["rotation"], "minDuration": 0.8, "maxDuration": 1.2, "pivotNearEdge": true },
+    "behavior": { "trigger": "select", "action": "toggle" }
+  },
+  {
+    "name": "automatic-door",
+    "prompt": "Make a sliding door panel 1 m wide, 2 m tall and 0.05 m thick that slides 1 m sideways over 0.8 seconds when someone walks within 3 metres of it, and slides back when they walk away.",
+    "uses": ["anim.track", "behavior.on"],
+    "size": [1, 2, 0.05], "sizeTolerance": 0.05,
+    "animation": { "properties": ["position"], "minDuration": 0.6, "maxDuration": 1.0 },
+    "behavior": { "trigger": "near", "action": "toggle", "radius": [2.5, 3.5] }
+  },
+  {
+    "name": "lever",
+    "prompt": "Make a lever: a bar 0.1 m wide, 0.6 m long and 0.05 m thick, pivoting about one end. When clicked it should pull down 60 degrees over half a second and stay down.",
+    "uses": ["anim.track", "behavior.on"],
+    "size": [0.1, 0.6, 0.05], "sizeTolerance": 0.05,
+    "animation": { "properties": ["rotation"], "minDuration": 0.4, "maxDuration": 0.6 },
+    "behavior": { "trigger": "select", "action": "play" }
+  }
+]

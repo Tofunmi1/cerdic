@@ -7,6 +7,8 @@
 
 use std::f32::consts::TAU;
 
+pub(crate) mod showcase;
+
 use bevy_asset::Assets;
 use bevy_camera::Camera3d;
 use bevy_color::Color;
@@ -45,6 +47,16 @@ impl BenchSpec {
     pub(crate) const STRESS: Self = Self {
         draws: 300,
         triangles: 400_000,
+    };
+    /// S4: one million triangles, beyond the original Quest targets (a desktop and future-device probe).
+    pub(crate) const MILLION: Self = Self {
+        draws: 600,
+        triangles: 1_000_000,
+    };
+    /// S5: two million triangles, the evaluator's Final budget.
+    pub(crate) const TWO_MILLION: Self = Self {
+        draws: 1_000,
+        triangles: 2_000_000,
     };
 }
 
@@ -126,8 +138,11 @@ fn spawn_room(
     wall_height: f32,
 ) -> Result<(), KernelError> {
     let (h, mid) = (wall_height, wall_height / 2.0);
+    // The floor's top sits 5 mm below y = 0 so a model's own base slab (top at y = 0, as authored
+    // models are) is not coplanar with it; coplanar faces tie in the depth test and flicker as the
+    // camera moves.
     let room = [
-        ([14.0, 0.1, 14.0], Vec3::new(0.0, -0.05, 0.0)),
+        ([14.0, 0.1, 14.0], Vec3::new(0.0, -0.055, 0.0)),
         ([14.0, h, 0.1], Vec3::new(0.0, mid, -7.0)),
         ([14.0, h, 0.1], Vec3::new(0.0, mid, 7.0)),
         ([0.1, h, 14.0], Vec3::new(-7.0, mid, 0.0)),
@@ -145,6 +160,9 @@ fn spawn_room(
                 ..VeMaterial::default()
             },
             Transform::from_translation(position),
+            crate::studio::StudioRoom {
+                base_position: position,
+            },
         ));
     }
     Ok(())
@@ -238,6 +256,15 @@ pub(crate) fn stage_scene(
     commands.spawn((
         Camera3d::default(),
         Transform::from_xyz(0.0, 1.0, 2.2).looking_at(Vec3::new(0.0, 0.3, 0.0), Vec3::Y),
+    ));
+    Ok(())
+}
+
+/// A camera and nothing else: no room, no floor, no lights. The document being viewed brings its own.
+pub(crate) fn open_scene(commands: &mut Commands) -> Result<(), KernelError> {
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(0.0, 1.6, 4.0).looking_at(Vec3::new(0.0, 1.0, 0.0), Vec3::Y),
     ));
     Ok(())
 }

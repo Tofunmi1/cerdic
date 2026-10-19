@@ -1,0 +1,30 @@
+[
+  {
+    "name": "robot-arm",
+    "prompt": "Make a robot arm: a 0.1 m square upper arm 0.6 m long and a forearm 0.1 m square and 0.5 m long attached below it. The upper arm swings 45 degrees about the shoulder at its top end, and the forearm bends 90 degrees at the elbow. Both movements repeat every 3 seconds. The forearm must travel with the upper arm.",
+    "uses": ["anim.track", "anim.parent"],
+    "animation": { "properties": ["rotation"], "minDuration": 2.5, "maxDuration": 3.5 },
+    "assembly": { "followers": 1, "moving": 2 }
+  },
+  {
+    "name": "car-wheels",
+    "prompt": "Make a simple car: a body block 2 m long, 0.6 m tall and 1 m wide, and four wheels (cylinders 0.3 m radius, 0.15 m thick, axles along the width) at the corners. The car body drives forward 5 metres over 4 seconds. The wheels must travel with the car body and also spin about their axles.",
+    "uses": ["anim.track|anim.wave", "anim.parent"],
+    "animation": { "properties": ["position", "rotation"] },
+    "assembly": { "followers": 4, "moving": 5 }
+  },
+  {
+    "name": "bobbing-lantern",
+    "prompt": "Make a lantern: a small glowing bulb (emissive and emitting light) hanging below a 0.2 m cube housing. The housing bobs up and down 0.1 m every 3 seconds, the bulb must move with the housing, and the bulb's glow flickers gently, never going fully dark.",
+    "uses": ["anim.wave", "anim.parent"],
+    "animation": { "properties": ["position", "glow"] },
+    "assembly": { "followers": 1, "moving": 2 }
+  },
+  {
+    "name": "windmill",
+    "prompt": "Make a windmill: a tapered tower (a box is fine, 1 m wide, 3 m tall) with a hub on its upper front and four blades 0.15 m wide and 1.5 m long mounted on the hub. The blades and hub turn together once every 4 seconds, forever, about an axis pointing out of the tower's front. The tower itself does not move.",
+    "uses": ["anim.track|anim.wave"],
+    "animation": { "properties": ["rotation"], "minDuration": 3.5, "maxDuration": 4.5, "loop": true },
+    "assembly": { "followers": 0, "moving": 1 }
+  }
+]

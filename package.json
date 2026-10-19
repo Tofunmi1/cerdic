@@ -33,6 +33,7 @@
     "@types/react-dom": "^19.2.0",
     "@types/three": "^0.185",
     "@vitejs/plugin-react": "^5.0.0",
+    "gltf-validator": "^2.0.0-dev.3.10",
     "typescript": "~5.9.3",
     "vite": "^7.0.0"
   }

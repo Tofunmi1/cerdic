@@ -5,6 +5,16 @@ struct View {
     clip_from_world: mat4x4<f32>,
     camera_position: vec4<f32>,
     exposure: vec4<f32>,
+    // Present for layout compatibility with the forward pass; the depth pass does not grade.
+    grading: vec4<f32>,
+    tint: vec4<f32>,
+    world_from_clip: mat4x4<f32>,
+    viewport: vec4<f32>,
+    horizon: vec4<f32>,
+    zenith: vec4<f32>,
+    ground: vec4<f32>,
+    sun: vec4<f32>,
+    cloud: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> view: View;

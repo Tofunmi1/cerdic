@@ -276,8 +276,8 @@ things in parallel. Each gate needs recorded evidence, not just a passing build.
 | G6 | Polygon topology and restricted editing | G5, X3 |
 | G7 | Subdivision surfaces | G6, X3 |
 | G8 | Organic fields and meshing | G4; follows G7 by default |
-| G9 | Broader AI modeling and follow-up evaluation | G5-G8 |
-| G10 | Procedural appearance and core gallery | G9 |
+| G9 | Modeling fixes, visual fidelity, AI composition and evaluation | G5-G8 |
+| G10 | Remaining procedural appearance and material authoring | G9 |
 | G11 | Optional stylized rendering and strokes | G10 |
 | G12 | Optional constrained sketches | G5, X5 |
 | V5 | Optional tool edit modes: polygon edit, stroke draw, sketch edit | V3 and the matching G gate |
@@ -382,18 +382,38 @@ valid known cases; unsupported trims and self-intersections are rejected explici
 trimmed-surface booleans and general constant-thickness shelling are outside this gate.
 
 **G6 — Polygon tools.** Polygon and corner storage plus adjacency; selected-face extrusion, inset,
-bridge loops, weld, dissolve, orientation change, restricted bevel. X3 lists which operators the chosen
-library provides; the rest (expected: bevel, inset, bridge) are deferred or covered by a small
-separate plan with its own corpus, agreed before G6 starts. Never begin G6 with an unassigned
-operator. *Accept:* boundary, closed and non-manifold cases follow the contract; attribute domains and
+bridge loops, weld, dissolve, orientation change, restricted bevel. X3 found these edit operators are
+in-house work on `PolyMesh`; the narrow v1 contracts, algorithms and codes are in
+[`g6-polygon-operators.md`](g6-polygon-operators.md). Never begin G6 with an unassigned operator.
+*Accept:* boundary, closed and non-manifold cases follow the contract; attribute domains and
 semantic selections are preserved where defined; bevel failures are typed and transactional;
 connectivity, winding and Euler changes validated; open meshes need not be solids.
+*Status 2026-10-14:* implemented against its case table (G6-01 to G6-47) and covered by a passing strict
+gate; ADR 0019 and ADR 0020 await acceptance. Scope added while building the facade fixture:
+`poly.merge_coplanar`, `poly.grid`, individual inset and extrude, `poly.delete_faces` and derived `role`
+tags. Limits and measurements are in [`g6-report.md`](../modeling/g6-report.md); colour regions through
+polygon edits, non-planar extrusion and bevel networks remain open.
 
 **G7 — Subdivision.** Catmull-Clark with supported boundary and crease rules and face-varying
-attributes, using the backend X3 selects (OpenSubdiv CPU first). Keep the cage; preview and final
-levels. *Accept:* extraordinary vertices, creases, boundaries and UV seams match reference cases
-within tolerance; refinement growth is preflighted and cancellable. Manifold smooth and refine stay a
-distinct tangent-based triangle operation, not a Catmull-Clark substitute.
+attributes, using the backend X3 selects (OpenSubdiv CPU proposed). Keep the cage; preview and final
+levels. *Accept:* implemented paths match reference cases within tolerance; unsupported attribute/hole
+paths fail with typed reasons; refinement growth is preflighted and bounded library-call cancellation limits
+are documented. Manifold smooth and refine stay a distinct tangent-based triangle operation, not a
+Catmull-Clark substitute.
+
+**Implementation status (2026-10-14):** OpenSubdiv is vendored and builds for native and browser/WASI
+targets; the C ABI, safe kernel API and geometry adapter cover uniform refinement, boundary modes,
+edge creases, corner sharpness, provenance, cancellation boundaries and bounded growth. Curved quads now
+triangulate deterministically and `poly.subdivide@1` is reachable from text and MCP. Graph crease/corner
+selection inputs, face-region propagation, save/reload/undo, grouped instances, 29 native/WASI corpus lines,
+Node WASI execution, near-cap WASI memory/timing, a bevelled block gallery and MCP guidance are covered.
+`poly.subdivide` is documented as the final edit step in v1: planar-patch extrusion and bevel networks have
+stable level-1/2 refusal tests. Explicit attribute limits remain: FVar UVs and float point primvars are refused
+with typed errors; a non-zero face `hole` tag is recognized and refuses because child-face provenance assumes
+every source face refines to children. Exact infinite-level extraordinary reference positions and multilevel
+crease-decay references are future numerical checks; `RefineUniform` remains uninterruptible even though the
+near-cap WASI calls measured below a second. See
+[`g7-report.md`](../modeling/g7-report.md) for evidence and remaining acceptance cases.
 
 **G8 — Organic fields.** Bounded field tape (primitive distances, blends, transforms, repeat,
 deterministic noise), explicit bounds and resolution, cell and instruction budgets, Manifold `LevelSet`
@@ -403,24 +423,63 @@ blends by convergence or reference samples; clipped and unbounded domains and ov
 rejected; boundary behaviour checked; creature fixture with a multi-view silhouette review and named
 regions, without claiming animation-ready topology.
 
-**G9 — AI composition and editing.** Select capabilities and groups by task with dependency closure,
-supply a bounded summary of current IDs and parameters, targeted diagnostic repair, optional budgeted
-render critique. The validator owns correctness; the LLM cannot bypass contracts or limits.
-*Accept:* freeze at least 60 creation and edit tasks across modeling families, including impossible
-requests, ambiguous edits and stale revisions. Report first-try validity, repaired validity, semantic
-and visual success, edit locality, latency and provider cost separately. Version model, prompt and
-schema; cap calls, tokens, time and critique images. Judge attachments against declared sockets;
-intentionally disconnected assemblies are valid. Keep a deterministic mock corpus. Freeze rubrics and
-thresholds before evaluating; compare overlapping tasks with the spike baseline. A metrics table
-alone does not establish useful modeling. AI-proposed edits appear in the editor as a reviewable
-pending transaction (graph diff plus viewport preview) the user accepts or rejects.
+**Status (2026-10-14): partial foundation only.** A bounded Rust field expression/tape, C++ Manifold
+adapter and graph path for sphere, ellipsoid, plane, other primitives, combinations and explicit
+`field.to_solid` are implemented. Measurements
+reduced the initial 8M grid proposal to enforced limits of 2M samples and 64M sample-instruction
+operations; see [ADR 0022](../adr/0022-bounded-spatial-fields.md) and
+[`g8-report.md`](../modeling/g8-report.md). Noise/repeat/deformation, graph-wide cost preflight,
+native/WASI modeling corpus parity, regions, creature review, MCP and the full strict gate remain
+open, so G8 acceptance is not met.
 
-**G10 — Appearance and gallery.** Typed bounded procedural material subset, object and triplanar
-coordinates, stable material slots, deliberate normals and tangents, optional UV atlas after X4;
-texture and shader limits and real renderer support; MaterialX informs contracts only. A material
-editor panel in the inspector. *Accept:* core fixtures show material boundaries, seams, mirrored cases
-and follow-up edits correctly; all survive save, reload, undo and redo; supported recipes and
-limitations published with screenshots.
+**G9 — Fixes, visual fidelity, AI composition and editing.** G9 has three ordered slices, recorded in
+[ADR 0023](../adr/0023-g9-fidelity-before-ai.md): fix planner overestimation, automatic Preview-to-Final
+refinement, concave subdivision, large atomic command batches, and profile large-scene evaluation first;
+then improve lighting, occlusion, materials, rounded edges, presentation and composition using the pistol
+and furnished-room review fixtures; then build AI capability selection and dependency closure, bounded
+scene context, targeted diagnostic repair, optional budgeted render critique, and reviewable pending edits.
+Correctness stays in the validator; an LLM cannot bypass contracts or limits. Expensive visual features
+need Low/Medium/High policies, typed refusal or fallback, measured cost and deterministic evaluator parity
+where applicable. Quest costs remain unmeasured until tested on a headset.
+*Accept:* G9a regressions pass, including a chain of eight cuts at Preview, a real preflight budget refusal,
+Final refinement that retains Preview after failure, concave subdivision and a one-transaction large-scene
+edit; large-scene timing and cache work are recorded. G9b has lighting, AO, procedural materials, rounding,
+post effects and composition with tier policies, measured desktop costs, before/after fixed views and owner
+scores for the pistol and study room. G9c freezes at least 60 creation and
+edit tasks including impossible requests, ambiguous edits and stale revisions. Report first-try validity,
+repaired validity, semantic and visual success, edit locality, latency and cost separately. Version model,
+prompt and schema; cap calls, tokens, time and critique images; keep deterministic mock tasks and freeze
+rubrics and thresholds before evaluation. Provider-backed results require funded credit and are reported
+separately from mock results. AI proposals appear as a reviewable pending transaction with graph diff and
+viewport preview; the user accepts or rejects the proposal.
+
+**Status (2026-10-15): started.** A1's repeated boolean multiplication has a regression fix; the eight-cut, large-array and dense-subdivide
+preflight cases pass, with the all-gallery estimate audit open. A2 schedules Final after Preview settles, preserves Preview on Final failure and
+retries the failed quality after worker recovery; focused browser acceptance passed, including Preview-budget escalation and bounded upload. A3
+triangulates concave faces before refinement, preserves face and corner source attributes, reports a warning, and passes geometry/graph tests plus
+native/WASI parity. A4's limit is 1,000 commands / 1 MiB, and the 382-command study-room fixture applies and undoes as one transaction (42,667
+encoded bytes; 72.9 ms for native Session apply in the latest local run). A5's browser profile measured 100.8 ms Preview and 55.3 ms Final worker
+time, with 4.35 s and 8.77 s to accepted projections, respectively; broader multi-batch cache profiling remains open. B1 now supports authored
+sun/point/spot lights and bounded emissive-derived point emitters; its affected-crate quick gate and a study-room browser slice pass under
+SwiftShader. B1's owner image review is open. B2 AO, B5 procedural materials, B7 composition
+and B8 visual scoring remain open. B6's whole-solid edge treatment now covers `solid.round` and the new `solid.chamfer` (an octahedron Minkowski
+that cuts a flat 45-degree facet on convex edges), and the `poly.bevel_edges` v1 disjoint-edge contract is pinned by refusal tests; edge networks
+stay disabled and owner review of the sharp/chamfered captures is open. B3's authored `scene.environment` L1 sky/ground band, optional ground bounce and serialization are implemented,
+gated by focused crate tests and a passing Engine Viewer before/after capture (`web/tests/g9-environment.mjs`); owner review of the captures remains
+open. B4's 45-degree default and bounded viewer grading with five presets are implemented and browser-tested (`web/tests/g9-grading.mjs`); bloom and
+depth of field are deferred with the reason in ADR 0023, and presentation acceptance remains open. All of G9c remains open. See
+[`handoff-g9-fidelity-and-ai.md`](../handoff-g9-fidelity-and-ai.md) and Proposed [ADR 0023](../adr/0023-g9-fidelity-before-ai.md).
+`cargo xtask check --strict --no-cache` passed on 2026-10-15 with no cached stages (606 tests; full browser stage 761 s under SwiftShader;
+`target/reports/g9/strict-final2.log`, `exit=0`). Focused evidence and remaining acceptance are recorded in [`g9-report.md`](../modeling/g9-report.md).
+This status is workspace progress, not G9 completion.
+
+**G10 — Remaining appearance and material authoring.** Continue the typed bounded procedural material
+language and supported recipes beyond the subset pulled into G9b, stable material slots, deliberate
+normals and tangents, optional UV atlas after X4, texture and shader limits, and a material editor panel
+in the inspector. MaterialX informs contracts only. *Accept:* core fixtures show material boundaries,
+seams, mirrored cases and follow-up edits correctly; all survive save, reload, undo and redo; supported
+recipes and limitations are published with screenshots. G10 does not duplicate the appearance features
+accepted by G9b.
 
 **G11 — Optional styles and strokes.** Toon material mode, outlines with a defined open and closed mesh
 policy; layered 3D and on-plane strokes with widths, opacity, colours and filled contours. Static
@@ -524,7 +583,7 @@ cancellation behaviour, maintenance risk.
 |---|---|---|
 | X1 | Evaluator-only WASM in a worker with the real C++ toolchain; termination, restart, buffer transfer | Resolve packaging before G2; no heavy evaluation on the window |
 | X2 | Curvo for loft, sweep, revolve and adaptive surfaces against a fixture and tolerance corpus | A documented limited profile and polyline sweep subset; defer the rest |
-| X3 | OpenSubdiv CPU (primary for subdivision) and PMP (polygon and remeshing): subdivision rules, creases, corner data; output a table of G6 and G7 operators as provided, missing or partial | Narrow operators or rules with diagnostics; missing operators get a small plan (rule 4) |
+| X3 | OpenSubdiv CPU and PMP: subdivision rules, creases, corner data; table of G6/G7 operators, WASM compatibility, costs and cancellation | **Complete 2026-10-14:** OpenSubdiv CPU proposed for G7 behind adapter; G6 operations implemented on `PolyMesh`; PMP stays a reference/remeshing candidate pending no-exception/no-RTTI compatibility. Review ADR 0019 before G6 |
 | X4 | xatlas for UV charts with vertex remapping and corner provenance | Keep object and triplanar coordinates; defer unwrap |
 | X5 | neoscad sketch-solver (primary) against a frozen 40-sketch corpus, WASM build | Defer constraints; keep dimensioned procedural profiles |
 | X6 | Engine canvas inside a React shell: wasm instance lifecycle, resize, focus, pointer lock, two instances | Keep the engine page in an iframe with a message bridge |
@@ -576,7 +635,7 @@ frame-budget claims need real measurements.
 |---|---|
 | D1 | **Licences are not a selection criterion.** MPL-2.0 is allowed; OpenSubdiv's Tomorrow Open Source Technology License 1.0 (Apache with a changed trademark section) is allowed. ADR 0005 records this, supersedes the permissive-only wording of ADR 0003 and extends the `deny.toml` allowlist as needed. Standing rule kept from before: no GPL or AGPL code in the engine, principles only; say if that also goes. Supply-chain advisory checks stay. |
 | D2 | **Subdivision:** OpenSubdiv CPU is the primary backend, confirmed by X3; PMP for polygon and remeshing work; Manifold smooth stays a separate triangle operation. |
-| D3 | **Surfaces:** Curvo is the primary adapter if X2 passes; otherwise the limited subset in section 6. |
+| D3 | **Surfaces:** X2 rejects Curvo for the evaluator's panic/cancellation contract; G5 starts with a bounded in-house polyline and cubic Bézier subset (ADR 0017). NURBS waits for a separately validated adapter. |
 | D4 | **Sketches:** neoscad sketch-solver is primary if X5 passes; otherwise G12 is deferred. |
 | D5 | **Blender:** no offline worker in this release; browser authoring stands alone. |
 | D6 | **Evaluation:** worker isolation early (G2), one authored command system, groups early. |
@@ -589,6 +648,11 @@ frame-budget claims need real measurements.
 | D13 | **Tick and runtime:** fixed 60 Hz, integer ticks, no wall clock; the interpreter runs inside the engine module on the window thread under a per-tick step budget; the geometry worker only does rebuild jobs. |
 | D14 | **Re-trigger default:** `ignore` while a rule's chain is running; `restart` and `queue` (at most 8) are explicit per rule. |
 | D15 | **Per-frame writes** are live parameters only (transforms, visibility, material parameters); geometry parameters are discrete, coalesced rebuild requests. |
+
+**D2 amendment proposed, not yet accepted:** X3 evidence is recorded in [ADR 0019](../adr/0019-polygon-and-subdivision-backend.md).
+Its proposed implementation boundary keeps G6 operators on `PolyMesh`, uses OpenSubdiv CPU Far behind a G7
+adapter, and does not link current PMP into the evaluator while its exception/RTTI requirements conflict with
+the engine C++ build. Maintainers decide whether to accept this amendment.
 
 Primary references (checked 2026-10-12; pin a commit during adoption):
 [vendored Manifold API](../../third_party/manifold/include/manifold/manifold.h) and
@@ -710,10 +774,63 @@ release build passed. See [G4d report](../modeling/g4d-report.md); design:
 [ADR 0015](../adr/0015-assembly-frames.md). G4 is complete. V3 frame gizmos and V4 group authoring
 UI remain separate milestones.
 
-G4-G13, V1-V7 and L0-L9 incomplete; X2-X5 and X7-X9 not performed. No gate has passed merely because this
-document was revised. Replace this line with per-milestone evidence as work lands:
-commit, contract version, cases and commands run, pass, fail and skips, benchmark artifact, known
-limitations, next dependency. Run `cargo xtask check --strict` from `engine/`, the separate
+**V3 implemented, strict-gated 2026-10-13 (uncommitted), gaps recorded:** cases and per-case evidence are in
+`modeling/cases.md` (section V3); ADR 0016 is the authored-command contract and now states what is built.
+Built: pure drag maths, move/rotate/scale handles with snapping and part-centre, origin or socket pivots,
+atomic authored transform insertion, polygon-point, radius, array/repeat spacing, socket-frame and revolve
+handles, drag guards (Escape, cancel, lost capture, blur, stale revision, a busy evaluation), feature picking
+with `selection.ambiguous`, `selection.lost`, bounds, wire, normals, diagnostic and socket-frame overlays,
+and frame-selected. `cargo xtask check --strict` passed with 387 native tests and every browser suite
+(`target/v3-strict-02.log`). Open, and stated in [`v3-report.md`](../modeling/v3-report.md): the overlays are an
+SVG layer over the desktop canvas, not rendered per eye (needed before V6); no preview-tier rebuild during a
+geometry drag; world axes only; no handle for an instance's exposed-parameter override; loft handles wait
+for G5. All visual evidence is SwiftShader only; no headset or real-GPU run. V4 group authoring UI is a separate milestone.
+
+**G5 in progress (2026-10-13):** X2 is answered; Curvo is not selected for the evaluator because its
+dependency/runtime and cancellation risks do not meet our panic-free worker contract. Draft ADR 0017
+selects the bounded in-house adapter, with NURBS deferred. Implemented and focused-tested: typed
+`Points3`, cached curve values, open/closed authored polylines, fixed-step cubic `curve.bezier`, `curve.circle`,
+`solid.sweep` for open and supported closed paths with one convex profile loop, and `solid.loft` for two to 64
+matching convex sections. Sweep/loft preflight includes sides, caps and a bounded triangle-grid intersection pass;
+cancellation is polled during construction and per grid cell. The original sufficient path-distance test is
+unchanged; the new mesh test catches cap/tube contact, bend-vertex touch and parallel overlap while a separated
+near-miss still builds. Six-section hollow vase and straight/curved pipe compositions pass. For matched
+corresponding vertices with linear loft interpolation, the radial wall gap's minimum occurs at a section; a 0.005 m
+thin wall missed by 0.035 m mesh sampling is covered under explicit assumptions (equal point counts, correspondence,
+inner inside outer at each section, and raised inner loft). This is not a runtime guarantee through arbitrary
+floor/rim transitions. Twist, taper and bend sample edge midpoints and face centroids, locally split shared edges
+without T-junctions, check face/Jacobian orientation and validate the result with the Manifold kernel. Two
+refinement rounds preserve the 16x growth cap; hard-bent thin-box and twisted-loft fixtures pass and impossible
+sampled tolerances refuse. The sampled tolerance is not a continuous face-wide bound.
+
+`cargo xtask check --strict` passed after these changes (431 nextest tests, native/WASI parity and all browser
+suites on SwiftShader); `cargo xtask rules`, workspace Clippy, focused G5 Rust suites, TypeScript checks and a fresh
+release WASM build also passed. Twelve modeling outputs match between native and WASI. Save/reload, group sharing,
+history and instance override/definition-edit behavior have focused coverage (G5-11). Five G5 gallery programs
+pass six-view SwiftShader automation. The scripted MCP browser client builds a pipe and loft and edits them by
+stable ID, but no external language model or provider is configured (G5-14 remains open). Authored curves render
+in the desktop SVG overlay, with draggable 3D Bézier/polyline control points.
+
+G5 remains incomplete: provider-backed G5-14 is untested, the wall argument is limited to its stated assumptions,
+and the grid's floating-point predicates are not an exact guarantee for degenerate or near-coplanar meshes. See
+[`experiments.md`](../modeling/experiments.md#x2-curvo-as-the-g5-geometry-adapter-2026-10-13--answered-do-not-embed-in-the-evaluator),
+[ADR 0017](../adr/0017-bounded-surface-adapter.md), and the additional foundation cases in
+[`cases.md`](../modeling/cases.md).
+
+**G5 follow-up (2026-10-14):** cases G5-26 to G5-31 are recorded, including material regions and loft blending,
+robust small-solid deformer coverage, expanded checked-in gallery programs, and the five-union Preview estimate
+regression. Fresh release WASM sizes and SwiftShader gallery evidence are recorded in [`g5-report.md`](../modeling/g5-report.md).
+`cargo xtask check --strict` passed after the union-planner change (458 native tests; all gates passed;
+`target/next-after-g5-strict-03.log`). Browser evidence used SwiftShader; no headset or physical-GPU run has
+been made. Material-region propagation through deformers, realize and attachments remains open, as does G5-14's
+reproducible provider-backed natural-language evidence. G6 awaits maintainer review of the X3 outcome and
+proposed ADR 0019. X3 is documented in [`experiments.md`](../modeling/experiments.md),
+with the operator contracts in [`g6-polygon-operators.md`](g6-polygon-operators.md) and cases in
+[`cases.md`](../modeling/cases.md). No G6 implementation has started; begin after maintainer review of ADR 0019.
+
+The earlier G5 strict gate passed after its A-C follow-ups; provider-backed G5-14 and broader track work remain incomplete. X4-X5 and X7-X9
+not performed. Preserve per-milestone evidence as work lands: contract version, cases and commands run, pass/fail/
+skips, benchmark artifact, limitations and next dependency. Run `cargo xtask check --strict` from `engine/`, the separate
 `cargo xtask advisories` gate, and explicit release builds with size measurement; strict checks do
 not replace release measurements or headset testing.
 

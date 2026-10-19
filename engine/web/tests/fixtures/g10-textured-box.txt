@@ -1,0 +1,9 @@
+box = solid.box@1(size=[1, 1, 1])
+paint = solid.material@1(box, color=[0.8, 0.8, 0.8], roughness=0.6)
+cage = poly.from_solid@1(paint)
+flat = poly.merge_coplanar@1(cage)
+seams = poly.select@1(flat, element="edge", by="sharp", angle=0.5)
+uv = poly.unwrap_uv@1(flat, seams, method="angle", rotate=true)
+solid = poly.to_solid@1(uv)
+pattern = solid.texture@1(solid, program="grain = fbm(scale_x=5, scale_y=5, iterations=3); albedo = colorize(grain, gradient=[0:#24415a, 1:#d7ad68]); roughness = grain; metallic = grain; height = grain; emissive = colorize(grain, gradient=[0:#000000, 1:#ff6a22])")
+output textured_box = pattern

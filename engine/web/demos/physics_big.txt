@@ -1,0 +1,247 @@
+# Big physics demo. Press Play. Four set pieces on one floor:
+#  1. Bowling: a heavy ball rolls down a ramp into ten revolved pins.
+#  2. Dominoes: a ball rolls down a small ramp and sets off a chain of fourteen.
+#  3. Brick wall: a very heavy ball rolls down a ramp into a wall of twenty bricks.
+#  4. Funnel: eight marbles drop into a static funnel and fall through its hole.
+# Drag any prop to lift it and let go to throw it. Stop puts everything back.
+
+# Floor and walls.
+floor_box = solid.box@1(size=[26, 0.2, 16])
+floor_down = xform.move@1(floor_box, by=[0, -0.1, 0])
+floor_tint = solid.material@1(floor_down, color=[0.42, 0.47, 0.42], roughness=0.9)
+floor = phys.body@1(floor_tint, kind="static", shape="box", friction=0.7)
+output ground = floor
+wall_long = solid.box@1(size=[26.4, 0.7, 0.2])
+wall_short = solid.box@1(size=[0.2, 0.7, 16])
+wall_tint = solid.material@1(wall_long, color=[0.55, 0.58, 0.7], roughness=0.8)
+wall_short_tint = solid.material@1(wall_short, color=[0.55, 0.58, 0.7], roughness=0.8)
+wn_at = xform.move@1(wall_tint, by=[0, 0.35, -8.1])
+wn = phys.body@1(wn_at, kind="static", shape="box")
+output wall_n = wn
+ws_at = xform.move@1(wall_tint, by=[0, 0.35, 8.1])
+ws = phys.body@1(ws_at, kind="static", shape="box")
+output wall_s = ws
+we_at = xform.move@1(wall_short_tint, by=[13.1, 0.35, 0])
+we = phys.body@1(we_at, kind="static", shape="box")
+output wall_e = we
+ww_at = xform.move@1(wall_short_tint, by=[-13.1, 0.35, 0])
+ww = phys.body@1(ww_at, kind="static", shape="box")
+output wall_w = ww
+
+# 1. Bowling. A pin is a revolved, smoothed profile (neck, belly, base) that collides as its convex hull.
+pin_profile = profile.polygon@1(points=[[0,0],[0.045,0],[0.06,0.05],[0.062,0.12],[0.04,0.22],[0.028,0.3],[0.04,0.34],[0.04,0.38],[0,0.4]])
+pin_round = profile.smooth@1(pin_profile, iterations=2, keep_axis=true)
+pin_body = solid.revolve@1(pin_round, angle=360deg, segments=20)
+pin_white = solid.material@1(pin_body, color=[0.95, 0.95, 0.9], roughness=0.35)
+lane_board = solid.box@1(size=[5.6, 0.1, 1.3])
+lane_tilt = xform.rotate@1(lane_board, angles=[0, 0, -15])
+lane_at = xform.move@1(lane_tilt, by=[-8.9, 0.74, -5])
+lane_tint = solid.material@1(lane_at, color=[0.7, 0.5, 0.3], roughness=0.5)
+lane = phys.body@1(lane_tint, kind="static", shape="convex", friction=0.5)
+output bowling_lane = lane
+bowl = solid.sphere@1(radius=0.21, segments=28)
+bowl_dark = solid.material@1(bowl, color=[0.08, 0.08, 0.3], roughness=0.2)
+bowl_at = xform.move@1(bowl_dark, by=[-11.2, 1.75, -5])
+bowling_ball = phys.body@1(bowl_at, shape="sphere", density=6, angular_damping=0.02)
+output bowling_ball = bowling_ball
+p1_at = xform.move@1(pin_white, by=[-2.0, 0, -5.0])
+p1 = phys.body@1(p1_at, shape="convex", friction=0.5)
+output pin1 = p1
+p2_at = xform.move@1(pin_white, by=[-1.78, 0, -5.12])
+p2 = phys.body@1(p2_at, shape="convex", friction=0.5)
+output pin2 = p2
+p3_at = xform.move@1(pin_white, by=[-1.78, 0, -4.88])
+p3 = phys.body@1(p3_at, shape="convex", friction=0.5)
+output pin3 = p3
+p4_at = xform.move@1(pin_white, by=[-1.56, 0, -5.24])
+p4 = phys.body@1(p4_at, shape="convex", friction=0.5)
+output pin4 = p4
+p5_at = xform.move@1(pin_white, by=[-1.56, 0, -5.0])
+p5 = phys.body@1(p5_at, shape="convex", friction=0.5)
+output pin5 = p5
+p6_at = xform.move@1(pin_white, by=[-1.56, 0, -4.76])
+p6 = phys.body@1(p6_at, shape="convex", friction=0.5)
+output pin6 = p6
+p7_at = xform.move@1(pin_white, by=[-1.34, 0, -5.36])
+p7 = phys.body@1(p7_at, shape="convex", friction=0.5)
+output pin7 = p7
+p8_at = xform.move@1(pin_white, by=[-1.34, 0, -5.12])
+p8 = phys.body@1(p8_at, shape="convex", friction=0.5)
+output pin8 = p8
+p9_at = xform.move@1(pin_white, by=[-1.34, 0, -4.88])
+p9 = phys.body@1(p9_at, shape="convex", friction=0.5)
+output pin9 = p9
+p10_at = xform.move@1(pin_white, by=[-1.34, 0, -4.64])
+p10 = phys.body@1(p10_at, shape="convex", friction=0.5)
+output pin10 = p10
+
+# 2. Dominoes: fourteen tiles 0.3 m apart; a ball from a short ramp starts the chain.
+tile = solid.box@1(size=[0.08, 0.5, 0.3])
+tile_red = solid.material@1(tile, color=[0.85, 0.2, 0.2], roughness=0.5)
+tile_blue = solid.material@1(tile, color=[0.2, 0.35, 0.85], roughness=0.5)
+mini_board = solid.box@1(size=[2.2, 0.1, 0.7])
+mini_tilt = xform.rotate@1(mini_board, angles=[0, 0, -20])
+mini_at = xform.move@1(mini_tilt, by=[-10.4, 0.5, 0])
+mini_tint = solid.material@1(mini_at, color=[0.7, 0.5, 0.3], roughness=0.5)
+mini_ramp = phys.body@1(mini_tint, kind="static", shape="convex")
+output domino_ramp = mini_ramp
+starter = solid.sphere@1(radius=0.15, segments=20)
+starter_gold = solid.material@1(starter, color=[0.9, 0.7, 0.1], roughness=0.3)
+starter_at = xform.move@1(starter_gold, by=[-11.1, 1.0, 0])
+starter_ball = phys.body@1(starter_at, shape="sphere", density=4)
+output domino_ball = starter_ball
+d1_at = xform.move@1(tile_red, by=[-8.4, 0.25, 0])
+d1 = phys.body@1(d1_at, shape="box", friction=0.4)
+output domino1 = d1
+d2_at = xform.move@1(tile_blue, by=[-8.1, 0.25, 0])
+d2 = phys.body@1(d2_at, shape="box", friction=0.4)
+output domino2 = d2
+d3_at = xform.move@1(tile_red, by=[-7.8, 0.25, 0])
+d3 = phys.body@1(d3_at, shape="box", friction=0.4)
+output domino3 = d3
+d4_at = xform.move@1(tile_blue, by=[-7.5, 0.25, 0])
+d4 = phys.body@1(d4_at, shape="box", friction=0.4)
+output domino4 = d4
+d5_at = xform.move@1(tile_red, by=[-7.2, 0.25, 0])
+d5 = phys.body@1(d5_at, shape="box", friction=0.4)
+output domino5 = d5
+d6_at = xform.move@1(tile_blue, by=[-6.9, 0.25, 0])
+d6 = phys.body@1(d6_at, shape="box", friction=0.4)
+output domino6 = d6
+d7_at = xform.move@1(tile_red, by=[-6.6, 0.25, 0])
+d7 = phys.body@1(d7_at, shape="box", friction=0.4)
+output domino7 = d7
+d8_at = xform.move@1(tile_blue, by=[-6.3, 0.25, 0])
+d8 = phys.body@1(d8_at, shape="box", friction=0.4)
+output domino8 = d8
+d9_at = xform.move@1(tile_red, by=[-6.0, 0.25, 0])
+d9 = phys.body@1(d9_at, shape="box", friction=0.4)
+output domino9 = d9
+d10_at = xform.move@1(tile_blue, by=[-5.7, 0.25, 0])
+d10 = phys.body@1(d10_at, shape="box", friction=0.4)
+output domino10 = d10
+d11_at = xform.move@1(tile_red, by=[-5.4, 0.25, 0])
+d11 = phys.body@1(d11_at, shape="box", friction=0.4)
+output domino11 = d11
+d12_at = xform.move@1(tile_blue, by=[-5.1, 0.25, 0])
+d12 = phys.body@1(d12_at, shape="box", friction=0.4)
+output domino12 = d12
+d13_at = xform.move@1(tile_red, by=[-4.8, 0.25, 0])
+d13 = phys.body@1(d13_at, shape="box", friction=0.4)
+output domino13 = d13
+d14_at = xform.move@1(tile_blue, by=[-4.5, 0.25, 0])
+d14 = phys.body@1(d14_at, shape="box", friction=0.4)
+output domino14 = d14
+
+# 3. Brick wall: four courses of five bricks, every other course shifted half a brick, and a heavy ball from a ramp.
+brick = solid.box@1(size=[0.25, 0.25, 0.5])
+brick_a = solid.material@1(brick, color=[0.7, 0.3, 0.2], roughness=0.85)
+brick_b = solid.material@1(brick, color=[0.62, 0.27, 0.18], roughness=0.85)
+r1c1_at = xform.move@1(brick_a, by=[6, 0.125, 2.5])
+r1c1 = phys.body@1(r1c1_at, shape="box", friction=0.8)
+output brick_1_1 = r1c1
+r1c2_at = xform.move@1(brick_b, by=[6, 0.125, 3.02])
+r1c2 = phys.body@1(r1c2_at, shape="box", friction=0.8)
+output brick_1_2 = r1c2
+r1c3_at = xform.move@1(brick_a, by=[6, 0.125, 3.54])
+r1c3 = phys.body@1(r1c3_at, shape="box", friction=0.8)
+output brick_1_3 = r1c3
+r1c4_at = xform.move@1(brick_b, by=[6, 0.125, 4.06])
+r1c4 = phys.body@1(r1c4_at, shape="box", friction=0.8)
+output brick_1_4 = r1c4
+r1c5_at = xform.move@1(brick_a, by=[6, 0.125, 4.58])
+r1c5 = phys.body@1(r1c5_at, shape="box", friction=0.8)
+output brick_1_5 = r1c5
+r2c1_at = xform.move@1(brick_b, by=[6, 0.385, 2.76])
+r2c1 = phys.body@1(r2c1_at, shape="box", friction=0.8)
+output brick_2_1 = r2c1
+r2c2_at = xform.move@1(brick_a, by=[6, 0.385, 3.28])
+r2c2 = phys.body@1(r2c2_at, shape="box", friction=0.8)
+output brick_2_2 = r2c2
+r2c3_at = xform.move@1(brick_b, by=[6, 0.385, 3.8])
+r2c3 = phys.body@1(r2c3_at, shape="box", friction=0.8)
+output brick_2_3 = r2c3
+r2c4_at = xform.move@1(brick_a, by=[6, 0.385, 4.32])
+r2c4 = phys.body@1(r2c4_at, shape="box", friction=0.8)
+output brick_2_4 = r2c4
+r2c5_at = xform.move@1(brick_b, by=[6, 0.385, 4.84])
+r2c5 = phys.body@1(r2c5_at, shape="box", friction=0.8)
+output brick_2_5 = r2c5
+r3c1_at = xform.move@1(brick_a, by=[6, 0.645, 2.5])
+r3c1 = phys.body@1(r3c1_at, shape="box", friction=0.8)
+output brick_3_1 = r3c1
+r3c2_at = xform.move@1(brick_b, by=[6, 0.645, 3.02])
+r3c2 = phys.body@1(r3c2_at, shape="box", friction=0.8)
+output brick_3_2 = r3c2
+r3c3_at = xform.move@1(brick_a, by=[6, 0.645, 3.54])
+r3c3 = phys.body@1(r3c3_at, shape="box", friction=0.8)
+output brick_3_3 = r3c3
+r3c4_at = xform.move@1(brick_b, by=[6, 0.645, 4.06])
+r3c4 = phys.body@1(r3c4_at, shape="box", friction=0.8)
+output brick_3_4 = r3c4
+r3c5_at = xform.move@1(brick_a, by=[6, 0.645, 4.58])
+r3c5 = phys.body@1(r3c5_at, shape="box", friction=0.8)
+output brick_3_5 = r3c5
+r4c1_at = xform.move@1(brick_b, by=[6, 0.905, 2.76])
+r4c1 = phys.body@1(r4c1_at, shape="box", friction=0.8)
+output brick_4_1 = r4c1
+r4c2_at = xform.move@1(brick_a, by=[6, 0.905, 3.28])
+r4c2 = phys.body@1(r4c2_at, shape="box", friction=0.8)
+output brick_4_2 = r4c2
+r4c3_at = xform.move@1(brick_b, by=[6, 0.905, 3.8])
+r4c3 = phys.body@1(r4c3_at, shape="box", friction=0.8)
+output brick_4_3 = r4c3
+r4c4_at = xform.move@1(brick_a, by=[6, 0.905, 4.32])
+r4c4 = phys.body@1(r4c4_at, shape="box", friction=0.8)
+output brick_4_4 = r4c4
+r4c5_at = xform.move@1(brick_b, by=[6, 0.905, 4.84])
+r4c5 = phys.body@1(r4c5_at, shape="box", friction=0.8)
+output brick_4_5 = r4c5
+long_board = solid.box@1(size=[4.2, 0.1, 1.2])
+long_tilt = xform.rotate@1(long_board, angles=[0, 0, 18])
+long_at = xform.move@1(long_tilt, by=[9.6, 0.9, 3.7])
+long_tint = solid.material@1(long_at, color=[0.7, 0.5, 0.3], roughness=0.5)
+wreck_ramp = phys.body@1(long_tint, kind="static", shape="convex", friction=0.4)
+output wrecker_ramp = wreck_ramp
+wreck = solid.sphere@1(radius=0.32, segments=28)
+wreck_steel = solid.material@1(wreck, color=[0.45, 0.48, 0.52], roughness=0.25)
+wreck_at = xform.move@1(wreck_steel, by=[11.3, 2.05, 3.7])
+wrecking_ball = phys.body@1(wreck_at, shape="sphere", density=14, angular_damping=0.02)
+output wrecking_ball = wrecking_ball
+
+# 4. Funnel: a revolved shell (static mesh) with a 0.15 m hole, and eight marbles dropped into it.
+funnel_profile = profile.polygon@1(points=[[0.15,0],[0.25,0],[0.95,0.6],[0.85,0.6]])
+funnel_shell = solid.revolve@1(funnel_profile, angle=360deg, segments=40)
+funnel_tint = solid.material@1(funnel_shell, color=[0.7, 0.75, 0.85], roughness=0.3, metallic=0.6)
+funnel_at = xform.move@1(funnel_tint, by=[1.5, 2.2, 5])
+funnel = phys.body@1(funnel_at, kind="static", shape="mesh", friction=0.2)
+output funnel = funnel
+marble = solid.sphere@1(radius=0.07, segments=14)
+m_red = solid.material@1(marble, color=[0.9, 0.15, 0.15], roughness=0.2)
+m_green = solid.material@1(marble, color=[0.15, 0.8, 0.25], roughness=0.2)
+m_blue = solid.material@1(marble, color=[0.2, 0.3, 0.9], roughness=0.2)
+m_gold = solid.material@1(marble, color=[0.95, 0.75, 0.15], roughness=0.2)
+mb1_at = xform.move@1(m_red, by=[1.2, 3.3, 5.0])
+mb1 = phys.body@1(mb1_at, shape="sphere", restitution=0.5)
+output marble1 = mb1
+mb2_at = xform.move@1(m_green, by=[1.8, 3.5, 5.1])
+mb2 = phys.body@1(mb2_at, shape="sphere", restitution=0.5)
+output marble2 = mb2
+mb3_at = xform.move@1(m_blue, by=[1.5, 3.7, 4.6])
+mb3 = phys.body@1(mb3_at, shape="sphere", restitution=0.5)
+output marble3 = mb3
+mb4_at = xform.move@1(m_gold, by=[1.4, 3.9, 5.4])
+mb4 = phys.body@1(mb4_at, shape="sphere", restitution=0.5)
+output marble4 = mb4
+mb5_at = xform.move@1(m_red, by=[1.9, 4.1, 4.9])
+mb5 = phys.body@1(mb5_at, shape="sphere", restitution=0.5)
+output marble5 = mb5
+mb6_at = xform.move@1(m_green, by=[1.1, 4.3, 4.8])
+mb6 = phys.body@1(mb6_at, shape="sphere", restitution=0.5)
+output marble6 = mb6
+mb7_at = xform.move@1(m_blue, by=[1.6, 4.5, 5.3])
+mb7 = phys.body@1(mb7_at, shape="sphere", restitution=0.5)
+output marble7 = mb7
+mb8_at = xform.move@1(m_gold, by=[1.5, 4.7, 5.0])
+mb8 = phys.body@1(mb8_at, shape="sphere", restitution=0.5)
+output marble8 = mb8

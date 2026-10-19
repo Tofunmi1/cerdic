@@ -1,0 +1,29 @@
+# One carved stone block, two styles. The colours come from the shape itself: pale wear on convex edges, dark dirt in creases and
+# grooves, moss on the tops, occlusion in the corners. The left block is a realistic PBR stone; the right one is the same shape with
+# hard colour steps, banded toon shading and an outline. Orbit around it to see the wear follow the edges.
+
+# ---- The shape: a block with grooves and a hole cut in, then softened ----
+slab = solid.box@1(size=[1.5, 0.95, 1.1])
+groove_a = solid.box@1(size=[1.7, 0.06, 0.05])
+groove_a_at = xform.move@1(groove_a, by=[0, 0.12, 0.56])
+groove_b = solid.box@1(size=[1.7, 0.06, 0.05])
+groove_b_at = xform.move@1(groove_b, by=[0, -0.22, 0.56])
+groove_c = solid.box@1(size=[0.06, 1.1, 0.05])
+groove_c_at = xform.move@1(groove_c, by=[0.3, 0, 0.56])
+hole = solid.cylinder@1(radius=0.17, height=1.3, segments=28)
+hole_turn = xform.rotate@1(hole, angles=[90, 0, 0])
+hole_at = xform.move@1(hole_turn, by=[-0.35, 0.05, 0])
+carved = solid.difference@1(slab, groove_a_at, groove_b_at, groove_c_at, hole_at)
+softened = solid.round@1(carved, radius=0.03, segments=6)
+standing = xform.move@1(softened, by=[0, 0.475, 0])
+
+# ---- Realistic: PBR stone with wear, dirt and moss ----
+real = solid.texture@1(standing, program="ao = surface_ao(strength=0.35); stone = colorize(ao, gradient=[0:#35302b, 1:#8a8378]); moss_col = colorize(ao, gradient=[0:#243615, 1:#6a9638]); dirt_col = colorize(ao, gradient=[0:#1a120c, 1:#3d3025]); wear_col = colorize(ao, gradient=[0:#8e887a, 1:#e6e0d0]); up = surface_up(power=3); cav = surface_cavity(gain=7); edge = surface_convex(gain=7); a1 = blend(moss_col, stone, up, blend_type=normal, amount=0.9); a2 = blend(dirt_col, a1, cav, blend_type=normal, amount=0.9); albedo = blend(wear_col, a2, edge, blend_type=normal, amount=0.85); roughness = colorize(edge, gradient=[0:#f0f0f0, 1:#909090]); height = ao")
+real_at = xform.move@1(real, by=[-1.2, 0, 0])
+output realistic = real_at
+
+# ---- Toon: the same signals cut into flat colour steps ----
+toon_tex = solid.texture@1(standing, program="ao = surface_ao(strength=0.35); shade = colorize(ao, gradient=[0:#5a4f7a, 0.55:#5a4f7a, 0.56:#8f86b3, 1:#8f86b3]); moss_col = colorize(ao, gradient=[0:#3f7a3a, 1:#7fc050]); dirt_col = colorize(ao, gradient=[0:#2c2340, 1:#2c2340]); wear_col = colorize(ao, gradient=[0:#e8e0f4, 1:#e8e0f4]); up = surface_up(power=3); up_step = colorize(up, gradient=[0:#000000, 0.45:#000000, 0.46:#ffffff, 1:#ffffff]); cav = surface_cavity(gain=7); cav_step = colorize(cav, gradient=[0:#000000, 0.3:#000000, 0.31:#ffffff, 1:#ffffff]); edge = surface_convex(gain=7); edge_step = colorize(edge, gradient=[0:#000000, 0.5:#000000, 0.51:#ffffff, 1:#ffffff]); a1 = blend(moss_col, shade, up_step, blend_type=normal, amount=1); a2 = blend(dirt_col, a1, cav_step, blend_type=normal, amount=1); albedo = blend(wear_col, a2, edge_step, blend_type=normal, amount=1)")
+toon_style = solid.toon@1(toon_tex, bands=2, feather=0.06, shade_color=[0.75, 0.7, 0.9], rim=0.25, outline=2.2, outline_color=[0.14, 0.1, 0.24])
+toon_at = xform.move@1(toon_style, by=[1.2, 0, 0])
+output toon = toon_at

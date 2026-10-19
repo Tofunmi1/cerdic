@@ -1,0 +1,14 @@
+[
+  {
+    "name": "swaying-reeds",
+    "prompt": "Make a row of 12 thin reeds, each 0.04 m square and 0.9 m tall, standing on the ground 0.12 m apart. They sway sideways about 12 degrees every 3 seconds, but not all together: each reed is a little out of step with the others so the row ripples.",
+    "uses": ["anim.wave|anim.track", "inst.array|inst.repeat"],
+    "field": { "phased": true, "copies": 12 }
+  },
+  {
+    "name": "wave-of-pillars",
+    "prompt": "Make 8 pillars, each 0.2 m wide and 1 m tall, in a straight line 0.5 m apart. Each pillar rises and falls by 0.3 m every 2 seconds, and a wave of motion travels along the line: every pillar is a quarter of a second behind the one before it.",
+    "uses": ["anim.wave|anim.track", "inst.array|inst.repeat"],
+    "field": { "phased": true, "copies": 8 }
+  }
+]

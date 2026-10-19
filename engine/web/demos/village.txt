@@ -1,0 +1,177 @@
+# Village in the afternoon. Press Play, click the view, then WASD walks, Shift runs, Space jumps, the mouse looks.
+# Brick house with a hinged door (drag it with the mouse), a stone pond with moving water, a marble well, lamp posts,
+# six trees, a fence, and loose crates and a ball to knock about. Everything is procedural: recipes for brick,
+# planks, wood, marble and metal, a texture program for the grass, noise for the tree canopies, water and sky nodes.
+
+sunset = scene.sky@1(sun_elevation=27, sun_azimuth=-40, sun_intensity=6, turbidity=3, ground_color=[0.45, 0.38, 0.28], clouds=true, cloud_cover=0.4, seed=21)
+output sky = sunset
+
+# Grass ground, with the scene's physics settings (walk, Earth gravity).
+ground_box = solid.box@1(size=[34, 0.4, 34])
+ground_low = xform.move@1(ground_box, by=[0, -0.2, 0])
+ground_grass = solid.texture@1(ground_low, program="n = fbm(scale_x=9, scale_y=9); m = fbm(scale_x=30, scale_y=30); albedo = colorize(n, gradient=[0:#4d7a35, 0.5:#79a84a, 1:#b5c26a]); roughness = m")
+ground_body = phys.body@1(ground_grass, kind="static", shape="box", friction=0.9)
+ground = phys.world@1(ground_body, gravity=[0, -9.81, 0], walker=true, speed=3.2, jump=4.5)
+output ground = ground
+
+# Cobbled plaza.
+plaza_box = solid.box@1(size=[10, 0.1, 10])
+plaza_up = xform.move@1(plaza_box, by=[0, 0.05, 0])
+plaza_stone = solid.material@1(plaza_up, color=[0.55, 0.52, 0.5], roughness=0.85, recipe="brick", texture_scale=2.5)
+plaza = phys.body@1(plaza_stone, kind="static", shape="box", friction=0.8)
+output plaza = plaza
+
+# Brick house at the back left: four walls with a doorway, a plank floor, a gabled roof and a door on a hinge.
+wall_back_box = solid.box@1(size=[6, 2.6, 0.3])
+wall_side_box = solid.box@1(size=[0.3, 2.6, 4])
+wall_front_box = solid.box@1(size=[2.4, 2.6, 0.3])
+wall_lintel_box = solid.box@1(size=[1.2, 0.6, 0.3])
+bricks_back = solid.material@1(wall_back_box, color=[0.62, 0.28, 0.2], roughness=0.9, recipe="brick", texture_scale=3)
+bricks_side = solid.material@1(wall_side_box, color=[0.62, 0.28, 0.2], roughness=0.9, recipe="brick", texture_scale=3)
+bricks_front = solid.material@1(wall_front_box, color=[0.62, 0.28, 0.2], roughness=0.9, recipe="brick", texture_scale=3)
+bricks_lintel = solid.material@1(wall_lintel_box, color=[0.62, 0.28, 0.2], roughness=0.9, recipe="brick", texture_scale=3)
+wall_back_at = xform.move@1(bricks_back, by=[-8, 1.3, -9])
+wall_back = phys.body@1(wall_back_at, kind="static", shape="box")
+output house_back = wall_back
+wall_left_at = xform.move@1(bricks_side, by=[-11, 1.3, -7])
+wall_left = phys.body@1(wall_left_at, kind="static", shape="box")
+output house_left = wall_left
+wall_right_at = xform.move@1(bricks_side, by=[-5, 1.3, -7])
+wall_right = phys.body@1(wall_right_at, kind="static", shape="box")
+output house_right = wall_right
+front_left_at = xform.move@1(bricks_front, by=[-9.8, 1.3, -5])
+front_left = phys.body@1(front_left_at, kind="static", shape="box")
+output house_front_left = front_left
+front_right_at = xform.move@1(bricks_front, by=[-6.2, 1.3, -5])
+front_right = phys.body@1(front_right_at, kind="static", shape="box")
+output house_front_right = front_right
+lintel_at = xform.move@1(bricks_lintel, by=[-8, 2.3, -5])
+lintel = phys.body@1(lintel_at, kind="static", shape="box")
+output house_lintel = lintel
+floor_planks_box = solid.box@1(size=[5.6, 0.1, 3.8])
+floor_planks = solid.material@1(floor_planks_box, color=[0.6, 0.42, 0.24], roughness=0.7, recipe="planks", texture_scale=3)
+floor_at = xform.move@1(floor_planks, by=[-8, 0.15, -7])
+house_floor = phys.body@1(floor_at, kind="static", shape="box", friction=0.8)
+output house_floor = house_floor
+roof_slab = solid.box@1(size=[3.9, 0.15, 4.7])
+roof_tiles = solid.material@1(roof_slab, color=[0.5, 0.2, 0.15], roughness=0.8, recipe="planks", texture_scale=4)
+roof_left_turn = xform.rotate@1(roof_tiles, angles=[0, 0, 28])
+roof_left_at = xform.move@1(roof_left_turn, by=[-9.65, 3.5, -7])
+output roof_left = roof_left_at
+roof_right_turn = xform.rotate@1(roof_tiles, angles=[0, 0, -28])
+roof_right_at = xform.move@1(roof_right_turn, by=[-6.35, 3.5, -7])
+output roof_right = roof_right_at
+door_box = solid.box@1(size=[1.12, 1.8, 0.08])
+door_oak = solid.material@1(door_box, color=[0.42, 0.26, 0.12], roughness=0.65, recipe="wood", texture_scale=3)
+door_at = xform.move@1(door_oak, by=[-8, 0.95, -5])
+door_body = phys.body@1(door_at, shape="box", density=0.4)
+door = phys.joint@1(door_body, kind="hinge", to="house_front_left", anchor=[-8.58, 0.95, -5], axis=[0, 1, 0], limited=true, low=-100, high=100, damping=2)
+output door = door
+
+# A stone pond with water at the back right.
+rim_outer = solid.cylinder@1(radius=3, height=0.45, segments=48)
+rim_cut = solid.cylinder@1(radius=2.5, height=0.8, segments=48)
+rim_ring = solid.difference@1(rim_outer, rim_cut)
+rim_stone = solid.material@1(rim_ring, color=[0.5, 0.5, 0.52], roughness=0.85, recipe="concrete", texture_scale=2)
+rim_at = xform.move@1(rim_stone, by=[7, 0.225, -5])
+pond_rim = phys.body@1(rim_at, kind="static", shape="mesh")
+output pond_rim = pond_rim
+pond_water = water.surface@1(size=[3.4, 3.4], level=0.32, depth=0.28, color=[0.08, 0.36, 0.5], opacity=0.62, wave_height=0.02, wave_length=1.2, speed=0.8, seed=4, resolution=40)
+pond_at = xform.move@1(pond_water, by=[7, 0, -5])
+output pond = pond_at
+
+# A marble well.
+well_ring = solid.cylinder@1(radius=0.75, height=0.9, segments=32)
+well_hole = solid.cylinder@1(radius=0.5, height=1.2, segments=32)
+well_shell = solid.difference@1(well_ring, well_hole)
+well_marble = solid.material@1(well_shell, color=[0.88, 0.87, 0.84], roughness=0.35, recipe="marble", texture_scale=2)
+well_at = xform.move@1(well_marble, by=[-3, 0.45, 3.5])
+well = phys.body@1(well_at, kind="static", shape="mesh")
+output well = well
+
+# Four lamp posts with glowing bulbs.
+post = solid.cylinder@1(radius=0.07, height=2.6, segments=12)
+post_metal = solid.material@1(post, color=[0.2, 0.22, 0.25], roughness=0.35, metallic=0.9, recipe="brushed_metal", texture_scale=2)
+bulb = solid.sphere@1(radius=0.18, segments=16)
+bulb_glass = solid.material@1(bulb, color=[0.05, 0.05, 0.05], emissive=[3.2, 2.5, 1.3], emits_light=true, roughness=0.3)
+lamp1_post_at = xform.move@1(post_metal, by=[4.6, 1.3, 4.6])
+lamp1_post = phys.body@1(lamp1_post_at, kind="static", shape="cylinder")
+output lamp1_post = lamp1_post
+lamp1_bulb_at = xform.move@1(bulb_glass, by=[4.6, 2.7, 4.6])
+output lamp1_bulb = lamp1_bulb_at
+lamp2_post_at = xform.move@1(post_metal, by=[-4.6, 1.3, 4.6])
+lamp2_post = phys.body@1(lamp2_post_at, kind="static", shape="cylinder")
+output lamp2_post = lamp2_post
+lamp2_bulb_at = xform.move@1(bulb_glass, by=[-4.6, 2.7, 4.6])
+output lamp2_bulb = lamp2_bulb_at
+lamp3_post_at = xform.move@1(post_metal, by=[4.6, 1.3, -4.6])
+lamp3_post = phys.body@1(lamp3_post_at, kind="static", shape="cylinder")
+output lamp3_post = lamp3_post
+lamp3_bulb_at = xform.move@1(bulb_glass, by=[4.6, 2.7, -4.6])
+output lamp3_bulb = lamp3_bulb_at
+
+# Six trees: a bark trunk (solid for the walker) and a lumpy canopy made by noise.
+trunk = solid.cylinder@1(radius=0.28, height=2.4, segments=14)
+trunk_bark = solid.material@1(trunk, color=[0.34, 0.24, 0.15], roughness=0.9, recipe="wood", texture_scale=3)
+canopy = solid.sphere@1(radius=1.5, segments=24)
+canopy_lumpy = xform.noise@1(canopy, amplitude=0.28, scale=0.9, seed=3, tolerance=0.05)
+canopy_green = solid.material@1(canopy_lumpy, color=[0.18, 0.4, 0.16], roughness=0.85)
+t1_trunk_at = xform.move@1(trunk_bark, by=[11, 1.2, 9])
+t1_trunk = phys.body@1(t1_trunk_at, kind="static", shape="cylinder")
+output tree1_trunk = t1_trunk
+t1_canopy_at = xform.move@1(canopy_green, by=[11, 3.4, 9])
+output tree1_canopy = t1_canopy_at
+t2_trunk_at = xform.move@1(trunk_bark, by=[-11, 1.2, 10])
+t2_trunk = phys.body@1(t2_trunk_at, kind="static", shape="cylinder")
+output tree2_trunk = t2_trunk
+t2_canopy_at = xform.move@1(canopy_green, by=[-11, 3.4, 10])
+output tree2_canopy = t2_canopy_at
+t3_trunk_at = xform.move@1(trunk_bark, by=[13, 1.2, 0])
+t3_trunk = phys.body@1(t3_trunk_at, kind="static", shape="cylinder")
+output tree3_trunk = t3_trunk
+t3_canopy_at = xform.move@1(canopy_green, by=[13, 3.4, 0])
+output tree3_canopy = t3_canopy_at
+t4_trunk_at = xform.move@1(trunk_bark, by=[-13, 1.2, 1])
+t4_trunk = phys.body@1(t4_trunk_at, kind="static", shape="cylinder")
+output tree4_trunk = t4_trunk
+t4_canopy_at = xform.move@1(canopy_green, by=[-13, 3.4, 1])
+output tree4_canopy = t4_canopy_at
+t5_trunk_at = xform.move@1(trunk_bark, by=[2, 1.2, 13])
+t5_trunk = phys.body@1(t5_trunk_at, kind="static", shape="cylinder")
+output tree5_trunk = t5_trunk
+t5_canopy_at = xform.move@1(canopy_green, by=[2, 3.4, 13])
+output tree5_canopy = t5_canopy_at
+t6_trunk_at = xform.move@1(trunk_bark, by=[13, 1.2, -12])
+t6_trunk = phys.body@1(t6_trunk_at, kind="static", shape="cylinder")
+output tree6_trunk = t6_trunk
+t6_canopy_at = xform.move@1(canopy_green, by=[13, 3.4, -12])
+output tree6_canopy = t6_canopy_at
+
+# A fence along the back edge: one post-and-rail segment repeated.
+fence_post = solid.box@1(size=[0.12, 1.1, 0.12])
+fence_rail = solid.box@1(size=[2, 0.08, 0.06])
+fence_rail_up = xform.move@1(fence_rail, by=[1, 0.35, 0])
+fence_rail_high = xform.move@1(fence_rail, by=[1, 0.8, 0])
+fence_posts = solid.union@1(fence_post, fence_rail_up, fence_rail_high)
+fence_wood = solid.material@1(fence_posts, color=[0.55, 0.4, 0.25], roughness=0.8, recipe="planks", texture_scale=3)
+fence_start = xform.move@1(fence_wood, by=[-16, 0.55, 16])
+fence = inst.repeat@1(fence_start, count=16, step=[2, 0, 0])
+output fence = fence
+
+# Loose props on the plaza: a stack of crates and a ball.
+crate = solid.box@1(size=[0.6, 0.6, 0.6])
+crate_wood = solid.material@1(crate, color=[0.7, 0.5, 0.25], roughness=0.8, recipe="planks", texture_scale=2)
+c1_at = xform.move@1(crate_wood, by=[2, 0.4, 2])
+c1 = phys.body@1(c1_at, shape="box", friction=0.8)
+output crate1 = c1
+c2_at = xform.move@1(crate_wood, by=[2, 1.01, 2])
+c2 = phys.body@1(c2_at, shape="box", friction=0.8)
+output crate2 = c2
+c3_at = xform.move@1(crate_wood, by=[2.7, 0.4, 2.1])
+c3 = phys.body@1(c3_at, shape="box", friction=0.8)
+output crate3 = c3
+ball = solid.sphere@1(radius=0.3, segments=24)
+ball_red = solid.material@1(ball, color=[0.85, 0.15, 0.12], roughness=0.35)
+ball_at = xform.move@1(ball_red, by=[0.5, 0.5, 3])
+beach_ball = phys.body@1(ball_at, shape="sphere", restitution=0.7, density=0.5)
+output ball = beach_ball

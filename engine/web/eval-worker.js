@@ -35,15 +35,27 @@ self.onmessage = async ({ data }) => {
     }
     if (own !== serial) return;
     const parts = state.done.parts.map((part, index) => {
-      const positions = api.eval_positions(index), indices = api.eval_indices(index);
+      const positions = api.eval_positions(index), indices = api.eval_indices(index), uvs = api.eval_uvs(index);
+      const occlusion = api.eval_occlusion(index);
       const transforms = api.eval_transforms(index), instance_indices = api.eval_instance_indices(index);
-      return { ...part, positions, indices, transforms, instance_indices };
+      // Per-vertex bone indices and weights only exist for a skinned part (ADR 0030).
+      const skinned = Boolean(part.skin);
+      const skin_joints = skinned ? api.eval_skin_joints(index) : new Uint32Array(0);
+      const skin_weights = skinned ? api.eval_skin_weights(index) : new Float32Array(0);
+      return { ...part, positions, indices, uvs, occlusion, transforms, instance_indices, skin_joints, skin_weights };
     });
-    const bytes = parts.reduce((sum, part) => sum + part.positions.byteLength + part.indices.byteLength + part.transforms.byteLength + part.instance_indices.byteLength
-      + new TextEncoder().encode(JSON.stringify(part.frames ?? {})).byteLength, 0);
-    const transfer = parts.flatMap(part => [part.positions.buffer, part.indices.buffer, part.transforms.buffer, part.instance_indices.buffer]);
-    postMessage({ kind: 'result', token: data.token, parts, bytes, sent_ms: performance.timeOrigin + performance.now(),
-      stats: { ...state.done, parts: undefined, elapsed_ms: performance.now() - began,
+    const warnings = state.done.warnings ?? [];
+    const lights = state.done.lights ?? [];
+    const environment = state.done.environment ?? null;
+    const bytes = parts.reduce((sum, part) => sum + part.positions.byteLength + part.indices.byteLength + part.uvs.byteLength + part.occlusion.byteLength + part.transforms.byteLength + part.instance_indices.byteLength
+      + part.skin_joints.byteLength + part.skin_weights.byteLength
+      + new TextEncoder().encode(JSON.stringify(part.frames ?? {})).byteLength, 0)
+      + new TextEncoder().encode(JSON.stringify(lights)).byteLength
+      + new TextEncoder().encode(JSON.stringify(environment)).byteLength
+      + new TextEncoder().encode(JSON.stringify(warnings)).byteLength;
+    const transfer = parts.flatMap(part => [part.positions.buffer, part.indices.buffer, part.uvs.buffer, part.occlusion.buffer, part.transforms.buffer, part.instance_indices.buffer, part.skin_joints.buffer, part.skin_weights.buffer]);
+    postMessage({ kind: 'result', token: data.token, parts, lights, environment, warnings, bytes, sent_ms: performance.timeOrigin + performance.now(),
+      stats: { ...state.done, parts: undefined, warnings: undefined, elapsed_ms: performance.now() - began,
         memory_bytes: wasm.memory.buffer.byteLength } }, transfer);
     api.eval_cancel();
   } catch (error) {

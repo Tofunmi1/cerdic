@@ -1,0 +1,38 @@
+# Cel-shading gallery: the same sphere shaded physically (left), then toon with 1, 2, 3 and 4 bands, then with rim and highlight.
+
+day = scene.sky@1(sun_elevation=42, sun_azimuth=25, sun_intensity=6, turbidity=2.4, ground_color=[0.55, 0.5, 0.45], clouds=true, cloud_cover=0.25, seed=7)
+output sky = day
+fill = scene.environment@1(sky_color=[0.65, 0.76, 0.95], ground_color=[0.75, 0.68, 0.58], intensity=0.7, reflection=0.1, bounce=0.3, bounce_color=[0.8, 0.72, 0.6])
+output fill = fill
+
+floor_box = solid.box@1(size=[9, 0.2, 4])
+floor_low = xform.move@1(floor_box, by=[0, -0.1, 0])
+floor_paint = solid.material@1(floor_low, color=[0.86, 0.84, 0.8], roughness=0.9)
+floor_toon = solid.toon@1(floor_paint, bands=1, feather=0.06, shade_color=[0.8, 0.78, 0.9])
+output floor = floor_toon
+
+ball = solid.sphere@1(radius=0.5, segments=48)
+ball_color = solid.material@1(ball, color=[0.95, 0.55, 0.5], roughness=0.6)
+
+pbr_at = xform.move@1(ball_color, by=[-3, 0.5, 0])
+output pbr = pbr_at
+
+b1 = solid.toon@1(ball_color, bands=1, feather=0.05, outline=2.5)
+b1_at = xform.move@1(b1, by=[-1.8, 0.5, 0])
+output bands_1 = b1_at
+
+b2 = solid.toon@1(ball_color, bands=2, feather=0.05, outline=2.5)
+b2_at = xform.move@1(b2, by=[-0.6, 0.5, 0])
+output bands_2 = b2_at
+
+b3 = solid.toon@1(ball_color, bands=3, feather=0.05, outline=2.5)
+b3_at = xform.move@1(b3, by=[0.6, 0.5, 0])
+output bands_3 = b3_at
+
+b4 = solid.toon@1(ball_color, bands=4, feather=0.05, outline=2.5)
+b4_at = xform.move@1(b4, by=[1.8, 0.5, 0])
+output bands_4 = b4_at
+
+b5 = solid.toon@1(ball_color, bands=2, feather=0.05, rim=0.5, spec=0.6, outline=2.5, outline_color=[0.35, 0.12, 0.2])
+b5_at = xform.move@1(b5, by=[3, 0.5, 0])
+output rim_spec = b5_at

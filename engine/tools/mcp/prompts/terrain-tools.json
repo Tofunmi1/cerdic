@@ -1,0 +1,19 @@
+[
+  {
+    "name": "rolling-hills",
+    "prompt": "Make a landscape of rolling grass hills, 30 m by 30 m, with the tallest hill about 4 m high.",
+    "uses": ["terrain.heightfield"],
+    "size": [30, 4.5, 30], "sizeTolerance": 1.0
+  },
+  {
+    "name": "island",
+    "prompt": "Make a small island: a 24 m by 24 m landscape that slopes down to sea level at all four edges, with hills up to 5 m in the middle, coloured sandy green.",
+    "uses": ["terrain.heightfield"],
+    "size": [24, 5.5, 24], "sizeTolerance": 1.5
+  },
+  {
+    "name": "forest-on-hills",
+    "prompt": "Make a forest on hills: a 20 m by 20 m hilly landscape (about 3 m high) with 60 simple trees (a trunk and a cone of leaves, about 2 m tall) standing on the ground, each tree rooted in the terrain at its own height.",
+    "uses": ["terrain.heightfield", "inst.drop", "inst.scatter"]
+  }
+]

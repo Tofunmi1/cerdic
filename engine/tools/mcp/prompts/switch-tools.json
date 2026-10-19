@@ -1,0 +1,20 @@
+[
+  {
+    "name": "wall-button-door",
+    "prompt": "Make a door 0.9 m wide, 2 m tall and 0.05 m thick, hinged at its left edge, that swings open 90 degrees over a second. Next to it put a small 0.15 m square button on the wall. Clicking the button opens the door, and clicking it again closes the door.",
+    "uses": ["anim.track", "behavior.on"],
+    "wired": { "senders": 1, "trigger": "select", "properties": ["rotation"] }
+  },
+  {
+    "name": "two-switches-one-gate",
+    "prompt": "Make a sliding gate panel 1.5 m wide, 1.2 m tall and 0.05 m thick that slides 1.5 m sideways over two seconds. Make two separate buttons, each 0.12 m square, placed apart from each other. Clicking either button slides the gate.",
+    "uses": ["anim.track", "behavior.on"],
+    "wired": { "senders": 2, "trigger": "select", "properties": ["position"] }
+  },
+  {
+    "name": "pressure-plate-bridge",
+    "prompt": "Make a flat bridge plank 2 m long, 0.4 m wide and 0.05 m thick that lowers 0.5 m over one second. Make a pressure plate, a 0.5 m square 0.03 m thick slab, which lowers the bridge plank when the viewer walks within 1.5 metres of the plate.",
+    "uses": ["anim.track", "behavior.on"],
+    "wired": { "senders": 1, "trigger": "near", "properties": ["position"] }
+  }
+]

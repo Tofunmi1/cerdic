@@ -92,6 +92,62 @@ pub fn eval_indices(part: u32) -> Vec<u32> {
     })
 }
 
+/// Copies authored UV coordinates in triangle-corner order for transfer to the page.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_uvs(part: u32) -> Vec<f32> {
+    HOST.with(|cell| {
+        cell.borrow()
+            .result
+            .as_ref()
+            .and_then(|r| r.parts.get(part as usize))
+            .map_or_else(Vec::new, |p| p.uvs.iter().flatten().copied().collect())
+    })
+}
+
+/// Copies one output's baked ambient visibility values into an owned transfer buffer.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_occlusion(part: u32) -> Vec<f32> {
+    HOST.with(|cell| {
+        cell.borrow()
+            .result
+            .as_ref()
+            .and_then(|r| r.parts.get(part as usize))
+            .map_or_else(Vec::new, |p| p.occlusion.clone())
+    })
+}
+
+/// Four bone indices per vertex of a skinned part (ADR 0030); empty for a rigid part.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_skin_joints(part: u32) -> Vec<u32> {
+    HOST.with(|cell| {
+        cell.borrow()
+            .result
+            .as_ref()
+            .and_then(|r| r.parts.get(part as usize))
+            .and_then(|p| p.skin.as_ref())
+            .map_or_else(Vec::new, |s| {
+                s.joints.iter().flatten().map(|j| u32::from(*j)).collect()
+            })
+    })
+}
+
+/// Four bone weights per vertex of a skinned part (ADR 0030); empty for a rigid part.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_skin_weights(part: u32) -> Vec<f32> {
+    HOST.with(|cell| {
+        cell.borrow()
+            .result
+            .as_ref()
+            .and_then(|r| r.parts.get(part as usize))
+            .and_then(|p| p.skin.as_ref())
+            .map_or_else(Vec::new, |s| s.weights.iter().flatten().copied().collect())
+    })
+}
+
 /// Copies instance placements for transferable transport; empty for an ordinary solid.
 #[wasm_bindgen]
 #[must_use]

@@ -1,0 +1,10 @@
+land = terrain.heightfield@1(size=[14,12], height=3, scale=4.5, octaves=4, roughness=0.52, seed=17, resolution=56, base=1.2, style="hills", edge_falloff=0.12, flat_below=0.15)
+water = water.surface@1(size=[9,7], level=0.58, depth=0.55, color=[0.08,0.34,0.5], opacity=0.58, wave_height=0.035, wave_length=2.4, speed=0.7, seed=9, resolution=64)
+pine = solid.cone@1(radius=0.24, height=1.8, segments=8)
+forest = inst.scatter@1(pine, count=12, width=13, depth=10, min_spacing=1.4, seed=5)
+trees = inst.drop@1(forest, land, offset=0, align=0.65)
+sky = scene.sky@1(sun_elevation=18, sun_azimuth=-35, sun_intensity=4, turbidity=4, ground_color=[0.32,0.25,0.18], clouds=true, cloud_cover=0.38, seed=13)
+output land = land
+output lake = water
+output trees = trees
+output sky = sky

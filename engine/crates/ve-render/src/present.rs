@@ -10,7 +10,9 @@ use std::collections::HashMap;
 
 use bevy_asset::Handle;
 use bevy_ecs::prelude::*;
-use bevy_render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer};
+use bevy_render::render_resource::binding_types::{
+    sampler, texture_2d, texture_depth_2d, uniform_buffer,
+};
 use bevy_render::render_resource::{
     BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntries, BindingResource,
     CachedRenderPipelineId, ColorTargetState, ColorWrites, FilterMode, FragmentState,
@@ -19,10 +21,12 @@ use bevy_render::render_resource::{
     TextureFormat, TextureSampleType, VertexState,
 };
 use bevy_render::renderer::{RenderContext, RenderDevice, ViewQuery};
-use bevy_render::view::ViewTarget;
+use bevy_render::view::{ViewDepthStencilTexture, ViewTarget};
 use bevy_shader::Shader;
 
 use crate::lens::{LensGpu, LensUniform, LensWarp};
+use crate::prepare::{ViewSlots, ViewUniform, ViewUniforms};
+use crate::quality::RenderQuality;
 use crate::targets::{ViewOffscreen, blits};
 
 /// Source of the present shader.
@@ -39,7 +43,8 @@ pub(crate) struct PresentPipelines {
     shader: Handle<Shader>,
     sampler: Option<Sampler>,
     lens_sampler: Option<Sampler>,
-    cache: HashMap<(TextureFormat, bool), CachedRenderPipelineId>,
+    post_layout: BindGroupLayoutDescriptor,
+    cache: HashMap<(TextureFormat, bool, bool), CachedRenderPipelineId>,
 }
 
 impl PresentPipelines {
@@ -65,9 +70,23 @@ impl PresentPipelines {
                 ),
             ),
         );
+        let post_layout = BindGroupLayoutDescriptor::new(
+            "ve_present_post_layout",
+            &BindGroupLayoutEntries::sequential(
+                ShaderStages::FRAGMENT,
+                (
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    sampler(SamplerBindingType::Filtering),
+                    uniform_buffer::<LensUniform>(false),
+                    texture_depth_2d(),
+                    uniform_buffer::<ViewUniform>(true),
+                ),
+            ),
+        );
         Self {
             layout,
             lens_layout,
+            post_layout,
             shader,
             sampler: None,
             lens_sampler: None,
@@ -75,15 +94,24 @@ impl PresentPipelines {
         }
     }
 
-    fn descriptor(&self, output_format: TextureFormat, lens: bool) -> RenderPipelineDescriptor {
+    fn descriptor(
+        &self,
+        output_format: TextureFormat,
+        lens: bool,
+        post: bool,
+    ) -> RenderPipelineDescriptor {
         // Non-sRGB outputs get the transfer function applied by hand.
-        let entry = match (lens, output_format.is_srgb()) {
+        let entry = match (post, output_format.is_srgb()) {
+            (true, true) => "fragment_post",
+            (true, false) => "fragment_post_srgb",
+            (false, true) if lens => "fragment_lens",
+            (false, false) if lens => "fragment_lens_srgb",
             (false, true) => "fragment_copy",
             (false, false) => "fragment_srgb",
-            (true, true) => "fragment_lens",
-            (true, false) => "fragment_lens_srgb",
         };
-        let layout = if lens {
+        let layout = if post {
+            &self.post_layout
+        } else if lens {
             &self.lens_layout
         } else {
             &self.layout
@@ -144,36 +172,48 @@ pub(crate) fn queue_present_pipelines(
     mut pipelines: ResMut<PresentPipelines>,
     pipeline_cache: Res<PipelineCache>,
     lens: Res<LensWarp>,
+    quality: Res<RenderQuality>,
     views: Query<&ViewTarget>,
 ) {
     let warped = lens.active();
+    let post = quality.ssao_enabled || quality.bloom_enabled;
     for format in views.iter().filter_map(ViewTarget::out_texture_view_format) {
-        if blits(format, *lens) && !pipelines.cache.contains_key(&(format, warped)) {
-            let id = pipeline_cache.queue_render_pipeline(pipelines.descriptor(format, warped));
-            pipelines.cache.insert((format, warped), id);
+        let key = (format, warped, post);
+        if blits(format, *lens, *quality) && !pipelines.cache.contains_key(&key) {
+            let id =
+                pipeline_cache.queue_render_pipeline(pipelines.descriptor(format, warped, post));
+            pipelines.cache.insert(key, id);
         }
     }
 }
 
 /// Copies the resolved main texture to the output for views that cannot render to it directly.
 pub(crate) fn present_pass(
-    view: ViewQuery<(&ViewTarget, &ViewOffscreen)>,
+    view: ViewQuery<(
+        &ViewTarget,
+        &ViewOffscreen,
+        Option<&ViewDepthStencilTexture>,
+        &ViewSlots,
+    )>,
     pipelines: Res<PresentPipelines>,
     pipeline_cache: Res<PipelineCache>,
     device: Res<RenderDevice>,
     lens: Res<LensWarp>,
     lens_gpu: Res<LensGpu>,
+    quality: Res<RenderQuality>,
+    view_uniforms: Res<ViewUniforms>,
     mut ctx: RenderContext,
 ) {
-    let (target, offscreen) = view.into_inner();
+    let (target, offscreen, depth, slots) = view.into_inner();
+    let post = quality.ssao_enabled || quality.bloom_enabled;
     let Some(format) = target
         .out_texture_view_format()
-        .filter(|f| blits(*f, *lens))
+        .filter(|f| blits(*f, *lens, *quality))
     else {
         return;
     };
     let warped = lens.active();
-    let sampler = if warped {
+    let sampler = if warped || post {
         pipelines.lens_sampler.as_ref()
     } else {
         pipelines.sampler.as_ref()
@@ -181,36 +221,26 @@ pub(crate) fn present_pass(
     let (Some(pipeline), Some(sampler)) = (
         pipelines
             .cache
-            .get(&(format, warped))
+            .get(&(format, warped, post))
             .and_then(|id| pipeline_cache.get_render_pipeline(*id)),
         sampler,
     ) else {
         return;
     };
-    let mut entries = vec![
-        BindGroupEntry {
-            binding: 0,
-            resource: BindingResource::TextureView(&offscreen.0.default_view),
-        },
-        BindGroupEntry {
-            binding: 1,
-            resource: BindingResource::Sampler(sampler),
-        },
-    ];
-    let layout_descriptor = if warped {
-        let Some(uniform) = lens_gpu.buffer.binding() else {
-            return;
-        };
-        entries.push(BindGroupEntry {
-            binding: 2,
-            resource: uniform,
-        });
-        &pipelines.lens_layout
-    } else {
-        &pipelines.layout
+    let Some(bind_group) = build_present_bind_group(
+        &pipelines,
+        &pipeline_cache,
+        &device,
+        offscreen,
+        sampler,
+        &lens_gpu,
+        depth,
+        &view_uniforms,
+        warped,
+        post,
+    ) else {
+        return;
     };
-    let layout = pipeline_cache.get_bind_group_layout(layout_descriptor);
-    let bind_group = device.create_bind_group("ve_present_bind_group", &layout, &entries);
     // The present pass is the one that writes the output, so it must take the output attachment from
     // the view (which records that it was written; see the note in `pass.rs`).
     let Some(output) = target.out_texture_color_attachment(None) else {
@@ -226,6 +256,73 @@ pub(crate) fn present_pass(
         multiview_mask: None,
     });
     pass.set_render_pipeline(pipeline);
-    pass.set_bind_group(0, &bind_group, &[]);
-    pass.draw(0..3, 0..1);
+    if post {
+        for slot in &slots.0 {
+            if let Some([x, y, width, height]) = slot.viewport {
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "viewports are below 2^24 pixels"
+                )]
+                pass.set_viewport(x as f32, y as f32, width as f32, height as f32, 0.0, 1.0);
+            }
+            pass.set_bind_group(0, &bind_group, &[slot.offset]);
+            pass.draw(0..3, 0..1);
+        }
+    } else {
+        pass.set_bind_group(0, &bind_group, &[]);
+        pass.draw(0..3, 0..1);
+    }
+}
+
+fn build_present_bind_group(
+    pipelines: &PresentPipelines,
+    pipeline_cache: &PipelineCache,
+    device: &RenderDevice,
+    offscreen: &ViewOffscreen,
+    sampler: &Sampler,
+    lens_gpu: &LensGpu,
+    depth: Option<&ViewDepthStencilTexture>,
+    view_uniforms: &ViewUniforms,
+    warped: bool,
+    post: bool,
+) -> Option<bevy_render::render_resource::BindGroup> {
+    let mut entries = vec![
+        BindGroupEntry {
+            binding: 0,
+            resource: BindingResource::TextureView(&offscreen.0.default_view),
+        },
+        BindGroupEntry {
+            binding: 1,
+            resource: BindingResource::Sampler(sampler),
+        },
+    ];
+    let layout_descriptor = if post {
+        let uniform = lens_gpu.buffer.binding()?;
+        entries.push(BindGroupEntry {
+            binding: 2,
+            resource: uniform,
+        });
+        let depth = depth?;
+        entries.push(BindGroupEntry {
+            binding: 3,
+            resource: BindingResource::TextureView(&depth.attachment.texture.default_view),
+        });
+        let view_uniform = view_uniforms.buffer.binding()?;
+        entries.push(BindGroupEntry {
+            binding: 4,
+            resource: view_uniform,
+        });
+        &pipelines.post_layout
+    } else if warped {
+        let uniform = lens_gpu.buffer.binding()?;
+        entries.push(BindGroupEntry {
+            binding: 2,
+            resource: uniform,
+        });
+        &pipelines.lens_layout
+    } else {
+        &pipelines.layout
+    };
+    let layout = pipeline_cache.get_bind_group_layout(layout_descriptor);
+    Some(device.create_bind_group("ve_present_bind_group", &layout, &entries))
 }

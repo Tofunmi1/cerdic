@@ -32,6 +32,16 @@ struct Pending {
 thread_local! {
     static PENDING: RefCell<Pending> = RefCell::new(Pending::default());
     static FOCUS: Cell<Focus> = Cell::new(Focus::default());
+    static ROOM_SCALE: Cell<f32> = const { Cell::new(1.0) };
+}
+
+/// Half the studio room's width at its normal size, in metres.
+const ROOM_HALF_WIDTH: f32 = 7.0;
+
+/// How much bigger than normal the studio room should be so a camera framing the focus stays inside
+/// its walls (1 for models that already fit).
+pub(crate) fn room_scale() -> f32 {
+    ROOM_SCALE.with(Cell::get)
 }
 
 fn with_pending<T>(f: impl FnOnce(&mut Pending) -> T) -> T {
@@ -79,6 +89,9 @@ pub(crate) fn apply(position: &mut Vec3, yaw: &mut f32, pitch: &mut f32, vertica
     if let Some(next) = pending.frame {
         focus = next;
         let distance = next.radius / (vertical_fov * 0.5).sin().max(0.05) * 1.1;
+        // Keep the camera, and the model's own footprint, inside the room's walls.
+        let reach = distance.max(next.center.x.abs().max(next.center.z.abs()) + next.radius);
+        ROOM_SCALE.with(|scale| scale.set((reach * 1.4 / ROOM_HALF_WIDTH).max(1.0)));
         let (azimuth, elevation) = (35.0_f32.to_radians(), 20.0_f32.to_radians());
         *position = next.center
             + distance

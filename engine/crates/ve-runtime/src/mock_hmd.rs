@@ -20,6 +20,37 @@ pub(crate) struct MockHead {
     pub(crate) hmd: MockHmd,
 }
 
+/// Updates a desktop viewer's mock headset while retaining a scene headset's field of view.
+pub(crate) fn viewer_head(
+    pose: Pose,
+    existing: Option<&MockHead>,
+    requested_fov: f32,
+    vertical_fov: f32,
+    size: (u32, u32),
+) -> MockHead {
+    if let Some(head) = existing
+        && requested_fov <= 0.0
+    {
+        return MockHead {
+            pose,
+            hmd: head.hmd,
+        };
+    }
+    #[expect(clippy::cast_precision_loss, reason = "window sizes are small")]
+    let aspect = (size.0 as f32 * 0.5) / (size.1.max(1) as f32);
+    let horizontal_fov = 2.0 * ((vertical_fov * 0.5).tan() * aspect).atan();
+    let fov = FovTangents::symmetric(horizontal_fov, vertical_fov).unwrap_or(FovTangents {
+        left: -1.0,
+        right: 1.0,
+        down: -1.0,
+        up: 1.0,
+    });
+    MockHead {
+        pose,
+        hmd: MockHmd::new(0.064, fov),
+    }
+}
+
 /// Builds the mock head used by the stereo scene: standing a little back from the origin, looking
 /// at it, with a roughly Quest-like 0.064 m IPD and a wide field of view.
 pub(crate) fn default_head(eye: Vec3, target: Vec3) -> MockHead {

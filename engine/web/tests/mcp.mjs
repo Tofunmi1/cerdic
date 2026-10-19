@@ -54,7 +54,7 @@ try {
   assert.equal(init.result.serverInfo.name, 'spatial-engine');
   const listed = await lonely.request('tools/list', {});
   const names = listed.result.tools.map(t => t.name);
-  for (const want of ['get_guide', 'list_operators', 'get_text', 'get_nodes', 'get_status', 'apply_text', 'apply_commands', 'undo', 'redo', 'set_view']) {
+  for (const want of ['get_guide', 'list_operators', 'texture_nodes', 'get_text', 'get_nodes', 'get_status', 'apply_text', 'apply_commands', 'undo', 'redo', 'set_view']) {
     assert(names.includes(want), `tool ${want} is listed`);
   }
   const none = await lonely.tool('get_text');
@@ -75,8 +75,22 @@ try {
 
   const empty = await mcp.tool('get_text');
   assert.equal(empty.data.revision, 0);
+  const textureMatches = await mcp.tool('texture_nodes', { query: 'noise', limit: 5 });
+  assert(!textureMatches.isError && textureMatches.data.length > 0 && textureMatches.data.every(node => typeof node === 'string'), 'MCP searches the browser texture catalog');
+  const textureName = textureMatches.data[0].match(/^[^(]+/)[0];
+  const textureDetails = await mcp.tool('texture_nodes', { node: textureName });
+  assert(!textureDetails.isError && textureDetails.data.includes(textureName), 'MCP describes a selected texture node');
+  const guide = await mcp.tool('get_guide');
+  for (const kit of ['desk', 'shelf', 'window']) {
+    assert.match(guide.data, new RegExp(`group ${kit}\\b`), `guide includes the canonical ${kit} group source`);
+    assert.match(guide.data, new RegExp(`item = ${kit}\\(\\)`), `guide explains how to instantiate ${kit}`);
+  }
   const ops = await mcp.tool('list_operators');
-  assert(ops.data.length >= 15 && ops.data.some(o => o.id === 'check.min_wall@1') && ops.data.every(o => o.readiness === 'ready'), 'ready operators listed');
+  assert(ops.data.length >= 15 && ops.data.some(o => o.id === 'check.min_wall@1') && ops.data.some(o => o.id === 'solid.sweep@1') && ops.data.some(o => o.id === 'solid.loft@1') && ops.data.every(o => o.readiness === 'ready'), 'ready operators listed');
+  for (const kit of ['desk', 'shelf', 'window']) {
+    assert(ops.data.some(o => o.id === `kit.${kit}` && o.category === 'kit' && o.source.includes(`group ${kit}`)),
+      `list_operators includes the source and usage for the ${kit} kit`);
+  }
 
   const built = await mcp.tool('apply_text', { text: vase, label: 'make a hollow vase' });
   assert.equal(built.data.applied, true, JSON.stringify(built.data).slice(0, 300));
@@ -196,6 +210,95 @@ try {
   assert.equal(empty2.data.applied, false);
   assert.equal(empty2.data.diagnostics[0].code, 'parse.unknown_group');
   console.log('MCP groups: a wheel used four times');
+  const curved = await mcp.tool('apply_text', { text: [
+    'path = curve.bezier@1(points=[[0,0,0],[0,0.4,0],[0.4,0.6,0],[0.4,1,0]], steps=24)',
+    'section = profile.circle@1(radius=0.025, segments=24)',
+    'pipe = solid.sweep@1(path, section)',
+    'output pipe',
+  ].join('\n') + '\n', label: 'a curved pipe' });
+  assert.equal(curved.data.applied, true, JSON.stringify(curved.data).slice(0, 300));
+  assert.equal(curved.data.failure, null);
+  const curvedNodes = (await mcp.tool('get_nodes')).data.nodes;
+  const curveIds = curvedNodes.map((node) => node.id);
+  const sectionNode = curvedNodes.find((node) => node.label === 'section');
+  const pipeEdit = await mcp.tool('apply_commands', { commands: [
+    { set_param: { node: sectionNode.id, param: 'radius', value: 0.03 } },
+  ], label: 'widen the pipe by stable node ID' });
+  assert.equal(pipeEdit.data.applied, true, JSON.stringify(pipeEdit.data).slice(0, 300));
+  assert.deepEqual((await mcp.tool('get_nodes')).data.nodes.map((node) => node.id), curveIds,
+    'the follow-up pipe edit preserves every authored ID');
+  assert.equal(pipeEdit.data.failure, null);
+  console.log('MCP built a swept curve');
+  const lofted = await mcp.tool('apply_text', { text: [
+    'loft_bottom = profile.circle@1(radius=0.2, segments=24)',
+    'loft_waist = profile.circle@1(radius=0.1, segments=24)',
+    'loft_body = solid.loft@1(loft_bottom, loft_waist, spacing=0.2)',
+    'output loft_body',
+  ].join('\n') + '\n', label: 'a lofted body' });
+  assert.equal(lofted.data.applied, true, JSON.stringify(lofted.data).slice(0, 300));
+  assert.equal(lofted.data.failure, null);
+  const loftNodes = (await mcp.tool('get_nodes')).data.nodes;
+  const loftIds = loftNodes.map((node) => node.id);
+  const loftOperator = loftNodes.find((node) => node.label === 'loft_body');
+  const loftEdit = await mcp.tool('apply_commands', { commands: [
+    { set_param: { node: loftOperator.id, param: 'spacing', value: 0.25 } },
+  ], label: 'raise the loft by stable node ID' });
+  assert.equal(loftEdit.data.applied, true, JSON.stringify(loftEdit.data).slice(0, 300));
+  assert.deepEqual((await mcp.tool('get_nodes')).data.nodes.map((node) => node.id), loftIds,
+    'the follow-up loft edit preserves every authored ID');
+  assert.equal(loftEdit.data.failure, null);
+  console.log('MCP built a loft');
+  const closed = await mcp.tool('apply_text', { text: [
+    'ring_path = curve.circle@1(center=[2,0,0], radius=1, segments=24)',
+    'ring_solid = solid.sweep@1(ring_path, section)',
+    'output ring_solid',
+  ].join('\n') + '\n', label: 'a closed ring sweep' });
+  assert.equal(closed.data.applied, true, JSON.stringify(closed.data).slice(0, 300));
+  assert.equal(closed.data.failure, null);
+  console.log('MCP built a closed circular sweep');
+  // G6: polygon editing through the same tools. A box gains a raised top panel, then the raise is
+  // edited by stable node ID; an impossible inset is refused with the operator's own code and leaves
+  // the document unchanged.
+  const polygon = await mcp.tool('apply_text', { text: [
+    'p_box = solid.box@1(size=[0.3, 0.3, 0.3])',
+    'p_triangles = poly.from_solid@1(p_box)',
+    'p_flat = poly.merge_coplanar@1(p_triangles)',
+    'p_top = poly.select@1(p_flat, by="normal", direction=[0, 1, 0], angle=0.05, expect="one")',
+    'p_raised = poly.extrude_faces@1(p_flat, p_top, offset=[0, 0.05, 0])',
+    'p_solid = poly.to_solid@1(p_raised)',
+    'output p_solid',
+  ].join('\n') + '\n', label: 'a box with a raised top' });
+  assert.equal(polygon.data.applied, true, JSON.stringify(polygon.data).slice(0, 300));
+  assert.equal(polygon.data.failure, null);
+  const polygonNodes = (await mcp.tool('get_nodes')).data.nodes;
+  const polygonIds = polygonNodes.map((node) => node.id);
+  const raised = polygonNodes.find((node) => node.label === 'p_raised');
+  const raiseEdit = await mcp.tool('apply_commands', { commands: [
+    { set_param: { node: raised.id, param: 'offset', value: [0, 0.08, 0] } },
+  ], label: 'raise the top further by stable node ID' });
+  assert.equal(raiseEdit.data.applied, true, JSON.stringify(raiseEdit.data).slice(0, 300));
+  assert.equal(raiseEdit.data.failure, null);
+  assert.deepEqual((await mcp.tool('get_nodes')).data.nodes.map((node) => node.id), polygonIds,
+    'the follow-up polygon edit preserves every authored ID');
+  const impossible = await mcp.tool('apply_text', { text: [
+    'q_grid = poly.grid@1(width=1, height=1, columns=1, rows=1)',
+    'q_all = poly.select@1(q_grid)',
+    'q_bad = poly.inset_faces@1(q_grid, q_all, distance=0.9)',
+    'output q_bad',
+  ].join('\n') + '\n', label: 'an inset that is too large' });
+  assert.equal(impossible.data.applied, false, JSON.stringify(impossible.data).slice(0, 300));
+  assert.equal(impossible.data.failure.code, 'poly.inset_too_large');
+  assert.deepEqual((await mcp.tool('get_nodes')).data.nodes.map((node) => node.id), polygonIds,
+    'the refused inset left the document unchanged');
+  const subdivided = await mcp.tool('apply_text', { text: [
+    's_box = solid.box@1(size=[0.2, 0.2, 0.2])',
+    's_cage = poly.from_solid@1(s_box)',
+    's_smooth = poly.subdivide@1(s_cage, levels=1)',
+    'output s_smooth',
+  ].join('\n') + '\n', label: 'a subdivided box' });
+  assert.equal(subdivided.data.applied, true, JSON.stringify(subdivided.data).slice(0, 300));
+  assert.equal(subdivided.data.failure, null);
+  console.log('MCP polygon editing and subdivision: built, edited by ID, and refusal preserved');
   assert.deepEqual(logs, [], 'no page errors');
   console.log('MCP acceptance passed');
 } finally {

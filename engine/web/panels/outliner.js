@@ -61,7 +61,9 @@ export function createOutliner({ root, selection, document: documentOf, problems
           dot.title = bad.get(id).map((d) => `${d.code}: ${d.message}`).join("\n");
           item.append(dot);
         }
-        const choose = () => selection.select(selection.node === id ? null : id);
+        // A second click clears the selection, except when one placement of an instance set is selected:
+        // then the row stands for the set, and clicking it widens the selection to the whole set.
+        const choose = () => selection.select(selection.node === id && selection.instance === null ? null : id);
         item.addEventListener("click", choose);
         item.addEventListener("keydown", (event) => {
           if (event.key === "Enter" || event.key === " ") { event.preventDefault(); choose(); }

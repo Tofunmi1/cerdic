@@ -11,6 +11,7 @@ use bevy_render::texture::{CachedTexture, TextureCache};
 use bevy_render::view::{Msaa, ViewDepthStencilTexture, ViewTarget};
 
 use crate::lens::LensWarp;
+use crate::quality::RenderQuality;
 
 /// Depth format of the forward pass. Bevy projections are reverse-z, so depth clears to 0.
 pub(crate) const DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
@@ -27,13 +28,17 @@ pub(crate) fn needs_blit(output_format: TextureFormat) -> bool {
 
 /// Whether a view with this output format renders offscreen: its output needs the present pass, or
 /// the lens warp is on and the present pass resamples every view.
-pub(crate) fn blits(output_format: TextureFormat, lens: LensWarp) -> bool {
-    needs_blit(output_format) || lens.active()
+pub(crate) fn blits(output_format: TextureFormat, lens: LensWarp, quality: RenderQuality) -> bool {
+    needs_blit(output_format) || lens.active() || quality.ssao_enabled || quality.bloom_enabled
 }
 
 /// The format the forward pass renders in for a view with this output format.
-pub(crate) fn render_format(output_format: TextureFormat, lens: LensWarp) -> TextureFormat {
-    if blits(output_format, lens) {
+pub(crate) fn render_format(
+    output_format: TextureFormat,
+    lens: LensWarp,
+    quality: RenderQuality,
+) -> TextureFormat {
+    if blits(output_format, lens, quality) {
         OFFSCREEN_FORMAT
     } else {
         output_format
@@ -76,7 +81,13 @@ pub(crate) fn prepare_depth_textures(
                 sample_count: msaa.samples(),
                 dimension: TextureDimension::D2,
                 format: DEPTH_FORMAT,
-                usage: TextureUsages::RENDER_ATTACHMENT,
+                // WebGL cannot make a multisampled texture that is also bound for sampling (it panics at startup), so
+                // depth is only made readable when the view is not multisampled.
+                usage: if msaa.samples() > 1 {
+                    TextureUsages::RENDER_ATTACHMENT
+                } else {
+                    TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING
+                },
                 view_formats: &[],
             },
         );
@@ -97,13 +108,14 @@ pub(crate) fn prepare_msaa_targets(
     device: Res<RenderDevice>,
     lens: Res<LensWarp>,
     views: Query<(Entity, &ExtractedCamera, &ViewTarget, &Msaa)>,
+    quality: Res<RenderQuality>,
 ) {
     for (entity, camera, target, msaa) in &views {
         let (Some(size), Some(format)) = (target_extent(camera), target.out_texture_view_format())
         else {
             continue;
         };
-        let format = render_format(format, *lens);
+        let format = render_format(format, *lens, *quality);
         if msaa.samples() <= 1 {
             commands.entity(entity).remove::<ViewMsaaColor>();
             continue;
@@ -133,13 +145,14 @@ pub(crate) fn prepare_offscreen_targets(
     device: Res<RenderDevice>,
     lens: Res<LensWarp>,
     views: Query<(Entity, &ExtractedCamera, &ViewTarget)>,
+    quality: Res<RenderQuality>,
 ) {
     for (entity, camera, target) in &views {
         let (Some(size), Some(format)) = (target_extent(camera), target.out_texture_view_format())
         else {
             continue;
         };
-        if !blits(format, *lens) {
+        if !blits(format, *lens, *quality) {
             commands.entity(entity).remove::<ViewOffscreen>();
             continue;
         }
@@ -157,5 +170,33 @@ pub(crate) fn prepare_offscreen_targets(
             },
         );
         commands.entity(entity).insert(ViewOffscreen(texture));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn disabled_post_effects_keep_the_direct_srgb_path() {
+        let format = TextureFormat::Rgba8UnormSrgb;
+        let quality = RenderQuality::default();
+        assert!(!blits(format, LensWarp::default(), quality));
+        assert_eq!(render_format(format, LensWarp::default(), quality), format);
+    }
+
+    #[test]
+    fn enabled_post_effects_request_a_sampleable_offscreen_target() {
+        let mut quality = RenderQuality::default();
+        quality.ssao_enabled = true;
+        assert!(blits(
+            TextureFormat::Rgba8UnormSrgb,
+            LensWarp::default(),
+            quality
+        ));
+        assert_eq!(
+            render_format(TextureFormat::Rgba8UnormSrgb, LensWarp::default(), quality),
+            OFFSCREEN_FORMAT
+        );
     }
 }

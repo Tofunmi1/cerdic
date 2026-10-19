@@ -1,0 +1,15 @@
+[package]
+name = "ve-physics"
+version = "0.0.0"
+description = "Deterministic rigid-body physics behind a small interface of our own (Rapier inside, ADR 0035). No engine or platform code."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+# enhanced-determinism: the same inputs give the same bits on every platform, which the viewer and the tests rely on.
+rapier3d = { version = "=0.22.0", default-features = false, features = ["f32", "enhanced-determinism", "dim3"] }
+thiserror.workspace = true
+
+[lints]
+workspace = true

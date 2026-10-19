@@ -1,0 +1,103 @@
+//! Per-view uniform initialization and optional view effects.
+
+use bevy_math::{Mat4, Vec4};
+
+use super::ViewUniform;
+use crate::{SkyBackground, grade::Grading, quality::RenderQuality};
+
+impl ViewUniform {
+    /// The uniform for an eye or camera at `world_from_view` with projection `clip_from_view`.
+    pub(crate) fn new(world_from_view: Mat4, clip_from_view: Mat4) -> Self {
+        Self {
+            clip_from_world: clip_from_view * world_from_view.inverse(),
+            camera_position: world_from_view.w_axis.truncate().extend(1.0),
+            exposure: Vec4::new(1.0, 0.0, 0.0, 0.0),
+            grading: Vec4::new(1.0, 1.0, 0.0, 0.0),
+            tint: Vec4::new(1.0, 1.0, 1.0, 0.0),
+            effects: Vec4::ZERO,
+            world_from_clip: (clip_from_view * world_from_view.inverse()).inverse(),
+            viewport: Vec4::ZERO,
+            horizon: Vec4::ZERO,
+            zenith: Vec4::ZERO,
+            ground: Vec4::ZERO,
+            sun: Vec4::ZERO,
+            cloud: Vec4::ZERO,
+        }
+    }
+
+    /// Writes the active viewer grading into this view's uniforms (see [`Grading`]).
+    pub(crate) fn set_grading(&mut self, grading: &Grading) {
+        self.exposure.x = grading.exposure;
+        self.grading = Vec4::new(grading.contrast, grading.saturation, 0.0, 0.0);
+        self.tint = Vec4::new(grading.tint[0], grading.tint[1], grading.tint[2], 0.0);
+    }
+
+    pub(crate) fn set_quality(&mut self, quality: &RenderQuality) {
+        self.effects.x = if quality.specular_aa_enabled {
+            1.0
+        } else {
+            0.0
+        };
+        self.effects.y = if quality.ssao_enabled { 1.0 } else { 0.0 };
+        self.effects.z = if quality.bloom_enabled { 1.0 } else { 0.0 };
+    }
+
+    pub(super) fn set_sky(&mut self, sky: &SkyBackground, viewport: [u32; 4]) {
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "viewports are bounded by browser render targets"
+        )]
+        {
+            self.viewport = Vec4::new(
+                viewport[0] as f32,
+                viewport[1] as f32,
+                viewport[2] as f32,
+                viewport[3] as f32,
+            );
+        }
+        // The fourth lane tells the forward shader there is an authored sky to reflect (the sky pass ignores it).
+        let authored = if sky.enabled { 1.0 } else { 0.0 };
+        self.horizon = Vec4::new(sky.horizon[0], sky.horizon[1], sky.horizon[2], authored);
+        self.zenith = Vec4::new(sky.zenith[0], sky.zenith[1], sky.zenith[2], 0.0);
+        self.ground = Vec4::new(sky.ground[0], sky.ground[1], sky.ground[2], 0.0);
+        self.sun = Vec4::new(
+            sky.sun_direction[0],
+            sky.sun_direction[1],
+            sky.sun_direction[2],
+            sky.sun_intensity,
+        );
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "cloud seeds are bounded to one million"
+        )]
+        let seed = sky.seed as f32;
+        self.cloud = Vec4::new(
+            seed,
+            sky.cloud_cover,
+            sky.turbidity,
+            if sky.clouds { 1.0 } else { 0.0 },
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn specular_aa_is_opt_in_in_the_per_view_uniform() {
+        let world_from_view = Mat4::IDENTITY;
+        let mut uniform = ViewUniform::new(world_from_view, Mat4::IDENTITY);
+        let mut quality = RenderQuality::default();
+        uniform.set_quality(&quality);
+        assert_eq!(uniform.effects.x, 0.0);
+
+        quality.specular_aa_enabled = true;
+        quality.ssao_enabled = true;
+        quality.bloom_enabled = true;
+        uniform.set_quality(&quality);
+        assert_eq!(uniform.effects.x, 1.0);
+        assert_eq!(uniform.effects.y, 1.0);
+        assert_eq!(uniform.effects.z, 1.0);
+    }
+}

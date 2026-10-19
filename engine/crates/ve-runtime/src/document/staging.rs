@@ -94,6 +94,20 @@ pub(crate) fn reject(text: &str, code: &str, message: &str) -> bool {
         if host.expected.as_ref() != Some(&token) {
             return false;
         }
+        if token.quality == ve_modeling::Quality::Preview
+            && code == "budget.triangles"
+            && host
+                .pending
+                .as_ref()
+                .is_some_and(|candidate| token.matches(candidate.document()))
+        {
+            // This is the one preview refusal that can be resolved by a higher quality. Keep the
+            // staged edit available for its automatic Final request; Final either commits it or
+            // rejects the transaction normally.
+            host.expected = None;
+            host.issues.clear();
+            return true;
+        }
         host.pending = None;
         host.expected = None;
         host.issues = vec![ve_graph::Diagnostic::error(code, message)];

@@ -5,6 +5,11 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use crate::web_pool as pool;
+
+/// How many parallel shards the gallery test is split into (each uses its own dev-server port).
+const GALLERY_SHARDS: usize = 3;
+
 type Failure = Box<dyn std::error::Error>;
 
 const TOOLS: &str = "target/tools";
@@ -77,6 +82,34 @@ pub(crate) fn build(profile: Profile) -> Result<(), Failure> {
         "web/wasi_snapshot_preview1.js",
         format!("{DIST}/wasi_snapshot_preview1.js"),
     )?;
+    fs::create_dir_all(format!("{DIST}/models"))?;
+    fs::copy(
+        "crates/ve-modeling/tests/gallery/viaduct.txt",
+        format!("{DIST}/models/viaduct.txt"),
+    )?;
+    for demo in [
+        "physics",
+        "physics_big",
+        "physics_joints",
+        "physics_walk",
+        "animation",
+        "scenery",
+        "village",
+        "village_hd",
+        "beach_arch",
+        "mannequin",
+        "toon_gallery",
+        "weathered_stone",
+        "style_gallery",
+        "outdoor_sky",
+        "materials_grid",
+        "lit_room",
+    ] {
+        fs::copy(
+            format!("web/demos/{demo}.txt"),
+            format!("{DIST}/models/{demo}.txt"),
+        )?;
+    }
     for page_file in [
         "index.html",
         "bench.js",
@@ -86,6 +119,7 @@ pub(crate) fn build(profile: Profile) -> Result<(), Failure> {
     ] {
         fs::copy(format!("web/{page_file}"), format!("{DIST}/{page_file}"))?;
     }
+    crate::texture_assets::copy_assets()?;
     // The editing panels are a folder of small modules; every file in it ships.
     fs::create_dir_all(format!("{DIST}/panels"))?;
     for entry in fs::read_dir("web/panels")? {
@@ -107,6 +141,20 @@ pub(crate) fn build(profile: Profile) -> Result<(), Failure> {
             "src/engine/viewer-bridge.ts",
             "--outfile",
             &format!("engine/{DIST}/viewer-bridge.js"),
+            "--target",
+            "browser",
+            "--format",
+            "esm",
+        ],
+    )?;
+    run_in(
+        "..",
+        "bun",
+        &[
+            "build",
+            "src/engine/texture/preview.ts",
+            "--outfile",
+            &format!("engine/{DIST}/texture-preview.js"),
             "--target",
             "browser",
             "--format",
@@ -160,24 +208,122 @@ fn build_evaluator(profile: Profile, bindgen: &str) -> Result<(), Failure> {
 
 /// Builds, then runs the Playwright acceptance test against the build.
 pub(crate) fn test(profile: Profile) -> Result<(), Failure> {
+    test_filtered(profile, &[])
+}
+
+/// Builds and runs all scripts, or only scripts matching requested names.
+pub(crate) fn test_filtered(profile: Profile, names: &[String]) -> Result<(), Failure> {
+    prepare_browser(profile)?;
+    let (jobs, mut timed) = browser_jobs()?;
+    let jobs = filter_jobs(jobs, names);
+    if !names.is_empty() {
+        timed.retain(|script| names.iter().any(|name| script.contains(name)));
+    }
+    if !names.is_empty() && jobs.is_empty() && timed.is_empty() {
+        return Err(format!("no browser scripts matched: {}", names.join(", ")).into());
+    }
+    if !names.is_empty() {
+        println!("-- web-test: filtered browser run; other scripts skipped");
+    }
+    pool::run_all(jobs, pool::workers()).map_err(|error| rerun_error(error, names))?;
+    pool::run_all(
+        timed
+            .into_iter()
+            .map(|script| pool::Job::new(&script, "web"))
+            .collect(),
+        1,
+    )
+    .map_err(|error| rerun_error(error, names))
+}
+
+fn prepare_browser(profile: Profile) -> Result<(), Failure> {
     build(profile)?;
     if !Path::new("web/node_modules/playwright").exists() {
         run_in("web", "bun", &["install", "--frozen-lockfile"])?;
     }
-    println!("-- web-test: playwright (headless Chromium)");
-    run_in("web", "bun", &["run", "test"])?;
     run_in("..", "bun", &["run", "typecheck"])?;
     run_in("..", "bun", &["scripts/build-engine.ts", "--copy-only"])?;
-    run("bun", &["web/tests/editor.mjs"])?;
-    run("bun", &["web/tests/evaluation.mjs"])?;
-    run("bun", &["web/tests/gallery.mjs"])?;
-    run("bun", &["web/tests/mcp.mjs"])?;
-    run("bun", &["web/tests/reflection.mjs"])?;
-    run("bun", &["web/tests/panels-graph.mjs"])?;
-    run("bun", &["web/tests/panels.mjs"])?;
-    run("bun", &["web/tests/panels-groups.mjs"])?;
-    run("bun", &["web/tests/instances.mjs"])?;
-    run("bun", &["web/tests/sockets.mjs"])
+    Ok(())
+}
+
+fn browser_jobs() -> Result<(Vec<pool::Job>, Vec<String>), Failure> {
+    println!("-- web-test: playwright (headless Chromium)");
+    let (timed, independent): (Vec<_>, Vec<_>) =
+        pool::chain_scripts()?.into_iter().partition(|script| {
+            pool::TIMING_SENSITIVE
+                .iter()
+                .any(|name| script.contains(name))
+        });
+    // Longest first, so the slow gallery shards start at once and the pool stays busy.
+    let mut jobs = Vec::new();
+    for shard in 0..GALLERY_SHARDS {
+        let mut job = pool::Job::new("web/tests/gallery.mjs", ".");
+        job.env = vec![
+            ("GALLERY_SHARD", format!("{shard}/{GALLERY_SHARDS}")),
+            ("GALLERY_PORT", (5189 + shard).to_string()),
+        ];
+        jobs.push(job);
+    }
+    for script in [
+        "instances",
+        "panels",
+        "evaluation",
+        "g9-study-room",
+        "g9-material-gallery",
+        "g9-environment",
+        "g9-grading",
+        "g10-render-aa",
+        "g9-chamfer",
+        "g9-kits",
+        "g10-bevel",
+        "g9-aqueduct-depth",
+        "g9-review",
+        "mcp",
+        "panels-groups",
+        "reflection",
+        "editor",
+        "sockets",
+        "panels-graph",
+        "v3-transform-commands",
+        "v3-gizmo",
+        "v3-parameter-handles",
+        "v3-profile-points",
+        "v3-curve-points",
+        "v3-radius-handle",
+        "v3-drag-guards",
+        "v3-scope",
+        "v3-frames",
+    ] {
+        jobs.push(pool::Job::new(&format!("web/tests/{script}.mjs"), "."));
+    }
+    // The package's own chain (minus the frame-pacing tests) runs in `web/`, as `bun run test`
+    // does.
+    jobs.extend(
+        independent
+            .iter()
+            .map(|script| pool::Job::new(script, "web")),
+    );
+    Ok((jobs, timed))
+}
+
+fn filter_jobs(mut jobs: Vec<pool::Job>, names: &[String]) -> Vec<pool::Job> {
+    if names.is_empty() {
+        return jobs;
+    }
+    jobs.retain(|job| names.iter().any(|name| job.script.contains(name)));
+    jobs
+}
+
+fn rerun_error(error: Box<dyn std::error::Error>, names: &[String]) -> Box<dyn std::error::Error> {
+    if names.is_empty() {
+        error
+    } else {
+        format!(
+            "{error}; rerun with `cargo xtask web-test dev {}`",
+            names.join(" ")
+        )
+        .into()
+    }
 }
 
 /// The wasm-bindgen CLI must match the library version in `Cargo.lock` exactly.
@@ -221,7 +367,13 @@ fn locked_version(package: &str) -> Result<String, Failure> {
 }
 
 fn run(program: &str, args: &[&str]) -> Result<(), Failure> {
+    let started = std::time::Instant::now();
     let status = Command::new(program).args(args).status()?;
+    println!(
+        "   timing: {program} {} {:.0}s",
+        args.join(" "),
+        started.elapsed().as_secs_f64()
+    );
     if status.success() {
         Ok(())
     } else {

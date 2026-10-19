@@ -1,0 +1,32 @@
+[
+  {
+    "name": "bending-arm",
+    "prompt": "Make a soft rubber arm: a square tube 0.2 m thick and 1 m long that bends in the middle like an elbow, folding 90 degrees over two seconds and then straightening again, repeating forever. The whole arm must bend smoothly as one skin, not be two separate blocks.",
+    "uses": ["rig.skin", "rig.bone"],
+    "rig": { "skinned": 1, "minBones": 2, "movingBones": 1 }
+  },
+  {
+    "name": "wagging-tail",
+    "prompt": "Make a tail: a tapered strip 1.2 m long and 0.15 m thick that wags from side to side. It must bend along its length (three bones, each swinging about 25 degrees about the vertical axis, a little out of step with the one before) rather than swinging stiffly as one piece.",
+    "uses": ["rig.skin", "rig.bone"],
+    "rig": { "skinned": 1, "minBones": 3, "movingBones": 2 }
+  },
+  {
+    "name": "waving-tentacle",
+    "prompt": "Make a tentacle: a round tube 0.12 m thick and 1.5 m long, standing upright, which waves. Use a skeleton of three bones along its length, with each bone swinging about 20 degrees, so the tentacle curls smoothly as a single skinned mesh.",
+    "uses": ["rig.skin", "rig.bone"],
+    "rig": { "skinned": 1, "minBones": 3, "movingBones": 2 }
+  },
+  {
+    "name": "twisting-forearm",
+    "prompt": "Make a forearm that twists: a square tube 0.2 m thick and 1 m long, standing upright, whose lower half turns a half circle about the tube's own length over two seconds (like wringing a cloth) while the upper half stays still. It must stay full width through the twist and not pinch thin at the middle.",
+    "uses": ["rig.skin", "rig.bone"],
+    "rig": { "skinned": 1, "minBones": 2, "movingBones": 1, "blend": "dual_quaternion" }
+  },
+  {
+    "name": "painted-knee",
+    "prompt": "Make a leg: a square tube 0.2 m thick and 1.2 m long that bends at the knee in the middle by 80 degrees, repeating. Paint the skin weights so the area right at the knee is carried fully by the shin bone, with a brush about 0.15 m wide.",
+    "uses": ["rig.skin", "rig.bone"],
+    "rig": { "skinned": 1, "minBones": 2, "movingBones": 1, "painted": true }
+  }
+]

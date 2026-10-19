@@ -1,6 +1,6 @@
 //! The sun's shadow map: its texture, per-frame matrix, depth-only pipelines and pass.
 //!
-//! One orthographic map follows the viewer (see `shadow_math`). It is sampled in the forward shader
+//! Up to three cascaded orthographic maps share one atlas and follow the viewer (see `shadow_math`). They are sampled in the forward shader
 //! with a comparison sampler. When shadows are off the lights bind group still needs a texture, so a
 //! 1 by 1 stand-in is bound and the shader skips the lookup.
 
@@ -9,18 +9,18 @@ use std::collections::HashMap;
 use bevy_asset::Handle;
 use bevy_ecs::prelude::*;
 use bevy_log::warn_once;
-use bevy_math::Vec4;
+use bevy_math::{Vec3, Vec4};
 use bevy_mesh::{Mesh, MeshVertexBufferLayoutRef, VertexBufferLayout};
 use bevy_render::mesh::RenderMesh;
 use bevy_render::mesh::allocator::MeshAllocator;
 use bevy_render::render_asset::RenderAssets;
 use bevy_render::render_resource::{
     BindGroup, BindGroupEntry, BindGroupLayoutDescriptor, CachedRenderPipelineId, CompareFunction,
-    DepthBiasState, DepthStencilState, Extent3d, FilterMode, LoadOp, MultisampleState, Operations,
-    PipelineCache, PrimitiveState, PrimitiveTopology, RenderPassDepthStencilAttachment,
-    RenderPassDescriptor, RenderPipelineDescriptor, Sampler, SamplerDescriptor, StencilState,
-    StoreOp, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
-    TextureView, TextureViewDescriptor, UniformBuffer, VertexState,
+    DepthBiasState, DepthStencilState, DynamicUniformBuffer, Extent3d, FilterMode, LoadOp,
+    MultisampleState, Operations, PipelineCache, PrimitiveState, PrimitiveTopology,
+    RenderPassDepthStencilAttachment, RenderPassDescriptor, RenderPipelineDescriptor, Sampler,
+    SamplerDescriptor, StencilState, StoreOp, Texture, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureUsages, TextureView, TextureViewDescriptor, VertexState,
 };
 use bevy_render::renderer::{RenderContext, RenderDevice, RenderQueue};
 use bevy_render::view::ExtractedView;
@@ -32,7 +32,7 @@ use crate::light::ExtractedLights;
 use crate::pipeline::instance_layout;
 use crate::prepare::{InstanceBatches, ViewUniform};
 use crate::quality::RenderQuality;
-use crate::shadow_math::{SHADOW_DISTANCE, ShadowParams, sun_shadow_params};
+use crate::shadow_math::{MAX_CASCADES, ShadowParams, sun_cascades, view_frustum};
 use crate::stereo::{StereoViews, viewer_position};
 
 /// Source of the shadow shader.
@@ -48,7 +48,10 @@ struct ShadowTarget {
     // Held so the texture outlives its view.
     _texture: Texture,
     view: TextureView,
+    /// Side of one cascade in texels.
     resolution: u32,
+    /// Cascades laid side by side: the atlas is `resolution * cascades` wide.
+    cascades: u32,
 }
 
 /// The shadow map texture (when shadows are on), a stand-in for when they are off, and the
@@ -74,18 +77,25 @@ impl ShadowMap {
         self.sampler.as_ref()
     }
 
-    /// Side of the real map in texels, or `None` when shadows are off.
-    pub(crate) fn resolution(&self) -> Option<u32> {
-        self.target.as_ref().map(|target| target.resolution)
+    /// Side of one cascade of the real map in texels and how many cascades it has, or `None` when shadows are off.
+    pub(crate) fn layout(&self) -> Option<(u32, u32)> {
+        self.target
+            .as_ref()
+            .map(|target| (target.resolution, target.cascades))
     }
 }
 
-fn depth_texture(device: &RenderDevice, size: u32, label: &'static str) -> (Texture, TextureView) {
+fn depth_texture(
+    device: &RenderDevice,
+    width: u32,
+    height: u32,
+    label: &'static str,
+) -> (Texture, TextureView) {
     let texture = device.create_texture(&TextureDescriptor {
         label: Some(label),
         size: Extent3d {
-            width: size,
-            height: size,
+            width,
+            height,
             depth_or_array_layers: 1,
         },
         mip_level_count: 1,
@@ -116,18 +126,26 @@ pub(crate) fn prepare_shadow_map(
         }));
     }
     if map.stand_in.is_none() {
-        map.stand_in = Some(depth_texture(&device, 1, "ve_shadow_stand_in"));
+        map.stand_in = Some(depth_texture(&device, 1, 1, "ve_shadow_stand_in"));
     }
-    let wanted = quality
-        .shadows_enabled()
-        .then_some(quality.shadow_resolution);
-    if map.resolution() != wanted {
-        map.target = wanted.map(|resolution| {
-            let (texture, view) = depth_texture(&device, resolution, "ve_shadow_map");
+    let most = u32::try_from(MAX_CASCADES).unwrap_or(3);
+    let wanted = quality.shadows_enabled().then_some((
+        quality.shadow_resolution,
+        quality.shadow_cascades.clamp(1, most),
+    ));
+    if map.layout() != wanted {
+        map.target = wanted.map(|(resolution, cascades)| {
+            let (texture, view) = depth_texture(
+                &device,
+                resolution * cascades,
+                resolution,
+                "ve_shadow_atlas",
+            );
             ShadowTarget {
                 _texture: texture,
                 view,
                 resolution,
+                cascades,
             }
         });
     }
@@ -145,7 +163,9 @@ pub(crate) struct ShadowPipelines {
     view_layout: BindGroupLayoutDescriptor,
     shader: Handle<Shader>,
     cache: HashMap<MeshVertexBufferLayoutRef, CachedRenderPipelineId>,
-    view_buffer: UniformBuffer<ViewUniform>,
+    /// One camera per cascade, addressed by dynamic offset.
+    view_buffer: DynamicUniformBuffer<ViewUniform>,
+    offsets: Vec<u32>,
     view_bind_group: Option<BindGroup>,
 }
 
@@ -155,7 +175,8 @@ impl ShadowPipelines {
             view_layout,
             shader,
             cache: HashMap::new(),
-            view_buffer: UniformBuffer::default(),
+            view_buffer: DynamicUniformBuffer::default(),
+            offsets: Vec::new(),
             view_bind_group: None,
         }
     }
@@ -210,7 +231,7 @@ pub(crate) fn prepare_shadow_state(
         .sun
         .as_ref()
         .filter(|(_, light)| light.intensity > 0.0);
-    let (Some(resolution), Some((forward, _))) = (map.resolution(), sun) else {
+    let (Some((resolution, cascades)), Some((forward, _))) = (map.layout(), sun) else {
         state.params = ShadowParams::default();
         return;
     };
@@ -219,18 +240,37 @@ pub(crate) fn prepare_shadow_state(
             .iter()
             .map(|(view, stereo)| (view.world_from_view.translation(), stereo)),
     );
-    let params = sun_shadow_params(
+    // The cascades follow the first view's direction and field of view (the head, for a headset).
+    let (view_forward, tan) = views
+        .iter()
+        .next()
+        .map_or((Vec3::NEG_Z, [1.0, 0.6]), |(view, _)| {
+            view_frustum(view.world_from_view.rotation(), view.clip_from_view)
+        });
+    let params = sun_cascades(
         -*forward,
         viewer,
-        SHADOW_DISTANCE,
+        view_forward,
+        tan,
+        cascades as usize,
         resolution,
         quality.shadow_pcf_radius,
     );
-    pipelines.view_buffer.set(ViewUniform {
-        clip_from_world: params.clip_from_world,
-        camera_position: Vec4::ZERO,
-        exposure: Vec4::new(1.0, 0.0, 0.0, 0.0),
-    });
+    pipelines.view_buffer.clear();
+    pipelines.offsets.clear();
+    for cascade in 0..params.cascades {
+        let uniform = ViewUniform {
+            clip_from_world: params.clip_from_world[cascade],
+            camera_position: Vec4::ZERO,
+            exposure: Vec4::new(1.0, 0.0, 0.0, 0.0),
+            // The depth-only shadow pass does not grade; keep the fields neutral but present.
+            grading: Vec4::new(1.0, 1.0, 0.0, 0.0),
+            tint: Vec4::new(1.0, 1.0, 1.0, 0.0),
+            ..ViewUniform::default()
+        };
+        let offset = pipelines.view_buffer.push(&uniform);
+        pipelines.offsets.push(offset);
+    }
     pipelines.view_buffer.write_buffer(&device, &queue);
     let layout = pipeline_cache.get_bind_group_layout(&pipelines.view_layout);
     pipelines.view_bind_group = pipelines.view_buffer.binding().map(|binding| {
@@ -315,24 +355,41 @@ pub(crate) fn shadow_pass(
         occlusion_query_set: None,
         multiview_mask: None,
     });
-    pass.set_bind_group(0, view_bind_group, &[0]);
-    for batch in &batches.batches {
-        let Some(render_mesh) = render_meshes.get(batch.mesh) else {
-            continue;
-        };
-        // Pipelines are queued one frame after a mesh first appears.
-        let Some(pipeline) = pipelines
-            .cache
-            .get(&render_mesh.layout)
-            .and_then(|id| pipeline_cache.get_render_pipeline(*id))
-        else {
-            continue;
-        };
-        pass.set_render_pipeline(pipeline);
-        if let Some(call) =
-            bind_geometry(&mut pass, &allocator, render_mesh, batch, instance_buffer)
-        {
-            call.issue(&mut pass, batch.instances.clone(), Pass::Shadow);
+    // Every cascade draws the same batches from its own sun camera into its own tile of the atlas.
+    for (index, offset) in pipelines.offsets.iter().enumerate() {
+        let tile = u32::try_from(index).unwrap_or(0) * target.resolution;
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "shadow tiles are far below 2^24 texels"
+        )]
+        pass.set_viewport(
+            tile as f32,
+            0.0,
+            target.resolution as f32,
+            target.resolution as f32,
+            0.0,
+            1.0,
+        );
+        pass.set_scissor_rect(tile, 0, target.resolution, target.resolution);
+        pass.set_bind_group(0, view_bind_group, &[*offset]);
+        for batch in &batches.batches {
+            let Some(render_mesh) = render_meshes.get(batch.mesh) else {
+                continue;
+            };
+            // Pipelines are queued one frame after a mesh first appears.
+            let Some(pipeline) = pipelines
+                .cache
+                .get(&render_mesh.layout)
+                .and_then(|id| pipeline_cache.get_render_pipeline(*id))
+            else {
+                continue;
+            };
+            pass.set_render_pipeline(pipeline);
+            if let Some(call) =
+                bind_geometry(&mut pass, &allocator, render_mesh, batch, instance_buffer)
+            {
+                call.issue(&mut pass, batch.instances.clone(), Pass::Shadow);
+            }
         }
     }
 }

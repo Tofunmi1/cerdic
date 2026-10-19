@@ -7,11 +7,13 @@ use bevy_render::Extract;
 use bevy_render::render_resource::ShaderType;
 use bevy_transform::components::GlobalTransform;
 
-use crate::shadow_math::ShadowParams;
+use crate::shadow_math::{MAX_CASCADES, ShadowParams};
 
 /// Upper bound on point lights per frame. Fixed so the uniform block has a known size on WebGL2;
 /// the quality tiers (M6) choose how many are actually used.
-pub const MAX_POINT_LIGHTS: usize = 8;
+pub const MAX_POINT_LIGHTS: usize = 16;
+/// Fixed WebGL2 uniform capacity for unshadowed spot lights.
+pub const MAX_SPOT_LIGHTS: usize = 8;
 
 /// A light infinitely far away, shining along its entity's forward (-Z) direction.
 #[derive(Component, Clone, Copy, Debug, PartialEq)]
@@ -52,24 +54,58 @@ impl Default for VePointLight {
     }
 }
 
+/// A cone light, currently unshadowed. Angles are full cone widths in radians.
+#[derive(Component, Clone, Copy, Debug, PartialEq)]
+pub struct VeSpotLight {
+    /// Light colour.
+    pub color: Color,
+    /// Brightness at one metre.
+    pub intensity: f32,
+    /// Distance in metres where the light reaches zero.
+    pub range: f32,
+    /// Normalized world direction the cone points toward.
+    pub direction: Vec3,
+    /// Full cone angle at full intensity.
+    pub inner_angle: f32,
+    /// Full cone angle at zero intensity.
+    pub outer_angle: f32,
+}
+
 /// Constant light that reaches every surface equally, standing in for the sky.
+///
+/// The sky and ground colours are packed as a first-order (L1) spherical-harmonic irradiance band.
+/// This is a bounded, stable approximation of a two-colour environment, not global illumination:
+/// it captures the sky-to-ground gradient a real environment would add, but no inter-surface bounce.
 #[derive(Resource, Clone, Copy, Debug, PartialEq)]
 pub struct VeAmbientLight {
     /// Light colour.
     pub color: Color,
+    /// Colour of diffuse light arriving from above; multiplied by `intensity`.
+    pub sky_color: Color,
+    /// Colour of diffuse light arriving from below; multiplied by `intensity`.
+    pub ground_color: Color,
     /// Brightness.
     pub intensity: f32,
     /// How strongly surfaces reflect a procedural studio sky (a gradient with two soft light boxes),
     /// so metals and glossy paint have something to reflect. 0 turns it off.
     pub reflection: f32,
+    /// Colour of the optional warm ground bounce; multiplied by `intensity`.
+    pub bounce_color: Color,
+    /// Strength of the optional ground bounce added to downward-facing surfaces, 0 to 1. 0 (the
+    /// default) matches a plain two-colour hemisphere; this is an approximation, not GI.
+    pub bounce: f32,
 }
 
 impl Default for VeAmbientLight {
     fn default() -> Self {
         Self {
             color: Color::WHITE,
+            sky_color: Color::srgb(0.68, 0.76, 0.9),
+            ground_color: Color::srgb(0.46, 0.39, 0.3),
             intensity: 0.15,
             reflection: 0.0,
+            bounce_color: Color::srgb(0.6, 0.44, 0.28),
+            bounce: 0.0,
         }
     }
 }
@@ -88,18 +124,43 @@ pub(crate) struct PointLightUniform {
 pub(crate) struct LightsUniform {
     /// rgb: ambient colour times intensity, w: strength of the reflected studio sky.
     pub(crate) ambient: Vec4,
+    /// rgb: constant (L0) term of the sky/ground irradiance band, already intensity-scaled.
+    pub(crate) ambient_sh0: Vec4,
+    /// rgb: first-order (L1) term of the sky/ground irradiance band, aligned to +Y.
+    pub(crate) ambient_sh1: Vec4,
+    /// rgb: warm ground-bounce colour times intensity, w: bounce strength (0 turns it off).
+    pub(crate) ambient_bounce: Vec4,
     /// xyz: unit vector pointing from the surface toward the sun.
     pub(crate) sun_direction: Vec4,
     /// rgb: sun colour times intensity (zero when there is no sun).
     pub(crate) sun_color: Vec4,
     /// x: number of valid entries in `points`.
     pub(crate) counts: Vec4,
-    /// World position to the sun's shadow-map clip space.
-    pub(crate) sun_shadow_from_world: Mat4,
-    /// x: 1 when the sun's shadow map is sampled, y: filter radius in taps, z: one texel in uv units,
-    /// w: normal-offset bias in metres.
+    /// World position to the sun's shadow-map clip space, one matrix per cascade.
+    pub(crate) sun_shadow_from_world: [Mat4; MAX_CASCADES],
+    /// x: number of shadow cascades (0 when the shadow map is not sampled), y: filter radius in taps, z and w: one texel of the
+    /// atlas in uv units along x and y.
     pub(crate) shadow_params: Vec4,
+    /// xyz: the far edge of each cascade along the viewing direction, in metres.
+    pub(crate) shadow_splits: Vec4,
+    /// xyz: each cascade's normal-offset bias in metres.
+    pub(crate) shadow_bias: Vec4,
+    /// xyz: the viewing direction the splits are measured along.
+    pub(crate) shadow_forward: Vec4,
     pub(crate) points: [PointLightUniform; MAX_POINT_LIGHTS],
+    /// Bounded spot array. Angles are packed as outer and inner cosines.
+    pub(crate) spots: [SpotLightUniform; MAX_SPOT_LIGHTS],
+}
+
+/// One spot light as consumed by the forward shader.
+#[derive(Clone, Copy, Debug, Default, PartialEq, ShaderType)]
+pub(crate) struct SpotLightUniform {
+    /// xyz: world position; w: range.
+    pub(crate) position_range: Vec4,
+    /// xyz: normalized ray direction; w: outer cone cosine.
+    pub(crate) direction_outer: Vec4,
+    /// rgb: colour times intensity; w: inner cone cosine.
+    pub(crate) color_inner: Vec4,
 }
 
 /// A point light extracted from the world, before packing.
@@ -117,6 +178,19 @@ pub(crate) struct ExtractedLights {
     pub(crate) ambient: Option<VeAmbientLight>,
     pub(crate) sun: Option<(Vec3, VeDirectionalLight)>,
     pub(crate) points: Vec<ExtractedPoint>,
+    pub(crate) spots: Vec<ExtractedSpot>,
+}
+
+/// A spot light extracted from the main world.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct ExtractedSpot {
+    pub(crate) position: Vec3,
+    pub(crate) direction: Vec3,
+    pub(crate) color: LinearRgba,
+    pub(crate) intensity: f32,
+    pub(crate) range: f32,
+    pub(crate) inner_angle: f32,
+    pub(crate) outer_angle: f32,
 }
 
 /// Replaces [`ExtractedLights`] with the lights of the main world.
@@ -125,6 +199,7 @@ pub(crate) fn extract_lights(
     ambient: Extract<Option<Res<VeAmbientLight>>>,
     suns: Extract<Query<(&VeDirectionalLight, &GlobalTransform)>>,
     points: Extract<Query<(&VePointLight, &GlobalTransform)>>,
+    spots: Extract<Query<(&VeSpotLight, &GlobalTransform)>>,
 ) {
     out.ambient = ambient.as_deref().copied();
     // With several suns, the brightest wins; the rest are ignored (one shadow-capable sun by design).
@@ -140,6 +215,17 @@ pub(crate) fn extract_lights(
             intensity: light.intensity,
             range: light.range,
         }));
+    out.spots.clear();
+    out.spots
+        .extend(spots.iter().map(|(light, transform)| ExtractedSpot {
+            position: transform.translation(),
+            direction: light.direction.normalize_or_zero(),
+            color: LinearRgba::from(light.color),
+            intensity: light.intensity,
+            range: light.range,
+            inner_angle: light.inner_angle,
+            outer_angle: light.outer_angle,
+        }));
 }
 
 fn scaled(color: LinearRgba, intensity: f32) -> Vec4 {
@@ -151,6 +237,54 @@ fn scaled(color: LinearRgba, intensity: f32) -> Vec4 {
     )
 }
 
+fn point_order(a: &ExtractedPoint, b: &ExtractedPoint, viewer: Vec3) -> std::cmp::Ordering {
+    a.position
+        .distance_squared(viewer)
+        .total_cmp(&b.position.distance_squared(viewer))
+        .then_with(|| a.position.x.total_cmp(&b.position.x))
+        .then_with(|| a.position.y.total_cmp(&b.position.y))
+        .then_with(|| a.position.z.total_cmp(&b.position.z))
+        .then_with(|| a.range.total_cmp(&b.range))
+        .then_with(|| a.intensity.total_cmp(&b.intensity))
+        .then_with(|| a.color.red.total_cmp(&b.color.red))
+        .then_with(|| a.color.green.total_cmp(&b.color.green))
+        .then_with(|| a.color.blue.total_cmp(&b.color.blue))
+}
+
+fn compare_spots(a: &ExtractedSpot, b: &ExtractedSpot, viewer: Vec3) -> std::cmp::Ordering {
+    a.position
+        .distance_squared(viewer)
+        .total_cmp(&b.position.distance_squared(viewer))
+        .then_with(|| a.position.x.total_cmp(&b.position.x))
+        .then_with(|| a.position.y.total_cmp(&b.position.y))
+        .then_with(|| a.position.z.total_cmp(&b.position.z))
+        .then_with(|| a.direction.x.total_cmp(&b.direction.x))
+        .then_with(|| a.direction.y.total_cmp(&b.direction.y))
+        .then_with(|| a.direction.z.total_cmp(&b.direction.z))
+        .then_with(|| a.range.total_cmp(&b.range))
+        .then_with(|| a.inner_angle.total_cmp(&b.inner_angle))
+        .then_with(|| a.outer_angle.total_cmp(&b.outer_angle))
+        .then_with(|| a.intensity.total_cmp(&b.intensity))
+        .then_with(|| a.color.red.total_cmp(&b.color.red))
+        .then_with(|| a.color.green.total_cmp(&b.color.green))
+        .then_with(|| a.color.blue.total_cmp(&b.color.blue))
+}
+
+/// Writes the cascaded shadow settings into the uniform block.
+fn pack_shadow(uniform: &mut LightsUniform, shadow: &ShadowParams) {
+    uniform.sun_shadow_from_world = shadow.clip_from_world;
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "the cascade count is at most 3 and the filter radius 0 or 1"
+    )]
+    let (cascades, radius) = (shadow.cascades as f32, shadow.pcf_radius as f32);
+    uniform.shadow_params = Vec4::new(cascades, radius, shadow.texel_uv[0], shadow.texel_uv[1]);
+    uniform.shadow_splits = Vec4::new(shadow.splits[0], shadow.splits[1], shadow.splits[2], 0.0);
+    let bias = shadow.normal_bias;
+    uniform.shadow_bias = Vec4::new(bias[0], bias[1], bias[2], 0.0);
+    uniform.shadow_forward = shadow.forward.extend(0.0);
+}
+
 /// Packs the extracted lights into the uniform block, keeping at most `max_points` point lights.
 ///
 /// When there are more point lights than allowed, the ones closest to `viewer` are kept because
@@ -159,12 +293,34 @@ pub(crate) fn pack_lights(
     lights: &ExtractedLights,
     viewer: Vec3,
     max_points: usize,
+    max_spots: usize,
     shadow: &ShadowParams,
 ) -> LightsUniform {
     let mut uniform = LightsUniform::default();
     if let Some(ambient) = lights.ambient {
         uniform.ambient = scaled(LinearRgba::from(ambient.color), ambient.intensity);
         uniform.ambient.w = ambient.reflection.max(0.0);
+        // A two-colour hemisphere is exactly the L1 band along Y, so the constant and directional
+        // terms below are the mean and half-difference of the sky and ground irradiance.
+        let sky = LinearRgba::from(ambient.sky_color);
+        let ground = LinearRgba::from(ambient.ground_color);
+        let half = 0.5 * ambient.intensity;
+        let mid = Vec4::new(
+            (sky.red + ground.red) * half,
+            (sky.green + ground.green) * half,
+            (sky.blue + ground.blue) * half,
+            0.0,
+        );
+        let dir = Vec4::new(
+            (sky.red - ground.red) * half,
+            (sky.green - ground.green) * half,
+            (sky.blue - ground.blue) * half,
+            0.0,
+        );
+        uniform.ambient_sh0 = mid;
+        uniform.ambient_sh1 = dir;
+        uniform.ambient_bounce = scaled(LinearRgba::from(ambient.bounce_color), ambient.intensity);
+        uniform.ambient_bounce.w = ambient.bounce.max(0.0);
     }
     if let Some((forward, sun)) = &lights.sun {
         // The shader wants the direction toward the light, the opposite of where it points.
@@ -172,19 +328,12 @@ pub(crate) fn pack_lights(
         uniform.sun_direction = toward.extend(0.0);
         uniform.sun_color = scaled(LinearRgba::from(sun.color), sun.intensity);
         if shadow.enabled {
-            uniform.sun_shadow_from_world = shadow.clip_from_world;
-            #[expect(clippy::cast_precision_loss, reason = "the filter radius is 0 or 1")]
-            let radius = shadow.pcf_radius as f32;
-            uniform.shadow_params = Vec4::new(1.0, radius, shadow.texel_uv, shadow.normal_bias);
+            pack_shadow(&mut uniform, shadow);
         }
     }
 
     let mut order: Vec<&ExtractedPoint> = lights.points.iter().collect();
-    order.sort_by(|a, b| {
-        a.position
-            .distance_squared(viewer)
-            .total_cmp(&b.position.distance_squared(viewer))
-    });
+    order.sort_by(|a, b| point_order(a, b, viewer));
     let count = order.len().min(max_points.min(MAX_POINT_LIGHTS));
     for (slot, light) in uniform.points.iter_mut().zip(order.iter().take(count)) {
         slot.position_range = light.position.extend(light.range.max(0.0));
@@ -197,136 +346,32 @@ pub(crate) fn pack_lights(
     {
         uniform.counts.x = count as f32;
     }
+    let mut spot_order: Vec<&ExtractedSpot> = lights.spots.iter().collect();
+    spot_order.sort_by(|a, b| compare_spots(a, b, viewer));
+    let spot_count = spot_order.len().min(max_spots.min(MAX_SPOT_LIGHTS));
+    for (slot, light) in uniform
+        .spots
+        .iter_mut()
+        .zip(spot_order.iter().take(spot_count))
+    {
+        slot.position_range = light.position.extend(light.range.max(0.0));
+        slot.direction_outer = light
+            .direction
+            .normalize_or_zero()
+            .extend((light.outer_angle * 0.5).cos());
+        slot.color_inner = scaled(light.color, light.intensity);
+        slot.color_inner.w = (light.inner_angle * 0.5).cos();
+    }
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "count is at most MAX_SPOT_LIGHTS"
+    )]
+    {
+        uniform.counts.y = spot_count as f32;
+    }
     uniform
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn point(x: f32) -> ExtractedPoint {
-        ExtractedPoint {
-            position: Vec3::new(x, 0.0, 0.0),
-            color: LinearRgba::WHITE,
-            intensity: 1.0,
-            range: 5.0,
-        }
-    }
-
-    const NO_SHADOW: ShadowParams = ShadowParams {
-        enabled: false,
-        clip_from_world: Mat4::IDENTITY,
-        pcf_radius: 0,
-        texel_uv: 0.0,
-        normal_bias: 0.0,
-    };
-
-    #[test]
-    fn the_sky_reflection_strength_travels_in_the_ambient_alpha() {
-        let pack = |reflection: Option<f32>| {
-            let ambient =
-                reflection.map_or_else(VeAmbientLight::default, |reflection| VeAmbientLight {
-                    reflection,
-                    ..VeAmbientLight::default()
-                });
-            let lights = ExtractedLights {
-                ambient: Some(ambient),
-                ..ExtractedLights::default()
-            };
-            pack_lights(&lights, Vec3::ZERO, MAX_POINT_LIGHTS, &NO_SHADOW)
-        };
-        let off = pack(None);
-        assert!(
-            off.ambient.w.abs() < f32::EPSILON,
-            "off by default, so old scenes keep their look"
-        );
-        let on = pack(Some(1.5));
-        assert!((on.ambient.w - 1.5).abs() < f32::EPSILON);
-        let negative = pack(Some(-3.0));
-        assert!(
-            negative.ambient.w.abs() < f32::EPSILON,
-            "negative strength is clamped to off"
-        );
-    }
-
-    #[test]
-    fn no_lights_pack_to_zero() {
-        let uniform = pack_lights(
-            &ExtractedLights::default(),
-            Vec3::ZERO,
-            MAX_POINT_LIGHTS,
-            &NO_SHADOW,
-        );
-        assert_eq!(uniform, LightsUniform::default());
-    }
-
-    #[test]
-    fn sun_direction_points_toward_the_light() {
-        let lights = ExtractedLights {
-            sun: Some((Vec3::NEG_Y, VeDirectionalLight::default())),
-            ..Default::default()
-        };
-        let uniform = pack_lights(&lights, Vec3::ZERO, MAX_POINT_LIGHTS, &NO_SHADOW);
-        assert!((uniform.sun_direction.y - 1.0).abs() < 1e-6);
-        assert!(uniform.sun_color.x > 0.0);
-        assert!(
-            uniform.shadow_params.x.abs() < f32::EPSILON,
-            "no shadows were enabled"
-        );
-    }
-
-    #[test]
-    fn enabled_shadows_are_packed_only_when_there_is_a_sun() {
-        let shadow = ShadowParams {
-            enabled: true,
-            clip_from_world: Mat4::from_scale(Vec3::splat(2.0)),
-            pcf_radius: 1,
-            texel_uv: 0.25,
-            normal_bias: 0.05,
-        };
-        let with_sun = ExtractedLights {
-            sun: Some((Vec3::NEG_Y, VeDirectionalLight::default())),
-            ..Default::default()
-        };
-        let packed = pack_lights(&with_sun, Vec3::ZERO, MAX_POINT_LIGHTS, &shadow);
-        assert_eq!(packed.shadow_params, Vec4::new(1.0, 1.0, 0.25, 0.05));
-        assert_eq!(packed.sun_shadow_from_world, shadow.clip_from_world);
-        let without = pack_lights(
-            &ExtractedLights::default(),
-            Vec3::ZERO,
-            MAX_POINT_LIGHTS,
-            &shadow,
-        );
-        assert_eq!(without.shadow_params, Vec4::ZERO);
-    }
-
-    #[test]
-    fn keeps_the_closest_lights_when_over_the_cap() {
-        let lights = ExtractedLights {
-            points: (0..12_u8).rev().map(|i| point(f32::from(i))).collect(),
-            ..Default::default()
-        };
-        let uniform = pack_lights(&lights, Vec3::ZERO, 3, &NO_SHADOW);
-        assert!((uniform.counts.x - 3.0).abs() < f32::EPSILON);
-        let xs: Vec<f32> = uniform.points[..3]
-            .iter()
-            .map(|p| p.position_range.x)
-            .collect();
-        assert_eq!(xs, [0.0, 1.0, 2.0]);
-        assert!(
-            uniform.points[3..]
-                .iter()
-                .all(|p| *p == PointLightUniform::default())
-        );
-    }
-
-    #[test]
-    fn tier_cap_cannot_exceed_the_block_size() {
-        let lights = ExtractedLights {
-            points: (0..20_u8).map(|i| point(f32::from(i))).collect(),
-            ..Default::default()
-        };
-        let uniform = pack_lights(&lights, Vec3::ZERO, 1000, &NO_SHADOW);
-        assert!((uniform.counts.x - 8.0).abs() < f32::EPSILON);
-    }
-}
+#[path = "light_tests.rs"]
+mod tests;

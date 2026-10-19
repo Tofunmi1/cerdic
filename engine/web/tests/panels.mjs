@@ -69,6 +69,27 @@ try {
   assert(tree.every((row) => !row.selected), 'nothing is selected at first');
   assert.equal((await engineSelection(page)).node, null);
 
+  step('typed subdivision reports are visible and select their source node');
+  const baseNode = await idOf(page, 'base');
+  await page.evaluate((node) => {
+    window.__ve.evaluation.state.warnings = [{
+      code: 'poly.subdivide.attribute_dropped', node,
+      message: "Integer point attribute 'tag' was dropped during subdivision",
+    }];
+    window.__ve.docPanel.render();
+  }, baseNode);
+  await page.waitForFunction(() => document.querySelector('#dock-problems')?.textContent.includes('poly.subdivide.attribute_dropped'));
+  const warningRow = page.locator('#dock-problems .prow').filter({ hasText: 'poly.subdivide.attribute_dropped' });
+  assert.equal(await warningRow.count(), 1, 'the typed report appears once');
+  assert((await warningRow.getAttribute('class')).includes('report'), 'dropped-attribute reports have warning styling');
+  await warningRow.click();
+  assert.equal((await engineSelection(page)).node, baseNode, 'the report selects its authored node');
+  await page.evaluate(() => window.__ve.docPanel.selection.select(null));
+  await page.evaluate(() => {
+    window.__ve.evaluation.state.warnings = [];
+    window.__ve.docPanel.render();
+  });
+
   step('selecting in the outliner lights up the part in the viewport');
   await frames(page);
   const before = await modelPixels(page);
@@ -77,6 +98,20 @@ try {
   const selected = await engineSelection(page);
   assert.equal(selected.node, baseId, 'the engine knows the selection');
   assert.deepEqual(selected.parts, [await idOf(page, 'red')], 'base builds the red part, so that part lights up');
+  step('frame selected uses the selected output bounds');
+  const selectedBounds = await page.evaluate(() => {
+    const selection = JSON.parse(window.__spatialRuntime.selection_get());
+    return window.__ve.evaluation.boundsForNodes(selection.parts);
+  });
+  assert(selectedBounds, 'the selected output has evaluated bounds');
+  await page.click('#v-frame');
+  await frames(page, 8);
+  const camera = await page.evaluate(() => window.__ve.read().viewer.position);
+  const fov = Number(await page.locator('#v-fov').inputValue());
+  const center = selectedBounds.min.map((value, axis) => (value + selectedBounds.max[axis]) * 0.5);
+  const distance = Math.hypot(...camera.map((value, axis) => value - center[axis]));
+  const frameRadius = Math.max(0.02, Math.hypot(...selectedBounds.max.map((value, axis) => value - selectedBounds.min[axis])) * 0.5);
+  assert(Math.abs(distance - frameRadius / Math.sin(fov * Math.PI / 360) * 1.1) < 0.05, 'the viewer frames the selected bounds at the configured FOV');
   await frames(page, 30); // the glow eases in
   const after = await modelPixels(page);
   const lit = changed(before, after);
@@ -184,6 +219,18 @@ try {
   const reopened = await open(name, null, storage);
   assert.deepEqual((await doc(reopened)).nodes, saved.nodes, 'the reloaded document equals the saved one');
   assert.deepEqual((await rows(reopened)).map((row) => row.text), ['red', 'body', 'base', 'ball_up', 'ball'], 'and the outliner shows it');
+
+  step('removing the selected node reports selection.lost');
+  const lost = await open(`panels-lost-${Date.now()}`, 'loose = solid.box@1(size=[0.2, 0.2, 0.2])\n');
+  const looseId = await idOf(lost, 'loose');
+  await lost.click(`.dock .orow[data-id="${looseId}"]`);
+  await lost.evaluate((id) => window.__ve.doc.send([
+    { remove_node: { node: id, cascade: true } },
+  ], 'Remove selected node'), looseId);
+  await settled(lost, 2);
+  await lost.waitForFunction(() => document.querySelector('#dock-inspector').textContent.includes('selection.lost'));
+  assert.match(await lost.textContent('#dock-inspector'), /selection\.lost: selected node/);
+  await lost.close();
 
   assert.deepEqual(problems, [], 'no page errors');
   console.log('panels test passed');

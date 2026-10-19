@@ -10,7 +10,7 @@ import { differingFraction, drawnPixels, driverAdvisory, GOLDEN, here, serve } f
 const TIERS = {
   low: { msaa: 1, shadow_resolution: 0, max_point_lights: 2 },
   medium: { msaa: 2, shadow_resolution: 1024, max_point_lights: 4 },
-  high: { msaa: 4, shadow_resolution: 2048, max_point_lights: 8 },
+  high: { msaa: 4, shadow_resolution: 2048, max_point_lights: 16 },
 };
 const SWITCHES = 24;
 const MEMORY_GROWTH_LIMIT = 4 * 1024 * 1024;

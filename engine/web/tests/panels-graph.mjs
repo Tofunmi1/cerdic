@@ -1,6 +1,6 @@
 // The graph helpers behind the outliner, the selection highlight and the diagnostics badges.
 import assert from 'node:assert/strict';
-import { diagnosticsByNode, exposedParams, fromDegrees, instanceInfo, nodeName, outlineRows, partsFor, show, sinks, toDegrees } from '../panels/graph.js';
+import { diagnosticsByNode, exposedParams, featureCandidates, fromDegrees, instanceInfo, nodeName, outlineRows, partsFor, show, sinks, toDegrees } from '../panels/graph.js';
 
 const node = (id, op, inputs = {}, extra = {}) => ({
   id, op, inputs: Object.fromEntries(Object.entries(inputs).map(([port, ids]) => [port, ids.map((n) => ({ node: n, port: 'out' }))])), ...extra,
@@ -99,6 +99,20 @@ assert.deepEqual(info.droppedLinks, [], 'the link is to an input the group still
 assert.equal(instanceInfo(gdoc, gdoc.nodes.find((n) => n.id === 'w1')).outdated, false);
 assert.equal(instanceInfo(gdoc, gdoc.nodes.find((n) => n.id === 'm1')), null, 'not an instance');
 assert.deepEqual(exposedParams(gdoc, gdoc.groups[0]).map((p) => [p.name, p.node.label, p.param]), [['radius', 'tyre', 'major']]);
+
+// V3-09: what a click on a part can mean. m = move(u), u = union(a, b), c feeds u2 and u3 twice.
+assert.deepEqual(featureCandidates(doc, 'm'), { ambiguous: ['a', 'b'], at: 'u', path: ['m', 'u'] },
+  'through the move to the union: the clicked face could be either operand');
+assert.deepEqual(featureCandidates(doc, 'a'), { node: 'a', path: ['a'] }, 'a primitive is its own feature');
+assert.deepEqual(featureCandidates({ nodes: [node('p', 'solid.box@1'), node('q', 'xform.move@1', { in: ['p'] }),
+  node('r', 'xform.scale@1', { in: ['q'] })], outputs: [] }, 'r'), { node: 'p', path: ['r', 'q', 'p'] },
+'single inputs are followed down to the one feature that makes the shape');
+assert.deepEqual(featureCandidates({ nodes: [node('x', 'xform.array@1', { in: ['y', 'y'] }), node('y', 'solid.box@1')], outputs: [] }, 'x').node, 'y',
+  'the same operand twice is one candidate, not an ambiguity');
+assert.deepEqual(featureCandidates(doc, 'gone'), { lost: 'gone' }, 'a part that is not in the document is lost');
+assert.deepEqual(featureCandidates({ nodes: [node('k', 'xform.move@1', { in: ['void'] })], outputs: [] }, 'k'), { lost: 'void' },
+  'a dangling operand is lost, not guessed');
+assert.deepEqual(featureCandidates(gdoc, 'w1').node, 'w1', 'a group instance is one feature; its members are inside it');
 
 assert(Math.abs(fromDegrees(toDegrees(1.234)) - 1.234) < 1e-12);
 assert.equal(toDegrees(Math.PI), 180);

@@ -8,11 +8,30 @@ type Failure = Box<dyn std::error::Error>;
 
 const SOURCES: &[&str] = &[
     "cpp/src/kernel.cpp",
+    "cpp/src/field_mesh.cpp",
+    "cpp/src/field_tape.cpp",
+    "cpp/src/field_tape.hpp",
     "cpp/src/profiles.cpp",
+    "cpp/src/subdivision.cpp",
+    "cpp/src/subdivision_channels.cpp",
+    "cpp/src/tangents.cpp",
     "cpp/src/profile_validation.hpp",
+    "cpp/src/subdivision_internal.h",
     "cpp/src/solid_handle.hpp",
+    "cpp/src/context_handle.hpp",
     "cpp/src/extrusion.hpp",
     "cpp/tests/kernel_test.cpp",
+    "cpp/tests/field_test.cpp",
+    "cpp/tests/subdivision_test.cpp",
+    "cpp/tests/tangents_test.cpp",
+    "cpp/tests/bevel_test.cpp",
+    "cpp/blender/ops/polymesh.hh",
+    "cpp/blender/ops/polymesh.cc",
+    "cpp/blender/ops/bevel.cc",
+    "cpp/blender/shim/det_libm.cc",
+    "cpp/blender/shim/memory_usage.cc",
+    "cpp/blender/shim/ve_stubs.cc",
+    "cpp/blender/shim/PRF_profile.hh",
     "cpp/include/ve_kernel.h",
 ];
 const SAN_DIR: &str = "target/cpp-san";
@@ -33,7 +52,10 @@ pub(crate) fn run() -> Result<(), Failure> {
     format_check()?;
     sanitized_tests()?;
     match wasi_sdk() {
-        Some(sdk) => tidy(&sdk)?,
+        Some(sdk) => {
+            tidy(&sdk)?;
+            crate::blender_audit::run(&sdk, WASM_DIR)?;
+        }
         None => println!("-- cpp: clang-tidy skipped (set WASI_SDK to a wasi-sdk install)"),
     }
     Ok(())
@@ -61,7 +83,11 @@ fn sanitized_tests() -> Result<(), Failure> {
         ],
     )?;
     run_cmd("cmake", &["--build", SAN_DIR])?;
-    run_cmd(&format!("{SAN_DIR}/kernel_test"), &[])
+    run_cmd(&format!("{SAN_DIR}/kernel_test"), &[])?;
+    run_cmd(&format!("{SAN_DIR}/subdivision_test"), &[])?;
+    run_cmd(&format!("{SAN_DIR}/tangents_test"), &[])?;
+    run_cmd(&format!("{SAN_DIR}/bevel_test"), &[])?;
+    run_cmd(&format!("{SAN_DIR}/field_test"), &[])
 }
 
 fn tidy(sdk: &std::path::Path) -> Result<(), Failure> {
@@ -92,8 +118,28 @@ fn tidy(sdk: &std::path::Path) -> Result<(), Failure> {
             "-p",
             WASM_DIR,
             "cpp/src/kernel.cpp",
+            "cpp/src/field_mesh.cpp",
+            "cpp/src/field_tape.cpp",
             "cpp/src/profiles.cpp",
+            "cpp/src/tangents.cpp",
             "cpp/tests/kernel_test.cpp",
+            "cpp/tests/subdivision_test.cpp",
+            "cpp/tests/tangents_test.cpp",
+            "cpp/tests/bevel_test.cpp",
+            "cpp/blender/shim/det_libm.cc",
+        ],
+    )?;
+    run_cmd(
+        &tidy,
+        &[
+            "--config-file=cpp/.clang-tidy",
+            "--checks=-clang-analyzer-security.ArrayBound,-clang-analyzer-optin.cplusplus.UninitializedObject",
+            "-p",
+            WASM_DIR,
+            "cpp/src/subdivision.cpp",
+            "cpp/src/subdivision_channels.cpp",
+            "cpp/src/field_mesh.cpp",
+            "cpp/src/field_tape.cpp",
         ],
     )
 }
