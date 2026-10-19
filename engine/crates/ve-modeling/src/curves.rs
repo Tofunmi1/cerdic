@@ -4,9 +4,11 @@ mod loft;
 mod loft_blend;
 mod mesh_overlap;
 mod overlap;
+mod rings;
 mod sample;
 mod sweep;
 mod tools;
+mod tube;
 mod vec3;
 
 use crate::{
@@ -95,6 +97,7 @@ pub(crate) fn run(
         "curve.polyline" | "curve.bezier" | "curve.circle" => Some(evaluate(node)),
         family if tools::handles(family) => Some(tools::build(node, inputs)),
         "solid.sweep" => Some(sweep(node, inputs, context)),
+        "curve.tube" => Some(tube::build(node, inputs, context)),
         "solid.loft" => Some(loft(node, inputs, context)),
         _ => None,
     }

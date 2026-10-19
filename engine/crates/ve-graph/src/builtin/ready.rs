@@ -83,6 +83,7 @@ pub(super) const READY: &[&str] = &[
     "curve.reverse@1",
     "curve.circle@1",
     "solid.sweep@1",
+    "curve.tube@1",
     "solid.loft@1",
     "poly.grid@1",
     "poly.from_solid@1",

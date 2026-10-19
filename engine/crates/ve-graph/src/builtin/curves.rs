@@ -97,6 +97,54 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
             ],
         ),
         spec(
+            "curve.tube@1",
+            "A round tube along a curve for trunks, branches, vines, pipes, roots, and cables. The radius runs from radius to end_radius along the length (a taper), or through the stations of radii. \
+             The radius is set at the curve's own points, so give the curve enough points for the shape you want (curve.resample adds them; a two-point curve can only taper in a straight line). \
+             The tube does not twist as it winds and keeps its width at bends; a turn sharper than 150 degrees is refused (round the curve first with curve.fillet). A closed curve makes a ring.",
+            vec![single("curve", CURVE)],
+            OutputSpec::Fixed(SOLID[0]),
+            vec![
+                ParamSpec {
+                    name: "radius",
+                    ty: ParamType::Num {
+                        unit: Unit::Length,
+                        min: 0.0,
+                        max: 100.0,
+                    },
+                    default: Some(crate::value::Value::Num(0.1)),
+                    doc: "Radius at the start in metres.",
+                },
+                ParamSpec {
+                    name: "end_radius",
+                    ty: ParamType::Num {
+                        unit: Unit::Length,
+                        min: 0.0,
+                        max: 100.0,
+                    },
+                    default: Some(crate::value::Value::Num(0.0)),
+                    doc: "Radius at the end; zero keeps the start radius.",
+                },
+                ParamSpec {
+                    name: "sides",
+                    ty: ParamType::Int { min: 3, max: 64 },
+                    default: Some(crate::value::Value::Int(8)),
+                    doc: "Number of sides around the tube.",
+                },
+                ParamSpec {
+                    name: "caps",
+                    ty: ParamType::Bool,
+                    default: Some(crate::value::Value::Bool(true)),
+                    doc: "Flat end caps on an open curve. Leave this on: a tube with open ends is not a solid and is refused. A closed curve has no ends.",
+                },
+                ParamSpec {
+                    name: "radii",
+                    ty: ParamType::Str { max_len: 256 },
+                    default: Some(crate::value::Value::Str(String::new())),
+                    doc: "Optional radii in metres, 2 to 16 separated by commas, at equal steps along the length, for example \"0.3, 0.12, 0.1\" for a flared base. Replaces radius and end_radius.",
+                },
+            ],
+        ),
+        spec(
             "solid.loft@1",
             "Lofts matching convex profile loops at even spacing along Y; steps above 1 blend smoothly between them.",
             vec![variadic("sections", PROFILE)],

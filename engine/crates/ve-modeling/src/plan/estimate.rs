@@ -40,6 +40,7 @@ pub(super) fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<u
         "terrain.heightfield" => return Ok(crate::terrain::estimate(node)),
         "water.surface" => return Ok(crate::terrain::water::estimate(node)),
         "solid.sweep" => return Ok(estimate_sweep(node, sizes)),
+        "curve.tube" => return Ok(estimate_tube(node, sizes)),
         "solid.loft" => return Ok(estimate_loft(node, sizes)),
         "poly.grid" => {
             return Ok(2usize
@@ -155,6 +156,21 @@ fn estimate_sweep(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> usize {
         .saturating_mul(profile)
         .saturating_mul(2)
         .saturating_add(profile.saturating_mul(2))
+}
+
+fn estimate_tube(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> usize {
+    let points = node
+        .inputs
+        .get("curve")
+        .and_then(|links| links.first())
+        .and_then(|link| sizes.get(&link.node))
+        .copied()
+        .unwrap_or(0);
+    let side_count = bounded_count(node, "sides", 8, 3, 64);
+    points
+        .saturating_mul(side_count)
+        .saturating_mul(2)
+        .saturating_add(side_count.saturating_mul(2))
 }
 
 fn estimate_loft(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> usize {
