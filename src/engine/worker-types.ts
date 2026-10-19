@@ -6,7 +6,7 @@ export type Token = {
 };
 export type Candidate = { document: Document; hash: string; pending: boolean };
 export type Job = { token: Token; document: Document; test?: 'spin' | 'crash' };
-export type PartMaterial = { color: [number, number, number]; opacity?: number; metallic: number; roughness: number; emissive: [number, number, number]; emits_light: boolean; texture_program?: string | null; texture_tile?: number; texture_style?: string | null; toon?: { bands: number; feather: number; shift: number; spec: number; shade_color: [number, number, number]; rim: number; outline?: number; outline_color?: [number, number, number] } | null; foliage?: { alpha_cutoff: number; sway: number; flutter: number } | null };
+export type PartMaterial = { color: [number, number, number]; opacity?: number; metallic: number; roughness: number; emissive: [number, number, number]; emits_light: boolean; texture_program?: string | null; texture_tile?: number; texture_size?: number; texture_style?: string | null; toon?: { bands: number; feather: number; shift: number; spec: number; shade_color: [number, number, number]; rim: number; outline?: number; outline_color?: [number, number, number] } | null; foliage?: { alpha_cutoff: number; sway: number; flutter: number } | null };
 export type SceneLight = { node: string; name: string; kind: 'point' | 'spot' | 'sun'; position: [number, number, number]; direction: [number, number, number]; color: [number, number, number]; intensity: number; range: number; inner_angle: number; outer_angle: number };
 export type SceneEnvironment = {
   node: string; sky_color: [number, number, number]; ground_color: [number, number, number];

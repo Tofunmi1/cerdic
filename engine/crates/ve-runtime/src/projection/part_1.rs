@@ -127,6 +127,9 @@ struct State {
     /// The environment applied by the last commit, or `None` when the document authored none.
     environment: Option<SceneEnvironment>,
     instance_sets: std::collections::BTreeMap<String, usize>,
+    /// Baked texture maps held by the scene on screen, and the GPU bytes they take (mip chains included).
+    texture_maps: usize,
+    texture_bytes: usize,
 }
 thread_local! { static STATE: RefCell<State> = RefCell::new(State::default()); }
 

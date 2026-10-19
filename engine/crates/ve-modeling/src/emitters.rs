@@ -107,6 +107,7 @@ mod tests {
             recipe: crate::MaterialRecipe::None,
             texture_scale: 1.0,
             texture_tile: 0.0,
+            texture_size: 0,
             toon: None,
             texture_program: None,
             texture_style: None,

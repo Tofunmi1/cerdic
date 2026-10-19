@@ -110,6 +110,14 @@ pub(super) fn specs() -> Vec<Option<OperatorSpec>> {
                     default: Some(Value::Num(0.0)),
                     doc: "0 lays the texture out once over the part. Above 0 it repeats every this many metres in world space (use 1 to 4 for ground, 0.5 to 2 for walls) so big surfaces stay sharp.",
                 },
+                ParamSpec {
+                    name: "size",
+                    ty: ParamType::Choice {
+                        options: &["auto", "256", "512", "1024"],
+                    },
+                    default: Some(Value::Str("auto".to_owned())),
+                    doc: "Side in pixels of the maps the viewer bakes: auto is 1024. The viewer holds a fixed amount of texture memory, so small things (a leaf, a pebble, a distant prop) can say 256 or 512 and leave room for many more textured parts; when memory still runs out the viewer shrinks the biggest maps first and tells you. It does not change the exported file.",
+                },
             ],
         ),
         spec(

@@ -105,9 +105,29 @@ struct Lights {
 @group(1) @binding(5) var probe_y: texture_3d<f32>;
 @group(1) @binding(6) var probe_z: texture_3d<f32>;
 @group(1) @binding(7) var probe_sampler: sampler;
-// Baked maps of textured surfaces, one layer each: albedo (sRGB), normal, metallic-roughness, emissive (sRGB).
-@group(2) @binding(0) var material_maps: texture_2d_array<f32>;
-@group(2) @binding(1) var material_sampler: sampler;
+// Baked maps of textured surfaces, one layer each: albedo (sRGB), normal, metallic-roughness, emissive (sRGB). Three arrays by
+// size: 1024, 512 and 256 texels square. A map is named by an id, tier * 4096 + layer (tier 0 is the 1024 array).
+@group(2) @binding(0) var maps_large: texture_2d_array<f32>;
+@group(2) @binding(1) var maps_medium: texture_2d_array<f32>;
+@group(2) @binding(2) var maps_small: texture_2d_array<f32>;
+@group(2) @binding(3) var material_sampler: sampler;
+
+// Reads a baked map by id with the given texture-coordinate derivatives, so it is safe in non-uniform control flow (the id differs
+// between instances). A negative id (no map) gives zero without a fetch.
+fn sample_map(id: f32, uv: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>) -> vec4<f32> {
+    if (id < 0.0) {
+        return vec4<f32>(0.0);
+    }
+    let tier = floor(id / 4096.0);
+    let layer = i32(id - tier * 4096.0);
+    if (tier < 0.5) {
+        return textureSampleGrad(maps_large, material_sampler, uv, layer, dx, dy);
+    }
+    if (tier < 1.5) {
+        return textureSampleGrad(maps_medium, material_sampler, uv, layer, dx, dy);
+    }
+    return textureSampleGrad(maps_small, material_sampler, uv, layer, dx, dy);
+}
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -567,16 +587,14 @@ fn fragment(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @
         + dpdy(input.world_position) * dpdy(pattern.z);
     var n = normalize(surface_normal - bump_gradient * 0.035);
     let v = normalize(view.camera_position.xyz - input.world_position);
-    // Baked maps: sampled unconditionally (the layer index is clamped) so derivatives stay uniform, then
-    // used only where the surface has them.
-    let albedo_layer = max(i32(input.maps.x), 0);
-    let normal_layer = max(i32(input.maps.y), 0);
-    let mr_layer = max(i32(input.maps.z), 0);
-    let emissive_layer = max(i32(input.maps.w), 0);
-    let albedo_map = textureSample(material_maps, material_sampler, input.uv, albedo_layer);
-    let normal_map = textureSample(material_maps, material_sampler, input.uv, normal_layer);
-    let mr_map = textureSample(material_maps, material_sampler, input.uv, mr_layer);
-    let emissive_map = textureSample(material_maps, material_sampler, input.uv, emissive_layer);
+    // Baked maps: the derivatives are taken here, in uniform control flow, and handed to every read, so each read can pick its
+    // array by the instance's map id. A surface without a map skips the fetch.
+    let uv_dx = dpdx(input.uv);
+    let uv_dy = dpdy(input.uv);
+    let albedo_map = sample_map(input.maps.x, input.uv, uv_dx, uv_dy);
+    let normal_map = sample_map(input.maps.y, input.uv, uv_dx, uv_dy);
+    let mr_map = sample_map(input.maps.z, input.uv, uv_dx, uv_dy);
+    let emissive_map = sample_map(input.maps.w, input.uv, uv_dx, uv_dy);
     // Derivatives must be taken in uniform control flow, so the mapped normal is always computed.
     let mapped_normal = perturb_normal(normalize(surface_normal), input.world_position, input.uv, normalize(normal_map.xyz * 2.0 - vec3<f32>(1.0)));
     n = select(n, mapped_normal, input.maps.y >= 0.0);

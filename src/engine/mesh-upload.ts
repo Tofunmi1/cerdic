@@ -1,7 +1,7 @@
 import type { Runtime } from './bridge';
 import { bakeMaterialMaps, type BakedMaterialMaps } from './texture/apply';
 import { Baker } from './texture/bake';
-import { fitToLayerBudget, VIEWPORT_LAYER_LIMIT } from './texture/budget';
+import { DEFAULT_MAP_SIZE, fitToBudget, snapMapSize, type MapName } from './texture/budget';
 import { loadBrowserTextureLibrary } from './texture/browser-library';
 import { SURFACE_NODE_NAMES } from './texture/surface-nodes';
 import { cornerNormals } from './normals';
@@ -9,14 +9,17 @@ import { worldTileUvs } from './texture/uv';
 import type { EvaluationWarning, MeshPart, SceneEnvironment, SceneLight, Token } from './worker-types';
 
 const TRIANGLES_PER_CHUNK = 512;
-/** Side of the baked maps shown in the viewport: the renderer's layer size. */
-// A box part's six faces share one map in a 3 x 2 grid, so each face gets a sixth of it (170 x 256 pixels at 512, blurry on big walls;
-// 340 x 512 at 1024). The renderer's texture array has fixed layers of `ve_render::LAYER_SIZE` (1024), 32 layers at most, so this
-// must match it; a slow software GPU (the test browser) may not go below it either, only bake slower.
-const DEFAULT_MAP_SIZE = 1024;
-function viewportMapSize(): number {
-  const wanted = Number((globalThis as { __veMapSize?: number }).__veMapSize);
-  return Number.isInteger(wanted) && wanted >= 64 && wanted <= 2048 ? wanted : DEFAULT_MAP_SIZE;
+/**
+ * Side of the baked maps shown for a part: the size its material asks for (`solid.texture` size), else 1024, snapped to one of
+ * the renderer's three map sizes (1024, 512, 256). A box part's six faces share one map in a 3 x 2 grid, so each face gets a
+ * sixth of it (170 x 256 pixels at 512, blurry on big walls; 340 x 512 at 1024), which is why large is the default. The page
+ * may override it for every part (`__veMapSize`, used by tests); a slow software GPU may not go below 1024 either, only bake slower.
+ */
+function viewportMapSize(part?: MeshPart): number {
+  const forced = Number((globalThis as { __veMapSize?: number }).__veMapSize);
+  if (Number.isInteger(forced) && forced >= 64 && forced <= 2048) return snapMapSize(forced);
+  const asked = part?.material?.texture_size;
+  return snapMapSize(asked && asked > 0 ? asked : DEFAULT_MAP_SIZE);
 }
 const NO_MAP = new Uint8Array(0);
 /** Resamples an RGBA square with pixel-centred bilinear filtering. */
@@ -45,7 +48,7 @@ function bakeKey(part: MeshPart): string {
   let checksum = 0;
   const step = Math.max(1, Math.floor(part.positions.length / 512));
   for (let i = 0; i < part.positions.length; i += step) checksum = (checksum * 31 + Math.round(part.positions[i] * 1e4)) | 0;
-  return `${part.material?.texture_program}|${part.material?.texture_style ?? ''}|${part.material?.texture_tile ?? 0}|${part.indices.length}|${part.uvs?.length ?? 0}|${checksum}`;
+  return `${part.material?.texture_program}|${part.material?.texture_style ?? ''}|${part.material?.texture_tile ?? 0}|${viewportMapSize(part)}|${part.indices.length}|${part.uvs?.length ?? 0}|${checksum}`;
 }
 
 /** Bakes the maps of every textured part for the viewport. A part that cannot be baked is shown without them. */
@@ -64,7 +67,7 @@ async function bakeForViewport(parts: MeshPart[]): Promise<Map<MeshPart, BakedMa
       // A program that reads the surface (edges, creases, height) depends on the part's own mesh, so it is never shared.
       const readsSurface = SURFACE_NODE_NAMES.some(name => part.material?.texture_program?.includes(name));
       const shareable = tile > 0 && !part.uvs?.length && !readsSurface;
-      const size = viewportMapSize();
+      const size = viewportMapSize(part);
       const key = shareable ? `tiled|${part.material?.texture_program}|${part.material?.texture_style ?? ''}|${tile}|${size}` : bakeKey(part);
       let maps = inScene.get(key) ?? bakedCache.get(key);
       if (!maps) {
@@ -91,15 +94,30 @@ export async function uploadResult(runtime: Runtime, token: Token, parts: MeshPa
   if (!runtime.eval_projection_lights(text, JSON.stringify(lights))) return false;
   if (environment && !runtime.eval_projection_environment(text, JSON.stringify(environment))) return false;
   const baked = await bakeForViewport(parts);
-  // The viewport's texture array is shared and bounded: later surfaces lose their least useful maps first.
-  const entries = [...baked.entries()];
-  const fitted = fitToLayerBudget(entries.map(([, maps]) => maps));
+  // What each part sends to the renderer: its baked maps, or a normal map baked by bake.maps resampled to the part's size.
+  type Sent = Partial<Record<MapName, Uint8Array>>;
+  const sending = new Map<MeshPart, Sent>();
+  for (const part of parts) {
+    const maps = baked.get(part);
+    const normal = maps?.normal ?? (part.baked?.normal && (part.region ?? 0) === 0 ? resampleRgba(part.baked.normal, part.baked.size, viewportMapSize(part)) : undefined);
+    if (maps || normal) sending.set(part, { albedo: maps?.albedo, normal, metallicRoughness: maps?.metallicRoughness, emissive: maps?.emissive });
+  }
+  // The viewport's texture arrays share one byte budget: the largest maps shrink first (last surfaces first), and only when
+  // everything is already the smallest size do the last surfaces lose their least useful maps.
+  const entries = [...sending.entries()];
+  const fitted = fitToBudget(entries.map(([, maps]) => maps));
   entries.forEach(([part], i) => {
-    baked.set(part, fitted.kept[i]);
+    sending.set(part, fitted.kept[i]);
     if (fitted.dropped[i].length > 0) {
       notes.push({
         code: 'texture.viewport_budget', node: part.node,
-        message: `The viewport holds ${VIEWPORT_LAYER_LIMIT} texture maps in all; "${part.name}" is shown without its ${fitted.dropped[i].join(', ')} map(s). The exported .glb still has them. Use fewer textured parts or drop channels you do not need.`,
+        message: `The viewport's texture memory is full; "${part.name}" is shown without its ${fitted.dropped[i].join(', ')} map(s). The exported .glb still has them. Use fewer textured parts, a smaller solid.texture size, or drop channels you do not need.`,
+      });
+    } else if (fitted.shrunk[i].length > 0) {
+      const list = fitted.shrunk[i].map(({ name, from, to }) => `${name} ${from} to ${to}`).join(', ');
+      notes.push({
+        code: 'texture.viewport_shrunk', node: part.node,
+        message: `The viewport's texture memory is nearly full; "${part.name}" is shown with smaller maps (${list}). The exported .glb keeps full size. Give less important parts a smaller solid.texture size.`,
       });
     }
   });
@@ -126,9 +144,9 @@ export async function uploadResult(runtime: Runtime, token: Token, parts: MeshPa
       if (!runtime.eval_projection_body(text, part.node, JSON.stringify(part.body), needs ? part.positions : new Float32Array(0), needs ? part.indices : new Uint32Array(0))) return false;
     }
     const maps = baked.get(part);
+    const sent = sending.get(part);
     if (maps || part.baked?.normal || part.baked?.ao) {
-      const normal = maps?.normal ?? (part.baked?.normal && region === 0 ? resampleRgba(part.baked.normal, part.baked.size, viewportMapSize()) : NO_MAP);
-      if (!runtime.eval_projection_maps(text, part.node, region, maps?.albedo ?? NO_MAP, normal, maps?.metallicRoughness ?? NO_MAP, maps?.emissive ?? NO_MAP)) return false;
+      if (!runtime.eval_projection_maps(text, part.node, region, sent?.albedo ?? NO_MAP, sent?.normal ?? NO_MAP, sent?.metallicRoughness ?? NO_MAP, sent?.emissive ?? NO_MAP)) return false;
     }
     const normals = part.indices.length / 3 <= SMOOTH_TRIANGLE_LIMIT ? cornerNormals(part.positions, part.indices) : null;
     // A baked normal map is sampled with the part's own UVs (one pair per triangle corner), so they travel with its vertices.
