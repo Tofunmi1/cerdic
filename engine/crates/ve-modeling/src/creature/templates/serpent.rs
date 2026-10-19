@@ -14,7 +14,17 @@ pub(super) fn serpent(s: &Sliders) -> Creature {
             length * (along - 0.5),
         ]
     };
-    let radius = |k: f64| 0.1 * lm * (1.0 - 0.93 * k).max(0.07);
+    // Girth along the body: a narrow neck, thickest about a third of the way down, then a long taper to the tail tip.
+    let radius = |k: f64| {
+        let profile = if k < 0.3 {
+            0.6 + 0.4 * (k / 0.3)
+        } else {
+            1.0 - 0.94 * ((k - 0.3) / 0.7).powf(1.3)
+        };
+        0.12 * lm * profile.max(0.06)
+    };
+    // The front of the body rears off the ground: no lift past a quarter of the length, a smooth curve up to the head.
+    let lift = |k: f64| 0.3 * length * (1.0 - (k / 0.25).min(1.0)).powi(2);
     let mut bones = Vec::new();
     for index in 0..SEGMENTS {
         let count = f64::from(u32::try_from(SEGMENTS).unwrap_or(1));
@@ -25,8 +35,8 @@ pub(super) fn serpent(s: &Sliders) -> Creature {
         let name = format!("seg{index}");
         let parent = (index > 0).then(|| format!("seg{}", index - 1));
         let (mut head, mut tail) = (point(a), point(b));
-        head[1] = radius(a);
-        tail[1] = radius(b);
+        head[1] = radius(a) + lift(a);
+        tail[1] = radius(b) + lift(b);
         bones.push(bone(
             &name,
             parent.as_deref(),
@@ -39,7 +49,7 @@ pub(super) fn serpent(s: &Sliders) -> Creature {
     let front = point(0.0);
     let blobs = vec![blob(
         "skull",
-        [front[0], radius(0.0) * 1.1, front[2] + 0.06],
+        [front[0], radius(0.0) * 1.1 + lift(0.0), front[2] + 0.06],
         [0.085 * hd, 0.065 * hd, 0.14 * hd],
         false,
     )];

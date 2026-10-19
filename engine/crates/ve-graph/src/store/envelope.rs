@@ -203,13 +203,15 @@ fn check_document(doc: &Document) -> Result<(), Box<Diagnostic>> {
                 "budget.source",
                 "the saved document is larger than the limit",
             )
-            .with_limit(count(MAX_DOCUMENT_BYTES), count(size)),
+            .with_limit(count(MAX_DOCUMENT_BYTES), count(size))
+            .suggest("remove nodes or materials, or split the document"),
         ));
     }
     if doc.nodes.len() > MAX_NODES {
         return Err(Box::new(
             Diagnostic::error("budget.nodes", "the saved document has too many nodes")
-                .with_limit(count(MAX_NODES), count(doc.nodes.len())),
+                .with_limit(count(MAX_NODES), count(doc.nodes.len()))
+                .suggest("remove nodes you no longer need"),
         ));
     }
     let ids: BTreeSet<&NodeId> = doc.nodes.iter().map(|n| &n.id).collect();

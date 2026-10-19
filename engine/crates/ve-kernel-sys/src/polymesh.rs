@@ -68,8 +68,8 @@ pub struct VeMeshOpInput {
     pub vertices: *const u32,
     /// Number of selected vertices.
     pub vertex_count: usize,
-    /// Operator numbers; their meaning depends on the operator.
-    pub params: [f64; 4],
+    /// Operator numbers; their meaning depends on the operator. Unused entries are zero.
+    pub params: [f64; 12],
     /// Operator flags; their meaning depends on the operator.
     pub flags: i32,
 }

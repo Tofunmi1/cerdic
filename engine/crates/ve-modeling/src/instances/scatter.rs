@@ -94,7 +94,8 @@ pub(crate) fn scatter(node: &Node) -> Result<Vec<DMat4>, Fail> {
                         points.len()
                     ),
                 )
-                .at_node(&node.id),
+                .at_node(&node.id)
+                .suggest("enlarge `width` and `depth`, or lower `min_spacing` or `count`"),
             ));
         }
         let candidate = (stream.signed() * width * 0.5, stream.signed() * depth * 0.5);

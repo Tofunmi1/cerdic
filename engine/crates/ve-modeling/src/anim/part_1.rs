@@ -3,7 +3,7 @@ use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 use ve_graph::{Node, Value as Param};
 
-use crate::{Fail, cache::Value, fail};
+use crate::{Fail, cache::Value, fail, fail_suggest};
 
 /// Most keys one track may have.
 pub const MAX_KEYS: usize = 64;
@@ -176,11 +176,12 @@ pub(crate) fn clip_name(node: &Node) -> Result<String, Fail> {
     if valid {
         Ok(text.to_owned())
     } else {
-        Err(fail(
+        Err(fail_suggest(
             "anim.clip_name",
             format!(
                 "clip name \"{text}\" must be lowercase letters, digits and underscores, start with a letter, and be at most {MAX_CLIP_NAME} long"
             ),
+            "use lowercase letters, digits and underscores, starting with a letter",
         ))
     }
 }

@@ -95,7 +95,10 @@ fn write_link(
                     Diagnostic::error("graph.port_arity", "no room for that link")
                         .at_node(&to.node)
                         .at_port(&to.port)
-                        .with_limit(count(MAX_VARIADIC), count(links.len() + 1)),
+                        .with_limit(count(MAX_VARIADIC), count(links.len() + 1))
+                        .suggest(format!(
+                            "a variadic port takes at most {MAX_VARIADIC} links"
+                        )),
                 ));
             }
             links.insert(at, from.clone());
@@ -274,7 +277,8 @@ pub(crate) fn check_graph(ctx: &Ctx<'_>) -> Result<(), Fail> {
     if let Some(cycle) = find_cycle(doc) {
         let first = cycle.first().cloned();
         let mut d = Diagnostic::error("graph.cycle", "these nodes would feed each other")
-            .with_related(cycle);
+            .with_related(cycle)
+            .suggest("remove one of the links that closes the loop");
         d.node = first;
         return Err(Box::new(d));
     }
@@ -332,7 +336,8 @@ pub(crate) fn check_graph(ctx: &Ctx<'_>) -> Result<(), Fail> {
                         )
                         .at_node(&node.id)
                         .at_port(port)
-                        .with_related(vec![source.node.clone()]),
+                        .with_related(vec![source.node.clone()])
+                        .suggest(format!("connect a {} into {port:?}", accepted.join(" or "))),
                     ));
                 }
             }

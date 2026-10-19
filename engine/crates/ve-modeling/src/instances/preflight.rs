@@ -15,7 +15,8 @@ pub(crate) fn product(a: usize, b: usize) -> Result<usize, Fail> {
                     "budget.instances",
                     "placement product exceeds the instance limit",
                 )
-                .with_limit(16_384.0, f64::from(a) * f64::from(b)),
+                .with_limit(16_384.0, f64::from(a) * f64::from(b))
+                .suggest("lower count_x, count_y, count_z or count"),
             ))
         }
     }

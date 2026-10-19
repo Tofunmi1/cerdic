@@ -61,7 +61,7 @@ pub(crate) fn mesh_op(
     mesh: &PolygonMesh<'_>,
     selection: &MeshSelection<'_>,
     code: i32,
-    params: [f64; 4],
+    params: [f64; 12],
     flags: i32,
 ) -> Result<crate::bevel::BeveledMesh, KernelError> {
     let flat_positions = mesh.positions.as_flattened();

@@ -123,8 +123,14 @@ fn execute_to_solid(
         .ok_or_else(|| fail("graph.missing_input", "field.to_solid needs a field"))?;
     let bounds = [vector(node, "min")?, vector(node, "max")?];
     let edge = number(node, "edge_length")? * quality.field_edge_scale();
-    let solid = ve_geometry::field::mesh(source, bounds, edge, context)
-        .map_err(|error| fail(field_code(&error), error.to_string()))?;
+    let solid = ve_geometry::field::mesh(source, bounds, edge, context).map_err(|error| {
+        let code = field_code(&error);
+        let diagnostic = ve_graph::Diagnostic::error(code, error.to_string());
+        match field_suggestion(code) {
+            Some(text) => Box::new(diagnostic.suggest(text)),
+            None => Box::new(diagnostic),
+        }
+    })?;
     let mesh = solid
         .to_mesh()
         .map_err(|error| fail("kernel.failed", error.to_string()))?;
@@ -217,6 +223,17 @@ fn repeat_counts(node: &Node) -> Result<[u32; 3], Fail> {
     )]
     let output = [counts[0] as u32, counts[1] as u32, counts[2] as u32];
     Ok(output)
+}
+
+/// What a caller can change so a field meshing refusal does not happen again, by code.
+fn field_suggestion(code: &str) -> Option<&'static str> {
+    Some(match code {
+        "field.clipped" => "enlarge `min` and `max` so the bounds contain the whole field",
+        "field.empty" => "enlarge `min` and `max`, or widen the field's shape",
+        "budget.field_cells" => "raise `edge_length`, or shrink the `min` and `max` bounds",
+        "budget.field_ops" => "raise `edge_length`, or use fewer field primitives",
+        _ => return None,
+    })
 }
 
 fn field_code(error: &ve_geometry::GeometryError) -> &'static str {

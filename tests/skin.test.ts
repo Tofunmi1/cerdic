@@ -57,6 +57,28 @@ test('a skinned part exports a valid glTF skin whose joints are the bone parts a
   expect(gltf.animations[0].channels.some((c: { target: { node: number } }) => c.target.node === index('lower_bone'))).toBe(true);
 });
 
+test('the bone parts a skin names are joints without geometry, so no viewer shows a cube at each joint', async () => {
+  const glb = buildGlb(arm());
+  const gltf = json(glb);
+  const node = (name: string) => gltf.nodes.find((n: { name: string }) => n.name === name);
+  expect(node('lower_bone').mesh).toBeUndefined();
+  expect(node('upper_bone').mesh).toBeUndefined();
+  // Only the sleeve is geometry, and the file has no mesh for the joints.
+  expect(gltf.meshes).toHaveLength(1);
+  expect(gltf.meshes[node('sleeve').mesh].primitives[0].attributes.JOINTS_0).toBeDefined();
+  // The joint still carries its clip and stays in the skin.
+  expect(gltf.animations[0].channels.length).toBeGreaterThan(0);
+  const report = await validator.validateBytes(glb);
+  expect(report.issues.numErrors).toBe(0);
+});
+
+test('a bone part that no skin names keeps its mesh (a rig drawn on purpose)', () => {
+  const parts = arm();
+  parts[2] = { ...parts[2], skin: null, skin_joints: undefined, skin_weights: undefined };
+  const gltf = json(buildGlb(parts));
+  expect(gltf.nodes.find((n: { name: string }) => n.name === 'lower_bone').mesh).toBeDefined();
+});
+
 test('a skin naming a bone that is not in the file is exported as a plain mesh', async () => {
   const parts = arm();
   parts[2] = { ...parts[2], skin: { bones: ['lower_bone', 'ghost'], falloff: 3, influences: 4 } };

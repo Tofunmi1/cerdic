@@ -152,10 +152,13 @@ fn min_wall(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
         ports.get("outer").and_then(|v| v.first()),
         ports.get("inner").and_then(|v| v.first()),
     ) else {
-        return Err(Box::new(Diagnostic::error(
-            "graph.missing_input",
-            "check.min_wall needs an outer and an inner profile",
-        )));
+        return Err(Box::new(
+            Diagnostic::error(
+                "graph.missing_input",
+                "check.min_wall needs an outer and an inner profile",
+            )
+            .suggest("link both the `outer` and the `inner` profiles"),
+        ));
     };
     let min = number(node, "min").map_err(|e| kernel_fail(node, &e))?;
     let wall = Profile::from_loops(&outer.loops)

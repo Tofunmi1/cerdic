@@ -114,7 +114,8 @@ impl<B: Backend> DocStore<B> {
         if size > MAX_DOCUMENT_BYTES {
             return Err(Box::new(
                 Diagnostic::error("budget.source", "the document is too large to save")
-                    .with_limit(count(MAX_DOCUMENT_BYTES), count(size)),
+                    .with_limit(count(MAX_DOCUMENT_BYTES), count(size))
+                    .suggest("remove nodes or materials, or split the document"),
             ));
         }
         let mut newest: Option<(char, u64)> = None;
@@ -151,7 +152,8 @@ impl<B: Backend> DocStore<B> {
             .map_err(|e| match e {
                 BackendError::QuotaExceeded { needed } => Box::new(
                     Diagnostic::error("store.quota", "storage is full; the previous save was kept")
-                        .with_limit(count(needed), count(needed)),
+                        .with_limit(count(needed), count(needed))
+                        .suggest("close another document, or remove nodes you no longer need"),
                 ),
                 BackendError::Failed(why) => Box::new(Diagnostic::error(
                     "store.unavailable",

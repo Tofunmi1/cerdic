@@ -316,7 +316,8 @@ pub(crate) fn apply_batch(
         #[expect(clippy::cast_precision_loss, reason = "sizes are far below 2^53")]
         return Err(vec![
             Diagnostic::error("budget.source", "the document would be too large")
-                .with_limit(MAX_DOCUMENT_BYTES as f64, size as f64),
+                .with_limit(MAX_DOCUMENT_BYTES as f64, size as f64)
+                .suggest("remove nodes or materials, or split the document"),
         ]);
     }
     Ok(Applied {

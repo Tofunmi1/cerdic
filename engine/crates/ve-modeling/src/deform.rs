@@ -43,7 +43,8 @@ fn build(node: &Node, inputs: &[Rc<Value>], context: &ExecutionContext) -> Resul
                 "socket.invalid_frame",
                 "mesh deformations cannot preserve attached socket frames yet",
             )
-            .at_node(&node.id),
+            .at_node(&node.id)
+            .suggest("remove the sockets before deforming, or deform a shape without them"),
         ));
     }
     let (minimum, maximum) = validate::bounds(&input.mesh)?;
@@ -108,7 +109,8 @@ fn refine(
                     "budget.triangles",
                     format!("refining for this deformation passes {MAX_REFINED_TRIANGLES} triangles; raise tolerance or soften the deformation"),
                 )
-                .at_node(&node.id),
+                .at_node(&node.id)
+                .suggest("raise `tolerance`, or lower the mesh detail"),
             ));
         }
     }
@@ -120,7 +122,8 @@ fn refine(
                 format!("bounded refinement leaves sampled chord deviation {observed:.6} above tolerance {tolerance:.6}; raise tolerance or soften the deformation"),
             )
             .at_node(&node.id)
-            .with_limit(tolerance, observed),
+            .with_limit(tolerance, observed)
+            .suggest("raise `tolerance`, or soften the deformation"),
         ));
     }
     Ok(mesh)
@@ -282,7 +285,8 @@ fn validate_bend(
                     length / angle.abs()
                 ),
             )
-            .at_node(&node.id),
+            .at_node(&node.id)
+            .suggest("lower the bend `angle`, or bend a shape with more width"),
         ));
     }
     Ok(())

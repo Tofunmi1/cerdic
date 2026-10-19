@@ -108,7 +108,8 @@ fn scopes(doc: &Document) -> Result<(), Fail> {
                         "a link may not cross the edge of a group; use a group input or an instance",
                     )
                     .at_node(&node.id)
-                    .with_related(vec![from.id.clone()]),
+                    .with_related(vec![from.id.clone()])
+                    .suggest("route the value through a group.input or an instance"),
                 ));
             }
         }
@@ -147,10 +148,10 @@ fn interfaces(ctx: &Ctx<'_>) -> Result<(), Fail> {
             ));
         }
         if links::output_type(doc, ctx.reg, &output.id) != Some(PortType::Solid) {
-            return Err(error(
-                "graph.port_type",
-                "a group's result must be a solid",
-                &output.id,
+            return Err(Box::new(
+                Diagnostic::error("graph.port_type", "a group's result must be a solid")
+                    .at_node(&output.id)
+                    .suggest("make the group's result a solid, for example solid.box"),
             ));
         }
         let mut names = BTreeSet::new();
@@ -220,7 +221,8 @@ fn cycles_and_depth(doc: &Document) -> Result<(), Fail> {
                     "group.recursive",
                     format!("{owner} would contain itself through {}", instance.group),
                 )
-                .at_node(&node.id),
+                .at_node(&node.id)
+                .suggest("remove the instance that closes the loop"),
             ));
         }
     }
@@ -233,7 +235,8 @@ fn cycles_and_depth(doc: &Document) -> Result<(), Fail> {
     if deepest > MAX_GROUP_DEPTH {
         return Err(Box::new(
             Diagnostic::error("budget.group_depth", "groups are nested too deeply")
-                .with_limit(count(MAX_GROUP_DEPTH), count(deepest)),
+                .with_limit(count(MAX_GROUP_DEPTH), count(deepest))
+                .suggest("flatten the group nesting"),
         ));
     }
     Ok(())

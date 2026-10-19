@@ -226,10 +226,10 @@ fn scope_lines(
             done.insert(node.id.as_str());
         }
         if rest.len() == before {
-            return Err(Box::new(Diagnostic::error(
-                "graph.cycle",
-                "the links form a cycle",
-            )));
+            return Err(Box::new(
+                Diagnostic::error("graph.cycle", "the links form a cycle")
+                    .suggest("remove one of the links that closes the loop"),
+            ));
         }
         pending = rest;
     }

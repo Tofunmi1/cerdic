@@ -153,7 +153,8 @@ impl Builder<'_> {
                     "budget.expanded_nodes",
                     "the groups unfold into too many nodes",
                 )
-                .with_limit(count(MAX_EXPANDED_NODES), count(self.nodes.len() + 1)),
+                .with_limit(count(MAX_EXPANDED_NODES), count(self.nodes.len() + 1))
+                .suggest("use fewer instances, or smaller groups"),
             ));
         }
         if let Some((instance, member)) = origin {
@@ -191,7 +192,8 @@ impl Builder<'_> {
                             "graph.missing_input",
                             format!("the group input {name:?} has nothing linked to it"),
                         )
-                        .at_node(frame.map_or(&node.id, |f| &f.outermost)),
+                        .at_node(frame.map_or(&node.id, |f| &f.outermost))
+                        .suggest(format!("link {name:?} on the instance")),
                     )
                 })?;
                 flat.insert(node.id.clone(), bound.clone());
@@ -255,7 +257,8 @@ impl Builder<'_> {
         if depth > MAX_GROUP_DEPTH {
             return Err(Box::new(
                 Diagnostic::error("budget.group_depth", "groups are nested too deeply")
-                    .with_limit(count(MAX_GROUP_DEPTH), count(depth)),
+                    .with_limit(count(MAX_GROUP_DEPTH), count(depth))
+                    .suggest("flatten the group nesting"),
             ));
         }
         let bindings: BTreeMap<String, NodeId> = inputs

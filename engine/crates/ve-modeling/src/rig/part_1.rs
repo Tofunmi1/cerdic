@@ -3,7 +3,7 @@ use std::{collections::HashMap, rc::Rc};
 use serde::{Deserialize, Serialize};
 use ve_graph::{Node, Value as Param};
 
-use crate::{EvaluationWarning, Fail, Part, cache::Value, fail};
+use crate::{EvaluationWarning, Fail, Part, cache::Value, fail, fail_suggest};
 
 mod dual;
 pub mod paint;
@@ -141,9 +141,10 @@ pub(crate) fn skin(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
         bones.push(name.to_owned());
     }
     if bones.is_empty() || bones.len() > MAX_BONES {
-        return Err(fail(
+        return Err(fail_suggest(
             "param.range",
             format!("rig.skin needs 1 to {MAX_BONES} bones, got {}", bones.len()),
+            format!("name between 1 and {MAX_BONES} bone parts in `bones`"),
         ));
     }
     if input.skin.is_some() {

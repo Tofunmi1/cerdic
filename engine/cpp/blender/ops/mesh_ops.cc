@@ -199,21 +199,42 @@ bool run_symmetrize(BMesh* bm, const ve_mesh_op_input& in) {
 }
 
 bool run_triangulate(BMesh* bm) {
-  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS,
-                      "triangulate faces=%hf quad_method=%i ngon_method=%i",
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "triangulate faces=%hf quad_method=%i ngon_method=%i",
                       BM_ELEM_SELECT, 1, 1);
 }
 
 bool run_remove_doubles(BMesh* bm, const ve_mesh_op_input& in) {
-  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "remove_doubles verts=%hv dist=%f",
-                      BM_ELEM_SELECT, in.params[0]);
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "remove_doubles verts=%hv dist=%f", BM_ELEM_SELECT,
+                      in.params[0]);
+}
+
+bool run_bisect(BMesh* bm, const ve_mesh_op_input& in) {
+  const float point[3] = {static_cast<float>(in.params[0]), static_cast<float>(in.params[1]),
+                          static_cast<float>(in.params[2])};
+  const float normal[3] = {static_cast<float>(in.params[3]), static_cast<float>(in.params[4]),
+                           static_cast<float>(in.params[5])};
+  BMOperator bisect;
+  if (!BMO_op_initf(bm, &bisect, BMO_FLAG_DEFAULTS,
+                    "bisect_plane geom=%avef dist=%f plane_co=%v plane_no=%v use_snap_center=%b "
+                    "clear_inner=%b clear_outer=%b",
+                    in.params[6], point, normal, false, flag(in, 1), flag(in, 2)))
+    return false;
+  BMO_op_exec(bm, &bisect);
+  bool filled = true;
+  if (flag(in, 4) && (flag(in, 1) || flag(in, 2))) {
+    filled = BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "holes_fill edges=%S sides=%i", &bisect,
+                          "geom_cut.out", 0);
+  }
+  BMO_op_finish(bm, &bisect);
+  return filled;
 }
 
 // Checks the numbers an operator takes and what it selects; returns VE_OK when the call may
 // proceed.
 ve_status validate_params(const ve_mesh_op_input& in) {
   const double* p = in.params;
-  for (int i = 0; i < 4; ++i) {
+  const int param_count = in.op == VE_MESH_OP_BISECT ? 7 : 4;
+  for (int i = 0; i < param_count; ++i) {
     if (!finite_within(p[i])) {
       return VE_ERR_NON_FINITE;
     }
@@ -250,6 +271,9 @@ ve_status validate_params(const ve_mesh_op_input& in) {
       return VE_OK;
     case VE_MESH_OP_REMOVE_DOUBLES:
       return in_range(p[0], 1.0e-9, 1.0e3) ? VE_OK : VE_ERR_INVALID_ARG;
+    case VE_MESH_OP_BISECT:
+      return p[6] >= 0.0 && (p[3] != 0.0 || p[4] != 0.0 || p[5] != 0.0) ? VE_OK
+                                                                        : VE_ERR_INVALID_ARG;
     default:
       return VE_ERR_INVALID_ARG;
   }
@@ -309,6 +333,8 @@ bool run_op(BMesh* bm, const ve_mesh_op_input& in, const LoadedMesh& mesh, const
       return run_triangulate(bm);
     case VE_MESH_OP_REMOVE_DOUBLES:
       return run_remove_doubles(bm, in);
+    case VE_MESH_OP_BISECT:
+      return run_bisect(bm, in);
     default:
       return run_symmetrize(bm, in);
   }

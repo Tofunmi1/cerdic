@@ -2,7 +2,7 @@
 mod estimate;
 mod fields;
 
-use crate::{Fail, Quality, budget, fail};
+use crate::{Fail, Quality, budget, fail, fail_suggest};
 use estimate::estimate;
 use std::collections::{BTreeMap, BTreeSet};
 use ve_graph::{
@@ -162,7 +162,13 @@ fn output_kind(
             .and_then(|r| r.first())
             .and_then(|r| types.get(&r.node))
             .copied()
-            .ok_or_else(|| fail("graph.missing_input", port)),
+            .ok_or_else(|| {
+                fail_suggest(
+                    "graph.missing_input",
+                    port,
+                    format!("link the {port} input"),
+                )
+            }),
     }
 }
 
@@ -189,9 +195,10 @@ fn validate_outputs(
             )
         ) || output.from.port != "out"
         {
-            return Err(fail(
+            return Err(fail_suggest(
                 "graph.port_type",
                 "scene outputs must name geometry, a light or the environment",
+                "output a solid, an instance, a polygon, a light or the environment",
             ));
         }
         if output_kind == Some(&PortType::Light) {
@@ -278,9 +285,10 @@ fn validate(
             Arity::Variadic { min } => (usize::from(min)..=64).contains(&links.len()),
         };
         if !valid {
-            return Err(fail(
+            return Err(fail_suggest(
                 "graph.missing_input",
                 format!("{} requires {}", node.id, port.name),
+                format!("link the {} input of {}", port.name, node.id),
             ));
         }
         for link in links {
@@ -289,9 +297,10 @@ fn validate(
                     .get(&link.node)
                     .is_some_and(|kind| port.accepts.contains(kind))
             {
-                return Err(fail(
+                return Err(fail_suggest(
                     "graph.port_type",
                     format!("incompatible input on {}", node.id),
+                    format!("link a value the {} input accepts", port.name),
                 ));
             }
         }

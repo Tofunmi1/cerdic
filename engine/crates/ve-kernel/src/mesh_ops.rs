@@ -1,5 +1,5 @@
 //! Blender's bmesh operators on polygon meshes: inset, solidify, extrude, dissolve, poke, subdivide,
-//! wireframe and symmetrize.
+//! wireframe, symmetrize and bisect.
 
 use crate::{BeveledMesh, KernelError, PolygonMesh, ffi};
 
@@ -127,6 +127,21 @@ pub enum MeshOp {
         /// Maximum distance between vertices to merge.
         distance: f64,
     },
+    /// Bisects the entire mesh with a plane.
+    Bisect {
+        /// A point on the plane.
+        point: [f64; 3],
+        /// The plane normal.
+        normal: [f64; 3],
+        /// Distance for classifying vertices on the plane.
+        distance: f64,
+        /// Remove the side opposite the normal.
+        clear_inner: bool,
+        /// Remove the side the normal points toward.
+        clear_outer: bool,
+        /// Fill the cut boundary when a side is removed.
+        fill: bool,
+    },
 }
 
 impl MeshOp {
@@ -226,6 +241,7 @@ impl MeshOp {
             ),
             Self::Triangulate => (10, [0.0; 4], 0),
             Self::RemoveDoubles { distance } => (11, [distance, 0.0, 0.0, 0.0], 0),
+            Self::Bisect { .. } => (12, [0.0; 4], 0),
         }
     }
 }
@@ -248,5 +264,27 @@ pub fn edit_mesh(
     op: &MeshOp,
 ) -> Result<EditedMesh, KernelError> {
     let (code, params, flags) = op.encode();
-    ffi::polymesh::mesh_op(mesh, selection, code, params, flags)
+    // Most operators use the first four numbers; the interface carries twelve for those that need more (a plane, a transform).
+    let mut wide = [0.0; 12];
+    wide[..4].copy_from_slice(&params);
+    let (code, flags) = if let MeshOp::Bisect {
+        point,
+        normal,
+        distance,
+        clear_inner,
+        clear_outer,
+        fill,
+    } = *op
+    {
+        wide[0..3].copy_from_slice(&point);
+        wide[3..6].copy_from_slice(&normal);
+        wide[6] = distance;
+        (
+            12,
+            i32::from(clear_inner) | (i32::from(clear_outer) << 1) | (i32::from(fill) << 2),
+        )
+    } else {
+        (code, flags)
+    };
+    ffi::polymesh::mesh_op(mesh, selection, code, wide, flags)
 }

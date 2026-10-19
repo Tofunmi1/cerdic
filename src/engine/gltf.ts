@@ -173,8 +173,12 @@ export function buildGlb(parts: MeshPart[], options: GlbOptions = {}): Uint8Arra
   const lookAnimated: { material: number; tracks: NonNullable<MeshPart['animation']>; strength: number; glow: boolean; name: string }[] = [];
   const clipsIn = (tracks: AnimationTrack[]) => [...new Set(tracks.map(track => track.clip ?? ''))];
   const inClip = (tracks: AnimationTrack[], name: string) => tracks.filter(track => (track.clip ?? '') === name);
+  // A bone part (from `rig.bone`) that a skin names is a joint, not geometry: its small placeholder cube is hidden in our own viewer, so
+  // it is written as an empty node. Any other viewer would show it as a floating cube at every joint.
+  const jointNames = new Set(parts.flatMap(p => (p.skin && p.skin_joints?.length ? p.skin.bones : [])));
+  const isJoint = (p: MeshPart) => Boolean(p.bone) && !p.skin && !p.transforms?.length && jointNames.has(p.name || p.node);
   // Parts that get a node: a skin may only name bones that exist in the file.
-  const drawn = new Set(parts.filter(p => p.indices.length >= 3 && p.positions.length >= 9 && !p.transforms?.length).map(p => p.name || p.node));
+  const drawn = new Set(parts.filter(p => isJoint(p) || (p.indices.length >= 3 && p.positions.length >= 9 && !p.transforms?.length)).map(p => p.name || p.node));
   const push = (bytes: Uint8Array, target?: number) => {
     const offset = length;
     chunks.push(bytes);
@@ -194,6 +198,13 @@ export function buildGlb(parts: MeshPart[], options: GlbOptions = {}): Uint8Arra
     return { index };
   };
   for (const [partIndex, part] of parts.entries()) {
+    if (isJoint(part)) {
+      nodes.push({ name: part.name || part.node });
+      placed.push({ part, node: nodes.length - 1 });
+      const motion = part.animation?.filter(track => !['glow', 'visible', 'color'].includes(track.property)) ?? [];
+      for (const name of clipsIn(motion)) animated.push({ node: nodes.length - 1, clip: sampleClip(inClip(motion, name)), name });
+      continue;
+    }
     if (part.indices.length < 3 || part.positions.length < 9) continue;
     const pngs = options.textureImages?.get(partIndex);
     const mesh = weld(part, crease, !!pngs?.normal, options.mikkTangents);

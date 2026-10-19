@@ -28,6 +28,7 @@ pub(super) fn handles(family: &str) -> bool {
             | "poly.unsubdivide"
             | "poly.triangulate"
             | "poly.remove_doubles"
+            | "poly.bisect"
     )
 }
 
@@ -41,6 +42,7 @@ pub(super) fn ignores_selection(family: &str) -> bool {
             | "poly.unsubdivide"
             | "poly.triangulate"
             | "poly.remove_doubles"
+            | "poly.bisect"
             | "poly.pack_uv"
     )
 }
@@ -84,6 +86,35 @@ pub(super) fn apply(
         };
         return ve_geometry::pack_uv(poly, &options, context)
             .map_err(|error| poly_fail(node, &error, Some(poly)));
+    }
+    if family == "poly.bisect" {
+        let normal = vector(node, "normal")?;
+        if normal.iter().all(|v| *v == 0.0) {
+            return Err(super::errors::refuse(
+                node,
+                "poly.bisect_normal_zero",
+                "normal must be non-zero".to_owned(),
+            ));
+        }
+        let point = vector(node, "point")?;
+        let keep = text(node, "keep")?;
+        let dot = |p: [f32; 3]| {
+            (f64::from(p[0]) - point[0]) * normal[0]
+                + (f64::from(p[1]) - point[1]) * normal[1]
+                + (f64::from(p[2]) - point[2]) * normal[2]
+        };
+        let has_kept = poly.positions().iter().any(|p| match keep {
+            "above" => dot(*p) >= 0.0,
+            "below" => dot(*p) <= 0.0,
+            _ => true,
+        });
+        if !has_kept {
+            return Err(super::errors::refuse(
+                node,
+                "poly.bisect_empty",
+                "plane removes the entire mesh".to_owned(),
+            ));
+        }
     }
     let op = operator(node, family)?;
     ve_geometry::blender_edit(poly, &faces, &edges, &vertices, &op, context)
@@ -236,6 +267,18 @@ fn operator(node: &Node, family: &str) -> Result<MeshOp, Fail> {
         "poly.remove_doubles" => MeshOp::RemoveDoubles {
             distance: number(node, "distance")?,
         },
+        "poly.bisect" => {
+            let normal = vector(node, "normal")?;
+            let keep = text(node, "keep")?;
+            MeshOp::Bisect {
+                point: vector(node, "point")?,
+                normal,
+                distance: number(node, "distance")?,
+                clear_inner: keep == "above",
+                clear_outer: keep == "below",
+                fill: flag(node, "fill")?,
+            }
+        }
         _ => MeshOp::Symmetrize {
             axis: match text(node, "axis")? {
                 "y" => 1,
