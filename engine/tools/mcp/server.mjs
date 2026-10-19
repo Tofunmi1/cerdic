@@ -422,7 +422,13 @@ where its albedo's alpha is under the cutoff, in the picture, in its shadow and 
 two-sided. End the expr code with a vec4 whose last number is the alpha to draw the shape: out = vec4(0.1, 0.5, 0.1, 1.0 - step(0.8,
 length(q * vec2(1.0, 1.4)))) is a leaf. The shape needs UVs over the whole surface (poly.grid gives one quad with them, or unwrap a
 mesh with poly.unwrap_uv); a solid.box has its six faces in one atlas, so a shape drawn into it is split across them. Wind: sway
-bends the whole shape (tall parts more), flutter trembles the surface; both 0 is an ordinary surface.
+bends the whole shape (tall parts more, so give it vertices to bend: a flat quad or box only shears), flutter trembles the surface;
+both 0 is an ordinary surface. The wind itself is set on scene.environment (or scene.sky) with wind_direction (degrees, 0 is +x,
+90 is +z) and wind_strength (0 still, 0.5 gentle breeze, 2 gale); the viewer shows it, the exported glTF does not.
+Global illumination: scene.environment(gi=true) (also on scene.sky) lights the scene with traced light probes instead of the
+constant sky ambient, so a room lit through a window is dark away from it and walls pick up neighbouring colour. It is traced a
+little each frame after an edit (the scene looks as before until done); gi_spacing in metres (0 sizes it from the scene),
+gi_bounces 1 to 4, gi_rays 32 to 512. Static geometry only.
 Export glTF bakes these in the browser, requires WebGL2 plus EXT_color_buffer_float, and embeds PNG maps.
 The viewport shows these baked maps on the model (up to 64 maps in all; later parts lose emissive, then
 metallic-roughness, then normal maps first, with a warning). Give a part UVs with poly.unwrap_uv before

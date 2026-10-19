@@ -115,10 +115,19 @@ pub(crate) fn apply_requested(mut clock: ResMut<AnimationClock>) {
 pub(crate) fn advance(
     time: Res<Time<Real>>,
     mut clock: ResMut<AnimationClock>,
+    mut wind: ResMut<ve_render::WindField>,
     mut materials: Query<&mut VeMaterial>,
 ) {
     if clock.playing {
         clock.seconds += time.delta_secs() * clock.speed;
+    }
+    // Gusts and flutter run on the shared clock, so pausing it holds the foliage still.
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the shaders only need the clock to a fraction of a second"
+    )]
+    {
+        wind.time = clock.seconds as f32;
     }
     for mut material in &mut materials {
         if material.recipe == ve_render::ProceduralRecipe::Water {

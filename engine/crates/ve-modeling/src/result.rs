@@ -208,6 +208,29 @@ pub struct SceneEnvironment {
     /// Light the scene with traced light probes (global illumination) instead of the constant ambient above.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gi: Option<LightProbes>,
+    /// The wind that bends foliage (see `solid.foliage`).
+    #[serde(default)]
+    pub wind: Wind,
+}
+
+/// The scene's wind: where it blows and how hard.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Wind {
+    /// Direction it blows toward on the ground plane, in degrees around the vertical axis: 0 is +x, 90 is +z.
+    pub direction: f32,
+    /// 0 is still air, 1 a strong breeze, 2 a gale.
+    pub strength: f32,
+}
+
+impl Default for Wind {
+    /// A gentle breeze toward +x.
+    fn default() -> Self {
+        Self {
+            direction: 0.0,
+            strength: 0.5,
+        }
+    }
 }
 
 /// Settings of the traced light probes (`gi` on a `scene.environment` or `scene.sky`).

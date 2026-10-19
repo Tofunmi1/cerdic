@@ -48,6 +48,16 @@ fn valid(environment: &SceneEnvironment) -> bool {
         && (0.0..=1.0).contains(&environment.reflection)
         && environment.bounce.is_finite()
         && (0.0..=1.0).contains(&environment.bounce)
+        && environment.wind.direction.is_finite()
+        && (-360.0..=360.0).contains(&environment.wind.direction)
+        && environment.wind.strength.is_finite()
+        && (0.0..=2.0).contains(&environment.wind.strength)
+        && environment.gi.is_none_or(|gi| {
+            gi.spacing.is_finite()
+                && (0.0..=64.0).contains(&gi.spacing)
+                && (1..=4).contains(&gi.bounces)
+                && (32..=512).contains(&gi.rays)
+        })
         && environment.sky.as_ref().is_none_or(|sky| {
             let direction = bevy_math::Vec3::from_array(sky.sun_direction);
             sky.sun_direction.iter().all(|value| value.is_finite())

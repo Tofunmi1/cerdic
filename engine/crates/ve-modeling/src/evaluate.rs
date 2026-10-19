@@ -286,8 +286,7 @@ fn finish(job: &Job, ao_cache: &mut crate::ao::Cache) -> Result<Evaluation, Fail
                 sun.name.clone_from(&output.name);
                 lights.push(sun);
                 if let Some(existing) = &mut environment {
-                    existing.sky = Some(sky.clone());
-                    existing.gi = existing.gi.or(scene.gi);
+                    crate::environment::add_sky(existing, scene, sky);
                 } else {
                     environment = Some(scene.clone());
                 }
@@ -299,12 +298,7 @@ fn finish(job: &Job, ao_cache: &mut crate::ao::Cache) -> Result<Evaluation, Fail
                     ));
                 }
                 authored_environment = true;
-                let sky = environment.as_ref().and_then(|current| current.sky.clone());
-                let probes = environment.as_ref().and_then(|current| current.gi);
-                let mut authored = scene.clone();
-                authored.sky = sky;
-                authored.gi = authored.gi.or(probes);
-                environment = Some(authored);
+                environment = Some(crate::environment::over_sky(scene, environment.as_ref()));
             }
             continue;
         }

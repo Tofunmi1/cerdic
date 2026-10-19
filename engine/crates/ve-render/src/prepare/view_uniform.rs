@@ -22,7 +22,13 @@ impl ViewUniform {
             ground: Vec4::ZERO,
             sun: Vec4::ZERO,
             cloud: Vec4::ZERO,
+            wind: Vec4::new(1.0, 0.0, 0.0, 0.0),
         }
+    }
+
+    /// Writes the wind field the foliage vertex shaders bend with.
+    pub(crate) fn set_wind(&mut self, wind: &crate::WindField) {
+        self.wind = wind.uniform();
     }
 
     /// Writes the active viewer grading into this view's uniforms (see [`Grading`]).

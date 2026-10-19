@@ -5,6 +5,7 @@ pub(crate) fn update(
     mut sky_background: ResMut<ve_render::SkyBackground>,
     mut textures: ResMut<ve_render::MaterialTextures>,
     mut probes: ResMut<ve_render::ProbeVolume>,
+    mut wind: ResMut<ve_render::WindField>,
     baseline: Res<crate::scene::SceneAmbient>,
     old: Query<(Entity, &Mesh3d), With<Authored>>,
     gallery: Query<(Entity, &Mesh3d), With<GalleryObject>>,
@@ -78,6 +79,15 @@ pub(crate) fn update(
                 })
                 .unwrap_or_default();
             state.environment.clone_from(&candidate.environment);
+            // The wind an environment authors, or the default breeze; the clock keeps running.
+            let blowing = candidate
+                .environment
+                .as_ref()
+                .map_or_else(ve_modeling::Wind::default, |scene| scene.wind);
+            *wind = ve_render::WindField {
+                time: wind.time,
+                ..ve_render::WindField::from_degrees(blowing.direction, blowing.strength)
+            };
             // Light probes are traced from the geometry collected below; until they finish the scene keeps the sky ambient.
             gi::clear(&mut probes);
             let mut collector =
