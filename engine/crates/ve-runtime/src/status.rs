@@ -48,7 +48,15 @@ fn xr_view_info(cameras: &Query<&StereoViews, With<XrCamera>>) -> serde_json::Va
 fn render_counts() -> serde_json::Value {
     let counts = ve_render::last_frame_counts();
     let pass = |c: ve_render::PassCounts| json!({ "draws": c.draws, "triangles": c.triangles });
-    json!({ "main": pass(counts.main), "shadow": pass(counts.shadow), "depth": pass(counts.depth) })
+    let sets = ve_render::last_set_stats();
+    json!({
+        "main": pass(counts.main), "shadow": pass(counts.shadow), "depth": pass(counts.depth),
+        // Retained instance sets: how many, their copies and chunks, and what the camera's culling kept.
+        "sets": {
+            "sets": sets.sets, "copies": sets.copies, "chunks": sets.chunks,
+            "chunks_visible": sets.chunks_visible, "copies_visible": sets.copies_visible,
+        },
+    })
 }
 
 /// The controllers as the app sees them, with where each hand's wand ended up in the world.

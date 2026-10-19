@@ -9,8 +9,8 @@ use bevy_render::mesh::allocator::MeshAllocator;
 use bevy_render::render_asset::RenderAssets;
 use bevy_render::render_phase::TrackedRenderPass;
 use bevy_render::render_resource::{
-    BindGroup, Buffer, LoadOp, Operations, PipelineCache, RenderPassColorAttachment,
-    RenderPassDescriptor, StoreOp, TextureFormat, WgpuTextureView,
+    BindGroup, LoadOp, Operations, PipelineCache, RenderPassColorAttachment, RenderPassDescriptor,
+    StoreOp, TextureFormat, WgpuTextureView,
 };
 use bevy_render::renderer::{RenderContext, ViewQuery};
 use bevy_render::view::{ExtractedView, Msaa, ViewDepthStencilTexture, ViewTarget};
@@ -139,19 +139,12 @@ pub(crate) fn forward_pass(
         };
         Destination::Output(output)
     };
-    let (
-        Some(view_bind_group),
-        Some(lights_bind_group),
-        Some(textures_bind_group),
-        Some(instance_buffer),
-    ) = (
+    let (Some(view_bind_group), Some(lights_bind_group), Some(textures_bind_group)) = (
         view_uniforms.bind_group.as_ref(),
         lights.bind_group.as_ref(),
         textures.bind_group.as_ref(),
-        batches.buffer.buffer(),
-    )
-    else {
-        info_once!("forward pass skipped: view, lights, textures or instance data is not ready");
+    ) else {
+        info_once!("forward pass skipped: view, lights or textures are not ready");
         return;
     };
     let color_attachments = [Some(color_attachment(
@@ -187,7 +180,7 @@ pub(crate) fn forward_pass(
         render_meshes: &render_meshes,
         allocator: &allocator,
         view_bind_group,
-        instance_buffer,
+        batches: &batches,
         format,
         samples: msaa.samples(),
     };
@@ -209,7 +202,7 @@ fn draw_opaque_with_outlines<'a>(
     batches: &InstanceBatches,
     slots: &ViewSlots,
 ) {
-    for batch in batches.batches.iter().filter(|batch| !batch.transparent) {
+    for batch in batches.main_batches().filter(|batch| !batch.transparent) {
         let kind = if batch.foliage {
             PassKind::TwoSided
         } else {
@@ -218,8 +211,7 @@ fn draw_opaque_with_outlines<'a>(
         draw_batch(pass, gpu, batch, slots, kind);
     }
     for batch in batches
-        .batches
-        .iter()
+        .main_batches()
         .filter(|batch| !batch.transparent && batch.outlined)
     {
         draw_batch(pass, gpu, batch, slots, PassKind::Outline);
@@ -277,7 +269,8 @@ struct BatchGpu<'a> {
     render_meshes: &'a RenderAssets<RenderMesh>,
     allocator: &'a MeshAllocator,
     view_bind_group: &'a BindGroup,
-    instance_buffer: &'a Buffer,
+    /// The frame's batches and the retained instance sets: where each batch's instances live.
+    batches: &'a InstanceBatches,
     format: TextureFormat,
     samples: u32,
 }
@@ -304,8 +297,10 @@ fn draw_batch<'a>(
         return;
     };
     pass.set_render_pipeline(pipeline);
-    let Some(call) = bind_geometry(pass, gpu.allocator, render_mesh, batch, gpu.instance_buffer)
-    else {
+    let Some(instance_buffer) = gpu.batches.instance_buffer(batch) else {
+        return;
+    };
+    let Some(call) = bind_geometry(pass, gpu.allocator, render_mesh, batch, instance_buffer) else {
         info_once!("forward pass: a mesh is not uploaded to the GPU yet");
         return;
     };

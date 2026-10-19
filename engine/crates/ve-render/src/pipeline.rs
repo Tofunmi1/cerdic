@@ -244,7 +244,7 @@ pub(crate) fn queue_forward_pipelines(
             ))
         })
         .collect();
-    for batch in &batches.batches {
+    for batch in batches.queue_batches() {
         // A mesh that is not uploaded yet is retried next frame.
         let Some(render_mesh) = render_meshes.get(batch.mesh) else {
             continue;

@@ -5,6 +5,26 @@ use bevy_math::{Mat4, Vec4};
 use super::ViewUniform;
 use crate::{SkyBackground, grade::Grading, quality::RenderQuality};
 
+/// The clip-from-world matrix of each slot of a view (one for a camera, one per eye for a stereo view), as `prepare_view_uniforms`
+/// builds them, for anything that must agree with what is drawn (culling).
+pub(crate) fn view_clip_matrices(
+    view: &bevy_render::view::ExtractedView,
+    stereo: Option<&crate::stereo::StereoViews>,
+) -> Vec<Mat4> {
+    match stereo {
+        Some(stereo) => stereo
+            .eyes
+            .iter()
+            .map(|eye| eye.clip_from_view * eye.world_from_view.inverse())
+            .collect(),
+        None => {
+            vec![view.clip_from_world.unwrap_or_else(|| {
+                view.clip_from_view * view.world_from_view.to_matrix().inverse()
+            })]
+        }
+    }
+}
+
 impl ViewUniform {
     /// The uniform for an eye or camera at `world_from_view` with projection `clip_from_view`.
     pub(crate) fn new(world_from_view: Mat4, clip_from_view: Mat4) -> Self {

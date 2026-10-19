@@ -16,6 +16,7 @@ use bytemuck::{Pod, Zeroable};
 
 use crate::extract::{ExtractedMesh, ExtractedMeshes};
 use crate::grade::Grading;
+use crate::material::PackedMaterial;
 use crate::pipeline::ForwardPipelines;
 use crate::quality::RenderQuality;
 use crate::stereo::StereoViews;
@@ -25,6 +26,7 @@ mod lights_gpu;
 pub(crate) use lights_gpu::{LightsGpu, prepare_lights};
 #[path = "prepare/view_uniform.rs"]
 mod view_uniform;
+pub(crate) use view_uniform::view_clip_matrices;
 
 /// Per-instance vertex data: the model matrix (four `vec4` columns) and the material.
 #[repr(C)]
@@ -43,6 +45,10 @@ pub(crate) struct InstanceData {
 
 /// A run of consecutive instances that share a mesh and can be drawn with one call.
 #[derive(Clone, Debug, PartialEq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "each flag chooses a different extra pass, and they are set independently"
+)]
 pub(crate) struct Batch {
     pub(crate) mesh: AssetId<Mesh>,
     pub(crate) instances: Range<u32>,
@@ -55,13 +61,42 @@ pub(crate) struct Batch {
     pub(crate) cutout: bool,
     /// Whether any instance has foliage (a cutout or wind), so the batch is drawn two-sided.
     pub(crate) foliage: bool,
+    /// The instance set whose retained buffer `instances` indexes, or `None` for this frame's own buffer.
+    pub(crate) set: Option<Entity>,
 }
 
-/// The instance buffer and the draw batches over it.
+impl InstanceData {
+    /// The instance data of one copy: its matrix and its packed material.
+    pub(crate) fn new(world_from_local: &Mat4, material: &PackedMaterial) -> Self {
+        Self {
+            world_from_local: world_from_local.to_cols_array_2d(),
+            base_color: material.base_color,
+            params: material.params,
+            emissive: material.emissive,
+            maps: material.maps,
+            toon_a: material.toon_a,
+            toon_b: material.toon_b,
+            toon_c: material.toon_c,
+            foliage: material.foliage,
+        }
+    }
+}
+
+/// Whether a material has an outline, a cutout, foliage (a cutout, sway or flutter): what decides which extra passes draw a batch.
+pub(crate) fn batch_flags(material: &PackedMaterial) -> (bool, bool, bool) {
+    (
+        material.toon_c[3] > 0.0,
+        material.foliage[0] > 0.0,
+        material.foliage[..3].iter().any(|&lane| lane > 0.0),
+    )
+}
+
+/// The instance buffer and the draw batches over it, and the retained instance sets (see `instance_sets.rs`).
 #[derive(Resource)]
 pub(crate) struct InstanceBatches {
     pub(crate) buffer: RawBufferVec<InstanceData>,
     pub(crate) batches: Vec<Batch>,
+    pub(crate) sets: crate::instance_sets::RetainedSets,
 }
 
 impl Default for InstanceBatches {
@@ -69,6 +104,7 @@ impl Default for InstanceBatches {
         Self {
             buffer: RawBufferVec::new(BufferUsages::VERTEX),
             batches: Vec::new(),
+            sets: crate::instance_sets::RetainedSets::default(),
         }
     }
 }
@@ -93,20 +129,8 @@ pub(crate) fn group_into_batches(meshes: &[ExtractedMesh]) -> (Vec<InstanceData>
     let mut batches: Vec<Batch> = Vec::new();
     for mesh in &sorted {
         let index = u32::try_from(data.len()).unwrap_or(u32::MAX);
-        data.push(InstanceData {
-            world_from_local: mesh.world_from_local.to_cols_array_2d(),
-            base_color: mesh.material.base_color,
-            params: mesh.material.params,
-            emissive: mesh.material.emissive,
-            maps: mesh.material.maps,
-            toon_a: mesh.material.toon_a,
-            toon_b: mesh.material.toon_b,
-            toon_c: mesh.material.toon_c,
-            foliage: mesh.material.foliage,
-        });
-        let outlined = mesh.material.toon_c[3] > 0.0;
-        let cutout = mesh.material.foliage[0] > 0.0;
-        let foliage = mesh.material.foliage[..3].iter().any(|&lane| lane > 0.0);
+        data.push(InstanceData::new(&mesh.world_from_local, &mesh.material));
+        let (outlined, cutout, foliage) = batch_flags(&mesh.material);
         match batches.last_mut() {
             Some(batch) if !batch.transparent && !mesh.transparent && batch.mesh == mesh.mesh => {
                 batch.instances.end = index + 1;
@@ -123,6 +147,7 @@ pub(crate) fn group_into_batches(meshes: &[ExtractedMesh]) -> (Vec<InstanceData>
                 outlined,
                 cutout,
                 foliage,
+                set: None,
             }),
         }
     }

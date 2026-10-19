@@ -203,7 +203,14 @@ pub(super) fn spawn(
                 .into()
         })
         .filter(|tracks: &std::sync::Arc<[ve_modeling::anim::Track]>| !tracks.is_empty());
-    let spawn_one = |commands: &mut Commands, matrix: Mat4, index: Option<u32>| {
+    // Many copies that never move are one retained set, not an entity each.
+    if let Some(set) = placements
+        && super::bulk::eligible(set.matrices.len(), &surface, shared.is_some())
+    {
+        super::bulk::spawn(commands, item, token, surface, &set.matrices, &set.indices);
+        return;
+    }
+    let spawn_one =|commands: &mut Commands, matrix: Mat4, index: Option<u32>| {
         let mut entity = commands.spawn((
             Mesh3d(item.handle.clone()),
             surface,

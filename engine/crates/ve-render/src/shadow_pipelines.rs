@@ -176,7 +176,7 @@ pub(crate) fn queue_shadow_pipelines(
     if !state.params.enabled {
         return;
     }
-    for batch in &batches.batches {
+    for batch in batches.queue_batches() {
         let Some(render_mesh) = render_meshes.get(batch.mesh) else {
             continue;
         };

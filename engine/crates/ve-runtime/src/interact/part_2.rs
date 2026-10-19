@@ -46,6 +46,7 @@ pub(crate) fn run_interaction(
         Option<&'static ve_render::VeInstanceTransform>,
     )>,
     mut lasers: Query<(&Laser, &mut Transform), Without<Interactable>>,
+    bulk: Query<(Entity, &'static crate::projection::bulk::BulkInstances)>,
 ) {
     let dt = time.delta_secs();
     // A controller that lost tracking (no poses) is treated as gone, not as one that let go: the
@@ -70,6 +71,7 @@ pub(crate) fn run_interaction(
     let readonly = objects.as_readonly();
     let world = SceneWorld {
         objects: &readonly,
+        bulk: &bulk,
         hook: &hook,
     };
     let output = state.machine.update(&frames, &world);

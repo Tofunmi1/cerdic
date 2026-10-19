@@ -8,6 +8,7 @@ pub(crate) fn update(
     mut wind: ResMut<ve_render::WindField>,
     baseline: Res<crate::scene::SceneAmbient>,
     old: Query<(Entity, &Mesh3d), With<Authored>>,
+    old_sets: Query<(Entity, &ve_render::VeInstanceSet), With<Authored>>,
     gallery: Query<(Entity, &Mesh3d), With<GalleryObject>>,
     old_lights: Query<Entity, With<lights::AuthoredLight>>,
 ) {
@@ -49,6 +50,12 @@ pub(crate) fn update(
             for (entity, mesh) in old.iter().chain(gallery.iter()) {
                 commands.entity(entity).despawn();
                 meshes.remove(mesh.0.id());
+            }
+            for (entity, set) in &old_sets {
+                commands.entity(entity).despawn();
+                for level in &set.meshes {
+                    meshes.remove(level.mesh.id());
+                }
             }
             for entity in &old_lights {
                 commands.entity(entity).despawn();

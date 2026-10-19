@@ -161,7 +161,7 @@ pub(crate) fn queue_cutout_pipelines(
         (CutoutKind::Shadow, shadows.params.enabled),
         (CutoutKind::Depth, quality.ssao_enabled),
     ];
-    for batch in batches.batches.iter().filter(|batch| batch.cutout) {
+    for batch in batches.queue_batches().filter(|batch| batch.cutout) {
         let Some(render_mesh) = render_meshes.get(batch.mesh) else {
             continue;
         };
