@@ -3560,6 +3560,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ve-sky"
+version = "0.0.0"
+
+[[package]]
 name = "ve-xr-math"
 version = "0.0.0"
 dependencies = [
