@@ -118,5 +118,6 @@ pub(crate) fn execute(node: &Node) -> Result<Value, Fail> {
         bounce_color: ground,
         bounce: 0.2,
         sky: Some(sky),
+        gi: super::probes(node),
     }))
 }

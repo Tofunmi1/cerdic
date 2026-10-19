@@ -287,6 +287,7 @@ fn finish(job: &Job, ao_cache: &mut crate::ao::Cache) -> Result<Evaluation, Fail
                 lights.push(sun);
                 if let Some(existing) = &mut environment {
                     existing.sky = Some(sky.clone());
+                    existing.gi = existing.gi.or(scene.gi);
                 } else {
                     environment = Some(scene.clone());
                 }
@@ -299,8 +300,10 @@ fn finish(job: &Job, ao_cache: &mut crate::ao::Cache) -> Result<Evaluation, Fail
                 }
                 authored_environment = true;
                 let sky = environment.as_ref().and_then(|current| current.sky.clone());
+                let probes = environment.as_ref().and_then(|current| current.gi);
                 let mut authored = scene.clone();
                 authored.sky = sky;
+                authored.gi = authored.gi.or(probes);
                 environment = Some(authored);
             }
             continue;

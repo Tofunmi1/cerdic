@@ -6,9 +6,11 @@ use std::f32::consts::PI;
 use thiserror::Error;
 
 mod baker;
+mod builder;
 mod sh;
 
 pub use baker::{Baker, bake};
+pub use builder::{MAX_TRIANGLES, SceneBuilder, thinning};
 use sh::{eval, fix_invalid, project, sky_irradiance, sky_radiance};
 
 /// A surface's linear-colour response.

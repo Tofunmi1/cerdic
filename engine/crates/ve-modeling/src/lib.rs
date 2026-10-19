@@ -47,8 +47,8 @@ pub use job::{JobToken, hash};
 pub use kits::{KITS, Kit};
 pub use poly_ops::suggestion as poly_suggestion;
 pub use result::{
-    BakedMaps, Evaluation, EvaluationWarning, Foliage, MAX_SCENE_LIGHTS, Material, MaterialRecipe,
-    Part, Quality, SceneEnvironment, SceneLight, SceneLightKind,
+    BakedMaps, Evaluation, EvaluationWarning, Foliage, LightProbes, MAX_SCENE_LIGHTS, Material,
+    MaterialRecipe, Part, Quality, SceneEnvironment, SceneLight, SceneLightKind,
 };
 
 pub(crate) type Fail = Box<ve_graph::Diagnostic>;

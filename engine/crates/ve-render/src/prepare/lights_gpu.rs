@@ -9,6 +9,7 @@ use bevy_render::view::ExtractedView;
 
 use crate::light::{ExtractedLights, LightsUniform, pack_lights};
 use crate::pipeline::ForwardPipelines;
+use crate::probes::ProbeGpu;
 use crate::quality::RenderQuality;
 use crate::shadow::{ShadowMap, ShadowState};
 use crate::stereo::{StereoViews, viewer_position};
@@ -27,6 +28,7 @@ pub(crate) fn prepare_lights(
     views: Query<(&ExtractedView, Option<&StereoViews>)>,
     shadow: Res<ShadowState>,
     shadow_map: Res<ShadowMap>,
+    probes: Res<ProbeGpu>,
     mut gpu: ResMut<LightsGpu>,
     pipelines: Res<ForwardPipelines>,
     pipeline_cache: Res<PipelineCache>,
@@ -38,18 +40,23 @@ pub(crate) fn prepare_lights(
             .iter()
             .map(|(view, stereo)| (view.world_from_view.translation(), stereo)),
     );
-    gpu.buffer.set(pack_lights(
+    let mut uniform = pack_lights(
         &lights,
         viewer,
         quality.max_point_lights,
         quality.max_spot_lights,
         &shadow.params,
-    ));
+    );
+    uniform.gi_origin_spacing = probes.origin_spacing;
+    uniform.gi_dims = probes.dims_enabled;
+    gpu.buffer.set(uniform);
     gpu.buffer.write_buffer(&device, &queue);
-    let (Some(binding), Some(map_view), Some(map_sampler)) = (
+    let (Some(binding), Some(map_view), Some(map_sampler), Some(probe_views), Some(probe_sampler)) = (
         gpu.buffer.binding(),
         shadow_map.sampled_view(),
         shadow_map.sampler(),
+        probes.views(),
+        probes.sampler(),
     ) else {
         gpu.bind_group = None;
         return;
@@ -70,6 +77,26 @@ pub(crate) fn prepare_lights(
             BindGroupEntry {
                 binding: 2,
                 resource: BindingResource::Sampler(map_sampler),
+            },
+            BindGroupEntry {
+                binding: 3,
+                resource: BindingResource::TextureView(&probe_views[0]),
+            },
+            BindGroupEntry {
+                binding: 4,
+                resource: BindingResource::TextureView(&probe_views[1]),
+            },
+            BindGroupEntry {
+                binding: 5,
+                resource: BindingResource::TextureView(&probe_views[2]),
+            },
+            BindGroupEntry {
+                binding: 6,
+                resource: BindingResource::TextureView(&probe_views[3]),
+            },
+            BindGroupEntry {
+                binding: 7,
+                resource: BindingResource::Sampler(probe_sampler),
             },
         ],
     ));

@@ -3542,6 +3542,7 @@ dependencies = [
  "serde_json",
  "ve-audio",
  "ve-core",
+ "ve-gi",
  "ve-graph",
  "ve-interact",
  "ve-kernel",

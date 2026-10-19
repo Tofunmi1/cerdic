@@ -54,6 +54,10 @@ struct Lights {
     shadow_bias: vec4<f32>,
     // xyz: the viewing direction the splits are measured along.
     shadow_forward: vec4<f32>,
+    // xyz: world position of the first light probe, w: the distance between probes.
+    gi_origin_spacing: vec4<f32>,
+    // xyz: probes along each axis, w: 1 when a probe volume lights the scene (else the constant sky ambient).
+    gi_dims: vec4<f32>,
     points: array<PointLight, 16>,
     spots: array<SpotLight, 8>,
 };
@@ -64,6 +68,13 @@ struct Lights {
 @group(1) @binding(0) var<uniform> lights: Lights;
 @group(1) @binding(1) var shadow_map: texture_depth_2d;
 @group(1) @binding(2) var shadow_sampler: sampler_comparison;
+// Light probes (global illumination): irradiance over pi as first-order spherical harmonics, one 3D texture per coefficient (the
+// constant term, then the x, y and z terms, each as rgb), with a trilinear sampler. A zero 1 by 1 by 1 stand-in while off.
+@group(1) @binding(3) var probe_dc: texture_3d<f32>;
+@group(1) @binding(4) var probe_x: texture_3d<f32>;
+@group(1) @binding(5) var probe_y: texture_3d<f32>;
+@group(1) @binding(6) var probe_z: texture_3d<f32>;
+@group(1) @binding(7) var probe_sampler: sampler;
 // Baked maps of textured surfaces, one layer each: albedo (sRGB), normal, metallic-roughness, emissive (sRGB).
 @group(2) @binding(0) var material_maps: texture_2d_array<f32>;
 @group(2) @binding(1) var material_sampler: sampler;
@@ -302,6 +313,21 @@ fn environment(dir: vec3<f32>, roughness: f32) -> vec3<f32> {
     let rim_edge = mix(0.90, 0.30, blur);
     env += vec3<f32>(1.2, 1.5, 2.0) * mix(1.0, 0.25, blur) * smoothstep(rim_edge, rim_edge + 0.05, dot(dir, rim));
     return mix(env, vec3<f32>(0.40, 0.44, 0.52), blur * 0.6);
+}
+
+// The irradiance over pi that the light probes give a surface at `position` facing `n`. The grid holds probe i at texel centre
+// (i + 0.5) / dims, so one trilinear sample per coefficient texture blends the eight probes around the point. The lookup is nudged
+// off the surface along its normal, so a wall does not borrow light from the probe on its far side, and clamped to the grid.
+fn probe_irradiance(position: vec3<f32>, n: vec3<f32>) -> vec3<f32> {
+    let spacing = lights.gi_origin_spacing.w;
+    let dims = lights.gi_dims.xyz;
+    let cell = (position + n * spacing * 0.3 - lights.gi_origin_spacing.xyz) / spacing;
+    let uvw = clamp((cell + vec3<f32>(0.5)) / dims, vec3<f32>(0.5) / dims, vec3<f32>(1.0) - vec3<f32>(0.5) / dims);
+    let dc = textureSampleLevel(probe_dc, probe_sampler, uvw, 0.0).rgb;
+    let x = textureSampleLevel(probe_x, probe_sampler, uvw, 0.0).rgb;
+    let y = textureSampleLevel(probe_y, probe_sampler, uvw, 0.0).rgb;
+    let z = textureSampleLevel(probe_z, probe_sampler, uvw, 0.0).rgb;
+    return max(dc + x * n.x + y * n.y + z * n.z, vec3<f32>(0.0));
 }
 
 // Split-sum environment BRDF, Karis's analytic fit: the scale and bias on f0 for a given roughness.
@@ -586,9 +612,16 @@ fn fragment(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @
     // Low-order (L1) spherical-harmonic ambient irradiance. A two-colour sky/ground hemisphere is
     // exactly the first-order band along Y, so this reproduces the sky-to-ground gradient exactly;
     // it is a bounded approximation of an environment, not global illumination.
-    let ambient_irradiance = lights.ambient_sh0.rgb + lights.ambient_sh1.rgb * clamp(n.y, -1.0, 1.0);
+    var ambient_irradiance = lights.ambient_sh0.rgb + lights.ambient_sh1.rgb * clamp(n.y, -1.0, 1.0);
+    var bounce_strength = lights.ambient_bounce.w;
+    if (lights.gi_dims.w > 0.5) {
+        // Light probes replace the constant sky with traced irradiance: the sky as this place sees it (sheltered corners are
+        // darker), and sun and emission bounced off other surfaces. They already include the ground bounce.
+        ambient_irradiance = probe_irradiance(input.world_position, n);
+        bounce_strength = 0.0;
+    }
     // Optional warm ground bounce: light leaving a warm floor reaches downward-facing surfaces.
-    let bounce_term = lights.ambient_bounce.rgb * (lights.ambient_bounce.w * max(-n.y, 0.0))
+    let bounce_term = lights.ambient_bounce.rgb * (bounce_strength * max(-n.y, 0.0))
         * diffuse_color * input.occlusion;
     var ambient = ambient_irradiance * (diffuse_color + f0 * 0.2) * input.occlusion + bounce_term;
     if (lights.ambient.w > 0.0) {

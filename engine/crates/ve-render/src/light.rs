@@ -74,8 +74,9 @@ pub struct VeSpotLight {
 /// Constant light that reaches every surface equally, standing in for the sky.
 ///
 /// The sky and ground colours are packed as a first-order (L1) spherical-harmonic irradiance band.
-/// This is a bounded, stable approximation of a two-colour environment, not global illumination:
-/// it captures the sky-to-ground gradient a real environment would add, but no inter-surface bounce.
+/// This is a bounded, stable approximation of a two-colour environment: it captures the sky-to-ground
+/// gradient a real environment would add, but no inter-surface bounce. Scenes that ask for light probes
+/// (`probes.rs`) use traced irradiance instead.
 #[derive(Resource, Clone, Copy, Debug, PartialEq)]
 pub struct VeAmbientLight {
     /// Light colour.
@@ -147,6 +148,10 @@ pub(crate) struct LightsUniform {
     pub(crate) shadow_bias: Vec4,
     /// xyz: the viewing direction the splits are measured along.
     pub(crate) shadow_forward: Vec4,
+    /// xyz: world position of the first light probe, w: the distance between probes.
+    pub(crate) gi_origin_spacing: Vec4,
+    /// xyz: how many probes lie along each axis, w: 1 when a probe volume lights the scene, 0 for the constant sky ambient.
+    pub(crate) gi_dims: Vec4,
     pub(crate) points: [PointLightUniform; MAX_POINT_LIGHTS],
     /// Bounded spot array. Angles are packed as outer and inner cosines.
     pub(crate) spots: [SpotLightUniform; MAX_SPOT_LIGHTS],
