@@ -106,6 +106,7 @@ pub(crate) fn material(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail>
         skin: input.skin.clone(),
         ik: input.ik.clone(),
         body: input.body.clone(),
+        number: None,
     })
 }
 

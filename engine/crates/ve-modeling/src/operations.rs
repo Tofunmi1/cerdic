@@ -75,6 +75,9 @@ fn execute_special(
     quality: Quality,
 ) -> Option<Result<Value, Fail>> {
     let family = node.op.family().as_str();
+    if let Some(result) = crate::values::run(node, inputs) {
+        return Some(result);
+    }
     if family == "frame.add" {
         let Some(input) = inputs.first() else {
             return Some(Err(fail("graph.missing_input", "frame source")));

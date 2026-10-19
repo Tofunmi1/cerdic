@@ -115,6 +115,68 @@ fn variation_ops() -> Vec<Option<OperatorSpec>> {
             vec![vector("shift", Unit::Length, true), seed(), yaw2, scale2],
         ),
         spec(
+            "inst.scatter_on@1",
+            "Seeded scatter over the surface of a solid, in any orientation (pebbles on a hill's sides, bolts on a tank, moss on a wall): points are drawn uniformly by area over `surface`, and with align each copy's +Y axis follows the surface normal there. min_distance keeps copies apart or the node refuses (it never places fewer than count). region limits it to upward, sideways or downward faces. Build the prototype with its base at y=0 so it sits on the surface.",
+            vec![single("in", INPUT), single("surface", &[PortType::Solid])],
+            output,
+            vec![
+                ParamSpec {
+                    name: "count",
+                    ty: ParamType::Int { min: 1, max: 5_000 },
+                    default: Some(Value::Int(100)),
+                    doc: "Number of placements; refused rather than reduced when min_distance cannot be met.",
+                },
+                amount(
+                    "min_distance",
+                    Unit::Length,
+                    EXTENT,
+                    Some(0.0),
+                    "Smallest distance between two placements, in metres (0 for none).",
+                ),
+                ParamSpec {
+                    name: "align",
+                    ty: ParamType::Bool,
+                    default: Some(Value::Bool(true)),
+                    doc: "Turn each copy so its +Y axis is the surface normal; false keeps the prototype's orientation.",
+                },
+                ParamSpec {
+                    name: "spin",
+                    ty: ParamType::Bool,
+                    default: Some(Value::Bool(true)),
+                    doc: "Turn each copy by a seeded random angle about its own up axis.",
+                },
+                ParamSpec {
+                    name: "tilt",
+                    ty: ParamType::Num {
+                        unit: Unit::Angle,
+                        min: 0.0,
+                        max: std::f64::consts::FRAC_PI_4,
+                    },
+                    default: Some(Value::Num(0.0)),
+                    doc: "Largest seeded lean away from the surface normal (0 to 45 degrees).",
+                },
+                ParamSpec {
+                    name: "scale_jitter",
+                    ty: ParamType::Num {
+                        unit: Unit::None,
+                        min: 0.0,
+                        max: 1.0,
+                    },
+                    default: Some(Value::Num(0.0)),
+                    doc: "Scale each copy by 1 plus or minus up to this fraction.",
+                },
+                ParamSpec {
+                    name: "region",
+                    ty: ParamType::Choice {
+                        options: &["all", "up", "side", "down"],
+                    },
+                    default: Some(Value::Str("all".to_owned())),
+                    doc: "Where on the surface: all, up (normal pointing up), side, or down.",
+                },
+                seed(),
+            ],
+        ),
+        spec(
             "inst.drop@1",
             "Sets every placement down onto a surface (trees, rocks and grass on a terrain; props on a table): each copy slides straight down onto the highest point of `surface` under it. Scatter over the surface's footprint first, then drop. A copy is dropped from where its own origin (the prototype's origin after placement) is, so build the prototype with its base at y=0. Copies that are not over the surface are removed.",
             vec![single("in", INPUT), single("surface", &[PortType::Solid])],

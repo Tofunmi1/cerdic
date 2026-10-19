@@ -70,7 +70,12 @@ Lengths are metres (suffixes mm and cm work); angles are degrees unless you writ
 angle=90deg or 1.57rad). Numbers, "text", true/false and [lists] are the only values. Lines starting
 with # are comments. Constants and arithmetic: "let w = 1.5" defines one, and {w * 2} (or {w / 2 + 0.1}) in
 any value is replaced by its number; units go after the brace ({w * 1000}mm). Functions: min, max, abs,
-sqrt, floor, ceil, round, clamp, sin, cos, radians; constants pi and tau. Only operators from
+sqrt, floor, ceil, round, clamp, sin, cos, radians; constants pi and tau. Values: value.number,
+value.math and value.size make numbers that you link into any number parameter by its name (a vector
+component as size.y), for example r = value.number@1(value=0.5), d = value.math@1(op="mul", a=r, b=2),
+ball = solid.sphere@1(radius=d), box = solid.box@1(size=[1, 1, 1], size.y=h). value.size@1(part,
+measure="height") measures a part (width, height, depth, longest, shortest, volume, area), so one part
+can be sized from another. Only operators from
 list_operators can be used. Y is up. Profiles live in the XY
 plane: solid.revolve spins one (x >= 0) about Y, solid.extrude stands one up from y=0.
 

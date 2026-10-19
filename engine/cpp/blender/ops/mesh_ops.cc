@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <unordered_set>
 #include <vector>
 
@@ -14,6 +15,7 @@
 #include "bmesh_decimate.hh"
 #include "bmesh_error.hh"
 #include "bmesh_operators.hh"
+#include "bmesh_walkers.hh"
 #include "polymesh.hh"
 
 using namespace blender;
@@ -294,6 +296,71 @@ bool run_spin(BMesh* bm, const ve_mesh_op_input& in) {
                       in.params[8]);
 }
 
+bool run_loop_cut(BMesh* bm, const ve_mesh_op_input& in) {
+  const double* at = in.params;
+  BMEdge* start = nullptr;
+  double nearest = std::numeric_limits<double>::infinity();
+  BMIter all_edges;
+  BMEdge* edge;
+  BM_ITER_MESH(edge, &all_edges, bm, BM_EDGES_OF_MESH) {
+    const double x = (double(edge->v1->co[0]) + edge->v2->co[0]) * 0.5 - at[0];
+    const double y = (double(edge->v1->co[1]) + edge->v2->co[1]) * 0.5 - at[1];
+    const double z = (double(edge->v1->co[2]) + edge->v2->co[2]) * 0.5 - at[2];
+    const double distance = x * x + y * y + z * z;
+    if (distance < nearest) {
+      nearest = distance;
+      start = edge;
+    }
+  }
+  if (!start) {
+    return false;
+  }
+  double diagonal = 0.0;
+  for (int axis = 0; axis < 3; ++axis) {
+    float low = std::numeric_limits<float>::infinity();
+    float high = -std::numeric_limits<float>::infinity();
+    BMIter all_verts;
+    BMVert* vert;
+    BM_ITER_MESH(vert, &all_verts, bm, BM_VERTS_OF_MESH) {
+      low = std::min(low, vert->co[axis]);
+      high = std::max(high, vert->co[axis]);
+    }
+    diagonal += double(high - low) * double(high - low);
+  }
+  if (nearest > diagonal) {
+    return false;
+  }
+  BMWalker walker;
+  BMW_init(&walker, bm, BMW_EDGERING, BMW_MASK_NOP, BMW_MASK_NOP, BMW_MASK_NOP,
+           BMW_FLAG_NOP, BMW_NIL_LAY, BMW_DELIMIT_NONE);
+  std::vector<BMEdge*> ring;
+  for (BMEdge* edge = static_cast<BMEdge*>(BMW_begin(&walker, start)); edge;
+       edge = static_cast<BMEdge*>(BMW_step(&walker))) {
+    if (!BM_edge_is_manifold(edge) || edge->l->f->len != 4 || edge->l->radial_next->f->len != 4) {
+      BMW_end(&walker);
+      return false;
+    }
+    ring.push_back(edge);
+  }
+  BMW_end(&walker);
+  if (ring.size() < 3) {
+    return false;
+  }
+  BMIter clear_edges;
+  BM_ITER_MESH(edge, &clear_edges, bm, BM_EDGES_OF_MESH) {
+    BM_elem_flag_disable(edge, BM_ELEM_SELECT);
+  }
+  BM_mesh_elem_hflag_enable_all(bm, BM_VERT, BM_ELEM_SELECT, false);
+  for (BMEdge* edge : ring) {
+    BM_elem_flag_enable(edge, BM_ELEM_SELECT);
+    BM_elem_flag_enable(edge->v1, BM_ELEM_SELECT);
+    BM_elem_flag_enable(edge->v2, BM_ELEM_SELECT);
+  }
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS,
+                      "subdivide_edges edges=%he cuts=%i smooth=%f use_grid_fill=%b",
+                      BM_ELEM_SELECT, static_cast<int>(in.params[3]), in.params[4], false);
+}
+
 bool run_mirror(BMesh* bm, const ve_mesh_op_input& in) {
   const float normal[3] = {static_cast<float>(in.params[3]), static_cast<float>(in.params[4]), static_cast<float>(in.params[5])};
   const float point[3] = {static_cast<float>(in.params[0]), static_cast<float>(in.params[1]), static_cast<float>(in.params[2])};
@@ -326,7 +393,7 @@ bool run_mirror(BMesh* bm, const ve_mesh_op_input& in) {
 // proceed.
 ve_status validate_params(const ve_mesh_op_input& in) {
   const double* p = in.params;
-  const int param_count = in.op == VE_MESH_OP_MIRROR ? 7 : in.op == VE_MESH_OP_SPIN ? 9 : in.op == VE_MESH_OP_BISECT ? 7 : 4;
+  const int param_count = in.op == VE_MESH_OP_MIRROR ? 7 : in.op == VE_MESH_OP_SPIN ? 9 : in.op == VE_MESH_OP_BISECT ? 7 : in.op == VE_MESH_OP_LOOP_CUT ? 5 : 4;
   for (int i = 0; i < param_count; ++i) {
     if (!finite_within(p[i])) {
       return VE_ERR_NON_FINITE;
@@ -374,6 +441,9 @@ ve_status validate_params(const ve_mesh_op_input& in) {
                  ? VE_OK : VE_ERR_INVALID_ARG;
     case VE_MESH_OP_MIRROR:
       return p[6] >= 0.0 && (p[3] != 0.0 || p[4] != 0.0 || p[5] != 0.0) ? VE_OK : VE_ERR_INVALID_ARG;
+    case VE_MESH_OP_LOOP_CUT:
+      return in_range(p[3], 1.0, 32.0) && p[3] == std::floor(p[3]) && in_range(p[4], 0.0, 1.0)
+                 ? VE_OK : VE_ERR_INVALID_ARG;
     default:
       return VE_ERR_INVALID_ARG;
   }
@@ -442,6 +512,8 @@ bool run_op(BMesh* bm, const ve_mesh_op_input& in, const LoadedMesh& mesh, const
       return run_spin(bm, in);
     case VE_MESH_OP_MIRROR:
       return run_mirror(bm, in);
+    case VE_MESH_OP_LOOP_CUT:
+      return run_loop_cut(bm, in);
     default:
       return run_symmetrize(bm, in);
   }

@@ -19,16 +19,16 @@ pub(crate) const MAX_SCATTER: u32 = 16_384;
 const ATTEMPTS_PER_POINT: u32 = 32;
 
 /// `SplitMix64`: tiny, fast and bit-identical everywhere.
-struct Stream(u64);
+pub(crate) struct Stream(u64);
 
 impl Stream {
-    fn new(seed: u64, salt: u64) -> Self {
+    pub(crate) fn new(seed: u64, salt: u64) -> Self {
         let mut stream = Self(seed ^ salt.wrapping_mul(0x9E37_79B9_7F4A_7C15));
         stream.next_u64();
         stream
     }
 
-    fn next_u64(&mut self) -> u64 {
+    pub(crate) fn next_u64(&mut self) -> u64 {
         self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.0;
         z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
@@ -36,18 +36,23 @@ impl Stream {
         z ^ (z >> 31)
     }
 
-    /// Uniform in `[-1, 1)`.
-    fn signed(&mut self) -> f64 {
+    /// Uniform in `[0, 1)`.
+    pub(crate) fn unit(&mut self) -> f64 {
         #[expect(
             clippy::cast_precision_loss,
             reason = "53 random bits fit an f64 mantissa exactly"
         )]
-        let unit = (self.next_u64() >> 11) as f64 / 9_007_199_254_740_992.0;
-        unit * 2.0 - 1.0
+        let value = (self.next_u64() >> 11) as f64 / 9_007_199_254_740_992.0;
+        value
+    }
+
+    /// Uniform in `[-1, 1)`.
+    pub(crate) fn signed(&mut self) -> f64 {
+        self.unit() * 2.0 - 1.0
     }
 }
 
-fn seed(node: &Node) -> Result<u64, Fail> {
+pub(crate) fn seed(node: &Node) -> Result<u64, Fail> {
     Ok(u64::from(whole(node, "seed").map_err(|_| {
         fail("graph.invalid_param", "seed must be a whole number")
     })?))

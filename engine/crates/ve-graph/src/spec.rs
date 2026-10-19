@@ -37,6 +37,8 @@ pub enum PortType {
     Poly,
     /// A set of faces, edges, vertices or boundary loops of one polygon mesh, chosen by a rule.
     Selection,
+    /// A single number. It plugs into a number parameter of another node (see `value.*`), not into a geometry input.
+    Number,
 }
 
 /// How many links an input port takes.
@@ -215,6 +217,53 @@ impl OperatorSpec {
     pub fn param(&self, name: &str) -> Option<&ParamSpec> {
         self.params.iter().find(|p| p.name == name)
     }
+
+    /// The number parameter a link into port `port` fills: a number or whole-number parameter by its name (`width`),
+    /// or one component of a vector parameter as `name.x`, `name.y` (and `name.z` for three numbers).
+    /// Declared input ports are looked up first by [`OperatorSpec::input`]; this is for the others.
+    #[must_use]
+    pub fn socket(&self, port: &str) -> Option<Socket<'_>> {
+        let (name, component) = match port.split_once('.') {
+            Some((name, axis)) => (name, Some(["x", "y", "z"].iter().position(|a| *a == axis)?)),
+            None => (port, None),
+        };
+        let param = self.param(name)?;
+        let fits = match (&param.ty, component) {
+            (ParamType::Num { .. } | ParamType::Int { .. }, None)
+            | (ParamType::Vec3 { .. }, Some(_)) => true,
+            (ParamType::Vec2 { .. }, Some(i)) => i < 2,
+            _ => false,
+        };
+        fits.then_some(Socket { param, component })
+    }
+
+    /// Every socket name this operator has, for suggestions: `width`, `size.x`, `size.y`, `size.z`, and so on.
+    #[must_use]
+    pub fn socket_names(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        for param in &self.params {
+            match param.ty {
+                ParamType::Num { .. } | ParamType::Int { .. } => names.push(param.name.to_owned()),
+                ParamType::Vec2 { .. } => {
+                    names.extend(["x", "y"].map(|a| format!("{}.{a}", param.name)));
+                }
+                ParamType::Vec3 { .. } => {
+                    names.extend(["x", "y", "z"].map(|a| format!("{}.{a}", param.name)));
+                }
+                _ => {}
+            }
+        }
+        names
+    }
+}
+
+/// A number parameter, or one component of a vector parameter, that a [`PortType::Number`] link can fill.
+#[derive(Clone, Copy, Debug)]
+pub struct Socket<'a> {
+    /// The parameter filled.
+    pub param: &'a ParamSpec,
+    /// Which component of a vector parameter (0 = x), or `None` for a plain number.
+    pub component: Option<usize>,
 }
 
 /// All known operators, ordered by name and version.

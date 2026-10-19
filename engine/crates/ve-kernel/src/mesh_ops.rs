@@ -168,6 +168,15 @@ pub enum MeshOp {
         /// Maximum merge distance.
         distance: f64,
     },
+    /// Cuts a closed edge ring through quad faces.
+    LoopCut {
+        /// Point in metres whose nearest edge chooses the ring.
+        at: [f64; 3],
+        /// Number of cuts, from 1 to 32.
+        cuts: u32,
+        /// Subdivision smoothness, from 0 to 1.
+        smooth: f64,
+    },
 }
 
 impl MeshOp {
@@ -270,6 +279,7 @@ impl MeshOp {
             Self::Bisect { .. } => (12, [0.0; 4], 0),
             Self::Spin { .. } => (13, [0.0; 4], 0),
             Self::Mirror { .. } => (14, [0.0; 4], 0),
+            Self::LoopCut { .. } => (15, [0.0; 4], 0),
         }
     }
 }
@@ -337,6 +347,11 @@ pub fn edit_mesh(
         wide[3..6].copy_from_slice(&normal);
         wide[6] = distance;
         (14, i32::from(merge))
+    } else if let MeshOp::LoopCut { at, cuts, smooth } = *op {
+        wide[..3].copy_from_slice(&at);
+        wide[3] = f64::from(cuts);
+        wide[4] = smooth;
+        (15, 0)
     } else {
         (code, flags)
     };

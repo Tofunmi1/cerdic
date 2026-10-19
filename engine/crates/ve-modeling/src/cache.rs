@@ -53,6 +53,8 @@ pub(crate) struct Value {
     pub(crate) ik: Option<crate::rig::IkChain>,
     /// The physics properties of this part (`phys.body`).
     pub(crate) body: Option<crate::physics::PhysBody>,
+    /// The number a `value.*` node produced; it fills a number parameter of the nodes that link to it.
+    pub(crate) number: Option<f64>,
 }
 
 impl Value {
@@ -80,6 +82,7 @@ impl Value {
             skin: None,
             ik: None,
             body: None,
+            number: None,
         }
     }
 
@@ -107,6 +110,7 @@ impl Value {
             skin: None,
             ik: None,
             body: None,
+            number: None,
         }
     }
 
@@ -130,6 +134,13 @@ impl Value {
 
     pub(crate) fn nothing() -> Self {
         Self::solid(Mesh::default(), 0.0)
+    }
+
+    /// A single number from a `value.*` node.
+    pub(crate) fn number(number: f64) -> Self {
+        let mut value = Self::nothing();
+        value.number = Some(number);
+        value
     }
 
     pub(crate) fn bytes(&self) -> usize {

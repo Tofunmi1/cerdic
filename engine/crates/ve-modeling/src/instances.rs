@@ -15,6 +15,7 @@ mod drop;
 mod output;
 mod preflight;
 mod scatter;
+mod scatter_on;
 pub(crate) use output::parts;
 pub(crate) use preflight::estimate;
 pub(crate) use preflight::realization;
@@ -57,6 +58,12 @@ pub(crate) fn execute(
     }
     let transforms = match node.op.family().as_str() {
         "inst.scatter" => scatter::scatter(node)?,
+        "inst.scatter_on" => {
+            let surface = inputs
+                .get(1)
+                .ok_or_else(|| fail("graph.missing_input", "inst.scatter_on needs a surface"))?;
+            scatter_on::scatter_on(node, &surface.mesh)?
+        }
         _ => placements(node).map_err(|e| kernel_fail(node, &e))?,
     };
     let count = preflight::product(base.transforms.len(), transforms.len())?;

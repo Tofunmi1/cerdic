@@ -290,6 +290,7 @@ enum {
   VE_MESH_OP_BISECT = 12,
   VE_MESH_OP_SPIN = 13,
   VE_MESH_OP_MIRROR = 14,
+  VE_MESH_OP_LOOP_CUT = 15,
 };
 typedef struct ve_mesh_op_input {
   size_t struct_size;
