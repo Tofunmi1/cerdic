@@ -19,6 +19,7 @@
     reason = "cross product, barycentric and grid maths index with small counts and short names"
 )]
 
+mod bake;
 mod bvh;
 mod collision;
 mod error;
@@ -33,6 +34,7 @@ mod thickness;
 mod tool;
 mod uv;
 
+pub use bake::{Bake, LowMesh, MAX_RAYS, MAX_SIZE, MIN_SIZE, PADDING, bake_ao, bake_normals};
 pub use bvh::{Bvh, Hausdorff, closest_point, distance_between, raycast};
 pub use collision::{ConvexDecomposition, ConvexPart, convex_decomposition};
 pub use error::MeasureError;

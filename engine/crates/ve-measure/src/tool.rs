@@ -103,6 +103,9 @@ fn suggestion(error: &MeasureError) -> &'static str {
         }
         MeasureError::NoThickness => "no wall was hit: the part may be open or have no interior",
         MeasureError::Degenerate(_) => "the input is degenerate: check positions and uvs",
+        MeasureError::Bake(_) => {
+            "check the bake settings (image side 8 to 2048, rays 1 to 256) and that the low mesh is unwrapped (poly.unwrap_uv)"
+        }
     }
 }
 
