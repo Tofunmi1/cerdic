@@ -62,8 +62,24 @@ pub(crate) fn downsample(pixels: &[u8], size: usize) -> Vec<u8> {
 }
 
 /// Levels in the mip chain of a `side` square map: `side`, `side / 2`, ... 1.
-pub(crate) fn mip_levels(side: u32) -> u32 {
+#[must_use]
+pub fn mip_levels(side: u32) -> u32 {
     side.max(1).ilog2() + 1
+}
+
+/// Every level of the mip chain of a `side` square RGBA8 map, largest first, one after the other (the data layout of one texture layer
+/// with its mips).
+#[must_use]
+pub fn mip_chain(pixels: &[u8], side: u32) -> Vec<u8> {
+    let mut chain = pixels.to_vec();
+    let mut level = pixels.to_vec();
+    let mut edge = side as usize;
+    while edge > 1 {
+        level = downsample(&level, edge);
+        edge /= 2;
+        chain.extend_from_slice(&level);
+    }
+    chain
 }
 
 /// Uploads one layer of a `side` square array and every level of its mip chain.

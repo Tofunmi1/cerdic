@@ -120,5 +120,6 @@ pub(crate) fn execute(node: &Node) -> Result<Value, Fail> {
         sky: Some(sky),
         gi: super::probes(node),
         wind: super::wind(node),
+        haze: super::haze(node),
     }))
 }
