@@ -1,0 +1,15 @@
+[package]
+name = "ve-human"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+ruzstd = "0.8.3"
+serde.workspace = true
+serde_json = { workspace = true, features = ["preserve_order"] }
+thiserror.workspace = true
+
+[lints]
+workspace = true

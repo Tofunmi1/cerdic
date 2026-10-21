@@ -1,0 +1,13 @@
+[package]
+name = "ve-gait"
+version = "0.0.0"
+description = "Procedural foot placement for bodies with any number of legs."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+
+[lints]
+workspace = true
