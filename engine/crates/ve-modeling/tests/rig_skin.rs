@@ -315,12 +315,13 @@ fn skin_and_bone_text_is_validated() {
     ] {
         assert!(evaluate(bad).is_err(), "{bad}");
     }
-    let many = (0..33)
+    // The limit was 32 until a body with fingers needed about 55 bones; it is 64 now.
+    let many = (0..65)
         .map(|i| format!("b{i}"))
         .collect::<Vec<_>>()
         .join(";");
     let program = format!(
         "b = solid.box@1(size=[1, 1, 1])\nr = rig.skin@1(b, bones=\"{many}\")\noutput o = r\n"
     );
-    assert!(evaluate(&program).is_err(), "at most 32 bones");
+    assert!(evaluate(&program).is_err(), "at most 64 bones");
 }

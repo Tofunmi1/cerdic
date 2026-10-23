@@ -18,8 +18,9 @@ use crate::selection;
 const HOVER_GLOW: f32 = 0.35;
 const SELECT_GLOW: f32 = 0.10;
 
-/// The steady glow of a selected part, on top of any hover glow.
-const SELECTED_GLOW: f32 = 0.30;
+/// The steady glow of a selected part, on top of any hover glow. Zero: a selection stays until another is made, and a glow that stays
+/// washes light surfaces to white for good. Selection is shown by the outliner and the handles instead.
+const SELECTED_GLOW: f32 = 0.0;
 
 /// How quickly the glow follows the pointer or the selection, per second (about 70 ms to settle).
 const HOVER_FADE_RATE: f32 = 14.0;
@@ -51,8 +52,8 @@ pub(crate) fn highlight_hover(
     let ease = 1.0 - (-HOVER_FADE_RATE * time.delta_secs()).exp();
     for (entity, mut material, interactable, authored, instance, tint) in &mut objects {
         let hovered = state.hovered.contains(&entity);
-        let selected =
-            authored.is_some_and(|part| selection::is_part(part.node(), instance.map(|i| i.0)));
+        let selected = SELECTED_GLOW > 0.0
+            && authored.is_some_and(|part| selection::is_part(part.node(), instance.map(|i| i.0)));
         let Some(mut tint) = tint else {
             if hovered || selected {
                 commands.entity(entity).insert(HoverTint {

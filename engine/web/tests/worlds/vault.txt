@@ -1,0 +1,35 @@
+floor = solid.box@1(size=[30, 0.2, 8])
+floor_at = xform.move@1(floor, by=[0, -0.1, 0])
+floor_m = solid.material@1(floor_at, color=[0.35, 0.36, 0.4], roughness=0.7)
+wall_a = solid.box@1(size=[30, 3, 0.4])
+wall_n = xform.move@1(wall_a, by=[0, 1.5, -4])
+wall_s = xform.move@1(wall_a, by=[0, 1.5, 4])
+walls = solid.union@1(wall_n, wall_s)
+walls_m = solid.material@1(walls, color=[0.55, 0.57, 0.62], roughness=0.8)
+door_slab = solid.box@1(size=[0.5, 2.6, 7.6])
+door_mesh = solid.material@1(door_slab, color=[0.7, 0.25, 0.2], roughness=0.5)
+key_blob = solid.sphere@1(radius=0.25, segments=12)
+key_mesh = solid.material@1(key_blob, color=[1.0, 0.85, 0.2], emissive=[1.0, 0.7, 0.1], roughness=0.3)
+exit_blob = solid.cylinder@1(radius=0.8, height=0.1, segments=24)
+exit_mesh = solid.material@1(exit_blob, color=[0.2, 0.9, 0.5], emissive=[0.1, 0.8, 0.3], roughness=0.4)
+has_key = game.var@1(name="has_key", value=0)
+hero = game.kind@1(name="player", size=0.6, tags=["hero"])
+key = game.kind@1(name="key", size=0.8, tags=["key"], part="key_mesh")
+door = game.kind@1(name="door", size=2.0, tags=["gate"], part="door_mesh", solid=[0.5, 2.6, 7.6])
+exit = game.kind@1(name="exit", size=0.8, tags=["exit"], part="exit_mesh")
+p0 = game.spawn@1(kind="player", at=[-12, 0, 0])
+k0 = game.spawn@1(kind="key", at=[-4, 0.5, 2])
+d0 = game.spawn@1(kind="door", at=[4, 1.3, 0])
+e0 = game.spawn@1(kind="exit", at=[12, 0.05, 0])
+walk = game.input@1(name="walk", follow="viewer", target="tag:hero")
+take = game.rule@1(on="touch", a="tag:hero", b="tag:key", do="add:has_key:1;destroy:b;effect:sfx:coin@b")
+open = game.rule@1(on="touch", a="tag:hero", b="tag:gate", when="has_key>=1", do="destroy:b;effect:sfx:dooropen@b")
+leave = game.rule@1(on="touch", a="tag:hero", b="tag:exit", do="win")
+panel = game.hud@1(text="Key {has_key}", size=0.005)
+all = game.collect@1(has_key, hero, key, door, exit, p0, k0, d0, e0, walk, take, open, leave, panel, name="vault")
+output floor = floor_m
+output walls = walls_m
+output door_mesh = door_mesh
+output key_mesh = key_mesh
+output exit_mesh = exit_mesh
+output rules = all

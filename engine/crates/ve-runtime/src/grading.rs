@@ -43,7 +43,7 @@ pub(crate) fn snapshot() -> String {
     })
 }
 
-/// Selects a viewer grading preset (`"neutral"`, `"studio"`, `"warm"`, `"cool"` or `"mono"`).
+/// Selects a viewer grading preset (`"neutral"`, `"studio"`, `"warm"`, `"cool"`, `"mono"`, `"sunset"`, `"vivid"`, `"film"`, `"night"` or `"noir"`).
 ///
 /// Grading is a viewer-only setting: it changes the image on screen and never reaches the evaluator,
 /// so it does not affect saved documents or native/WASI evaluation output. Takes effect next frame.

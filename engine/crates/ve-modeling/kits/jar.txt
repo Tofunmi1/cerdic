@@ -1,0 +1,11 @@
+group jar
+  outer = profile.polygon@1(points=[[0, 0], [0.14, 0], [0.21, 0.12], [0.23, 0.28], [0.19, 0.44], [0.11, 0.52], [0.13, 0.6], [0, 0.6]])
+  inner = profile.polygon@1(points=[[0, 0.03], [0.11, 0.03], [0.18, 0.13], [0.2, 0.28], [0.16, 0.43], [0.08, 0.5], [0.09, 0.61], [0, 0.61]])
+  body = solid.revolve@1(outer, angle=360deg, segments=24)
+  cavity = solid.revolve@1(inner, angle=360deg, segments=24)
+  vessel = solid.difference@1(body, cavity)
+  surface = solid.material@1(vessel, color=[0.62, 0.3, 0.17], roughness=0.65)
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

@@ -1,0 +1,24 @@
+group adobe_hut
+  shell = solid.box@1(size=[4.4, 2.8, 4.4])
+  shell_at = xform.move@1(shell, by=[0, 1.4, 0])
+  room = solid.box@1(size=[3.9, 2.4, 3.9])
+  room_at = xform.move@1(room, by=[0, 1.35, 0])
+  door = solid.box@1(size=[1, 1.9, 0.44])
+  door_at = xform.move@1(door, by=[0, 1.05, 2.18])
+  window = solid.box@1(size=[0.7, 0.7, 1])
+  window_at = xform.move@1(window, by=[1.4, 1.7, 2.2])
+  cut = solid.difference@1(shell_at, room_at, door_at, window_at)
+  mesh = poly.from_solid@1(cut)
+  rounded = poly.round_edges@1(mesh, width=0.06, segments=2)
+  walls = poly.to_solid@1(rounded)
+  plaster = solid.material@1(walls, color=[0.76, 0.64, 0.46], roughness=0.95, recipe="painted_wall")
+  beam = solid.cylinder@1(radius=0.07, height=4.9, segments=8)
+  beam_turned = xform.rotate@1(beam, angles=[0, 0, 90])
+  beam_at = xform.move@1(beam_turned, by=[0, 2.9, -1.8])
+  beams = xform.array@1(beam_at, count_z=5, spacing=[0, 0, 0.9])
+  wood = solid.material@1(beams, color=[0.35, 0.24, 0.14], roughness=0.85, recipe="wood")
+  all = solid.union@1(plaster, wood)
+  expose plaster_color = plaster.color
+  expose wood_color = wood.color
+  result all
+end

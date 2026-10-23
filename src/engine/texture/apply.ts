@@ -1,6 +1,7 @@
 import type { MeshPart } from '../worker-types';
 import { compileTexture } from './compile';
 import { Baker, normalFromHeight, type PositionMap } from './bake';
+import { outfitImagePixels, parseImageProgram } from './outfit-images';
 import { parseTextureProgram, type Channel } from './program';
 import { surfaceInputs } from './signals';
 import { SURFACE_NODE_NAMES } from './surface-nodes';
@@ -33,6 +34,15 @@ export function bakeMaterialMaps(
   if (!source) throw new Error(`part "${part.name}" has no procedural texture program`);
   if (!Number.isInteger(size) || size < 16 || size > 2048) throw new Error('texture size must be an integer from 16 to 2048');
   if (!Number.isFinite(heightStrength) || heightStrength < 0 || heightStrength > 32) throw new Error('height strength must be from 0 to 32');
+  // Imported clothes and hair carry their own pictures: `image(albedo="name", normal="name")` takes them from the CC0 files beside the page.
+  const picture = parseImageProgram(source);
+  if (picture) {
+    if (!part.uvs?.length || part.uvs.length !== part.indices.length * 2) throw new Error('image() needs the part\'s own UVs (an imported body.outfit has them)');
+    const maps: BakedMaterialMaps = { uvs: part.uvs, size };
+    if (picture.albedo) maps.albedo = outfitImagePixels(picture.albedo, size);
+    if (picture.normal) maps.normal = outfitImagePixels(picture.normal, size);
+    return maps;
+  }
   const program = parseTextureProgram(source, library);
   // A program that reads the surface needs every surface point to have its own texel, so tiled UVs (which repeat) are
   // not used: such a part gets authored UVs or the unique box-chart atlas.
@@ -68,6 +78,7 @@ export function bakeMaterialMaps(
       else if (channel === 'roughness') roughness = pixels;
       else if (channel === 'metallic') metallic = pixels;
       else if (channel === 'height') height = pixels;
+      else if (channel === 'normal') maps.normal = pixels;
       else if (channel === 'emissive') maps.emissive = pixels;
     }
   } finally {
@@ -84,7 +95,7 @@ export function bakeMaterialMaps(
     }
     maps.metallicRoughness = packed;
   }
-  if (height) maps.normal = normalFromHeight(height, size, heightStrength);
+  if (height && !maps.normal) maps.normal = normalFromHeight(height, size, heightStrength);
   // A style (`solid.style`) finishes the colour map: painted over, pixelated or inked.
   const finish = part.material?.texture_style;
   if (maps.albedo && (finish === 'painterly' || finish === 'retro' || finish === 'ink')) maps.albedo = baker.finish(maps.albedo, size, finish);

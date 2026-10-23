@@ -38,16 +38,31 @@ pub enum GradePreset {
     Cool,
     /// Greyscale: saturation at zero with a small contrast lift.
     Mono,
+    /// Late-afternoon orange: a strong warm tint, richer colour and a little more contrast.
+    Sunset,
+    /// Punchy colour: high saturation and contrast.
+    Vivid,
+    /// A soft, slightly faded film look with lifted blacks and a faint warm cast.
+    Film,
+    /// Moonlight: dark, cool and a little desaturated.
+    Night,
+    /// Black and white with hard contrast.
+    Noir,
 }
 
 impl GradePreset {
     /// All presets, in menu order.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 10] = [
         Self::Neutral,
         Self::Studio,
         Self::Warm,
         Self::Cool,
         Self::Mono,
+        Self::Sunset,
+        Self::Vivid,
+        Self::Film,
+        Self::Night,
+        Self::Noir,
     ];
 
     /// The preset's lowercase name, as accepted by [`FromStr`].
@@ -59,6 +74,11 @@ impl GradePreset {
             Self::Warm => "warm",
             Self::Cool => "cool",
             Self::Mono => "mono",
+            Self::Sunset => "sunset",
+            Self::Vivid => "vivid",
+            Self::Film => "film",
+            Self::Night => "night",
+            Self::Noir => "noir",
         }
     }
 }
@@ -137,6 +157,36 @@ impl Grading {
             GradePreset::Mono => Self {
                 exposure: 1.0,
                 contrast: 1.1,
+                saturation: 0.0,
+                tint: [1.0, 1.0, 1.0],
+            },
+            GradePreset::Sunset => Self {
+                exposure: 1.05,
+                contrast: 1.12,
+                saturation: 1.25,
+                tint: [1.14, 0.98, 0.8],
+            },
+            GradePreset::Vivid => Self {
+                exposure: 1.0,
+                contrast: 1.15,
+                saturation: 1.5,
+                tint: [1.0, 1.0, 1.0],
+            },
+            GradePreset::Film => Self {
+                exposure: 1.1,
+                contrast: 0.86,
+                saturation: 0.82,
+                tint: [1.04, 1.0, 0.94],
+            },
+            GradePreset::Night => Self {
+                exposure: 0.62,
+                contrast: 1.1,
+                saturation: 0.8,
+                tint: [0.86, 1.1, 1.14],
+            },
+            GradePreset::Noir => Self {
+                exposure: 1.0,
+                contrast: 1.4,
                 saturation: 0.0,
                 tint: [1.0, 1.0, 1.0],
             },

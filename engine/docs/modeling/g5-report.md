@@ -12,6 +12,7 @@ so this report does not claim reproducible provider acceptance coverage.
 - Authored open/closed polylines, sampled cubic Béziers (closed cubics require matching endpoints), and
   sampled circles. Sweeps support open paths and closed sampled paths with a single convex profile loop;
   lofts accept 2 to 64 compatible convex sections.
+- `curve.hang@1(from, to, slack, points)` samples a catenary rope between two tie points under gravity.
 - Double-reflection sweep frames, closed seam holonomy correction, sampled curvature checks, and two
   self-intersection layers: the original sufficient path-distance rule (unchanged), then a bounded uniform
   triangle grid that catches cap/tube, bend-vertex and parallel overlap fixtures. A separated near-miss builds.

@@ -238,13 +238,13 @@ fn bad_skeletons_are_refused_with_the_fix() {
     );
     // A chain of bones deeper than the engine follows is refused, not silently cut.
     let mut deep = template(Plan::Serpent, &Sliders::default()).unwrap();
+    // (the chain limit was 8 until a body with fingers needed about 16; it is 20 now)
     let mut extra = deep.bones.last().unwrap().clone();
-    extra.name = "seg_extra".to_owned();
-    extra.parent = Some(deep.bones.last().unwrap().name.clone());
-    deep.bones.push(extra.clone());
-    extra.name = "seg_more".to_owned();
-    extra.parent = Some("seg_extra".to_owned());
-    deep.bones.push(extra);
+    for k in 0..22 {
+        extra.parent = Some(deep.bones.last().unwrap().name.clone());
+        extra.name = format!("seg_extra{k}");
+        deep.bones.push(extra.clone());
+    }
     assert!(
         deep.to_text()
             .unwrap_err()

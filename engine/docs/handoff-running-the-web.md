@@ -68,7 +68,7 @@ WebXR needs a secure context.
 - Register the server once: `claude mcp add spatial-engine -- bun engine/tools/mcp/server.mjs`, then open `http://127.0.0.1:8123/?viewer=1&mcp=1` and ask
   Claude Code to build something with the spatial-engine tools. One page connects at a time; the server listens on `127.0.0.1:8765` (`VE_MCP_PORT` changes it).
 - Tools: `get_guide`, `list_operators`, `get_text`, `get_nodes`, `get_status`, `apply_text`, `apply_commands`, `undo`, `redo`, `frame_view`, `set_view`.
-  A batch is atomic, up to 1,000 commands and 1 MiB; `apply_text` also caps source text at 256 KiB.
+  A batch is atomic, up to 10,000 commands and 4 MiB; `apply_text` also caps source text at 256 KiB.
 - One-shot helper that serves, opens and runs a model: `bun engine/tools/mcp/try-with-claude.mjs "make a hollow vase, then widen its opening"` (add
   `--headed` to watch). It uses the `claude` CLI; a hosted router only accepts that route (generic API clients are refused).
 - **Loading a text program by hand:** the Document panel's Text box is read-only. With `eval=1`, open the browser console and run

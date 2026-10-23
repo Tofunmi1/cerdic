@@ -1,0 +1,76 @@
+group oak
+  a = field.ellipsoid@1(radii=[3.4, 2.7, 3.4])
+  a_at = field.move@1(a, by=[0, 7.0, 0])
+  b = field.ellipsoid@1(radii=[2.3, 1.9, 2.3])
+  b_at = field.move@1(b, by=[2.6, 6.0, 1.2])
+  c = field.ellipsoid@1(radii=[2.2, 1.8, 2.2])
+  c_at = field.move@1(c, by=[-2.4, 6.2, -1.0])
+  ab = field.smooth_union@1(a_at, b_at, radius=1.4)
+  abc = field.smooth_union@1(ab, c_at, radius=1.4)
+  rough = field.noise@1(abc, amplitude=0.45, scale=1.5, octaves=3, seed=3)
+  crown = field.to_solid@1(rough, min=[-8, 2, -8], max=[8, 11, 8], edge_length=0.35)
+  leaves = solid.material@1(crown, color=[0.2, 0.42, 0.12], roughness=0.85)
+  limb = curve.bezier@1(points=[[0, 0, 0], [0.2, 2, 0.1], [-0.1, 4, 0], [0, 6.5, 0]], steps=12)
+  trunk = curve.tube@1(limb, radius=0.45, end_radius=0.2, sides=8)
+  bark = solid.material@1(trunk, color=[0.3, 0.2, 0.13], roughness=0.95)
+  tree = solid.union@1(leaves, bark)
+  expose seed = rough.seed
+  expose leaf_color = leaves.color
+  expose bark_color = bark.color
+  result tree
+end
+group pine
+  c1 = solid.cone@1(height=3.6, radius=2.4, top_radius=0.1, segments=16)
+  c1_at = xform.move@1(c1, by=[0, 2.2, 0])
+  c2 = solid.cone@1(height=3.2, radius=1.9, top_radius=0.1, segments=16)
+  c2_at = xform.move@1(c2, by=[0, 4.4, 0])
+  c3 = solid.cone@1(height=2.8, radius=1.4, top_radius=0.05, segments=16)
+  c3_at = xform.move@1(c3, by=[0, 6.4, 0])
+  c4 = solid.cone@1(height=2.4, radius=0.9, top_radius=0.02, segments=16)
+  c4_at = xform.move@1(c4, by=[0, 8.2, 0])
+  tiers = solid.union@1(c1_at, c2_at, c3_at, c4_at)
+  ragged = xform.noise@1(tiers, amplitude=0.25, scale=1.2, seed=2, tolerance=0.06)
+  needles = solid.material@1(ragged, color=[0.08, 0.26, 0.13], roughness=0.9)
+  stem = solid.cylinder@1(radius=0.3, height=3, segments=8)
+  stem_at = xform.move@1(stem, by=[0, 1.5, 0])
+  bark = solid.material@1(stem_at, color=[0.3, 0.2, 0.12], roughness=0.95)
+  tree = solid.union@1(needles, bark)
+  sized = xform.scale@1(tree, by=[1, 1, 1])
+  expose seed = ragged.seed
+  expose scale = sized.by
+  expose needle_color = needles.color
+  expose bark_color = bark.color
+  result sized
+end
+t = terrain.tile@1(size=[96, 96], cell=1, seed=11, height=8, scale=80)
+g = terrain.material@1(t, snow_line=9000, sand_line=-50)
+oak1 = oak()
+pine1 = pine()
+zone = field.expr@1(code="out = step(0.0, perlin(p * 0.03, 9.0))")
+other = field.expr@1(code="out = 1.0 - step(0.0, perlin(p * 0.03, 9.0))")
+oaks = scatter.place@1(oak1, t, zone, radius=20, seed=2, max_slope=25)
+pines = scatter.place@1(pine1, t, other, radius=15, seed=5, max_slope=25)
+size = field.expr@1(code="out = 0.7 + 0.6 * (0.5 + 0.5 * perlin(p * 0.21, 3.0))")
+oaks_v = inst.vary@1(oaks, scale=size)
+pines_v = inst.vary@1(pines, scale=size)
+glow = solid.sphere@1(radius=0.3, segments=12)
+lantern_mesh = solid.material@1(glow, color=[1.0, 0.8, 0.3], emissive=[1.0, 0.7, 0.2], roughness=0.4)
+spot = solid.box@1(size=[0.1, 0.1, 0.1])
+spots = scatter.place@1(spot, t, radius=26, seed=9, max_slope=15)
+score = game.var@1(name="score", value=0)
+hero = game.kind@1(name="player", size=0.6, tags=["hero"])
+lantern = game.kind@1(name="lantern", size=0.8, tags=["pickup"], part="lantern_mesh")
+p0 = game.spawn@1(kind="player", at=[0, 0, 0])
+placed = game.spawn@1(spots, kind="lantern")
+walk = game.input@1(name="walk", follow="viewer", target="tag:hero")
+pick = game.rule@1(on="touch", a="tag:hero", b="tag:pickup", do="add:score:1;destroy:b;effect:sfx:coin@b")
+win = game.goal@1(outcome="win", when="score>=4")
+panel = game.hud@1(text="Lanterns {score} / 4", anchor="gaze", size=0.005)
+all = game.collect@1(score, hero, lantern, p0, placed, walk, pick, win, panel, name="clearing")
+output ground = g
+output oaks = oaks_v
+output pines = pines_v
+output lantern_mesh = lantern_mesh
+output rules = all
+sky = scene.sky@1(sun_elevation=25, sun_azimuth=60, sun_intensity=4, turbidity=3, clouds=false)
+output sky = sky

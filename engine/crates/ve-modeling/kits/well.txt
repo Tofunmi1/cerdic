@@ -1,0 +1,23 @@
+group well
+  ring_out = solid.cylinder@1(radius=0.9, height=0.9, segments=24)
+  ring_in = solid.cylinder@1(radius=0.62, height=1.2, segments=24)
+  ring_cut = solid.difference@1(ring_out, ring_in)
+  ring_mesh = poly.from_solid@1(ring_cut)
+  ring_round = poly.round_edges@1(ring_mesh, width=0.03, segments=2)
+  ring_solid = poly.to_solid@1(ring_round)
+  ring = xform.move@1(ring_solid, by=[0, 0.45, 0])
+  stone = solid.material@1(ring, color=[0.55, 0.52, 0.47], roughness=0.95, recipe="concrete")
+  post = solid.box@1(size=[0.12, 1.9, 0.12])
+  post_l = xform.move@1(post, by=[-0.75, 1.4, 0])
+  post_r = xform.move@1(post, by=[0.75, 1.4, 0])
+  beam = solid.cylinder@1(radius=0.06, height=1.7, segments=10)
+  beam_turned = xform.rotate@1(beam, angles=[0, 0, 90])
+  beam_at = xform.move@1(beam_turned, by=[0, 1.9, 0])
+  frame = solid.union@1(post_l, post_r, beam_at)
+  wood = solid.material@1(frame, color=[0.4, 0.28, 0.17], roughness=0.8, recipe="wood")
+  all = solid.union@1(stone, wood)
+  expose radius = ring_out.radius
+  expose stone_color = stone.color
+  expose wood_color = wood.color
+  result all
+end

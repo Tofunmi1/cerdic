@@ -147,7 +147,9 @@ fn interfaces(ctx: &Ctx<'_>) -> Result<(), Fail> {
                 &output.id,
             ));
         }
-        if links::output_type(doc, ctx.reg, &output.id) != Some(PortType::Solid) {
+        // `None` is a result that reads a link not made yet (a text program creates the group before the links that read its
+        // inputs); a missing input is reported by the arity check, so only a known, different type is refused here.
+        if links::output_type(doc, ctx.reg, &output.id).is_some_and(|t| t != PortType::Solid) {
             return Err(Box::new(
                 Diagnostic::error("graph.port_type", "a group's result must be a solid")
                     .at_node(&output.id)

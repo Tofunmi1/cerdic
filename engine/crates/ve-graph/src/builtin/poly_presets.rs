@@ -14,8 +14,8 @@ fn round_edges() -> Option<OperatorSpec> {
     spec(
         "poly.round_edges@1",
         "Rounds every hard edge of a polygon mesh in one step: the edges between faces turned apart by at least angle get a bevel of the given width. \
-         Replaces poly.select by=sharp followed by poly.bevel_network. Merge a solid's coplanar triangles first (poly.from_solid then poly.merge_coplanar), \
-         otherwise every triangle edge counts as hard. Refuses with selection.lost when no edge is sharp enough.",
+         Replaces poly.select by=sharp followed by poly.bevel_network. A solid goes straight in (poly.from_solid then poly.round_edges): the diagonals of its triangles are flat, so \
+         they are not hard edges and no merging is needed, which also makes it work on walls cut by a boolean. Refuses with selection.lost when no edge is sharp enough.",
         vec![single("in", POLY)],
         OutputSpec::Fixed(PortType::Poly),
         vec![

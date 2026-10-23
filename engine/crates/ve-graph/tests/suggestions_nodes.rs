@@ -191,14 +191,14 @@ fn an_output_on_an_input_port_names_the_output_port() {
 fn too_many_outputs_names_the_output_limit() {
     let mut s = session();
     let mut commands = vec![add("solid.union@1", Some("$n"))];
-    for index in 0..65 {
+    for index in 0..257 {
         commands.push(Command::SetOutput {
             name: format!("o{index}"),
             from: Some(OutRef::out(NodeRef::Alias(alias("$n")))),
         });
     }
     let diagnostic = first_rejection(&mut s, "t_outputs_over", commands);
-    assert_suggested(&diagnostic, "budget.nodes", "64");
+    assert_suggested(&diagnostic, "budget.nodes", "256");
 }
 
 #[test]

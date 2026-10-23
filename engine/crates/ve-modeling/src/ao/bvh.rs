@@ -1,6 +1,8 @@
 //! Median-split triangle BVH and fixed-sequence cosine-hemisphere visibility sampling.
 use crate::Part;
 
+mod split;
+
 const LEAF_TRIANGLES: usize = 8;
 const RAY_DISTANCE: f64 = 6.0;
 const RAY_BIAS: f64 = 0.001;
@@ -59,10 +61,20 @@ struct Node {
     right: usize,
 }
 
+/// A triangle as a ray test wants it: a corner and the two edges from it, kept in leaf order so a leaf reads one contiguous run.
+#[derive(Clone, Copy)]
+struct Edges {
+    a: [f64; 3],
+    first: [f64; 3],
+    second: [f64; 3],
+}
+
 pub(super) struct Bvh {
     triangles: Vec<Triangle>,
     order: Vec<usize>,
     nodes: Vec<Node>,
+    /// The triangles in `order`, as corner and edges.
+    leaves: Vec<Edges>,
 }
 
 impl Bvh {
@@ -94,14 +106,27 @@ impl Bvh {
             order: (0..triangles.len()).collect(),
             triangles,
             nodes: Vec::new(),
+            leaves: Vec::new(),
         };
         if !tree.order.is_empty() {
-            tree.build(0, tree.order.len());
+            tree.build(0, tree.order.len(), 0);
         }
+        tree.leaves = tree
+            .order
+            .iter()
+            .map(|id| {
+                let t = tree.triangles[*id];
+                Edges {
+                    a: t.a,
+                    first: sub(t.b, t.a),
+                    second: sub(t.c, t.a),
+                }
+            })
+            .collect();
         tree
     }
 
-    fn build(&mut self, first: usize, count: usize) -> usize {
+    fn build(&mut self, first: usize, count: usize, depth: usize) -> usize {
         let index = self.nodes.len();
         self.nodes.push(Node::default());
         let (min, max) = self.bounds(first, count);
@@ -115,22 +140,13 @@ impl Bvh {
             };
             return index;
         }
-        let extent = sub(max, min);
-        let axis = if extent[0] >= extent[1] && extent[0] >= extent[2] {
-            0
-        } else if extent[1] >= extent[2] {
-            1
-        } else {
-            2
-        };
-        self.order[first..first + count].sort_by(|a, b| {
-            self.triangles[*a].center[axis]
-                .total_cmp(&self.triangles[*b].center[axis])
-                .then_with(|| a.cmp(b))
-        });
-        let left_count = count / 2;
-        let left = self.build(first, left_count);
-        let right = self.build(first + left_count, count - left_count);
+        let left_count = split::partition(
+            &mut self.order[first..first + count],
+            &self.triangles,
+            depth,
+        );
+        let left = self.build(first, left_count, depth + 1);
+        let right = self.build(first + left_count, count - left_count, depth + 1);
         self.nodes[index] = Node {
             min,
             max,
@@ -157,6 +173,33 @@ impl Bvh {
         positions: &[[f32; 3]],
         indices: &[u32],
         rays: usize,
+    ) -> Vec<f32> {
+        self.bake_with(positions, indices, rays, |origin, direction| {
+            self.hit(origin, direction)
+        })
+    }
+
+    /// The same bake testing every triangle for every ray: the reference the tree must agree with.
+    #[cfg(test)]
+    pub(super) fn bake_vertices_linear(
+        &self,
+        positions: &[[f32; 3]],
+        indices: &[u32],
+        rays: usize,
+    ) -> Vec<f32> {
+        self.bake_with(positions, indices, rays, |origin, direction| {
+            self.triangles
+                .iter()
+                .any(|triangle| triangle_hit(origin, direction, *triangle))
+        })
+    }
+
+    fn bake_with(
+        &self,
+        positions: &[[f32; 3]],
+        indices: &[u32],
+        rays: usize,
+        hit: impl Fn([f64; 3], [f64; 3]) -> bool,
     ) -> Vec<f32> {
         let mut normals = vec![[0.0; 3]; positions.len()];
         for face in indices.chunks_exact(3) {
@@ -202,7 +245,7 @@ impl Bvh {
                             add(mul(tangent, d[0]), mul(bitangent, d[1])),
                             mul(normal, d[2]),
                         ));
-                        self.hit(origin, direction)
+                        hit(origin, direction)
                     })
                     .count();
                 let hit_count = u8::try_from(hits).unwrap_or_default();
@@ -213,18 +256,19 @@ impl Bvh {
     }
 
     fn hit(&self, origin: [f64; 3], direction: [f64; 3]) -> bool {
+        // The division is the same for every box the ray meets, so it is done once.
+        let inverse = direction.map(|d| if d.abs() < 1.0e-12 { 0.0 } else { 1.0 / d });
         let mut stack = [0_usize; 64];
         let mut len = 1;
         while len > 0 {
             len -= 1;
-            let node = self.nodes[stack[len]];
-            if !box_hit(origin, direction, node.min, node.max) {
+            let node = &self.nodes[stack[len]];
+            if !box_hit(origin, direction, inverse, node.min, node.max) {
                 continue;
             }
             if node.count > 0 {
-                for id in &self.order[node.first..node.first + node.count] {
-                    let tri = self.triangles[*id];
-                    if triangle_hit(origin, direction, tri) {
+                for tri in &self.leaves[node.first..node.first + node.count] {
+                    if edges_hit(origin, direction, tri) {
                         return true;
                     }
                 }
@@ -238,9 +282,21 @@ impl Bvh {
     }
 }
 
+#[cfg(test)]
 fn triangle_hit(origin: [f64; 3], direction: [f64; 3], triangle: Triangle) -> bool {
-    let first_edge = sub(triangle.b, triangle.a);
-    let second_edge = sub(triangle.c, triangle.a);
+    edges_hit(
+        origin,
+        direction,
+        &Edges {
+            a: triangle.a,
+            first: sub(triangle.b, triangle.a),
+            second: sub(triangle.c, triangle.a),
+        },
+    )
+}
+
+fn edges_hit(origin: [f64; 3], direction: [f64; 3], triangle: &Edges) -> bool {
+    let (first_edge, second_edge) = (triangle.first, triangle.second);
     let perpendicular = cross(direction, second_edge);
     let determinant = dot(first_edge, perpendicular);
     if determinant.abs() < 1.0e-12 {
@@ -261,7 +317,13 @@ fn triangle_hit(origin: [f64; 3], direction: [f64; 3], triangle: Triangle) -> bo
         && distance <= RAY_DISTANCE
 }
 
-fn box_hit(origin: [f64; 3], direction: [f64; 3], min: [f64; 3], max: [f64; 3]) -> bool {
+fn box_hit(
+    origin: [f64; 3],
+    direction: [f64; 3],
+    inverse: [f64; 3],
+    min: [f64; 3],
+    max: [f64; 3],
+) -> bool {
     let (mut near, mut far) = (0.0_f64, RAY_DISTANCE);
     for axis in 0..3 {
         if direction[axis].abs() < 1.0e-12 {
@@ -269,7 +331,7 @@ fn box_hit(origin: [f64; 3], direction: [f64; 3], min: [f64; 3], max: [f64; 3]) 
                 return false;
             }
         } else {
-            let inverse = 1.0 / direction[axis];
+            let inverse = inverse[axis];
             let near_axis = (min[axis] - origin[axis]) * inverse;
             let far_axis = (max[axis] - origin[axis]) * inverse;
             near = near.max(near_axis.min(far_axis));

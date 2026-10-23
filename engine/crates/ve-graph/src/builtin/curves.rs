@@ -67,6 +67,58 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
                 },
             ],
         ),
+        spec(
+            "curve.hang@1",
+            "A catenary rope hanging under gravity between two tie points.",
+            vec![],
+            OutputSpec::Fixed(PortType::Curve),
+            vec![
+                ParamSpec {
+                    name: "from",
+                    ty: ParamType::Vec3 {
+                        unit: Unit::Length,
+                        min: -EXTENT,
+                        max: EXTENT,
+                    },
+                    default: Some(crate::value::Value::List(vec![
+                        crate::value::Value::Num(0.0),
+                        crate::value::Value::Num(3.0),
+                        crate::value::Value::Num(0.0),
+                    ])),
+                    doc: "First tie point [x, y, z] in metres.",
+                },
+                ParamSpec {
+                    name: "to",
+                    ty: ParamType::Vec3 {
+                        unit: Unit::Length,
+                        min: -EXTENT,
+                        max: EXTENT,
+                    },
+                    default: Some(crate::value::Value::List(vec![
+                        crate::value::Value::Num(4.0),
+                        crate::value::Value::Num(3.0),
+                        crate::value::Value::Num(0.0),
+                    ])),
+                    doc: "Second tie point [x, y, z] in metres.",
+                },
+                ParamSpec {
+                    name: "slack",
+                    ty: ParamType::Num {
+                        unit: Unit::Ratio,
+                        min: 0.0,
+                        max: 2.0,
+                    },
+                    default: Some(crate::value::Value::Num(0.05)),
+                    doc: "Extra rope length as a fraction of the straight distance.",
+                },
+                ParamSpec {
+                    name: "points",
+                    ty: ParamType::Int { min: 3, max: 512 },
+                    default: Some(crate::value::Value::Int(32)),
+                    doc: "Number of samples along the rope.",
+                },
+            ],
+        ),
         circle(),
         spec(
             "solid.sweep@1",
