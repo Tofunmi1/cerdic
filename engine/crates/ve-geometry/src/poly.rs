@@ -39,7 +39,7 @@ pub use individual::{
     InsetEach, MAX_GRID_FACES, MAX_INDIVIDUAL_FACES, extrude_each, grid, inset_each,
 };
 pub use inset_face::inset_face;
-pub use merge_coplanar::{MAX_MERGES, merge_coplanar};
+pub use merge_coplanar::{MAX_MERGES, merge_coplanar, merge_coplanar_keeping_holes};
 pub use pack_uv::pack_uv;
 pub use unwrap_uv::{UvMethod, UvUnwrap, unwrap_uv};
 pub use uv_quality::{UvQuality, uv_quality};

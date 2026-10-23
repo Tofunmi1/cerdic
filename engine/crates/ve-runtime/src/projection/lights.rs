@@ -90,6 +90,7 @@ pub(super) fn spawn(commands: &mut Commands, lights: &[SceneLight], token: &JobT
                     BevyTransform::from_translation(Vec3::from_array(light.position)),
                     Authored {
                         node: light.node.to_string(),
+                        name: String::new(),
                         revision: token.revision,
                     },
                     marker,
@@ -113,6 +114,7 @@ pub(super) fn spawn(commands: &mut Commands, lights: &[SceneLight], token: &JobT
                     BevyTransform::from_translation(Vec3::from_array(light.position)),
                     Authored {
                         node: light.node.to_string(),
+                        name: String::new(),
                         revision: token.revision,
                     },
                     marker,
@@ -133,6 +135,7 @@ pub(super) fn spawn(commands: &mut Commands, lights: &[SceneLight], token: &JobT
                     BevyTransform::IDENTITY.looking_to(direction, up),
                     Authored {
                         node: light.node.to_string(),
+                        name: String::new(),
                         revision: token.revision,
                     },
                     marker,

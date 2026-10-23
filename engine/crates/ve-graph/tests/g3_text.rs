@@ -315,6 +315,20 @@ fn syntax_errors_say_what_was_expected_and_where() {
 }
 
 #[test]
+fn a_reused_name_is_reported_as_reused_not_as_a_forward_reference() {
+    // `a` is defined twice and read between the two: the first complaint names the real mistake.
+    let errors = apply(
+        "a = solid.box@1(size=[1,1,1])\nb = xform.move@1(a, by=[1, 0, 0])\na = solid.sphere@1(radius=1)\n",
+    )
+    .unwrap_err();
+    assert_eq!(errors[0].code, "parse.duplicate_name", "{errors:?}");
+    assert!(
+        errors.iter().all(|e| e.code != "parse.forward_reference"),
+        "no misleading second error: {errors:?}"
+    );
+}
+
+#[test]
 fn shipped_field_operators_are_ready_for_text_graphs() {
     let registry = builtin_registry();
     for name in ["field.plane@1", "field.ellipsoid@1", "field.tube@1"] {

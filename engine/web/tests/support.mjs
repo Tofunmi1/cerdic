@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const here = path.dirname(fileURLToPath(import.meta.url));
-export const dist = path.join(here, "..", "dist");
+export const dist = process.env.VE_DIST ? path.resolve(process.env.VE_DIST) : path.join(here, "..", "dist");
 /** sRGB of the clear colour set in ve-runtime. */
 export const CLEAR = [26, 51, 102];
 export const GOLDEN = { channelTolerance: 10, maxBadFraction: 0.002 };

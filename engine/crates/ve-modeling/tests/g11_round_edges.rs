@@ -88,10 +88,21 @@ fn a_flat_mesh_has_no_hard_edge_and_says_what_to_do() {
 }
 
 #[test]
-fn unmerged_triangles_round_every_triangle_edge_hint_is_in_the_docs() {
-    // The operator documentation tells a model to merge coplanar triangles first.
+fn a_solids_triangles_need_no_merging_first_and_the_docs_say_so() {
+    // Triangle diagonals are flat (a turn of zero), so they are never hard edges: rounding straight from the solid gives
+    // the same mesh as rounding after merging, and it also works on walls cut by a boolean, which cannot be merged whole.
+    let direct = ok("box = solid.box@1(size=[2, 1, 1])\n\
+        triangles = poly.from_solid@1(box)\n\
+        round = poly.round_edges@1(triangles, width=0.1, segments=2)\n\
+        out = poly.to_solid@1(round)\noutput out = out\n");
+    let merged = ok("box = solid.box@1(size=[2, 1, 1])\n\
+        triangles = poly.from_solid@1(box)\n\
+        mesh = poly.merge_coplanar@1(triangles)\n\
+        round = poly.round_edges@1(mesh, width=0.1, segments=2)\n\
+        out = poly.to_solid@1(round)\noutput out = out\n");
+    assert_eq!(direct.parts[0].indices.len(), merged.parts[0].indices.len());
     let registry = builtin_registry();
     let id = ve_graph::OpId::new("poly.round_edges", 1).unwrap();
     let spec = registry.get(&id).unwrap();
-    assert!(spec.doc.contains("poly.merge_coplanar"));
+    assert!(spec.doc.contains("no merging is needed"));
 }

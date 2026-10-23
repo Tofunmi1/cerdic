@@ -15,6 +15,17 @@ pub fn fx_live_particles() -> usize {
     crate::fx::live_count()
 }
 
+/// JSON array of the names `audio_sfx` and the `effect:sfx:<name>` game action know.
+#[wasm_bindgen]
+#[must_use]
+pub fn audio_sfx_names() -> String {
+    let names: Vec<String> = ALL_SFX
+        .iter()
+        .map(|kind| format!("{kind:?}").to_lowercase())
+        .collect();
+    serde_json::to_string(&names).unwrap_or_else(|_| "[]".to_owned())
+}
+
 /// Generate mono samples for a named sound effect. Unknown names return an empty vector.
 #[wasm_bindgen]
 #[must_use]

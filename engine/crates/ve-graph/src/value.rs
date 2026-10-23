@@ -75,6 +75,13 @@ pub enum ParamType {
         /// Longest accepted text, in bytes.
         max_len: usize,
     },
+    /// A bounded list of text values.
+    StrList {
+        /// Maximum number of strings.
+        max_items: usize,
+        /// Maximum bytes in each string.
+        max_len: usize,
+    },
     /// One of a fixed set of words, stored as text.
     Choice {
         /// The accepted words.
@@ -186,6 +193,15 @@ fn components(value: &Value, len: usize, min: f64, max: f64) -> Result<Vec<Value
         .collect()
 }
 
+fn list_limit(limit: usize, observed: usize, label: &str) -> ParamIssue {
+    ParamIssue {
+        code: "param.range",
+        message: format!("{observed} exceeds the {limit} {label} limit"),
+        limit: None,
+        observed: None,
+    }
+}
+
 impl ParamType {
     /// Checks `value` against the type and returns it in canonical form: numbers become
     /// [`Value::Num`] (or [`Value::Int`] for integer parameters) so equal inputs serialise equally.
@@ -212,6 +228,28 @@ impl ParamType {
                 #[expect(clippy::cast_precision_loss, reason = "lengths are far below 2^53")]
                 Value::Str(s) => Err(ParamIssue::range(0.0, max_len as f64, s.len() as f64)),
                 _ => Err(ParamIssue::wrong_type("text")),
+            },
+            Self::StrList { max_items, max_len } => match value {
+                Value::List(items) if items.len() <= max_items.min(MAX_LIST_VALUES) => {
+                    items.iter().try_for_each(|item| match item {
+                        Value::Str(value) if value.len() <= max_len.min(MAX_PARAM_STRING_BYTES) => {
+                            Ok(())
+                        }
+                        Value::Str(value) => Err(list_limit(
+                            max_len.min(MAX_PARAM_STRING_BYTES),
+                            value.len(),
+                            "byte",
+                        )),
+                        _ => Err(ParamIssue::wrong_type("a list of text values")),
+                    })?;
+                    Ok(value.clone())
+                }
+                Value::List(items) => Err(list_limit(
+                    max_items.min(MAX_LIST_VALUES),
+                    items.len(),
+                    "item",
+                )),
+                _ => Err(ParamIssue::wrong_type("a list of text values")),
             },
             Self::Choice { options } => match value {
                 Value::Str(s) if options.contains(&s.as_str()) => Ok(value.clone()),

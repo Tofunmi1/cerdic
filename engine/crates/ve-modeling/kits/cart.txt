@@ -1,0 +1,27 @@
+group cart
+  bed = solid.box@1(size=[2.2, 0.12, 1.1])
+  bed_at = xform.move@1(bed, by=[0, 0.75, 0])
+  side = solid.box@1(size=[2.2, 0.4, 0.06])
+  side_a = xform.move@1(side, by=[0, 0.98, 0.52])
+  side_b = xform.move@1(side, by=[0, 0.98, -0.52])
+  tail = solid.box@1(size=[0.06, 0.4, 1.1])
+  tail_at = xform.move@1(tail, by=[-1.07, 0.98, 0])
+  shaft = solid.box@1(size=[1.8, 0.07, 0.07])
+  shaft_a = xform.move@1(shaft, by=[1.9, 0.72, 0.4])
+  shaft_b = xform.move@1(shaft, by=[1.9, 0.72, -0.4])
+  axle = solid.cylinder@1(radius=0.05, height=1.5, segments=10)
+  axle_turned = xform.rotate@1(axle, angles=[90, 0, 0])
+  axle_at = xform.move@1(axle_turned, by=[0, 0.6, 0])
+  rim = solid.torus@1(major=0.55, minor=0.05, segments=24, tube_segments=8)
+  rim_turned = xform.rotate@1(rim, angles=[90, 0, 0])
+  hub = solid.cylinder@1(radius=0.1, height=0.14, segments=12)
+  hub_turned = xform.rotate@1(hub, angles=[90, 0, 0])
+  wheel_parts = solid.union@1(rim_turned, hub_turned)
+  wheel_a = xform.move@1(wheel_parts, by=[0, 0.6, 0.7])
+  wheel_b = xform.move@1(wheel_parts, by=[0, 0.6, -0.7])
+  all = solid.union@1(bed_at, side_a, side_b, tail_at, shaft_a, shaft_b, axle_at, wheel_a, wheel_b)
+  surface = solid.material@1(all, color=[0.42, 0.29, 0.18], roughness=0.85, recipe="planks")
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end

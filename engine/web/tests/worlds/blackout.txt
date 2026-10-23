@@ -1,0 +1,407 @@
+# BLACKOUT. A deep-sea research station lost power. You are the maintenance tech. Four fuse cells are scattered through the station.
+# Carry them (grip) to the sockets (door 1, door 2, then the two reactor pedestals). Pull the lever (trigger) to open the cage.
+# The reactor spools for six seconds once all four are seated. The air runs out in about eight minutes.
+
+# ===== textures =====
+let t_panel = "b = bricks(rows=3, columns=2, row_offset=0.0, mortar=0.05, bevel=0.35); s = fbm(scale_x=6, scale_y=6, iterations=5); g = fbm(scale_x=40, scale_y=40, iterations=3); c = colorize(s, gradient=[0:#39434a, 0.6:#4a575f, 1:#5e6c75]); albedo = blend(c, c, b, blend_type=multiply, amount=1.0); metallic = colorize(g, gradient=[0:#c8c8c8, 1:#808080]); roughness = colorize(g, gradient=[0:#606060, 1:#a8a8a8]); height = b"
+let t_floor = "m = expr(code=\"cq = fract(p * 28.0); h = step(0.16, cq.x) * step(0.16, cq.y); out = vec4(vec3(h), 1.0)\"); s = fbm(scale_x=10, scale_y=10, iterations=4); base = colorize(s, gradient=[0:#14171a, 1:#2a3237]); albedo = blend(base, base, m, blend_type=multiply, amount=0.9); metallic = colorize(m, gradient=[0:#ffffff, 1:#a8a8a8]); roughness = colorize(s, gradient=[0:#505050, 1:#909090]); height = m"
+let t_hazard = "a = expr(code=\"d = fract((p.x + p.y) * 7.0); out = vec4(mix(vec3(0.07), vec3(0.95, 0.7, 0.05), step(0.5, d)), 1.0)\"); s = fbm(scale_x=12, scale_y=12, iterations=4); albedo = blend(a, a, s, blend_type=multiply, amount=0.4); roughness = colorize(s, gradient=[0:#707070, 1:#c0c0c0]); height = s"
+let t_screen = "a = expr(code=\"y = fract(p.y * 36.0); out = vec4(vec3(0.05, 0.85, 0.55) * (0.35 + 0.65 * step(0.3, y)) * (0.55 + 0.45 * fbm(vec2(p.x * 7.0, p.y * 3.0))), 1.0)\"); albedo = a; emissive = a"
+let t_grime = "s = fbm(scale_x=7, scale_y=7, iterations=5); w = fbm(scale_x=60, scale_y=14, iterations=3); c = colorize(s, gradient=[0:#8f8f8f, 0.5:#b4b4b4, 1:#d6d6d6]); albedo = blend(c, c, w, blend_type=multiply, amount=0.5); metallic = colorize(w, gradient=[0:#e0e0e0, 1:#909090]); roughness = colorize(w, gradient=[0:#5a5a5a, 1:#a0a0a0]); height = w"
+let t_rust = "m = expr(code=\"u = 1.0 - abs(2.0 * p.x - 1.0); v = 1.0 - abs(2.0 * p.y - 1.0); out = vec4(vec3(smoothstep(0.62, 0.8, fbm(vec2(u * 9.0, v * 9.0)) + 0.18 * fbm(vec2(u * 40.0, v * 40.0)))), 1.0)\"); steel = expr(code=\"out = vec4(0.22, 0.25, 0.27, 1.0)\"); rust = expr(code=\"u = 1.0 - abs(2.0 * p.x - 1.0); out = vec4(0.3 + 0.12 * fbm(vec2(u * 20.0, p.y * 20.0)), 0.19, 0.12, 1.0)\"); albedo = blend(rust, steel, m, blend_type=normal, amount=1.0); metallic = colorize(m, gradient=[0:#ffffff, 1:#303030]); roughness = colorize(m, gradient=[0:#6a6a6a, 1:#e0e0e0]); height = m"
+let t_core = "s = fbm(scale_x=5, scale_y=14, iterations=4); v = voronoi(scale_x=8, scale_y=8, randomness=1.0); c = colorize(s, gradient=[0:#06121e, 0.6:#0b2a46, 1:#12507a]); albedo = c; emissive = colorize(v, gradient=[0:#000000, 0.8:#000000, 1:#0a3a66]); metallic = colorize(s, gradient=[0:#d0d0d0, 1:#808080]); roughness = colorize(v, gradient=[0:#404040, 1:#909090]); height = s"
+
+# ===== station shell: 10.6 wide, three rooms along +z (A -4..3, B 3..14, C 14..24), 3.2 high =====
+let hh = 3.2
+floor = solid.box@1(size=[10.6, 0.3, 29])
+floor_at = xform.move@1(floor, by=[0, -0.15, 10.25])
+floor_m = solid.material@1(floor_at, color=[1, 1, 1], metallic=0.6, roughness=0.6)
+floor_t = solid.texture@1(floor_m, program="${t_floor}", tile=1.2, size="512")
+output floor = floor_t
+
+ceil = solid.box@1(size=[10.6, 0.3, 29])
+ceil_at = xform.move@1(ceil, by=[0, {hh + 0.15}, 10.25])
+ceil_m = solid.material@1(ceil_at, color=[0.16, 0.18, 0.2], metallic=0.5, roughness=0.7)
+output ceiling = ceil_m
+
+wall = solid.box@1(size=[0.3, {hh}, 29])
+wall_w = xform.move@1(wall, by=[-5.15, {hh / 2}, 10.25])
+wall_e = xform.move@1(wall, by=[5.15, {hh / 2}, 10.25])
+end_s = solid.box@1(size=[10.6, {hh}, 0.3])
+end_s_at = xform.move@1(end_s, by=[0, {hh / 2}, -4.15])
+end_n_at = xform.move@1(end_s, by=[0, {hh / 2}, 24.15])
+cut = solid.box@1(size=[1.7, 2.4, 1.0])
+cut_at = xform.move@1(cut, by=[0, 1.2, 0])
+part = solid.box@1(size=[10, {hh}, 0.3])
+part_at = xform.move@1(part, by=[0, {hh / 2}, 0])
+part_open = solid.difference@1(part_at, cut_at)
+part_1 = xform.move@1(part_open, by=[0, 0, 3])
+part_2 = xform.move@1(part_open, by=[0, 0, 14])
+walls = solid.union@1(wall_w, wall_e, end_s_at, end_n_at, part_1, part_2)
+walls_m = solid.material@1(walls, color=[1, 1, 1], metallic=0.6, roughness=0.55)
+walls_t = solid.texture@1(walls_m, program="${t_panel}", tile=1.5, size="512")
+output walls = walls_t
+
+# ribs, pilasters, pipes: the structure that makes a corridor feel built
+rib = solid.box@1(size=[10, 0.28, 0.34])
+rib_at = xform.move@1(rib, by=[0, {hh - 0.14}, -3.2])
+ribs = xform.array@1(rib_at, count_z=9, spacing=[0, 0, 3.1])
+pil = solid.box@1(size=[0.4, {hh}, 0.4])
+pil_w = xform.move@1(pil, by=[-4.8, {hh / 2}, -3.2])
+pil_e = xform.move@1(pil, by=[4.8, {hh / 2}, -3.2])
+pils = xform.array@1(pil_w, count_z=9, spacing=[0, 0, 3.1])
+pils_e = xform.array@1(pil_e, count_z=9, spacing=[0, 0, 3.1])
+frame = solid.union@1(ribs, pils, pils_e)
+frame_m = solid.material@1(frame, color=[0.55, 0.62, 0.64], metallic=0.7, roughness=0.5)
+frame_t = solid.texture@1(frame_m, program="${t_grime}", tile=1.4, size="256")
+output frame = frame_t
+
+pipe = solid.cylinder@1(radius=0.11, height=28.5, segments=14)
+pipe_r = xform.rotate@1(pipe, angles=[90, 0, 0])
+pipe_a = xform.move@1(pipe_r, by=[-3.9, {hh - 0.5}, 10.25])
+pipe_b = xform.move@1(pipe_r, by=[-3.55, {hh - 0.8}, 10.25])
+pipe_c = xform.move@1(pipe_r, by=[3.9, {hh - 0.5}, 10.25])
+joint = solid.cylinder@1(radius=0.16, height=0.18, segments=14)
+joint_r = xform.rotate@1(joint, angles=[90, 0, 0])
+joint_a = xform.move@1(joint_r, by=[-3.9, {hh - 0.5}, -3])
+joints_a = xform.array@1(joint_a, count_z=10, spacing=[0, 0, 3.0])
+joint_c = xform.move@1(joint_r, by=[3.9, {hh - 0.5}, -3])
+joints_c = xform.array@1(joint_c, count_z=10, spacing=[0, 0, 3.0])
+pipes = solid.union@1(pipe_a, pipe_b, pipe_c, joints_a, joints_c)
+pipes_m = solid.material@1(pipes, color=[0.5, 0.52, 0.55], metallic=0.85, roughness=0.4)
+output pipes = pipes_m
+
+# ceiling light strips: cool white in the hall and reactor, red in the quarters
+strip = solid.box@1(size=[0.22, 0.05, 1.5])
+strip_l = xform.move@1(strip, by=[-2.2, 3.05, 5])
+strip_r = xform.move@1(strip, by=[2.2, 3.05, 5])
+strips_b1 = xform.array@1(strip_l, count_z=4, spacing=[0, 0, 2.7])
+strips_b2 = xform.array@1(strip_r, count_z=4, spacing=[0, 0, 2.7])
+strips_b = solid.union@1(strips_b1, strips_b2)
+strips_b_m = solid.material@1(strips_b, color=[0.8, 0.9, 1.0], emissive=[0.6, 0.85, 1.2], roughness=0.3)
+output strips_hall = strips_b_m
+strip_c1 = xform.move@1(strip, by=[-3.0, 3.05, 17])
+strip_c2 = xform.move@1(strip, by=[3.0, 3.05, 17])
+strips_c1 = xform.array@1(strip_c1, count_z=3, spacing=[0, 0, 2.6])
+strips_c2 = xform.array@1(strip_c2, count_z=3, spacing=[0, 0, 2.6])
+strips_c = solid.union@1(strips_c1, strips_c2)
+strips_c_m = solid.material@1(strips_c, color=[0.7, 0.85, 1.0], emissive=[0.3, 0.6, 1.1], roughness=0.3)
+output strips_reactor = strips_c_m
+strip_a1 = xform.move@1(strip, by=[-2.0, 3.05, -1.5])
+strip_a2 = xform.move@1(strip, by=[2.0, 3.05, -1.5])
+strips_a = solid.union@1(strip_a1, strip_a2)
+strips_a_m = solid.material@1(strips_a, color=[1.0, 0.3, 0.25], emissive=[1.0, 0.12, 0.08], roughness=0.3)
+output strips_quarters = strips_a_m
+
+# hazard stripes at the doorways
+haz = solid.box@1(size=[2.4, 0.03, 0.7])
+haz_1 = xform.move@1(haz, by=[0, 0.015, 2.4])
+haz_1b = xform.move@1(haz, by=[0, 0.015, 3.6])
+haz_2 = xform.move@1(haz, by=[0, 0.015, 13.4])
+haz_2b = xform.move@1(haz, by=[0, 0.015, 14.6])
+hazs = solid.union@1(haz_1, haz_1b, haz_2, haz_2b)
+haz_m = solid.material@1(hazs, color=[1, 1, 1], roughness=0.7)
+haz_t = solid.texture@1(haz_m, program="${t_hazard}", tile=0.7, size="256")
+output hazards = haz_t
+
+# ===== room A: quarters =====
+table_top = solid.box@1(size=[1.5, 0.08, 0.8])
+table_top_at = xform.move@1(table_top, by=[-2.6, 0.88, -2.2])
+tleg = solid.box@1(size=[0.07, 0.86, 0.07])
+tleg_at = xform.move@1(tleg, by=[-3.28, 0.43, -2.52])
+tlegs = xform.array@1(tleg_at, count_x=2, count_z=2, spacing=[1.36, 0, 0.64])
+table = solid.union@1(table_top_at, tlegs)
+table_m = solid.material@1(table, color=[0.3, 0.32, 0.35], metallic=0.6, roughness=0.5)
+output table = table_m
+
+bunk = solid.box@1(size=[1.0, 0.12, 2.0])
+bunk_lo = xform.move@1(bunk, by=[3.9, 0.5, -1.2])
+bunk_hi = xform.move@1(bunk, by=[3.9, 1.5, -1.2])
+bpost = solid.box@1(size=[0.08, 1.9, 0.08])
+bpost_at = xform.move@1(bpost, by=[3.42, 0.95, -2.15])
+bposts = xform.array@1(bpost_at, count_z=2, spacing=[0, 0, 1.9])
+bunks = solid.union@1(bunk_lo, bunk_hi, bposts)
+bunks_m = solid.material@1(bunks, color=[0.34, 0.36, 0.4], metallic=0.5, roughness=0.55)
+mat = solid.box@1(size=[0.9, 0.12, 1.9])
+mat_lo = xform.move@1(mat, by=[3.9, 0.62, -1.2])
+mat_hi = xform.move@1(mat, by=[3.9, 1.62, -1.2])
+mats = solid.union@1(mat_lo, mat_hi)
+mats_m = solid.material@1(mats, color=[0.25, 0.32, 0.45], roughness=0.95)
+output bunks = bunks_m
+output mattresses = mats_m
+
+locker = solid.box@1(size=[0.6, 2.0, 0.5])
+locker_at = xform.move@1(locker, by=[-4.6, 1.0, 0.2])
+lockers = xform.array@1(locker_at, count_z=4, spacing=[0, 0, 0.62])
+lockers_m = solid.material@1(lockers, color=[0.2, 0.42, 0.4], metallic=0.5, roughness=0.5)
+lockers_t = solid.texture@1(lockers_m, program="${t_grime}", tile=0.8, size="256")
+output lockers = lockers_t
+
+# ===== room B: machine hall =====
+gen = solid.cylinder@1(radius=0.85, height=2.0, segments=24)
+gen_a = xform.move@1(gen, by=[-1.6, 1.0, 6])
+gen_b = xform.move@1(gen, by=[-1.6, 1.0, 9.2])
+cap = solid.cylinder@1(radius=0.95, height=0.2, segments=24)
+cap_a = xform.move@1(cap, by=[-1.6, 2.1, 6])
+cap_b = xform.move@1(cap, by=[-1.6, 2.1, 9.2])
+base = solid.box@1(size=[2.2, 0.25, 2.2])
+base_a = xform.move@1(base, by=[-1.6, 0.125, 6])
+base_b = xform.move@1(base, by=[-1.6, 0.125, 9.2])
+gens = solid.union@1(gen_a, gen_b, cap_a, cap_b, base_a, base_b)
+gens_m = solid.material@1(gens, color=[0.75, 0.55, 0.12], metallic=0.6, roughness=0.5)
+gens_t = solid.texture@1(gens_m, program="${t_grime}", tile=1.0, size="256")
+output generators = gens_t
+
+shelf_plank = solid.box@1(size=[0.7, 0.06, 4.0])
+plank_1 = xform.move@1(shelf_plank, by=[-4.55, 0.7, 11.6])
+plank_2 = xform.move@1(shelf_plank, by=[-4.55, 1.35, 11.6])
+plank_3 = xform.move@1(shelf_plank, by=[-4.55, 1.88, 11.6])
+spost = solid.box@1(size=[0.06, 2.2, 0.06])
+spost_at = xform.move@1(spost, by=[-4.25, 1.1, 9.65])
+sposts = xform.array@1(spost_at, count_z=5, spacing=[0, 0, 1.0])
+shelf = solid.union@1(plank_1, plank_2, plank_3, sposts)
+shelf_m = solid.material@1(shelf, color=[0.4, 0.42, 0.45], metallic=0.6, roughness=0.5)
+output shelf = shelf_m
+
+group crate
+  body = solid.box@1(size=[0.6, 0.6, 0.6])
+  body_at = xform.move@1(body, by=[0, 0.3, 0])
+  post = solid.box@1(size=[0.06, 0.64, 0.06])
+  post_at = xform.move@1(post, by=[-0.29, 0.32, -0.29])
+  posts = xform.array@1(post_at, count_x=2, count_z=2, spacing=[0.58, 0, 0.58])
+  all = solid.union@1(body_at, posts)
+  surface = solid.material@1(all, color=[0.2, 0.3, 0.26], metallic=0.4, roughness=0.65)
+  result surface
+end
+crate_a = crate()
+crate_1 = xform.move@1(crate_a, by=[3.2, 0, 5.2])
+crate_2 = xform.move@1(crate_a, by=[3.9, 0, 5.4])
+crate_3 = xform.move@1(crate_a, by=[3.5, 0.6, 5.3])
+crate_4 = xform.move@1(crate_a, by=[-4.1, 0, 4.2])
+output crates = crate_1
+output crates2 = crate_2
+output crates3 = crate_3
+output crates4 = crate_4
+crate_s1 = xform.move@1(crate_a, by=[-3.9, 0.7, 10.2])
+output shelf_crate = crate_s1
+
+# the cage: a plinth with the second fuse cell behind bars (the gate itself is a game entity)
+plinth = solid.box@1(size=[0.7, 0.9, 0.7])
+plinth_at = xform.move@1(plinth, by=[4.3, 0.45, 8.75])
+bar = solid.cylinder@1(radius=0.025, height=2.8, segments=8)
+bar_n = xform.move@1(bar, by=[3.2, 1.4, 7.9])
+bars_n = xform.array@1(bar_n, count_x=4, spacing=[0.62, 0, 0])
+bar_s = xform.move@1(bar, by=[3.2, 1.4, 9.6])
+bars_s = xform.array@1(bar_s, count_x=4, spacing=[0.62, 0, 0])
+bar_top = solid.box@1(size=[1.9, 0.06, 1.8])
+bar_top_at = xform.move@1(bar_top, by=[4.15, 2.8, 8.75])
+cage = solid.union@1(plinth_at, bars_n, bars_s, bar_top_at)
+cage_m = solid.material@1(cage, color=[0.35, 0.37, 0.4], metallic=0.8, roughness=0.4)
+output cage = cage_m
+
+# consoles with live screens
+console = solid.box@1(size=[1.6, 1.0, 0.6])
+console_a = xform.move@1(console, by=[-4.0, 0.5, 1.2])
+console_ar = xform.rotate@1(console_a, angles=[0, 90, 0])
+screen = solid.box@1(size=[1.3, 0.55, 0.05])
+screen_a = xform.move@1(screen, by=[2.2, 1.25, 12.8])
+screen_b = xform.move@1(screen, by=[-2.2, 1.25, 12.8])
+screens = solid.union@1(screen_a, screen_b)
+screens_m = solid.material@1(screens, color=[1, 1, 1], emissive=[0.1, 0.5, 0.35], roughness=0.3)
+screens_t = solid.texture@1(screens_m, program="${t_screen}", tile=1.3, size="256")
+output screens = screens_t
+desk = solid.box@1(size=[1.6, 1.0, 0.5])
+desk_a = xform.move@1(desk, by=[2.2, 0.5, 13.0])
+desk_b = xform.move@1(desk, by=[-2.2, 0.5, 13.0])
+desks = solid.union@1(desk_a, desk_b)
+desks_m = solid.material@1(desks, color=[0.22, 0.26, 0.3], metallic=0.6, roughness=0.5)
+output desks = desks_m
+
+# ===== room C: the reactor =====
+core = solid.cylinder@1(radius=1.0, height=2.6, segments=32)
+core_at = xform.move@1(core, by=[0, 1.3, 20])
+core_m = solid.material@1(core_at, color=[1, 1, 1], metallic=0.8, roughness=0.35)
+core_t = solid.texture@1(core_m, program="${t_core}", tile=1.2, size="512")
+output reactor = core_t
+ring_o = solid.cylinder@1(radius=1.6, height=0.18, segments=36)
+ring_i = solid.cylinder@1(radius=1.0, height=0.4, segments=36)
+ring = solid.difference@1(ring_o, ring_i)
+ring_a = xform.move@1(ring, by=[0, 0.09, 20])
+ring_b = xform.move@1(ring, by=[0, 2.6, 20])
+rings = solid.union@1(ring_a, ring_b)
+rings_m = solid.material@1(rings, color=[0.28, 0.3, 0.33], metallic=0.85, roughness=0.4)
+output reactor_rings = rings_m
+ped = solid.cylinder@1(radius=0.25, height=1.0, segments=16)
+ped_a = xform.move@1(ped, by=[-2.4, 0.5, 19])
+ped_b = xform.move@1(ped, by=[2.4, 0.5, 19])
+peds = solid.union@1(ped_a, ped_b)
+peds_m = solid.material@1(peds, color=[0.3, 0.33, 0.37], metallic=0.8, roughness=0.4)
+output pedestals = peds_m
+rcon = solid.box@1(size=[1.5, 1.0, 0.7])
+rcon_e = xform.move@1(rcon, by=[3.7, 0.5, 22.2])
+rcon_w = xform.move@1(rcon, by=[-3.7, 0.5, 22.2])
+rcons = solid.union@1(rcon_e, rcon_w)
+rcons_m = solid.material@1(rcons, color=[0.2, 0.24, 0.28], metallic=0.6, roughness=0.5)
+output reactor_consoles = rcons_m
+rscreen = solid.box@1(size=[1.2, 0.5, 0.05])
+rscreen_e = xform.move@1(rscreen, by=[3.7, 1.3, 22.5])
+rscreen_w = xform.move@1(rscreen, by=[-3.7, 1.3, 22.5])
+rscreens = solid.union@1(rscreen_e, rscreen_w)
+rscreens_m = solid.material@1(rscreens, color=[1, 1, 1], emissive=[0.1, 0.5, 0.35], roughness=0.3)
+rscreens_t = solid.texture@1(rscreens_m, program="${t_screen}", tile=1.2, size="256")
+output reactor_screens = rscreens_t
+
+# ===== game parts: what the game's entities look like (each centred on its own origin) =====
+glove_core = solid.sphere@1(radius=0.05, segments=14)
+glove_cuff = solid.cylinder@1(radius=0.065, height=0.03, segments=16)
+glove_cuff_at = xform.move@1(glove_cuff, by=[0, 0, 0.06])
+glove_cuff_r = xform.rotate@1(glove_cuff_at, angles=[90, 0, 0])
+glove = solid.union@1(glove_core, glove_cuff_r)
+glove_m = solid.material@1(glove, color=[0.1, 0.12, 0.14], emissive=[0.0, 0.5, 0.7], metallic=0.3, roughness=0.4)
+output glove_mesh = glove_m
+
+fuse_body = solid.cylinder@1(radius=0.05, height=0.16, segments=14)
+fuse_capa = solid.cylinder@1(radius=0.058, height=0.03, segments=14)
+fuse_cap1 = xform.move@1(fuse_capa, by=[0, 0.095, 0])
+fuse_cap2 = xform.move@1(fuse_capa, by=[0, -0.095, 0])
+fuse_caps = solid.union@1(fuse_cap1, fuse_cap2)
+fuse_caps_m = solid.material@1(fuse_caps, color=[0.5, 0.5, 0.55], metallic=0.9, roughness=0.3)
+fuse_core_m = solid.material@1(fuse_body, color=[0.2, 0.9, 0.35], emissive=[0.1, 0.9, 0.25], roughness=0.3)
+fuse = solid.union@1(fuse_core_m, fuse_caps_m)
+output fuse_mesh = fuse
+fuse_in_core = solid.material@1(fuse_body, color=[0.4, 1.0, 0.6], emissive=[0.3, 1.0, 0.5], roughness=0.3)
+fuse_in_house = solid.box@1(size=[0.22, 0.22, 0.12])
+fuse_in_house_m = solid.material@1(fuse_in_house, color=[0.25, 0.27, 0.3], metallic=0.8, roughness=0.4)
+fuse_in = solid.union@1(fuse_in_core, fuse_in_house_m)
+output fuse_in_mesh = fuse_in
+
+sock = solid.box@1(size=[0.24, 0.24, 0.1])
+sock_hole = solid.cylinder@1(radius=0.05, height=0.12, segments=14)
+sock_hole_r = xform.rotate@1(sock_hole, angles=[90, 0, 0])
+sock_body = solid.difference@1(sock, sock_hole_r)
+sock_m = solid.material@1(sock_body, color=[0.2, 0.22, 0.25], metallic=0.8, roughness=0.4)
+output socket_mesh = sock_m
+led = solid.sphere@1(radius=0.03, segments=10)
+led_red_m = solid.material@1(led, color=[1, 0.1, 0.05], emissive=[1.0, 0.1, 0.05], roughness=0.4)
+led_ok_m = solid.material@1(led, color=[0.1, 1, 0.3], emissive=[0.1, 1.0, 0.3], roughness=0.4)
+output led_red_mesh = led_red_m
+output led_ok_mesh = led_ok_m
+
+door = solid.box@1(size=[1.6, 2.4, 0.16])
+door_stripe = solid.box@1(size=[1.6, 0.25, 0.18])
+door_stripe_at = xform.move@1(door_stripe, by=[0, 0.9, 0])
+door_all = solid.union@1(door, door_stripe_at)
+door_m = solid.material@1(door_all, color=[1, 1, 1], metallic=0.7, roughness=0.5)
+door_t = solid.texture@1(door_m, program="${t_hazard}", tile=0.9, size="256")
+output door_mesh = door_t
+
+lever_base = solid.box@1(size=[0.2, 0.3, 0.06])
+lever_arm = solid.cylinder@1(radius=0.02, height=0.3, segments=8)
+lever_arm_up = xform.move@1(lever_arm, by=[0, 0.15, 0.05])
+lever_knob = solid.sphere@1(radius=0.045, segments=10)
+lever_knob_up = xform.move@1(lever_knob, by=[0, 0.3, 0.05])
+lever_up = solid.union@1(lever_base, lever_arm_up, lever_knob_up)
+lever_m = solid.material@1(lever_up, color=[0.9, 0.2, 0.1], emissive=[0.4, 0.05, 0.02], metallic=0.5, roughness=0.4)
+output lever_mesh = lever_m
+lever_arm_dn = xform.move@1(lever_arm, by=[0, -0.15, 0.05])
+lever_knob_dn = xform.move@1(lever_knob, by=[0, -0.3, 0.05])
+lever_dn = solid.union@1(lever_base, lever_arm_dn, lever_knob_dn)
+lever_dn_m = solid.material@1(lever_dn, color=[0.2, 0.9, 0.3], emissive=[0.05, 0.4, 0.1], metallic=0.5, roughness=0.4)
+output lever_dn_mesh = lever_dn_m
+
+gate_bar = solid.cylinder@1(radius=0.025, height=2.2, segments=8)
+gate_bars = xform.array@1(gate_bar, count_z=3, spacing=[0, 0, 0.62])
+gate_bars_at = xform.move@1(gate_bars, by=[0, 0, -0.62])
+gate_rail = solid.box@1(size=[0.06, 0.06, 1.9])
+gate_rail_t = xform.move@1(gate_rail, by=[0, 1.1, 0])
+gate_rail_b = xform.move@1(gate_rail, by=[0, -1.1, 0])
+gate = solid.union@1(gate_bars_at, gate_rail_t, gate_rail_b)
+gate_m = solid.material@1(gate, color=[0.35, 0.37, 0.4], metallic=0.8, roughness=0.4)
+output cage_mesh = gate_m
+
+core_lit = solid.cylinder@1(radius=0.72, height=2.5, segments=24)
+core_lit_m = solid.material@1(core_lit, color=[0.3, 0.7, 1.0], emissive=[0.25, 0.75, 1.3], roughness=0.3)
+output core_lit_mesh = core_lit_m
+
+# ===== lights and air =====
+a_red1 = light.point@1(position=[0, 2.8, -1.5], color=[1.0, 0.2, 0.14], intensity=16, range=8)
+a_red2 = light.point@1(position=[0, 2.8, 1.8], color=[1.0, 0.22, 0.16], intensity=12, range=7)
+b_cool1 = light.point@1(position=[0, 2.9, 6], color=[0.55, 0.7, 1.0], intensity=9, range=8)
+b_cool2 = light.point@1(position=[0, 2.9, 11], color=[0.55, 0.7, 1.0], intensity=7, range=8)
+b_screens = light.point@1(position=[0, 1.6, 12.4], color=[0.2, 1.0, 0.6], intensity=6, range=5)
+b_cool3 = light.point@1(position=[0, 2.9, 8.5], color=[0.6, 0.75, 1.0], intensity=8, range=7)
+output b_cool3 = b_cool3
+c_core = light.point@1(position=[0, 1.6, 20], color=[0.25, 0.55, 1.0], intensity=20, range=9)
+c_red = light.point@1(position=[0, 2.9, 22.5], color=[1.0, 0.12, 0.08], intensity=8, range=6)
+output a_red1 = a_red1
+output a_red2 = a_red2
+output b_cool1 = b_cool1
+output b_cool2 = b_cool2
+output b_screens = b_screens
+output c_core = c_core
+output c_red = c_red
+env = scene.environment@1(sky_color=[0.32, 0.4, 0.5], ground_color=[0.16, 0.19, 0.22], intensity=1.3, reflection=0.15, haze=0.05, haze_color=[0.2, 0.28, 0.34])
+output env = env
+
+# ===== the game =====
+# Core loop in one sentence: carry four fuse cells to four sockets before the air runs out, and the reactor restarts.
+g_fuses = game.var@1(name="fuses", value=0)
+g_air = game.var@1(name="air", value=100)
+g_spool = game.var@1(name="spool", value=0)
+k_hero = game.kind@1(name="player", size=0.5, speed=4, tags=["hero"])
+k_gl = game.kind@1(name="glove_l", size=0.09, tags=["hand", "hand_l"], part="glove_mesh")
+k_gr = game.kind@1(name="glove_r", size=0.09, tags=["hand", "hand_r"], part="glove_mesh")
+k_fuse = game.kind@1(name="fuse", size=0.12, tags=["item"], part="fuse_mesh", grab=true)
+k_fuse_in = game.kind@1(name="fuse_in", size=0.05, tags=["seated"], part="fuse_in_mesh")
+k_p1 = game.kind@1(name="port1", size=0.14, tags=["port"], part="socket_mesh")
+k_p2 = game.kind@1(name="port2", size=0.14, tags=["port"], part="socket_mesh")
+k_p3 = game.kind@1(name="port3", size=0.14, tags=["port"], part="socket_mesh")
+k_p4 = game.kind@1(name="port4", size=0.14, tags=["port"], part="socket_mesh")
+k_l1 = game.kind@1(name="led1", size=0.03, part="led_red_mesh")
+k_l2 = game.kind@1(name="led2", size=0.03, part="led_red_mesh")
+k_l3 = game.kind@1(name="led3", size=0.03, part="led_red_mesh")
+k_l4 = game.kind@1(name="led4", size=0.03, part="led_red_mesh")
+k_ok = game.kind@1(name="led_ok", size=0.03, part="led_ok_mesh")
+k_lever = game.kind@1(name="lever", size=0.25, tags=["control"], part="lever_mesh")
+k_lever_dn = game.kind@1(name="lever_dn", size=0.1, part="lever_dn_mesh")
+k_door1 = game.kind@1(name="door1", size=0.8, tags=["door"], part="door_mesh", solid=[1.7, 2.4, 0.4])
+k_door2 = game.kind@1(name="door2", size=0.8, tags=["door"], part="door_mesh", solid=[1.7, 2.4, 0.4])
+k_gate = game.kind@1(name="cage_gate", size=0.6, tags=["door"], part="cage_mesh", solid=[0.3, 2.2, 1.9])
+k_core = game.kind@1(name="core_lit", size=0.5, part="core_lit_mesh")
+
+s_hero = game.spawn@1(kind="player", at=[0, 0, -2.5])
+s_door1 = game.spawn@1(kind="door1", at=[0, 1.2, 3])
+s_door2 = game.spawn@1(kind="door2", at=[0, 1.2, 14])
+s_gate = game.spawn@1(kind="cage_gate", at=[3.2, 1.1, 8.75])
+s_gl = game.spawn@1(kind="glove_l", at=[-0.3, -10, -2.2])
+s_gr = game.spawn@1(kind="glove_r", at=[0.3, 1.2, -2.2])
+s_f1 = game.spawn@1(kind="fuse", at=[-2.6, 1.0, -2.2])
+s_f2 = game.spawn@1(kind="fuse", at=[4.3, 1.0, 8.75])
+s_f3 = game.spawn@1(kind="fuse", at=[-4.4, 2.0, 11.6])
+s_f4 = game.spawn@1(kind="fuse", at=[3.7, 1.15, 22.2])
+s_p1 = game.spawn@1(kind="port1", at=[1.5, 1.3, 2.8])
+s_p2 = game.spawn@1(kind="port2", at=[1.5, 1.3, 13.8])
+s_p3 = game.spawn@1(kind="port3", at=[-2.4, 1.05, 19])
+s_p4 = game.spawn@1(kind="port4", at=[2.4, 1.05, 19])
+s_l1 = game.spawn@1(kind="led1", at=[1.5, 1.52, 2.8])
+s_l2 = game.spawn@1(kind="led2", at=[1.5, 1.52, 13.8])
+s_l3 = game.spawn@1(kind="led3", at=[-2.4, 1.27, 19])
+s_l4 = game.spawn@1(kind="led4", at=[2.4, 1.27, 19])
+s_lever = game.spawn@1(kind="lever", at=[-4.75, 1.3, 7])
+walk = game.input@1(name="walk", follow="viewer", target="tag:hero")
+hand_l = game.input@1(name="left", follow="left_hand", target="tag:hand_l")
+hand_r = game.input@1(name="right", follow="right_hand", target="tag:hand_r")
+r_grab = game.rule@1(on="grab", do="effect:sfx:click@b")
+r_seat1 = game.rule@1(on="touch", a="kind:fuse", b="kind:port1", do="add:fuses:1;destroy:a;destroy:b;destroy:kind:led1;spawn:fuse_in@1.5,1.3,2.8;spawn:led_ok@1.5,1.52,2.8;move:kind:door1:0,2.6,0;effect:sfx:dooropen@b")
+r_seat2 = game.rule@1(on="touch", a="kind:fuse", b="kind:port2", do="add:fuses:1;destroy:a;destroy:b;destroy:kind:led2;spawn:fuse_in@1.5,1.3,13.8;spawn:led_ok@1.5,1.52,13.8;move:kind:door2:0,2.6,0;effect:sfx:dooropen@b")
+r_seat3 = game.rule@1(on="touch", a="kind:fuse", b="kind:port3", do="add:fuses:1;destroy:a;destroy:b;destroy:kind:led3;spawn:fuse_in@-2.4,1.05,19;spawn:led_ok@-2.4,1.27,19;effect:sfx:powerup@b")
+r_seat4 = game.rule@1(on="touch", a="kind:fuse", b="kind:port4", do="add:fuses:1;destroy:a;destroy:b;destroy:kind:led4;spawn:fuse_in@2.4,1.05,19;spawn:led_ok@2.4,1.27,19;effect:sfx:powerup@b")
+r_lever = game.rule@1(on="use", a="tag:hand", b="kind:lever", do="destroy:b;spawn:lever_dn@-4.75,1.3,7;destroy:kind:cage_gate;effect:sfx:click@b;effect:sfx:dooropen@b")
+r_air = game.rule@1(on="tick", every=5, do="add:air:-1")
+r_spool = game.rule@1(on="tick", every=1, when="fuses>=4", do="add:spool:1")
+r_start = game.rule@1(on="var:spool", when="spool==1", do="spawn:core_lit@0,1.3,20;effect:sfx:powerup@b")
+g_win = game.goal@1(outcome="win", when="spool>=6")
+g_lose = game.goal@1(outcome="lose", when="air<=0")
+g_hud = game.hud@1(text="Fuses {fuses} / 4   Air {air}   Reactor {spool} / 6", anchor="gaze", size=0.004)
+g_all = game.collect@1(g_fuses, g_air, g_spool, k_hero, k_gl, k_gr, k_fuse, k_fuse_in, k_p1, k_p2, k_p3, k_p4, k_l1, k_l2, k_l3, k_l4, k_ok, k_lever, k_lever_dn, k_door1, k_door2, k_gate, k_core, s_hero, s_door1, s_door2, s_gate, s_gl, s_gr, s_f1, s_f2, s_f3, s_f4, s_p1, s_p2, s_p3, s_p4, s_l1, s_l2, s_l3, s_l4, s_lever, walk, hand_l, hand_r, r_grab, r_seat1, r_seat2, r_seat3, r_seat4, r_lever, r_air, r_spool, r_start, g_win, g_lose, g_hud, name="blackout")
+output rules = g_all

@@ -99,7 +99,11 @@ impl Collector {
         let scale = environment.intensity;
         let colour = |c: [f32; 3]| {
             let linear = bevy_color::Color::srgb(c[0], c[1], c[2]).to_linear();
-            [linear.red * scale, linear.green * scale, linear.blue * scale]
+            [
+                linear.red * scale,
+                linear.green * scale,
+                linear.blue * scale,
+            ]
         };
         let zenith = colour(environment.sky_color);
         let ground = colour(environment.ground_color);
@@ -126,8 +130,8 @@ pub(super) fn sun(lights: &[ve_modeling::SceneLight]) -> Option<Sun> {
         .filter(|light| light.kind == ve_modeling::SceneLightKind::Sun)
         .max_by(|a, b| a.intensity.total_cmp(&b.intensity))
         .map(|light| {
-            let colour = bevy_color::Color::srgb(light.color[0], light.color[1], light.color[2])
-                .to_linear();
+            let colour =
+                bevy_color::Color::srgb(light.color[0], light.color[1], light.color[2]).to_linear();
             let toward = bevy_math::Vec3::from_array(light.direction)
                 .normalize_or_zero()
                 .to_array()

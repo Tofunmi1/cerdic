@@ -115,7 +115,10 @@ fn member<'c>(ctx: &'c Ctx<'_>, group: &GroupId, node: &NodeId) -> Result<&'c No
 fn must_be_solid(ctx: &Ctx<'_>, node: &NodeId) -> Result<(), Fail> {
     match links::output_type(&ctx.doc, ctx.reg, node) {
         Some(PortType::Solid) => Ok(()),
-        _ => Err(Box::new(
+        // Unresolved: the result reads the group's input (or a member that does), whose link is made after the group is
+        // created. The interface check at the end of the batch decides it once every link exists.
+        None => Ok(()),
+        Some(_) => Err(Box::new(
             Diagnostic::error("graph.port_type", "a group's result must be a solid")
                 .at_node(node)
                 .suggest("make the group's result a solid, for example solid.box"),

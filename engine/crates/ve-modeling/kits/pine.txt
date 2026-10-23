@@ -1,0 +1,24 @@
+group pine
+  c1 = solid.cone@1(height=3.6, radius=2.4, top_radius=0.1, segments=16)
+  c1_at = xform.move@1(c1, by=[0, 2.2, 0])
+  c2 = solid.cone@1(height=3.2, radius=1.9, top_radius=0.1, segments=16)
+  c2_at = xform.move@1(c2, by=[0, 4.4, 0])
+  c3 = solid.cone@1(height=2.8, radius=1.4, top_radius=0.05, segments=16)
+  c3_at = xform.move@1(c3, by=[0, 6.4, 0])
+  c4 = solid.cone@1(height=2.4, radius=0.9, top_radius=0.02, segments=16)
+  c4_at = xform.move@1(c4, by=[0, 8.2, 0])
+  tiers = solid.union@1(c1_at, c2_at, c3_at, c4_at)
+  ragged = xform.noise@1(tiers, amplitude=0.25, scale=1.2, seed=2, tolerance=0.06)
+  needles = solid.material@1(ragged, color=[0.08, 0.26, 0.13], roughness=0.9)
+  stem = solid.cylinder@1(radius=0.3, height=3, segments=8)
+  stem_at = xform.move@1(stem, by=[0, 1.5, 0])
+  bark = solid.material@1(stem_at, color=[0.3, 0.2, 0.12], roughness=0.95)
+  tree = solid.union@1(needles, bark)
+  sized = xform.scale@1(tree, by=[1, 1, 1])
+  expose seed = ragged.seed
+  expose ragged = ragged.amplitude
+  expose scale = sized.by
+  expose needle_color = needles.color
+  expose bark_color = bark.color
+  result sized
+end

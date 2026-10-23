@@ -1,0 +1,21 @@
+group tent
+  outer_section = profile.polygon@1(points=[[-1.4, 0], [1.4, 0], [0, 1.5]])
+  inner_section = profile.polygon@1(points=[[-1.34, 0], [1.34, 0], [0, 1.44]])
+  outer = solid.extrude@1(outer_section, height=3)
+  inner = solid.extrude@1(inner_section, height=3.4)
+  outer_turned = xform.rotate@1(outer, angles=[90, 0, 0])
+  inner_turned = xform.rotate@1(inner, angles=[90, 0, 0])
+  outer_at = xform.move@1(outer_turned, by=[0, 0, -1.5])
+  inner_at = xform.move@1(inner_turned, by=[0, 0, -1.7])
+  shell = solid.difference@1(outer_at, inner_at)
+  cloth = solid.material@1(shell, color=[0.78, 0.7, 0.55], roughness=1, recipe="fabric")
+  pole = solid.cylinder@1(radius=0.04, height=1.9, segments=8)
+  pole_front = xform.move@1(pole, by=[0, 0.95, 1.55])
+  pole_back = xform.move@1(pole, by=[0, 0.95, -1.55])
+  poles = solid.union@1(pole_front, pole_back)
+  wood = solid.material@1(poles, color=[0.4, 0.28, 0.17], roughness=0.8, recipe="wood")
+  all = solid.union@1(cloth, wood)
+  expose cloth_color = cloth.color
+  expose wood_color = wood.color
+  result all
+end

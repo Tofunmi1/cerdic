@@ -122,7 +122,21 @@ fn apply(
             .map_err(fail);
     }
     if family == "poly.merge_coplanar" {
-        return ve_geometry::merge_coplanar(poly, number(node, "angle")?, context).map_err(fail);
+        let angle = number(node, "angle")?;
+        // Absent in a document written before the parameter existed: those kept the strict behaviour.
+        let strict = text(node, "holes").map_or(true, |holes| holes == "refuse");
+        return if strict {
+            ve_geometry::merge_coplanar(poly, angle, context).map_err(|e| match e {
+                ve_geometry::GeometryError::PolyRefusal { .. } => crate::fail_suggest(
+                    "poly.loop_invalid",
+                    "a patch of coplanar faces around a hole or pinch cannot become one face",
+                    "set holes=\"keep\" to leave such a patch as it is and merge the rest",
+                ),
+                other => fail(other),
+            })
+        } else {
+            ve_geometry::merge_coplanar_keeping_holes(poly, angle, context).map_err(fail)
+        };
     }
     if super::blender::handles(family) {
         return super::blender::apply(node, family, poly, selection, context);

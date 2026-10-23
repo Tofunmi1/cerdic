@@ -22,6 +22,33 @@ pub fn merge_coplanar(
     angle: f64,
     context: &ExecutionContext,
 ) -> Result<PolyMesh, GeometryError> {
+    merge(mesh, angle, false, context)
+}
+
+/// Like [`merge_coplanar`], but a patch that cannot become one simple loop (a wall face around a window, a pinch) is left
+/// as it is, so every patch that can merge does. Faces cut by a boolean (openings, notches) are the common case.
+///
+/// # Errors
+/// As [`merge_coplanar`], except that a patch the merge would refuse is not an error.
+pub fn merge_coplanar_keeping_holes(
+    mesh: &PolyMesh,
+    angle: f64,
+    context: &ExecutionContext,
+) -> Result<PolyMesh, GeometryError> {
+    merge(mesh, angle, true, context)
+}
+
+/// A face's place, rounded, so a face left alone can be recognised after other patches have merged and the indices moved.
+fn face_key(centre: [f64; 3]) -> [i64; 3] {
+    centre.map(|v| (v * 1.0e5).round() as i64)
+}
+
+fn merge(
+    mesh: &PolyMesh,
+    angle: f64,
+    keep_holes: bool,
+    context: &ExecutionContext,
+) -> Result<PolyMesh, GeometryError> {
     if !angle.is_finite() || !(0.0..=0.5).contains(&angle) {
         return Err(GeometryError::PolyRefusal {
             code: "poly.angle_invalid",
@@ -29,12 +56,20 @@ pub fn merge_coplanar(
         });
     }
     let mut current = mesh.clone();
+    let mut left_alone: BTreeSet<[i64; 3]> = BTreeSet::new();
     for _ in 0..=MAX_MERGES {
         check_cancelled(context)?;
-        let Some(patch) = first_patch(&current, angle, context)? else {
+        let Some(patch) = first_patch(&current, angle, &left_alone, context)? else {
             return Ok(current);
         };
-        current = dissolve_faces(&current, &patch, context)?;
+        match dissolve_faces(&current, &patch, context) {
+            Ok(merged) => current = merged,
+            Err(GeometryError::PolyRefusal { .. }) if keep_holes => {
+                let at = planes(&current);
+                left_alone.extend(patch.iter().map(|&face| face_key(at[face].1)));
+            }
+            Err(error) => return Err(error),
+        }
     }
     Err(GeometryError::PolyRefusal {
         code: "poly.budget_exceeded",
@@ -85,10 +120,15 @@ fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
 fn first_patch(
     mesh: &PolyMesh,
     angle: f64,
+    left_alone: &BTreeSet<[i64; 3]>,
     context: &ExecutionContext,
 ) -> Result<Option<Vec<usize>>, GeometryError> {
     let topology = Topology::build(mesh, context)?;
     let planes = planes(mesh);
+    let skipped: Vec<bool> = planes
+        .iter()
+        .map(|(_, centre)| left_alone.contains(&face_key(*centre)))
+        .collect();
     let extent = mesh
         .positions()
         .iter()
@@ -98,7 +138,7 @@ fn first_patch(
     let cosine = angle.cos();
     for seed in 0..planes.len() {
         check_cancelled(context)?;
-        if dot(planes[seed].0, planes[seed].0) < 0.5 {
+        if skipped[seed] || dot(planes[seed].0, planes[seed].0) < 0.5 {
             continue;
         }
         let mut patch = BTreeSet::from([seed]);
@@ -117,7 +157,7 @@ fn first_patch(
                     )
                     .abs()
                         <= distance;
-                if coplanar && patch.insert(next) {
+                if coplanar && !skipped[next] && patch.insert(next) {
                     queue.push_back(next);
                 }
             }

@@ -7,3 +7,4 @@
 
 include!("anim/part_1.rs");
 include!("anim/part_2.rs");
+include!("anim/drop.rs");
