@@ -200,6 +200,134 @@ fn min_wall(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
     ))
 }
 
+/// Checks that each supplied solid is within `tolerance` of at least one other solid.
+pub(crate) fn attached(
+    node: &Node,
+    inputs: &[Rc<Value>],
+    labels: &BTreeMap<NodeId, String>,
+) -> Result<Value, Fail> {
+    use glam::DVec3;
+    use ve_kernel::Mesh;
+    use ve_measure::{NamedMesh, attachments};
+
+    let tolerance = number(node, "tolerance").map_err(|e| kernel_fail(node, &e))?;
+    let severity = match node.params.get("severity") {
+        Some(Param::Str(severity)) => severity.as_str(),
+        _ => "warning",
+    };
+    let links = node.inputs.get("parts").map_or(&[][..], Vec::as_slice);
+    let mut owned: Vec<(NodeId, String, Mesh)> = Vec::new();
+    for (link, value) in links.iter().zip(inputs) {
+        let source = link.node.clone();
+        let name = labels
+            .get(&source)
+            .cloned()
+            .unwrap_or_else(|| source.to_string());
+        let (mesh, transform) = match &value.instances {
+            Some(set) if set.transforms.len() != 1 => continue,
+            Some(set) => (&set.prototype.mesh, Some(set.transforms[0])),
+            None => (&value.mesh, None),
+        };
+        if mesh.triangle_count() < 4 {
+            continue;
+        }
+        let positions = mesh
+            .positions
+            .iter()
+            .map(|position| {
+                if let Some(transform) = transform {
+                    let world = transform.transform_point3(DVec3::new(
+                        f64::from(position[0]),
+                        f64::from(position[1]),
+                        f64::from(position[2]),
+                    ));
+                    #[expect(
+                        clippy::cast_possible_truncation,
+                        reason = "measurement mesh uses f32 positions"
+                    )]
+                    [world.x as f32, world.y as f32, world.z as f32]
+                } else {
+                    *position
+                }
+            })
+            .collect();
+        owned.push((
+            source,
+            name,
+            Mesh {
+                positions,
+                indices: mesh.indices.clone(),
+            },
+        ));
+    }
+    let borrowed: Vec<_> = owned
+        .iter()
+        .map(|(_, name, mesh)| NamedMesh {
+            name,
+            mesh: ve_measure::Mesh::new(&mesh.positions, &mesh.indices),
+        })
+        .collect();
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "tolerance is bounded by the operator spec"
+    )]
+    let tolerance_f32 = tolerance as f32;
+    let measured = attachments(&borrowed, tolerance_f32).map_err(|error| {
+        let is_budget = matches!(
+            error,
+            ve_measure::MeasureError::PartBudget { .. }
+                | ve_measure::MeasureError::TriangleBudget { .. }
+        );
+        let code = if is_budget {
+            "attach.budget"
+        } else {
+            "attach.measure_failed"
+        };
+        Box::new(Diagnostic::error(
+            code,
+            format!(
+                "could not check attachments: {error}; the check supports at most 64 parts and 2,000,000 triangles"
+            ),
+        )) as Fail
+    })?;
+    let mut result = Value::nothing();
+    for item in measured.into_iter().filter(|item| item.gap > tolerance_f32) {
+        let Some((part_node, _, _)) = owned.iter().find(|(_, name, _)| name == &item.name) else {
+            continue;
+        };
+        let Some((nearest_node, _, _)) = owned.iter().find(|(_, name, _)| name == &item.nearest)
+        else {
+            continue;
+        };
+        let gap = f64::from(item.gap);
+        let adjustment = (gap - tolerance).max(0.0);
+        let message = format!(
+            "`{}` floats {:.2} m from `{}` (nearest part); it should touch within {:.2} m",
+            item.name, gap, item.nearest, tolerance
+        );
+        let suggestion = format!(
+            "move the root of `{}` {:.2} m toward `{}`, or sink it inside `{}`; build attached parts with their roots inside the body",
+            item.name, adjustment, item.nearest, item.nearest
+        );
+        if severity == "error" {
+            return Err(Box::new(
+                Diagnostic::error("attach.floating", message)
+                    .at_node(part_node)
+                    .with_related(vec![nearest_node.clone()])
+                    .with_limit(tolerance, gap)
+                    .suggest(suggestion),
+            ));
+        }
+        result.warnings.push(crate::EvaluationWarning {
+            code: "attach.floating".to_owned(),
+            node: part_node.to_string(),
+            related: vec![item.nearest.clone()],
+            message: format!("{message}; {suggestion}"),
+        });
+    }
+    Ok(result)
+}
+
 pub(crate) fn number(node: &Node, name: &str) -> Result<f64, KernelError> {
     node.params
         .get(name)

@@ -2,13 +2,13 @@
 use crate::{ExecutionContext, KernelError, ffi};
 
 /// Maximum sampled grid cells in a final field result.
-pub const FIELD_MAX_CELLS: usize = 2_000_000;
+pub const FIELD_MAX_CELLS: usize = 6_000_000;
 /// Maximum tape length.
 pub const FIELD_MAX_INSTRUCTIONS: usize = 4_096;
 /// Maximum estimated instruction-by-cell work.
-pub const FIELD_MAX_OPERATIONS: usize = 64_000_000;
-const FIELD_MAX_PADDED_SLOTS: usize = 2_097_152;
-const FIELD_MAX_CELLS_F64: f64 = 2_000_000.0;
+pub const FIELD_MAX_OPERATIONS: usize = 1_500_000_000;
+const FIELD_MAX_PADDED_SLOTS: usize = 16_777_216;
+const FIELD_MAX_CELLS_F64: f64 = 6_000_000.0;
 
 /// A register-tape operation. Field values are positive inside and zero on the surface.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -52,6 +52,10 @@ pub enum FieldOp {
     Shell = 24,
     /// Fold coordinates into a bounded repeat; XYZ are periods and `input_b` packs counts.
     Repeat = 25,
+    /// Seeded bounded fractal noise displacement; constants are amplitude, scale, persistence, packed mode/octaves.
+    Noise = 26,
+    /// Axis warp: kind, axis and toward packed in W; from, to, start and end in XYZW (W packing takes precedence impossible).
+    Warp = 27,
 }
 
 /// One instruction; inputs must reference registers earlier in the same tape.
@@ -219,7 +223,15 @@ fn preflight(
     else {
         return Err(FieldError::Budget);
     };
-    let Some(work) = cells.checked_mul(instructions.len()) else {
+    let weighted_instructions = instructions.iter().fold(0_usize, |work, instruction| {
+        let extra = if instruction.opcode == FieldOp::Noise {
+            noise_octaves(instruction.w)
+        } else {
+            0
+        };
+        work.saturating_add(1 + extra.saturating_sub(1))
+    });
+    let Some(work) = cells.checked_mul(weighted_instructions) else {
         return Err(FieldError::Budget);
     };
     if cells > FIELD_MAX_CELLS || work > FIELD_MAX_OPERATIONS {
@@ -236,4 +248,21 @@ fn preflight(
         return Err(FieldError::Budget);
     }
     Ok(())
+}
+
+fn noise_octaves(packed: f64) -> usize {
+    let value = if packed >= 9.0 { packed - 8.0 } else { packed };
+    if value <= 1.0 {
+        1
+    } else if value <= 2.0 {
+        2
+    } else if value <= 3.0 {
+        3
+    } else if value <= 4.0 {
+        4
+    } else if value <= 5.0 {
+        5
+    } else {
+        6
+    }
 }

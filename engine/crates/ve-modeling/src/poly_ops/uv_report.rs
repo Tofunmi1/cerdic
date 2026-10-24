@@ -14,6 +14,7 @@ fn warning(node: &Node, code: &str, message: String) -> EvaluationWarning {
     EvaluationWarning {
         code: code.to_owned(),
         node: node.id.to_string(),
+        related: Vec::new(),
         message,
     }
 }

@@ -10,6 +10,7 @@ use crate::funnel::{self, Portal};
 use crate::grid::Grid;
 use crate::path::Path;
 use crate::raycast;
+use crate::{AreaId, Edge, EdgeKind, NavSpace, NodeId};
 
 /// A walkable representation of a level, ready for pathfinding.
 ///
@@ -20,6 +21,8 @@ use crate::raycast;
 pub struct NavMesh {
     config: NavConfig,
     grid: Grid,
+    cell_to_node: Vec<NodeId>,
+    node_to_cell: Vec<usize>,
 }
 
 impl NavMesh {
@@ -54,10 +57,15 @@ impl NavMesh {
             }
         }
         let grid = build::grid_from_mesh(vertices, indices, config)?;
-        Ok(Self {
+        let cell_to_node = vec![NodeId::MAX; grid.nx() * grid.nz()];
+        let mut mesh = Self {
             config: *config,
             grid,
-        })
+            cell_to_node,
+            node_to_cell: Vec::new(),
+        };
+        mesh.rebuild_node_ids();
+        Ok(mesh)
     }
 
     /// The configuration the mesh was built with.
@@ -82,6 +90,51 @@ impl NavMesh {
     #[must_use]
     pub fn walkable_count(&self) -> usize {
         self.grid.walkable_count()
+    }
+
+    /// Paints walkable cell centres inside the inclusive axis-aligned box with an area id.
+    pub fn paint_area(&mut self, min: [f32; 3], max: [f32; 3], area: AreaId) {
+        for iz in 0..self.grid.nz() {
+            for ix in 0..self.grid.nx() {
+                let cell = self.grid.index(ix, iz);
+                if self.grid.is_walkable(cell) {
+                    let p = self.grid.center3(ix, iz);
+                    if (0..3).all(|axis| p[axis] >= min[axis] && p[axis] <= max[axis]) {
+                        self.grid.set_area(cell, area.0);
+                    }
+                }
+            }
+        }
+    }
+
+    fn rebuild_node_ids(&mut self) {
+        self.cell_to_node.fill(NodeId::MAX);
+        self.node_to_cell.clear();
+        for cell in 0..self.grid.nx() * self.grid.nz() {
+            if self.grid.is_walkable(cell) {
+                let id = self.node_to_cell.len() as NodeId;
+                self.cell_to_node[cell] = id;
+                self.node_to_cell.push(cell);
+            }
+        }
+    }
+
+    fn allowed_step(&self, a: usize, b: usize, dx: isize, dz: isize) -> bool {
+        if !self.grid.is_walkable(b)
+            || (self.grid.height(b) - self.grid.height(a)).abs() > self.config.max_step()
+        {
+            return false;
+        }
+        if dx != 0 && dz != 0 {
+            let (x, z) = self.grid.coords(a);
+            self.grid
+                .is_walkable(self.grid.index((x.cast_signed() + dx) as usize, z))
+                && self
+                    .grid
+                    .is_walkable(self.grid.index(x, (z.cast_signed() + dz) as usize))
+        } else {
+            true
+        }
     }
 
     /// Whether a world point is over a walkable cell.
@@ -223,6 +276,60 @@ impl NavMesh {
             })
             .unwrap_or(0.0);
         [p.x, y, p.y]
+    }
+}
+
+impl NavSpace for NavMesh {
+    fn node_count(&self) -> usize {
+        self.node_to_cell.len()
+    }
+    fn position(&self, node: NodeId) -> [f32; 3] {
+        let (x, z) = self.grid.coords(self.node_to_cell[node as usize]);
+        self.grid.center3(x, z)
+    }
+    fn area(&self, node: NodeId) -> AreaId {
+        AreaId(self.grid.area(self.node_to_cell[node as usize]))
+    }
+    fn neighbours(&self, node: NodeId, out: &mut Vec<Edge>) {
+        const DELTAS: [(isize, isize); 8] = [
+            (1, 0),
+            (-1, 0),
+            (0, 1),
+            (0, -1),
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1),
+        ];
+        let cell = self.node_to_cell[node as usize];
+        let (x, z) = self.grid.coords(cell);
+        for (dx, dz) in DELTAS {
+            let nx = x.cast_signed() + dx;
+            let nz = z.cast_signed() + dz;
+            if nx < 0 || nz < 0 || nx as usize >= self.grid.nx() || nz as usize >= self.grid.nz() {
+                continue;
+            }
+            let next = self.grid.index(nx as usize, nz as usize);
+            if !self.allowed_step(cell, next, dx, dz) {
+                continue;
+            }
+            let to = self.cell_to_node[next];
+            let a = self.grid.center3(x, z);
+            let b = self.grid.center3(nx as usize, nz as usize);
+            let vx = a[0] - b[0];
+            let vy = a[1] - b[1];
+            let vz = a[2] - b[2];
+            out.push(Edge {
+                to,
+                length: (vx * vx + vy * vy + vz * vz).sqrt(),
+                kind: EdgeKind::WALK,
+            });
+        }
+    }
+    fn locate(&self, point: [f32; 3]) -> Option<NodeId> {
+        self.grid
+            .nearest_walkable(point)
+            .map(|(cell, _)| self.cell_to_node[cell])
     }
 }
 

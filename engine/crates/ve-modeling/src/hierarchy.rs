@@ -9,7 +9,7 @@ use ve_graph::{Node, Value as Param};
 use crate::{EvaluationWarning, Fail, Part, cache::Value, fail};
 
 /// Longest chain of parents a part may have.
-pub const MAX_DEPTH: usize = 8;
+pub const MAX_DEPTH: usize = 20;
 
 /// Records the node's parent name on the input.
 pub(crate) fn parent(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
@@ -35,6 +35,7 @@ fn warning(part: &Part, code: &str, message: String) -> EvaluationWarning {
     EvaluationWarning {
         code: code.to_owned(),
         node: part.node.to_string(),
+        related: Vec::new(),
         message,
     }
 }

@@ -1,0 +1,15 @@
+[package]
+name = "ve-npc"
+version = "0.0.0"
+description = "NPC cognition: memory, minds (LLM behind a strict intent boundary), brains and societies. Pure Rust, deterministic, wasm-safe (ADR 0063, 0064)."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

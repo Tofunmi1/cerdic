@@ -30,6 +30,8 @@ pub(super) fn spawn(
     surface: VeMaterial,
     matrices: &[Mat4],
     indices: &[u32],
+    range: Option<(f32, f32)>,
+    fade: f32,
 ) {
     let local_min = Vec3::from(item.bounds.min.map(|v| v as f32));
     let local_max = Vec3::from(item.bounds.max.map(|v| v as f32));
@@ -44,23 +46,33 @@ pub(super) fn spawn(
     };
     let centre = (local_min + local_max) * 0.5;
     let radius = (local_max - local_min).length() * 0.5;
+    let (min_distance, max_distance) = band(range);
+    let mut set = VeInstanceSet::new(
+        item.handle.clone(),
+        transforms,
+        Arc::from(indices),
+        (centre, radius),
+    );
+    set.min_distance = min_distance;
+    set.fade = fade;
+    set.meshes[0].max_distance = max_distance;
     commands.spawn((
-        VeInstanceSet::new(
-            item.handle.clone(),
-            transforms,
-            Arc::from(indices),
-            (centre, radius),
-        ),
+        set,
         surface,
         Transform::IDENTITY,
         Interactable::selection_only(&world),
-        Label(item.name),
+        Label(item.name.clone()),
         Authored {
             node: item.node,
+            name: item.name,
             revision: token.revision,
         },
         BulkInstances(boxes),
     ));
+}
+
+fn band(range: Option<(f32, f32)>) -> (f32, f32) {
+    range.unwrap_or((0.0, f32::INFINITY))
 }
 
 #[cfg(test)]
@@ -73,11 +85,23 @@ mod tests {
         assert!(eligible(BULK_MIN, &opaque, false));
         assert!(eligible(16_000, &opaque, false));
         assert!(!eligible(BULK_MIN - 1, &opaque, false), "too few to matter");
-        assert!(!eligible(16_000, &opaque, true), "animated copies are separate entities");
+        assert!(
+            !eligible(16_000, &opaque, true),
+            "animated copies are separate entities"
+        );
         let glass = VeMaterial {
             opacity: 0.5,
             ..VeMaterial::default()
         };
-        assert!(!eligible(16_000, &glass, false), "transparent copies sort per entity");
+        assert!(
+            !eligible(16_000, &glass, false),
+            "transparent copies sort per entity"
+        );
+    }
+
+    #[test]
+    fn no_range_means_unbounded_and_a_range_is_kept() {
+        assert_eq!(band(None), (0.0, f32::INFINITY));
+        assert_eq!(band(Some((45.0, 140.0))), (45.0, 140.0));
     }
 }
