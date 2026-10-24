@@ -91,4 +91,24 @@ pub enum NavError {
         /// The rejected id.
         id: usize,
     },
+    /// A node id is outside the space.
+    #[error("unknown navigation node {0}")]
+    UnknownNode(u32),
+    /// A link id is outside a linked space.
+    #[error("unknown navigation link {0}")]
+    UnknownLink(u32),
+    /// No filtered route connects the requested nodes.
+    #[error("no route from node {start} to node {goal}")]
+    NoRoute {
+        /// Requested start node.
+        start: u32,
+        /// Requested goal node.
+        goal: u32,
+    },
+    /// Search exhausted its expansion budget.
+    #[error("search limit reached after expanding {expanded} nodes")]
+    SearchLimit {
+        /// Number of nodes expanded before stopping.
+        expanded: usize,
+    },
 }

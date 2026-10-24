@@ -86,6 +86,7 @@ fn collision_boxes(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
     value.warnings.push(EvaluationWarning {
         code: "solid.collision_boxes.fit".to_owned(),
         node: node.id.to_string(),
+        related: Vec::new(),
         message: format!(
             "the {} collision shape fits the solid with volume ratio {:.1}",
             label(kind),

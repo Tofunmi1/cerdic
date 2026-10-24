@@ -1,4 +1,3 @@
-
 /// Why a chain cannot work, if it cannot: a code and a sentence.
 fn chain_problem(
     chain: &IkChain,
@@ -45,6 +44,7 @@ fn warning(part: &Part, code: &str, message: String) -> EvaluationWarning {
     EvaluationWarning {
         code: code.to_owned(),
         node: part.node.to_string(),
+        related: Vec::new(),
         message,
     }
 }
@@ -236,6 +236,14 @@ pub(crate) fn weigh(parts: &mut [Part]) -> Vec<EvaluationWarning> {
             ));
             skinned -= 1;
             vertices -= part.positions.len();
+            continue;
+        }
+        // A body skinned by `body.skin` arrives with the pack's weights, one entry per vertex, for exactly these bones: keep them.
+        if !skinning.joints.is_empty()
+            && skinning.joints.len() == part.positions.len()
+            && valid.len() == skinning.bones.len()
+        {
+            part.skin = Some(skinning);
             continue;
         }
         let segments: Vec<Segment> = valid.iter().map(|(_, segment)| *segment).collect();

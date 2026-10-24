@@ -14,6 +14,7 @@ pub(crate) struct Grid {
     cell: f32,
     height: Vec<f32>,
     walkable: Vec<bool>,
+    areas: Vec<u8>,
 }
 
 impl Grid {
@@ -33,6 +34,7 @@ impl Grid {
             cell,
             height,
             walkable,
+            areas: vec![0; nx * nz],
         }
     }
 
@@ -69,6 +71,14 @@ impl Grid {
     /// Whether a cell can be stood on.
     pub(crate) fn is_walkable(&self, index: usize) -> bool {
         self.walkable.get(index).copied().unwrap_or(false)
+    }
+
+    pub(crate) fn area(&self, index: usize) -> u8 {
+        self.areas[index]
+    }
+
+    pub(crate) fn set_area(&mut self, index: usize, area: u8) {
+        self.areas[index] = area;
     }
 
     /// Floor height of a cell (meaningless when the cell is blocked).

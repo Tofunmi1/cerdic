@@ -12,9 +12,9 @@
 
 namespace {
 
-constexpr size_t kMaxFieldCells = 2'000'000;
-constexpr size_t kMaxFieldOps = 64'000'000;
-constexpr size_t kMaxVoxelSlots = 2'097'152;
+constexpr size_t kMaxFieldCells = 6'000'000;
+constexpr size_t kMaxFieldOps = 1'500'000'000;
+constexpr size_t kMaxVoxelSlots = 16'777'216;
 
 void set_status(ve_status* out, ve_status value) {
   if (out != nullptr) {
@@ -114,7 +114,20 @@ bool prepare_grid(const ve_field_input* input, GridInfo& grid, ve_status* status
     return false;
   }
   grid.cells = grid.samples.at(0) * grid.samples.at(1) * grid.samples.at(2);
-  grid.operations = grid.cells * input->instruction_count;
+  size_t weighted_instructions = input->instruction_count;
+  for (size_t index = 0; index < input->instruction_count; ++index) {
+    const auto& instruction = input->instructions[index];
+    if (instruction.opcode == VE_FIELD_NOISE) {
+      const auto packed = static_cast<uint32_t>(instruction.w);
+      weighted_instructions += (packed & 7U) - 1U;
+    }
+  }
+  if (weighted_instructions > kMaxFieldOps ||
+      grid.cells > std::numeric_limits<size_t>::max() / weighted_instructions) {
+    set_status(status, VE_ERR_FIELD_BUDGET);
+    return false;
+  }
+  grid.operations = grid.cells * weighted_instructions;
   const std::array<size_t, 3> padded = {next_power_of_two(grid.samples.at(0) + 2),
                                         next_power_of_two(grid.samples.at(1) + 2),
                                         next_power_of_two(grid.samples.at(2) + 2)};
