@@ -109,6 +109,10 @@ pub(crate) fn forward_pass(
     view_uniforms: Res<ViewUniforms>,
     lights: Res<LightsGpu>,
     textures: Res<crate::textures::TexturesGpu>,
+    surfaces: (
+        Res<crate::water_gpu::WaterGpu>,
+        Res<crate::grass_gpu::GrassBounds>,
+    ),
     render_meshes: Res<RenderAssets<RenderMesh>>,
     allocator: Res<MeshAllocator>,
     clear: Res<ClearColor>,
@@ -118,6 +122,7 @@ pub(crate) fn forward_pass(
     quality: Res<RenderQuality>,
     mut ctx: RenderContext,
 ) {
+    let (water, grass_bounds) = surfaces;
     let (target, depth, slots, msaa, msaa_color, offscreen, extracted_view) = view.into_inner();
     let clear_color = clear.0.to_linear();
     let Some(output_format) = target.out_texture_view_format() else {
@@ -175,6 +180,8 @@ pub(crate) fn forward_pass(
     pass.set_bind_group(2, textures_bind_group, &[]);
 
     let gpu = BatchGpu {
+        water: &water,
+        grass_bounds: &grass_bounds,
         pipelines: &pipelines,
         pipeline_cache: &pipeline_cache,
         render_meshes: &render_meshes,
@@ -264,6 +271,8 @@ fn draw_sky<'a>(
 
 /// Everything `draw_batch` reads that is the same for all batches of a view.
 struct BatchGpu<'a> {
+    grass_bounds: &'a crate::grass_gpu::GrassBounds,
+    water: &'a crate::water_gpu::WaterGpu,
     pipelines: &'a ForwardPipelines,
     pipeline_cache: &'a PipelineCache,
     render_meshes: &'a RenderAssets<RenderMesh>,
@@ -287,16 +296,33 @@ fn draw_batch<'a>(
         info_once!("forward pass: a mesh is not uploaded to the GPU yet");
         return;
     };
+    let water_surface = gpu.batches.water_surface(batch);
     // Pipelines are queued one frame after a mesh first appears.
     let Some(pipeline) = gpu
         .pipelines
-        .get(&render_mesh.layout, gpu.format, gpu.samples, kind)
+        .get(
+            &render_mesh.layout,
+            gpu.format,
+            gpu.samples,
+            kind,
+            water_surface.is_some(),
+            water_surface.is_some_and(|w| w.sim_id != 0),
+        )
         .and_then(|id| gpu.pipeline_cache.get_render_pipeline(id))
     else {
         info_once!("forward pass: no ready pipeline for a mesh layout yet");
         return;
     };
     pass.set_render_pipeline(pipeline);
+    let Some(water) = gpu.water.forward_binding(
+        water_surface,
+        gpu.batches.terrain_surface(batch),
+        gpu.grass_bounds
+            .uniform(gpu.batches.grass_surface(batch), batch.mesh),
+    ) else {
+        return;
+    };
+    pass.set_bind_group(3, water, &[]);
     let Some(instance_buffer) = gpu.batches.instance_buffer(batch) else {
         return;
     };

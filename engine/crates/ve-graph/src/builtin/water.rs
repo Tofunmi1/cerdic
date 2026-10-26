@@ -62,16 +62,44 @@ fn color_param() -> ParamSpec {
 pub(super) fn all() -> Vec<Option<crate::spec::OperatorSpec>> {
     vec![spec(
         "water.surface@1",
-        "A closed, transparent water body with a seeded wavy rest mesh and a lightweight animated viewer ripple. Exported geometry is static; it is not a physics body. Use solid.material after this node to override its water material.",
+        "For lakes on a landscape use water.fill, which follows the hollow and shoreline. A closed, transparent water body with a seeded wavy rest mesh and a lightweight animated viewer ripple. Exported geometry is static; it is not a physics body. Use solid.material after this node to override its water material.",
         vec![],
         OutputSpec::Fixed(PortType::Solid),
-        parameters(),
+        {
+            let mut params = parameters();
+            params.extend(sim_parameters());
+            params
+        },
     )]
 }
 
 fn parameters() -> Vec<ParamSpec> {
     vec![
         size_param(),
+        ratio(
+            "ripple",
+            1.0,
+            0.0,
+            2.0,
+            "Wave amplitude multiplier; zero is a flat animated sheet.",
+        ),
+        ratio(
+            "flow",
+            1.0,
+            0.0,
+            4.0,
+            "Wave travel speed multiplier; zero freezes the waves.",
+        ),
+        ParamSpec {
+            name: "direction",
+            ty: ParamType::Num {
+                unit: Unit::Angle,
+                min: -std::f64::consts::TAU,
+                max: std::f64::consts::TAU,
+            },
+            default: Some(Value::Num(0.0)),
+            doc: "Main wave travel direction in degrees; zero is positive X.",
+        },
         length(
             "level",
             0.0,
@@ -122,7 +150,7 @@ fn parameters() -> Vec<ParamSpec> {
                 max: 1_000_000,
             },
             default: Some(Value::Int(0)),
-            doc: "Picks a repeatable rest-surface pattern.",
+            doc: "Picks repeatable rest-surface and travelling-wave patterns.",
         },
         ParamSpec {
             name: "resolution",
@@ -130,5 +158,38 @@ fn parameters() -> Vec<ParamSpec> {
             default: Some(Value::Int(64)),
             doc: "Grid cells per side, capped at 192 (at most 73,728 triangles).",
         },
+    ]
+}
+
+/// Shared interactive water controls.
+pub(super) fn sim_parameters() -> Vec<ParamSpec> {
+    vec![
+        ParamSpec {
+            name: "sim",
+            ty: ParamType::Bool,
+            default: Some(Value::Bool(false)),
+            doc: "Enable interactive shallow-water ripples.",
+        },
+        ParamSpec {
+            name: "sim_resolution",
+            ty: ParamType::Int { min: 32, max: 256 },
+            default: Some(Value::Int(128)),
+            doc: "Simulation cells along the longer side.",
+        },
+        ratio("sim_damping", 0.6, 0.0, 5.0, "Velocity damping per second."),
+        length(
+            "sim_depth",
+            1.0,
+            0.05,
+            50.0,
+            "Fallback physical depth in metres, setting ripple speed.",
+        ),
+        ratio(
+            "rain",
+            0.0,
+            0.0,
+            1.0,
+            "Seeded drops per second per 100 square metres of water.",
+        ),
     ]
 }

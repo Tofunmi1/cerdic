@@ -13,6 +13,7 @@ pub(super) fn describe(ty: &ParamType) -> String {
         ParamType::Bool => "true or false".to_owned(),
         ParamType::Str { .. } => "text in quotes".to_owned(),
         ParamType::Choice { options } => format!("one of {} in quotes", options.join(", ")),
+        ParamType::StrList { .. } => "a list of quoted text values".to_owned(),
         ParamType::Vec2 { unit, .. } => format!("[x, y] ({})", unit_name(*unit)),
         ParamType::Vec3 { unit, .. } => format!("[x, y, z] ({})", unit_name(*unit)),
         ParamType::Points2 { .. } => "a list of [x, y] points (metres)".to_owned(),
@@ -87,10 +88,33 @@ fn coerce(ty: &ParamType, lit: &Lit) -> Result<Value, Fail> {
         (ParamType::Int { .. }, _) => Err(wrong("a whole number")),
         (ParamType::Bool, Lit::Bool(b, _)) => Ok(Value::Bool(*b)),
         (ParamType::Bool, _) => Err(wrong("true or false")),
-        (ParamType::Str { .. } | ParamType::Choice { .. }, Lit::Text(t, _)) => {
-            Ok(Value::Str(t.clone()))
+        (ParamType::Str { .. }, Lit::Text(t, _)) => Ok(Value::Str(t.clone())),
+        (ParamType::Choice { options }, Lit::Text(t, _)) => {
+            let mut matches = options
+                .iter()
+                .filter(|option| option.eq_ignore_ascii_case(t));
+            let first = matches.next();
+            let canonical = match (first, matches.next()) {
+                (Some(option), None) => (*option).to_owned(),
+                _ => t.clone(),
+            };
+            Ok(Value::Str(canonical))
         }
+        (ParamType::StrList { .. }, Lit::List(items, _)) => items
+            .iter()
+            .map(|item| match item {
+                Lit::Text(value, _) => Ok(Value::Str(value.clone())),
+                _ => Err(wrong("a list of quoted text values")),
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Value::List),
         (ParamType::Str { .. }, _) => Err(wrong("text in quotes")),
+        (ParamType::Vec2 { unit, .. }, Lit::Num { .. }) => {
+            number(lit, *unit).map(|n| Value::List(vec![Value::Num(n); 2]))
+        }
+        (ParamType::Vec3 { unit, .. }, Lit::Num { .. }) => {
+            number(lit, *unit).map(|n| Value::List(vec![Value::Num(n); 3]))
+        }
         (ParamType::Vec2 { unit, .. } | ParamType::Vec3 { unit, .. }, Lit::List(items, _)) => items
             .iter()
             .map(|i| number(i, *unit).map(Value::Num))
@@ -115,6 +139,10 @@ fn coerce(ty: &ParamType, lit: &Lit) -> Result<Value, Fail> {
 /// A literal coerced to the parameter's type and checked against its bounds.
 pub(super) fn param_value(ty: &ParamType, key: &str, lit: &Lit) -> Result<Value, Fail> {
     let value = coerce(ty, lit)?;
-    ty.check(&value)
-        .map_err(|issue| Box::new(Diagnostic::from_issue(issue, None, key).at_span(lit.span())))
+    ty.check(&value).map_err(|mut issue| {
+        if matches!(ty, ParamType::Choice { .. }) {
+            issue.message = format!("{key}: {}", issue.message);
+        }
+        Box::new(Diagnostic::from_issue(issue, None, key).at_span(lit.span()))
+    })
 }

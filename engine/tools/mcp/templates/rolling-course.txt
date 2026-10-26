@@ -1,0 +1,242 @@
+# about: Hands-first mini golf on real terrain with a rolled ball
+# kind: game
+# change: Change the hole count, par values, and stroke limits.
+# change: Adjust terrain dimensions, green colours, and ball size.
+group fence
+  post = solid.box@1(size=[0.08, 1.2, 0.08])
+  post_at = xform.move@1(post, by=[0, 0.6, 0])
+  row = xform.array@1(post_at, count_x=3, spacing=[0.75, 0, 0])
+  posts = xform.mirror@1(row, axis="x")
+  rail = solid.box@1(size=[1.5, 0.08, 0.04])
+  rail_at = xform.move@1(rail, by=[0.75, 0.9, 0])
+  rails = xform.array@1(rail_at, count_y=2, spacing=[0, -0.6, 0])
+  braces = xform.mirror@1(rails, axis="x")
+  board = solid.box@1(size=[0.14, 1, 0.04])
+  board_at = xform.move@1(board, by=[0.075, 0.5, 0])
+  boarded = inst.array@1(board_at, count_x=10, spacing=[0.15, 0, 0])
+  varied = inst.jitter@1(boarded, shift=[0, 0, 0.006], yaw_jitter=0.03490658503988659rad)
+  half = inst.realize@1(varied)
+  slats = xform.mirror@1(half, axis="x")
+  all = solid.union@1(posts, braces, slats)
+  surface = solid.material@1(all, color=[0.52, 0.4, 0.26], roughness=0.7, recipe="planks")
+  expose posts = row.count_x
+  expose boards = boarded.count_x
+  expose spacing = row.spacing
+  expose seed = varied.seed
+  expose color = surface.color
+  expose roughness = surface.roughness
+  result surface
+end
+group grass_tuft
+  blade = solid.cone@1(height=0.45, radius=0.015, segments=4)
+  blade_up = xform.move@1(blade, by=[0, 0.225, 0])
+  bent = xform.bend@1(blade_up, angle=0.008726646259971648rad)
+  lean = xform.rotate@1(bent, angles=[0.004363323129985824rad, 0rad, 0rad])
+  ring = inst.radial@1(lean, count=7, radius=0.04)
+  tuft = inst.realize@1(ring)
+  green = solid.material@1(tuft, color=[0.28, 0.45, 0.15], roughness=0.8)
+  expose count = ring.count
+  expose color = green.color
+  result green
+end
+ball_shape = solid.sphere@1(radius=0.032, segments=20)
+ball_mesh = solid.material@1(ball_shape, color=[1, 1, 1], roughness=0.26)
+sky = scene.sky@1(sun_elevation=42, sun_azimuth=-155, ground_color=[0.24, 0.46, 0.25], clouds=true, cloud_cover=0.2, wind_strength=0)
+v_hole = game.var@1(name="hole", value=1)
+v_strokes = game.var@1(name="strokes", value=0)
+v_total = game.var@1(name="total", value=0)
+v_par = game.var@1(name="par", value=2)
+v_completed = game.var@1(name="completed", value=0)
+v_started = game.var@1(name="started", value=0)
+course_terrain = game.terrain@1(parts=["course_land", "green1", "tee1", "green2", "tee2", "green3", "tee3", "bunker"])
+rough_surface = game.surface@1(name="rough", parts=["course_land"], decel=2.8, bounce=0.18)
+green_surface = game.surface@1(name="green", parts=["green1", "tee1", "green2", "tee2", "green3", "tee3"], decel=0.55, bounce=0.22)
+sand_surface = game.surface@1(name="sand", parts=["bunker"], decel=8, bounce=0.08)
+player_kind = game.kind@1(name="player", size=0.15, tags=["hero"])
+ball_kind = game.kind@1(name="ball", size=0.032, tags=["ball"], part="ball_mesh", bounce=0.22, roll=true)
+putter_kind = game.kind@1(name="putter", size=0.065, tags=["hand_r"], part="putter_mesh", swing=true, reach=0.9)
+player_spawn = game.spawn@1(kind="player", at=[24.6, 1.308, 8.1])
+ball_spawn = game.spawn@1(kind="ball", at=[25, 1.342, 9])
+putter_spawn = game.spawn@1(kind="putter", at=[25.45, 2.308, 8.5])
+player_follow = game.input@1(name="player", target="tag:hero", follow="viewer")
+putter_follow = game.input@1(name="putter", target="tag:hand_r", follow="right_hand")
+cup_kind1 = game.kind@1(name="cup1", size=0.11, tags=["cup1"], pocket=true)
+cup_spawn1 = game.spawn@1(kind="cup1", at=[25, 1.558, 29])
+cup_kind2 = game.kind@1(name="cup2", size=0.11, tags=["cup2"], pocket=true)
+cup_spawn2 = game.spawn@1(kind="cup2", at=[25, 1.858, 59])
+cup_kind3 = game.kind@1(name="cup3", size=0.11, tags=["cup3"], pocket=true)
+cup_spawn3 = game.spawn@1(kind="cup3", at=[25, 1.858, 89])
+initial_tee = game.rule@1(on="tick", when="started==0", do="set:started:1;effect:message:goto_24.6_1.308_8.1_25_29")
+stroke_rule = game.rule@1(on="swing", when="completed<3", do="add:strokes:1;add:total:1;effect:sfx:hit@a")
+out_rule1 = game.rule@1(on="out", a="tag:ball", when="hole==1", do="add:strokes:1;add:total:1;destroy:a;spawn:ball@25,1.342,9;effect:message:goto_24.6_1.308_8.1_25_29;effect:sfx:click@a")
+pocket_rule1 = game.rule@1(on="pocket", a="kind:cup1", b="tag:ball", when="hole==1", do="destroy:b;add:completed:1;set:hole:2;set:strokes:0;set:par:3;spawn:ball@25,1.492,39;effect:message:goto_24.6_1.458_38.1_25_59;effect:sfx:powerup@a")
+out_rule2 = game.rule@1(on="out", a="tag:ball", when="hole==2", do="add:strokes:1;add:total:1;destroy:a;spawn:ball@25,1.492,39;effect:message:goto_24.6_1.458_38.1_25_59;effect:sfx:click@a")
+pocket_rule2 = game.rule@1(on="pocket", a="kind:cup2", b="tag:ball", when="hole==2", do="destroy:b;add:completed:1;set:hole:3;set:strokes:0;set:par:3;spawn:ball@25,1.642,69;effect:message:goto_24.6_1.608_68.1_25_89;effect:sfx:powerup@a")
+out_rule3 = game.rule@1(on="out", a="tag:ball", when="hole==3", do="add:strokes:1;add:total:1;destroy:a;spawn:ball@25,1.642,69;effect:message:goto_24.6_1.608_68.1_25_89;effect:sfx:click@a")
+pocket_rule3 = game.rule@1(on="pocket", a="kind:cup3", b="tag:ball", when="hole==3", do="destroy:b;add:completed:1;effect:sfx:powerup@a;win")
+win_goal = game.goal@1(outcome="win", when="completed>=3")
+hole_hud = game.hud@1(text="HOLE {hole}/3  PAR {par}", anchor="top", size=0.0025)
+score_hud = game.hud@1(text="STROKES {strokes}  TOTAL {total} / PAR 8", anchor="bottom", size=0.0025)
+hint_hud = game.hud@1(text="RIGHT HAND: PUTT | OUT: +1", anchor="left", size=0.002)
+mini_golf = game.collect@1(v_hole, v_strokes, v_total, v_par, v_completed, v_started, course_terrain, rough_surface, green_surface, sand_surface, player_kind, ball_kind, putter_kind, player_spawn, ball_spawn, putter_spawn, player_follow, putter_follow, cup_kind1, cup_spawn1, cup_kind2, cup_spawn2, cup_kind3, cup_spawn3, initial_tee, stroke_rule, out_rule1, pocket_rule1, out_rule2, pocket_rule2, out_rule3, pocket_rule3, win_goal, hole_hud, score_hud, hint_hud, name="sunny_greens")
+land_seed = terrain.tile@1(size=[50, 100], cell=0.5, seed=719, height=3.2, scale=28, octaves=3, roughness=0.35, warp=5)
+land_pad1 = terrain.flatten@1(land_seed, at=[25, 17], radius=5, blend=5, to="height", height=1.3)
+land_pad2 = terrain.flatten@1(land_pad1, at=[25, 25], radius=5, blend=5, to="height", height=1.3)
+land_pad3 = terrain.flatten@1(land_pad2, at=[25, 43], radius=4, blend=5, to="height", height=1.45)
+land_pad4 = terrain.flatten@1(land_pad3, at=[25, 48], radius=3.5, blend=5, to="height", height=2.25)
+land_pad5 = terrain.flatten@1(land_pad4, at=[25, 53], radius=3.5, blend=5, to="height", height=2.05)
+land_pad6 = terrain.flatten@1(land_pad5, at=[25, 74], radius=5, blend=5, to="height", height=1.6)
+land_pad7 = terrain.flatten@1(land_pad6, at=[25, 82], radius=5, blend=5, to="height", height=1.6)
+land_pad8 = terrain.flatten@1(land_pad7, at=[25, 9], radius=1.6, blend=2.5, to="height", height=1.3)
+land_pad9 = terrain.flatten@1(land_pad8, at=[25, 29], radius=3.5, blend=3, to="height", height=1.55)
+land_pad10 = terrain.flatten@1(land_pad9, at=[25, 39], radius=1.6, blend=2.5, to="height", height=1.45)
+land_pad11 = terrain.flatten@1(land_pad10, at=[25, 59], radius=3.5, blend=3, to="height", height=1.85)
+land_pad12 = terrain.flatten@1(land_pad11, at=[25, 69], radius=1.6, blend=2.5, to="height", height=1.6)
+land_pad13 = terrain.flatten@1(land_pad12, at=[25, 89], radius=3.5, blend=3, to="height", height=1.85)
+land_pad14 = terrain.flatten@1(land_pad13, at=[26.6, 79], radius=1.9, blend=1.8, to="height", height=0.75)
+stream_bed = river.carve@1(land_pad14, path="36,66; 34,74; 35,83; 38,94", level="descending", width=2.6, depth=0.85, bank_slope=24, bank_width=1.7, water_offset=0.27)
+plant_zone = terrain.mask@1(stream_bed, name="plant_zone", from=0.05, to=0.5, smooth=true, invert=true)
+land_finish = terrain.material@1(plant_zone, grass=[0.24, 0.39, 0.12], rock=[0.42, 0.43, 0.37], sand=[0.77, 0.66, 0.4], rock_slope=32, sand_line=0.95, sand_blend=0.3, variation=0.28, relief=0.32, relief_scale=2.5)
+stream_finish = river.water@1(stream_bed, shallow=[0.22, 0.52, 0.48], deep=[0.035, 0.21, 0.25], flow=0.45, ripple=0.25, foam=0.2)
+green_disc = solid.cylinder@1(radius=3.25, height=0.008, segments=80)
+green_base = xform.move@1(green_disc, by=[0, 0.004, 0])
+green_finish = solid.material@1(green_base, color=[0.28, 0.62, 0.26], roughness=0.94)
+tee_disc = solid.cylinder@1(radius=0.72, height=0.008, segments=48)
+tee_base = xform.move@1(tee_disc, by=[0, 0.004, 0])
+tee_finish = solid.material@1(tee_base, color=[0.48, 0.68, 0.31], roughness=0.93)
+sand_disc = solid.cylinder@1(radius=1.4, height=0.009, segments=64)
+sand_base = xform.move@1(sand_disc, by=[0, 0.0045, 0])
+sand_finish_new = solid.material@1(sand_base, color=[0.88, 0.74, 0.45], roughness=1)
+sand_relief_new = solid.finish@1(sand_finish_new, relief=0.28, relief_scale=85)
+sand_placed_new = terrain.place@1(sand_relief_new, plant_zone, at=[[26.6, 79]])
+green_placed1 = terrain.place@1(green_finish, plant_zone, at=[[25, 29]])
+tee_placed1 = terrain.place@1(tee_finish, plant_zone, at=[[25, 9]])
+green_placed2 = terrain.place@1(green_finish, plant_zone, at=[[25, 59]])
+tee_placed2 = terrain.place@1(tee_finish, plant_zone, at=[[25, 39]])
+green_placed3 = terrain.place@1(green_finish, plant_zone, at=[[25, 89]])
+tee_placed3 = terrain.place@1(tee_finish, plant_zone, at=[[25, 69]])
+edge_pattern = field.expr@1(code="out = max(smoothstep(6.5, 9.0, abs(p.x - 25.0)), smoothstep(94.0, 98.0, p.z));")
+oak_real = flora.tree@1(height=6.8, seed=42, sides=7, leaves=[0.22, 0.4, 0.1], sway=0.18, lod=3)
+pine_real = flora.tree@1(kind="pine", height=8.5, seed=18, sides=7, leaves=[0.12, 0.28, 0.17], sway=0.15, lod=3)
+birch_real = flora.tree@1(kind="birch", height=6.3, seed=56, sides=7, leaves=[0.43, 0.55, 0.18], sway=0.2, lod=3)
+willow_real = flora.tree@1(kind="willow", height=6.5, seed=71, sides=7, leaves=[0.31, 0.46, 0.19], sway=0.2, lod=3)
+oaks_scattered = scatter.place@1(oak_real, plant_zone, edge_pattern, radius=10, density=0.32, seed=30, layer="plant_zone", max_slope=30, scale=[0.82, 1.15], sink=0.04)
+pines_scattered = scatter.place@1(pine_real, plant_zone, edge_pattern, radius=11, density=0.25, seed=60, layer="plant_zone", max_slope=30, scale=[0.8, 1.13], sink=0.04)
+birches_scattered = scatter.place@1(birch_real, plant_zone, edge_pattern, radius=8, density=0.24, seed=90, layer="plant_zone", max_slope=30, scale=[0.8, 1.1], sink=0.04)
+willows_scattered = scatter.place@1(willow_real, plant_zone, edge_pattern, radius=13, density=0.15, seed=114, layer="plant_zone", max_slope=25, scale=[0.8, 1.1], sink=0.04)
+tuft_real = grass_tuft(color=[0.36, 0.47, 0.16])
+tufts_scattered = scatter.place@1(tuft_real, plant_zone, edge_pattern, radius=2.6, density=0.42, seed=321, layer="plant_zone", max_slope=45, scale=[0.5, 1.2], align=0.6)
+rock_seed = solid.sphere@1(radius=0.5, segments=9)
+rock_squash = xform.scale@1(rock_seed, by=[1.3, 0.6, 0.85])
+rock_rough = xform.noise@1(rock_squash, amplitude=0.09, scale=0.35, seed=13)
+rock_up = xform.move@1(rock_rough, by=[0, 0.2, 0])
+rock_real = solid.material@1(rock_up, color=[0.43, 0.44, 0.36], roughness=0.93)
+rocks_scattered = scatter.place@1(rock_real, plant_zone, edge_pattern, density=0.3, seed=232, layer="plant_zone", scale=[0.4, 1.4], align=0.6, sink=0.08)
+fence_real = fence(color=[0.55, 0.43, 0.27])
+fence_west = terrain.place@1(fence_real, plant_zone, at=[[2, 8], [2, 11], [2, 14], [2, 17], [2, 20], [2, 23]], yaw_scale=[[90, 1], [90, 1], [90, 1], [90, 1], [90, 1], [90, 1]], sink=0.06)
+fence_end = terrain.place@1(fence_real, plant_zone, at=[[20.5, 96], [23.5, 96], [26.5, 96], [29.5, 96]], sink=0.06)
+shaft_taper = solid.cone@1(height=0.75, radius=0.007, top_radius=0.0045, segments=20)
+shaft_axis = xform.rotate@1(shaft_taper, angles=[-1.5707963267948966rad, 0rad, 0rad])
+shaft_position = xform.move@1(shaft_axis, by=[0, 0, -0.495])
+shaft_chrome = solid.material@1(shaft_position, color=[0.68, 0.74, 0.77], metallic=0.96, roughness=0.2, recipe="brushed_metal")
+grip_taper = solid.cone@1(height=0.22, radius=0.0165, top_radius=0.0135, segments=24)
+grip_axis_new = xform.rotate@1(grip_taper, angles=[-1.5707963267948966rad, 0rad, 0rad])
+grip_position_new = xform.move@1(grip_axis_new, by=[0, 0, -0.045])
+grip_rubber = solid.material@1(grip_position_new, color=[0.025, 0.065, 0.065], roughness=0.92)
+grip_ring = solid.torus@1(major=0.0158, minor=0.0012, segments=24, tube_segments=6)
+grip_ring_axis = xform.rotate@1(grip_ring, angles=[1.5707963267948966rad, 0rad, 0rad])
+grip_ring_position = xform.move@1(grip_ring_axis, by=[0, 0, 0.045])
+grip_rings = xform.array@1(grip_ring_position, count_z=8, spacing=[0, 0, -0.024])
+grip_band_paint = solid.material@1(grip_rings, color=[0.67, 0.79, 0.44], roughness=0.8)
+hosel_path = curve.spline@1(points=[[0, 0, -0.855], [0.003, 0.008, -0.875], [0.014, 0.016, -0.895], [0.02, 0, -0.9]], steps=6)
+hosel_tube = curve.tube@1(hosel_path, radius=0.008, end_radius=0.007, sides=14)
+hosel_metal = solid.material@1(hosel_tube, color=[0.65, 0.72, 0.75], metallic=0.95, roughness=0.22)
+putter_head_blank = solid.box@1(size=[0.23, 0.05, 0.08])
+putter_head_poly = poly.from_solid@1(putter_head_blank)
+putter_head_edges = poly.select@1(putter_head_poly, element="edge", by="sharp", angle=0.6108652381980153rad)
+putter_head_bevel = poly.bevel_network@1(putter_head_poly, putter_head_edges, width=0.006)
+putter_head_solid = poly.to_solid@1(putter_head_bevel)
+putter_head_position = xform.move@1(putter_head_solid, by=[0.065, 0, -0.9])
+putter_head_paint = solid.material@1(putter_head_position, color=[0.035, 0.23, 0.25], metallic=0.72, roughness=0.26)
+face_blank = solid.box@1(size=[0.19, 0.033, 0.0025])
+face_bevel = solid.round@1(face_blank, radius=0.0008, segments=8)
+face_position = xform.move@1(face_bevel, by=[0.065, 0, -0.9405])
+face_metal = solid.material@1(face_position, color=[0.76, 0.79, 0.8], metallic=0.93, roughness=0.26, recipe="brushed_metal")
+sight_blank = solid.box@1(size=[0.0025, 0.001, 0.048])
+sight_position = xform.move@1(sight_blank, by=[0.065, 0.0254, -0.9])
+sight_paint = solid.material@1(sight_position, color=[0.95, 0.94, 0.78])
+putter_complete = solid.union@1(shaft_chrome, grip_rubber, grip_band_paint, hosel_metal, putter_head_paint, face_metal, sight_paint)
+cup_sunk_shape = solid.cylinder@1(radius=0.108, height=0.18, segments=48)
+cup_sunk_base = xform.move@1(cup_sunk_shape, by=[0, -0.075, 0])
+cup_black = solid.material@1(cup_sunk_base, color=[0.008, 0.014, 0.012], roughness=1)
+cup_lip = solid.torus@1(major=0.115, minor=0.006, tube_segments=8)
+cup_lip_lift = xform.move@1(cup_lip, by=[0, 0.015, 0])
+cup_lip_metal = solid.material@1(cup_lip_lift, color=[0.86, 0.88, 0.78], metallic=0.6, roughness=0.38)
+flag_pole_shape = solid.cone@1(height=1.75, radius=0.012, top_radius=0.006, segments=16)
+flag_pole_base = xform.move@1(flag_pole_shape, by=[0, 0.875, 0])
+flag_pole_paint = solid.material@1(flag_pole_base, color=[0.91, 0.9, 0.76], metallic=0.35, roughness=0.35)
+cloth_profile = profile.polygon@1(points=[[0, 0], [0.55, 0.045], [0.43, 0.32], [0, 0.34]])
+cloth_extrude = solid.extrude@1(cloth_profile, height=0.003, divisions=18)
+cloth_stand = xform.rotate@1(cloth_extrude, angles=[1.5707963267948966rad, 0rad, 0rad])
+cloth_ripple = xform.wave@1(cloth_stand, amplitude=0.025, wavelength=0.36, tolerance=0.004)
+cloth_at_top = xform.move@1(cloth_ripple, by=[0, 1.38, 0])
+cup_placed1 = terrain.place@1(cup_black, plant_zone, at=[[25, 29]])
+lip_placed1 = terrain.place@1(cup_lip_metal, plant_zone, at=[[25, 29]])
+pole_placed1 = terrain.place@1(flag_pole_paint, plant_zone, at=[[25, 29]])
+cloth_color1 = solid.material@1(cloth_at_top, color=[0.88, 0.22, 0.12], roughness=0.95, recipe="fabric")
+cloth_placed1 = terrain.place@1(cloth_color1, plant_zone, at=[[25, 29]])
+cloth_breeze1 = anim.wave@1(cloth_placed1, property="rotation", amplitude=[0, 5, 0], period=3.9, pivot=[25, 1.55, 29])
+cup_placed2 = terrain.place@1(cup_black, plant_zone, at=[[25, 59]])
+lip_placed2 = terrain.place@1(cup_lip_metal, plant_zone, at=[[25, 59]])
+pole_placed2 = terrain.place@1(flag_pole_paint, plant_zone, at=[[25, 59]])
+cloth_color2 = solid.material@1(cloth_at_top, color=[0.95, 0.65, 0.12], roughness=0.95, recipe="fabric")
+cloth_placed2 = terrain.place@1(cloth_color2, plant_zone, at=[[25, 59]])
+cloth_breeze2 = anim.wave@1(cloth_placed2, property="rotation", amplitude=[0, 5, 0], period=4.3, pivot=[25, 1.85, 59])
+cup_placed3 = terrain.place@1(cup_black, plant_zone, at=[[25, 89]])
+lip_placed3 = terrain.place@1(cup_lip_metal, plant_zone, at=[[25, 89]])
+pole_placed3 = terrain.place@1(flag_pole_paint, plant_zone, at=[[25, 89]])
+cloth_color3 = solid.material@1(cloth_at_top, color=[0.12, 0.39, 0.69], roughness=0.95, recipe="fabric")
+cloth_placed3 = terrain.place@1(cloth_color3, plant_zone, at=[[25, 89]])
+cloth_breeze3 = anim.wave@1(cloth_placed3, property="rotation", amplitude=[0, 5, 0], period=4.7, pivot=[25, 1.85, 89])
+course_ambient = scene.environment@1(sky_color=[0.62, 0.76, 0.88], ground_color=[0.34, 0.42, 0.24], intensity=0.65, reflection=0.4, bounce=0.35)
+outdoor_preview = script.js@1(source="const reply = await world.call(\"world.query\", {has:[\"bevy_transform::components::transform::Transform\"], components:[\"bevy_transform::components::transform::Transform\"], limit:2048});\nconst rows = reply.result?.rows || reply.rows || [];\nconst room = rows.filter(r => { const t=r.components?.[\"bevy_transform::components::transform::Transform\"]; return !r.node && t && t.scale[0]>5 && Math.abs(t.scale[0]-t.scale[1])<0.01 && Math.abs(t.scale[1]-t.scale[2])<0.01; });\nif(room.length) await world.batch(room.map(r=>({method:\"world.insert_components\",params:{entity:r.entity,components:{Visibility:\"Hidden\"}}})));\nlog(\"Outdoor backdrop: hid \"+room.length+\" preview-room panels.\");", name="outdoor_preview")
+cloth_world1 = xform.move@1(cloth_color1, by=[25, 1.55, 29])
+flag_sway1 = anim.wave@1(cloth_world1, property="rotation", amplitude=[0, 12, 0], period=4, pivot=[25, 3.1, 29])
+cloth_world2 = xform.move@1(cloth_color2, by=[25, 1.85, 59])
+flag_sway2 = anim.wave@1(cloth_world2, property="rotation", amplitude=[0, 12, 0], period=4, pivot=[25, 3.4000000000000004, 59])
+cloth_world3 = xform.move@1(cloth_color3, by=[25, 1.85, 89])
+flag_sway3 = anim.wave@1(cloth_world3, property="rotation", amplitude=[0, 12, 0], period=4, pivot=[25, 3.4000000000000004, 89])
+output green1 = green_placed1
+output tee1 = tee_placed1
+output green2 = green_placed2
+output tee2 = tee_placed2
+output green3 = green_placed3
+output tee3 = tee_placed3
+output bunker = sand_placed_new
+output ball_mesh
+output sky
+output rules = mini_golf
+output course_land = land_finish
+output stream = stream_finish
+output oaks = oaks_scattered
+output pines = pines_scattered
+output birches = birches_scattered
+output willows = willows_scattered
+output grasses = tufts_scattered
+output rocks = rocks_scattered
+output boundary_west = fence_west
+output boundary_end = fence_end
+output putter_mesh = putter_complete
+output cup_visual1 = cup_placed1
+output rim1 = lip_placed1
+output flagpole1 = pole_placed1
+output flag1 = flag_sway1
+output cup_visual2 = cup_placed2
+output rim2 = lip_placed2
+output flagpole2 = pole_placed2
+output flag2 = flag_sway2
+output cup_visual3 = cup_placed3
+output rim3 = lip_placed3
+output flagpole3 = pole_placed3
+output flag3 = flag_sway3
+output course_ambient

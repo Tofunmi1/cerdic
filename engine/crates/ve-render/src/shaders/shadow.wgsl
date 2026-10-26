@@ -36,7 +36,8 @@ struct VertexInput {
 fn vertex(input: VertexInput) -> @builtin(position) vec4<f32> {
     let model = mat4x4<f32>(input.model_0, input.model_1, input.model_2, input.model_3);
     let world = model * vec4<f32>(input.position, 1.0);
-    let moved = world.xyz + wind_displacement(model[3].xyz, world.xyz, input.position, input.foliage);
+    let wind_world = world.xyz + wind_displacement(model[3].xyz, world.xyz, input.position, input.foliage);
+    let moved = grass_world_position(wind_world, model, input.position, view.camera_position.xyz, water.grass);
     return view.clip_from_world * vec4<f32>(moved, 1.0);
 }
 
@@ -84,7 +85,8 @@ fn vertex_cutout(input: CutoutInput) -> CutoutOutput {
     let model = mat4x4<f32>(input.model_0, input.model_1, input.model_2, input.model_3);
     var out: CutoutOutput;
     let world = model * vec4<f32>(input.position, 1.0);
-    let moved = world.xyz + wind_displacement(model[3].xyz, world.xyz, input.position, input.foliage);
+    let wind_world = world.xyz + wind_displacement(model[3].xyz, world.xyz, input.position, input.foliage);
+    let moved = grass_world_position(wind_world, model, input.position, view.camera_position.xyz, water.grass);
     out.clip_position = view.clip_from_world * vec4<f32>(moved, 1.0);
     out.uv = input.uv;
     out.albedo_layer = input.maps.x;

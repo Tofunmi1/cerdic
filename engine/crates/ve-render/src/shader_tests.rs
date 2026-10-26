@@ -81,6 +81,30 @@ fn the_post_pass_reads_depth_from_a_colour_texture() {
 #[test]
 fn the_forward_shader_parses_and_validates() {
     check("forward.wgsl", crate::pipeline::FORWARD_SHADER);
+    check(
+        "forward_without_sim",
+        &crate::pipeline::without_sim(crate::pipeline::FORWARD_SHADER),
+    );
+    check(
+        "forward_without_uv",
+        &crate::pipeline::forward_shader_without_uv(),
+    );
+    for has_uv in [false, true] {
+        check(
+            "forward_color",
+            &crate::pipeline::forward_shader_with_color(has_uv),
+        );
+    }
+    for has_uv in [false, true] {
+        check(
+            "ordinary_water",
+            &crate::pipeline::without_sim(&crate::pipeline::forward_shader_with_color(has_uv)),
+        );
+    }
+    check("water_waves.wgsl", concat!(include_str!("shaders/grass.wgsl"), include_str!("shaders/surface_types.wgsl"), include_str!("shaders/forward_terrain.wgsl"), include_str!("shaders/stochastic.wgsl"), include_str!("shaders/water_waves.wgsl"),
+        "@vertex fn v(@location(0) p: vec2<f32>) -> @builtin(position) vec4<f32> { return vec4<f32>(p.x, water_wave_height(p, 1.0), p.y, 1.0); }
+",
+        "@fragment fn f() -> @location(0) vec4<f32> { return vec4<f32>(water_wave_normal(vec2<f32>(1.0), 1.0) + water_detail_normal(vec2<f32>(1.0), 1.0), 1.0); }"));
 }
 
 #[test]
@@ -96,4 +120,66 @@ fn the_shadow_shader_parses_and_validates() {
 #[test]
 fn the_sky_shader_parses_and_validates() {
     check("sky.wgsl", include_str!("shaders/sky.wgsl"));
+}
+
+#[test]
+fn stochastic_shader_translates_to_webgl() {
+    check(
+        "stochastic.wgsl",
+        concat!(
+            include_str!("shaders/stochastic.wgsl"),
+            "@fragment fn f(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> { let s = stochastic_cells(uv, 1.0, 7u); return vec4<f32>(s[0].uv, s[0].weight, 1.0); }"
+        ),
+    );
+}
+
+#[test]
+fn shared_surface_uniform_has_the_same_cpu_and_shader_size() {
+    use bevy_render::render_resource::ShaderType;
+    let module = naga::front::wgsl::parse_str(crate::pipeline::FORWARD_SHADER).unwrap();
+    let span = module
+        .types
+        .iter()
+        .find_map(|(_, ty)| match (&ty.name, &ty.inner) {
+            (Some(name), naga::TypeInner::Struct { span, .. }) if name == "WaterWaves" => {
+                Some(u64::from(*span))
+            }
+            _ => None,
+        });
+    assert_eq!(span, Some(crate::water_gpu::WaterUniform::min_size().get()));
+}
+
+#[test]
+fn grass_helpers_translate_to_webgl() {
+    check(
+        "grass.wgsl",
+        concat!(
+            include_str!("shaders/grass.wgsl"),
+            r#"
+        @vertex fn v(@location(0) p: vec3<f32>) -> @builtin(position) vec4<f32> {
+            let ratio = grass_height_ratio(p.y, -0.1, 2.0);
+            let normal = grass_upward_normal(vec3<f32>(1.0, 0.0, 0.0), ratio);
+            var grass: GrassParams;
+            grass.look = vec4<f32>(1.0, 0.5, 1.0, 0.0);
+            grass.shape = vec4<f32>(25.0, 70.0, -0.1, 2.0);
+            let world = grass_world_position(p, mat4x4<f32>(), p, vec3<f32>(0.0), grass);
+            return vec4<f32>(world + normal * grass_sink_correction(p.y, ratio) * grass_fade_scale(40.0, 25.0, 70.0), 1.0);
+        }
+        @fragment fn f() -> @location(0) vec4<f32> {
+            return vec4<f32>(grass_ground_blend(vec3<f32>(0.5), vec3<f32>(0.2), 0.2, 0.6, 1.0) * grass_sky_occlusion(0.2) * grass_contact_ao(0.2), 1.0);
+        }
+    "#
+        ),
+    );
+}
+
+#[test]
+fn only_simulation_pipelines_bind_the_height_texture() {
+    let sim = crate::pipeline::FORWARD_SHADER;
+    let ordinary = crate::pipeline::without_sim(sim);
+    assert!(sim.contains("@binding(1) var water_sim: texture_2d<f32>"));
+    assert!(!ordinary.contains("var water_sim:"));
+    assert!(sim.contains("textureLoad(water_sim"));
+    check("interactive_water", sim);
+    check("ordinary_water", &ordinary);
 }

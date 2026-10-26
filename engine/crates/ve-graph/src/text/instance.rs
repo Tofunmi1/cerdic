@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::coerce::param_value;
 use super::lex::error;
+use super::near;
 use super::node::{Built, Known, connect};
 use super::parse::{Arg, Lit};
 use crate::command::{Alias, Command, GroupRef, NodeRef};
@@ -112,7 +113,11 @@ impl Instance<'_> {
         } else {
             let valid: Vec<&str> = self.info.inputs.iter().map(String::as_str).collect();
             parts.errors.push(Diagnostic {
-                suggestion: Some(format!("inputs: {}", valid.join(", "))),
+                suggestion: near::suggestion(
+                    port,
+                    valid.iter().copied(),
+                    Some(format!("inputs: {}", valid.join(", "))),
+                ),
                 ..error(
                     "graph.unknown_port",
                     span,
@@ -141,7 +146,11 @@ impl Instance<'_> {
         let Some(ty) = self.info.params.get(key) else {
             let valid: Vec<&str> = self.info.params.keys().map(String::as_str).collect();
             parts.errors.push(Diagnostic {
-                suggestion: Some(format!("{} exposes: {}", self.op, valid.join(", "))),
+                suggestion: near::suggestion(
+                    key,
+                    valid.iter().copied(),
+                    Some(format!("{} exposes: {}", self.op, valid.join(", "))),
+                ),
                 ..error(
                     "parse.unknown_param",
                     key_span,

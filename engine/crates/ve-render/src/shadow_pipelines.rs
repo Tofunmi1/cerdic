@@ -60,7 +60,11 @@ impl ShadowPipelines {
     fn descriptor(&self, mesh_layout: VertexBufferLayout) -> RenderPipelineDescriptor {
         RenderPipelineDescriptor {
             label: Some("ve_shadow".into()),
-            layout: vec![self.view_layout.clone()],
+            layout: vec![
+                self.view_layout.clone(),
+                crate::textures::textures_layout(),
+                crate::water_gpu::layout(),
+            ],
             vertex: VertexState {
                 shader: self.shader.clone(),
                 entry_point: Some("vertex".into()),
@@ -138,7 +142,7 @@ pub(crate) fn prepare_shadow_state(
     for cascade in 0..params.cascades {
         let uniform = ViewUniform {
             clip_from_world: params.clip_from_world[cascade],
-            camera_position: Vec4::ZERO,
+            camera_position: viewer.extend(1.0),
             exposure: Vec4::new(1.0, 0.0, 0.0, 0.0),
             // The depth-only shadow pass does not grade; keep the fields neutral but present.
             grading: Vec4::new(1.0, 1.0, 0.0, 0.0),

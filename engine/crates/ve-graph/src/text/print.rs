@@ -9,6 +9,9 @@ use crate::id::GroupId;
 use crate::spec::{OperatorRegistry, OperatorSpec};
 use crate::value::{ParamType, Unit, Value};
 
+mod node_lines;
+pub use node_lines::to_text_node_lines;
+
 fn plain_name(label: &str) -> bool {
     let mut chars = label.chars();
     chars
@@ -45,7 +48,7 @@ fn number(value: f64, unit: Unit) -> String {
     }
 }
 
-fn literal(value: &Value, unit: Unit) -> String {
+pub(super) fn literal(value: &Value, unit: Unit) -> String {
     match value {
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
@@ -110,7 +113,13 @@ fn flag_args(node: &Node, args: &mut Vec<String>) {
     }
 }
 
-fn statement(node: &Node, spec: &OperatorSpec, names: &BTreeMap<String, String>) -> String {
+fn statement(
+    node: &Node,
+    spec: &OperatorSpec,
+    names: &BTreeMap<String, String>,
+    compact: bool,
+    registry: &OperatorRegistry,
+) -> String {
     let mut args = inputs(node, spec, names);
     // Number sockets (`width=w`, `size.y=h`): a number node linked into a parameter, written by port name.
     for (port, links) in &node.inputs {
@@ -135,12 +144,21 @@ fn statement(node: &Node, spec: &OperatorSpec, names: &BTreeMap<String, String>)
         args.push(format!(
             "{}={}",
             param.name,
-            literal(value, unit_of(&param.ty))
+            render_literal(value, unit_of(&param.ty), compact)
         ));
     }
     flag_args(node, &mut args);
     let name = names.get(node.id.as_str()).map_or("", String::as_str);
-    format!("{name} = {}({})", node.op, args.join(", "))
+    let op = if compact
+        && !registry
+            .iter()
+            .any(|s| s.id.family() == node.op.family() && s.id.version() > node.op.version())
+    {
+        node.op.family().to_string()
+    } else {
+        node.op.to_string()
+    };
+    format!("{name} = {op}({})", args.join(", "))
 }
 
 fn unsupported(message: String) -> Box<Diagnostic> {
@@ -155,6 +173,7 @@ fn instance_statement(
     node: &Node,
     instance: &Instance,
     names: &BTreeMap<String, String>,
+    compact: bool,
 ) -> Result<String, Box<Diagnostic>> {
     let group = doc.group(&instance.group).ok_or_else(|| {
         Box::new(
@@ -192,7 +211,7 @@ fn instance_statement(
                 Some(unit_of(&registry.get(&holder.op)?.param(&p.param)?.ty))
             })
             .unwrap_or(Unit::None);
-        args.push(format!("{name}={}", literal(value, unit)));
+        args.push(format!("{name}={}", render_literal(value, unit, compact)));
     }
     flag_args(node, &mut args);
     let name = names.get(node.id.as_str()).map_or("", String::as_str);
@@ -205,6 +224,7 @@ fn scope_lines(
     registry: &OperatorRegistry,
     nodes: &[&Node],
     names: &BTreeMap<String, String>,
+    compact: bool,
 ) -> Result<Vec<String>, Box<Diagnostic>> {
     let mut lines = Vec::new();
     let mut done: BTreeSet<&str> = BTreeSet::new();
@@ -223,7 +243,9 @@ fn scope_lines(
                 continue;
             }
             if let Some(instance) = &node.instance {
-                lines.push(instance_statement(doc, registry, node, instance, names)?);
+                lines.push(instance_statement(
+                    doc, registry, node, instance, names, compact,
+                )?);
             } else {
                 let spec = registry.get(&node.op).ok_or_else(|| {
                     Box::new(
@@ -234,7 +256,7 @@ fn scope_lines(
                         .at_node(&node.id),
                     )
                 })?;
-                lines.push(statement(node, spec, names));
+                lines.push(statement(node, spec, names, compact, registry));
             }
             done.insert(node.id.as_str());
         }
@@ -245,6 +267,9 @@ fn scope_lines(
             ));
         }
         pending = rest;
+    }
+    if compact {
+        return Ok(super::compact::pipes(lines, doc, registry, nodes, names));
     }
     Ok(lines)
 }
@@ -279,12 +304,13 @@ fn group_block(
     doc: &Document,
     registry: &OperatorRegistry,
     group: &Group,
+    compact: bool,
 ) -> Result<Vec<String>, Box<Diagnostic>> {
     let members: Vec<&Node> = doc.members(&group.id).collect();
     let names = names(&members);
     let mut lines = vec![format!("group {}", group.name)];
     lines.extend(
-        scope_lines(doc, registry, &members, &names)?
+        scope_lines(doc, registry, &members, &names, compact)?
             .into_iter()
             .map(|l| format!("  {l}")),
     );
@@ -309,13 +335,29 @@ fn group_block(
 /// links loop, and `text.unsupported` for an instance that is behind its group (text always makes a
 /// current instance, so upgrade it first).
 pub fn to_text(registry: &OperatorRegistry, doc: &Document) -> Result<String, Box<Diagnostic>> {
+    render(registry, doc, false)
+}
+
+fn render_literal(value: &Value, unit: Unit, compact: bool) -> String {
+    if compact {
+        super::compact::literal(value, unit)
+    } else {
+        literal(value, unit)
+    }
+}
+
+pub(super) fn render(
+    registry: &OperatorRegistry,
+    doc: &Document,
+    compact: bool,
+) -> Result<String, Box<Diagnostic>> {
     let mut lines = Vec::new();
     for group in groups_in_order(doc) {
-        lines.extend(group_block(doc, registry, group)?);
+        lines.extend(group_block(doc, registry, group, compact)?);
     }
     let top: Vec<&Node> = doc.nodes.iter().filter(|n| n.group.is_none()).collect();
     let names = names(&top);
-    lines.extend(scope_lines(doc, registry, &top, &names)?);
+    lines.extend(scope_lines(doc, registry, &top, &names, compact)?);
     for output in &doc.outputs {
         let source = names
             .get(output.from.node.as_str())

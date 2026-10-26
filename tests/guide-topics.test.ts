@@ -51,10 +51,27 @@ test('the menu lists every topic and says how to ask', () => {
 
 test('an unknown topic lists the real ones; a guide with no topics is returned whole', () => {
   const split = splitGuide(guide, topics);
-  expect(topicText(split, 'nope')).toContain('Topics: one, two, three, all.');
+  expect(topicText(split, 'nope')).toContain('Topics: core, one, two, three, all.');
   const plain = splitGuide('Only a core.', topics);
   expect(plain.sections.size).toBe(0);
   expect(coreWithMenu(plain)).toBe('Only a core.');
+});
+
+test('core is a named topic and fast start ends the guide with four ordered steps', () => {
+  const split = splitGuide(guide, topics);
+  const core = coreWithMenu(split);
+  expect(topicText(split, 'core')).toBe(core);
+  const steps = core.split('Fast start:\n')[1].split('\n');
+  expect(steps).toHaveLength(4);
+  expect(steps[0]).toContain('get_guide once');
+  expect(steps[0]).toContain('start_from');
+  expect(steps[1]).toContain('pipes and loops');
+  expect(steps[1]).toContain('batch');
+  expect(steps[1]).toContain('run');
+  expect(steps[2]).toContain('ONE snapshot of several cameras');
+  expect(steps[3]).toContain('edit by label');
+  expect(steps[3]).toContain('check');
+  expect(core.length - split.core.length - split.topics.map((topic: { id: string; summary: string }) => `- ${topic.id}: ${topic.summary}`).join('\n').length).toBeLessThan(1500);
 });
 
 test('the real topic table has unique ids and distinct opening words', () => {

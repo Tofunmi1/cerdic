@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::coerce::{describe, param_value};
 use super::lex::error;
+use super::near;
 use super::parse::{Arg, Lit};
 use crate::command::{Alias, Command, InputRef, NodeRef, OutRef};
 use crate::diag::{Diagnostic, Span};
@@ -62,8 +63,17 @@ fn read_params(spec: &OperatorSpec, args: &[Arg]) -> Params {
             }
         } else {
             let valid: Vec<_> = spec.params.iter().map(|p| p.name).collect();
+            // A unique likely spelling already explains the missing value; keep the useful
+            // unknown-parameter diagnostic instead of also reporting the intended one as absent.
+            if let [candidate] = near::closest(key, valid.iter().copied().chain(FLAGS)).as_slice() {
+                out.bad.insert((*candidate).to_owned());
+            }
             out.errors.push(Diagnostic {
-                suggestion: Some(format!("{} takes: {}", spec.id, valid.join(", "))),
+                suggestion: near::suggestion(
+                    key,
+                    valid.iter().copied().chain(FLAGS),
+                    Some(format!("{} takes: {}", spec.id, valid.join(", "))),
+                ),
                 ..error(
                     "parse.unknown_param",
                     *key_span,
@@ -109,7 +119,10 @@ pub(super) fn node_commands(
         .params
         .iter()
         .filter(|p| {
-            p.default.is_none() && !read.values.contains_key(p.name) && !read.bad.contains(p.name)
+            p.default.is_none()
+                && !spec.has_input_default(p.name)
+                && !read.values.contains_key(p.name)
+                && !read.bad.contains(p.name)
         })
         .collect();
     for param in missing {
@@ -219,7 +232,11 @@ pub(super) fn links(spec: &OperatorSpec, name: &str, args: &[Arg], known: &Known
             let mut valid: Vec<String> = spec.inputs.iter().map(|p| p.name.to_owned()).collect();
             valid.extend(spec.socket_names());
             errors.push(Diagnostic {
-                suggestion: Some(format!("{} takes: {}", spec.id, valid.join(", "))),
+                suggestion: near::suggestion(
+                    port,
+                    valid.iter().map(String::as_str),
+                    Some(format!("{} takes: {}", spec.id, valid.join(", "))),
+                ),
                 ..error(
                     "graph.unknown_port",
                     *span,

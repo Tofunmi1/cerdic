@@ -1,0 +1,6 @@
+for i in 0..2
+  for j in 0..3
+    tile_{i}_{j} = solid.box(size=[0.9, 0.1, 0.9]) | xform.move(by=[{i}, 0, {j}])
+    output tile_{i}_{j}
+  end
+end

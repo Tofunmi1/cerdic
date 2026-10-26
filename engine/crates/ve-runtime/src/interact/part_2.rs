@@ -90,6 +90,16 @@ pub(crate) fn run_interaction(
     for event in &output.events {
         let line = describe(event, &labels);
         state.note(line);
+        // The same events, for scripts (`on("click:crate_left", ...)`): by part name, with which pointer did it.
+        let (name, pointer, target) = match *event {
+            Event::HoverStart { pointer, target } => ("hover", pointer, target),
+            Event::HoverEnd { pointer, target } => ("unhover", pointer, target),
+            Event::SelectStart { pointer, target } => ("press", pointer, target),
+            Event::SelectEnd { pointer, target, click } => (if click { "click" } else { "release" }, pointer, target),
+            Event::GrabStart { pointer, target } => ("grab", pointer, target),
+            Event::GrabEnd { pointer, target, .. } => ("drop", pointer, target),
+        };
+        crate::world_api::push_event(name, &report::label_of(target, &labels), serde_json::json!({ "pointer": pointer.0 }));
         match event {
             Event::SelectEnd {
                 target,
@@ -113,7 +123,10 @@ pub(crate) fn run_interaction(
             _ => {}
         }
     }
+    // Only pointers that exist this frame can hover: a mouse that left the page or a controller that lost tracking must not leave its last target glowing.
+    let active: Vec<PointerId> = frames.iter().map(|frame| frame.id).collect();
     state.hovered = (0..=3_u32)
+        .filter(|id| active.contains(&PointerId(*id)))
         .filter_map(|id| state.machine.hover_of(PointerId(id)))
         .filter_map(entity_of)
         .collect();

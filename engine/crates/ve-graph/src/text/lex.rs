@@ -19,6 +19,7 @@ pub(super) enum Tok {
     LBracket,
     RBracket,
     Comma,
+    Pipe,
     Newline,
 }
 
@@ -151,10 +152,11 @@ pub(super) fn lex(source: &str) -> Result<Vec<Token>, Fail> {
                 cur.bump();
                 (Tok::Newline, 1)
             }
-            '=' | '(' | ')' | '[' | ']' | ',' => {
+            '=' | '(' | ')' | '[' | ']' | ',' | '|' => {
                 cur.bump();
                 let tok = match c {
                     '=' => Tok::Equals,
+                    '|' => Tok::Pipe,
                     '(' => Tok::Open,
                     ')' => Tok::Close,
                     '[' => Tok::LBracket,

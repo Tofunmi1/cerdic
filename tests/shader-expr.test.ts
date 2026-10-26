@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { emitGlsl, evalExpr, parseExpr } from "../src/engine/texture/expr";
+import type { ErrorCode } from "../src/engine/texture/expr/types";
 const parsed = (s: string) => {
   const r = parseExpr(s);
   if ("error" in r) throw new Error(`${r.error.code}: ${r.error.message}`);
@@ -62,7 +63,7 @@ describe("bounded shader expressions", () => {
     close(value("out = hsv(1/3,1,1)").slice(0, 3), [0, 1, 0], 1e-5);
   });
   test("5. rejects unsupported programs with useful typed errors", () => {
-    const cases: [string, string][] = [
+    const cases: [string, ErrorCode][] = [
       ["a = 1", "expr.no_out"],
       ["out = foo(1)", "expr.unknown_name"],
       ["a = vec2(1)\nout = a + vec3(1)", "expr.type"],
@@ -71,7 +72,7 @@ describe("bounded shader expressions", () => {
         "for i in 0..2 { for j in 0..2 { for k in 0..2 { } } }\nout = 1",
         "expr.loop",
       ],
-      ["x".repeat(601), "expr.limit"],
+      ["x".repeat(2001), "expr.limit"],
       ["out = while", "expr.syntax"],
       ["out = if", "expr.syntax"],
       ["out = texture(p)", "expr.unknown_name"],

@@ -1,0 +1,22 @@
+// What Blackout 2 contains right now: node tools/blackout2-look.mjs [world]
+import { chromium } from "../web/node_modules/playwright/index.mjs";
+const world = process.argv[2] ?? "worlds/blackout2.txt";
+const browser = await chromium.launch({ channel: "chromium", args: ["--enable-unsafe-webgpu", "--enable-features=Metal,WebGPU", "--ignore-gpu-blocklist"] });
+const page = await browser.newPage({ viewport: { width: 1000, height: 650 } });
+page.on("pageerror", (e) => console.log("PAGEERR", String(e).slice(0, 300)));
+await page.goto(`http://localhost:8801/?viewer=1&eval=1&scene=open&quality=low&world=${world}`);
+await page.waitForFunction(() => window.__ve?.ready, null, { timeout: 120000 });
+await page.evaluate(async () => { window.__rt = await import("./ve_runtime.js"); });
+await page.waitForFunction(() => JSON.parse(window.__rt.eval_projection_status()).committed?.quality === "final", null, { timeout: 400000 });
+await page.waitForFunction(() => JSON.parse(window.__rt.game_status()).present, null, { timeout: 60000 });
+await page.waitForTimeout(4000);
+const s = await page.evaluate(() => JSON.parse(window.__rt.game_status()));
+const by = {};
+for (const e of s.entities) (by[e.kind] ??= []).push(e.position.map((v) => +v.toFixed(2)));
+console.log("vars", JSON.stringify(s.vars), "status", s.status, "steps", s.steps, "drawn", s.drawn, "nav", JSON.stringify(s.nav));
+for (const [k, v] of Object.entries(by)) if (/scuttler|crate|player/.test(k)) console.log(k, JSON.stringify(v));
+const names = await page.evaluate(() => window.__ve.evaluation.parts.map((p) => p.name).filter((n) => /floor|scuttler|crate/.test(n)));
+console.log("parts:", names.join(", "));
+const tri = await page.evaluate(() => window.__ve.evaluation.parts.reduce((sum, p) => sum + (p.indices.length / 3) * (p.transforms?.length ? Math.floor(p.transforms.length / 16) : 1), 0));
+console.log("triangles", Math.round(tri));
+await browser.close();

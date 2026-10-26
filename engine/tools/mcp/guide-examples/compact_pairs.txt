@@ -1,0 +1,4 @@
+for [x, z] in [[1, 2], [3, 4], [5, 2]]
+  marker_{x} = solid.box(size=[0.25, 1, 0.25]) | xform.move(by=[{x}, 0.5, {z}])
+  output marker_{x}
+end

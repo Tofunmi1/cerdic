@@ -115,3 +115,47 @@ fn errors_point_at_the_expression() {
     let span = failure.span.unwrap();
     assert_eq!((span.line, span.col, span.len), (2, 7, 7));
 }
+
+#[test]
+fn a_text_constant_is_spliced_into_strings() {
+    let text =
+        "let mirror = \"u = 1.0 - abs(2.0 * p.x - 1.0);\"\nt = f(program=\"${mirror} out = u\")\n";
+    assert_eq!(
+        run(text),
+        "\nt = f(program=\"u = 1.0 - abs(2.0 * p.x - 1.0); out = u\")\n"
+    );
+}
+
+#[test]
+fn a_number_constant_is_spliced_into_strings_too() {
+    let text =
+        "let grain = 12\nlet half = {grain / 2}\nt = f(program=\"fbm(${grain}, ${half})\")\n";
+    assert_eq!(run(text), "\n\nt = f(program=\"fbm(12, 6)\")\n");
+}
+
+#[test]
+fn text_constants_may_use_earlier_ones_and_carry_escaped_quotes() {
+    let text = "let mirror = \"u = p.x;\"\nlet prog = \"n = expr(code=\\\"${mirror} out = u\\\")\"\nt = f(program=\"${prog}; albedo = n\")\n";
+    assert_eq!(
+        run(text),
+        "\n\nt = f(program=\"n = expr(code=\\\"u = p.x; out = u\\\"); albedo = n\")\n"
+    );
+}
+
+#[test]
+fn an_unknown_name_in_a_string_says_which() {
+    let error = expand("t = f(program=\"${nope} x\")\n").unwrap_err();
+    assert_eq!(error.code, "parse.expression");
+    assert!(error.message.contains("nope"), "{}", error.message);
+}
+
+#[test]
+fn text_constants_are_reported_and_cannot_repeat_a_name() {
+    assert_eq!(expand("let a = \"x\"\nlet b = 2\n").unwrap().1, ["a", "b"]);
+    assert!(expand("let a = \"x\"\nlet a = 3\n").is_err());
+}
+
+#[test]
+fn a_dollar_brace_outside_a_string_is_left_alone() {
+    assert_eq!(run("let a = 1\nx = f({a}) # ${a}\n"), "\nx = f(1) # ${a}\n");
+}

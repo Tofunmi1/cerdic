@@ -38,6 +38,10 @@ pub struct SetMesh {
 /// the component to change them.
 #[derive(Component, Clone, Debug)]
 pub struct VeInstanceSet {
+    /// Nearest camera distance in metres. Honoured by the Bevy path only; the existing renderer ignores it.
+    pub min_distance: f32,
+    /// Cross-fade width in metres at each finite level boundary. Honoured by the Bevy path only.
+    pub fade: f32,
     /// Levels of detail, nearest first (at least one).
     pub meshes: Vec<SetMesh>,
     /// The copies' world matrices.
@@ -60,6 +64,8 @@ impl VeInstanceSet {
         bounds: (Vec3, f32),
     ) -> Self {
         Self {
+            min_distance: 0.0,
+            fade: 0.0,
             meshes: vec![SetMesh {
                 mesh,
                 max_distance: f32::INFINITY,
@@ -169,6 +175,33 @@ pub(crate) struct RetainedSets {
 }
 
 impl InstanceBatches {
+    /// Grass settings on an ordinary batch or retained set.
+    pub(crate) fn grass_surface(&self, batch: &Batch) -> Option<crate::FoliageStyle> {
+        batch
+            .set
+            .and_then(|e| self.sets.sets.get(&e))
+            .map(|s| s.signature.material.foliage)
+            .filter(|s| s.grass)
+            .or(batch.grass)
+    }
+
+    /// The terrain look of an entity batch or a retained set.
+    pub(crate) fn terrain_surface(&self, batch: &Batch) -> Option<crate::SurfaceTerrain> {
+        batch
+            .set
+            .and_then(|entity| self.sets.sets.get(&entity))
+            .and_then(|set| set.signature.material.finish.terrain)
+            .or(batch.terrain)
+    }
+
+    pub(crate) fn water_surface(&self, batch: &Batch) -> Option<crate::SurfaceWater> {
+        batch
+            .set
+            .and_then(|entity| self.sets.sets.get(&entity))
+            .and_then(|set| set.signature.material.water_surface())
+            .or(batch.water)
+    }
+
     /// Every batch a pipeline might be needed for: this frame's entity batches and every level of every set.
     pub(crate) fn queue_batches(&self) -> impl Iterator<Item = &Batch> {
         self.batches.iter().chain(&self.sets.queue)
@@ -288,6 +321,14 @@ pub(crate) fn prepare_sets(
     for retained in sets.sets.values() {
         for (mesh, _) in &retained.levels {
             sets.queue.push(Batch {
+                grass: retained
+                    .signature
+                    .material
+                    .foliage
+                    .grass
+                    .then_some(retained.signature.material.foliage),
+                water: retained.signature.material.water_surface(),
+                terrain: retained.signature.material.finish.terrain,
                 mesh: *mesh,
                 instances: 0..0,
                 transparent: false,

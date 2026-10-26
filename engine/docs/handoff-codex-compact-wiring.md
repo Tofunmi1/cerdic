@@ -1,0 +1,34 @@
+# Handoff: wire the compact text into the page, the evaluator build and the guide (ADR 0069, part 2)
+
+Read `docs/adr/0069-compact-text-and-batched-tools.md`. Part 1 (pipes, loops, `ve_graph::to_text_compact`) is in `crates/ve-graph` and its tests (`tests/g70_compact_text.rs`) must pass before you start; if they do not, stop and say so in Status.
+
+## What to do
+1. **Find how the page answers `get_text`** (the MCP server relays `get_text` to the page; start from `tools/mcp/server.mjs`, `web/` and `crates/ve-evaluator/src`). Add a compact variant next to the canonical one: the evaluator wasm exports the compact text of the document (use `ve_graph::to_text_compact`), the page's `get_text` answer takes `format: "compact" | "canonical"` and defaults to compact; `find` results and any other place that prints node text for a model use the compact form too when it is just for reading. The canonical text stays what is stored, hashed, diffed and shown in the viewer's Text panel unless that panel is only for reading (keep it canonical).
+   Update the `get_text` tool schema/description in `tools/mcp/server.mjs` (`format` parameter, one sentence).
+2. **Guide**: add a short topic `compact` in `tools/mcp/guide.mjs` (and list it in the topic menu) with working examples of pipes, loops (range, list, pairs, nested, names with `{i}`), `let` constants and `{expression}`, and the limits (2,000 statements, depth 3, no groups in loops). Put one sentence about it in the core guide (pipes and loops make a long build short). Every example must parse: add a test in `tools/` (a small bun script, `tools/compact-guide-test.mjs`) that extracts the examples from the topic text and feeds each through the native evaluator example `cargo run -p ve-modeling --example eval_text <file>` or, if that is awkward, through `ve_graph::parse_text` in a Rust test `crates/ve-graph/tests/g70_guide_examples.rs` that includes the examples as strings kept in a `tools/mcp/guide-examples/compact_*.txt` file the guide topic also includes.
+3. **Rebuild the evaluator wasm** (needed so the browser page has the new syntax and printer) and place it in `web/dist-bevy-gpu`:
+   `cd engine; export CARGO_TARGET_DIR=<yours>; cargo build -q -p ve-evaluator --target wasm32-unknown-unknown --release` then `target/tools/bin/wasm-bindgen --target web --out-dir web/dist-bevy-gpu --no-typescript <your target dir>/wasm32-unknown-unknown/release/ve_evaluator.wasm` (the wasm-bindgen binary is at `engine/target/tools/bin/wasm-bindgen`). Then in `web/dist-bevy-gpu/ve_evaluator.js` replace `from "wasi_snapshot_preview1"` by `from "./wasi_snapshot_preview1.js"` with your edit tool (no sed). Do not rebuild the runtime wasm (`ve-runtime`); Claude does that.
+4. Rust tests for anything new in Rust; keep files under 400 lines.
+
+## Rules
+- AGENTS.md rules. No `cargo xtask`, no `cargo fmt` (use `rustfmt --edition 2024 --config-path rustfmt.toml <file>`). Own `CARGO_TARGET_DIR`. No commits or staging.
+- You cannot run a browser; Claude runs the browser checks. Run `cargo test -p ve-graph`, `cargo test -p ve-evaluator` and `bun tools/batch-run-test.mjs` (the last needs port 8791; if the sandbox refuses ports say so).
+
+## Status
+Implemented on 2026-10-26. All Cargo commands used `CARGO_TARGET_DIR=/tmp/codex-target-compact2`.
+
+- Part 1 prerequisite: `cargo test -p ve-graph --test g70_compact_text` passed all 21 tests before implementation.
+- Added evaluator exports `doc_text_compact(document, nodes)` and `doc_parse_text(document, text)`, with stateless worker requests. `get_text` defaults to compact and accepts `format="canonical"`; `find` uses standalone compact lines from the same Rust printer, retaining complete parameter text and node details. The MCP schema advertises the format parameter.
+- Page and editor text edits parse against their candidate document through the evaluator worker, so pipes and loops work with the rebuilt evaluator before the separate runtime rebuild. `sendText` is now asynchronous; page loading call sites await it. Worker text requests do not cancel geometry work and reject outstanding requests on restart/disposal.
+- Stored documents, hashing, diffs, canonical `doc.text()` and the viewer's Text panel retain their existing paths. Snapshot parameter types are restored from the registry after JavaScript JSON serialization, including group overrides, so integral radian values and numeric defaults print correctly.
+- Added the `compact` guide topic and menu entry, plus a sentence in the core guide. Five shared `tools/mcp/guide-examples/compact_*.txt` fixtures cover continued pipes, range/list/pair/nested loops, interpolated names, constants and arithmetic; the topic documents the 2,000-statement/depth-3/no-groups limits. `crates/ve-graph/tests/g70_guide_examples.rs` parses and applies those exact files.
+- Rebuilt evaluator release wasm, generated browser glue into `web/dist-bevy-gpu`, and patched every WASI import to `./wasi_snapshot_preview1.js` with the edit tool. Refreshed the viewer bridge bundle and changed page/worker assets there. Did not rebuild runtime wasm.
+
+Validation:
+- Full `cargo test -p ve-graph -p ve-evaluator` passed; after adding the JSON numeric-type regression, `cargo test -p ve-evaluator` passed all 13 tests. Tests cover compact/canonical round trips, standalone node lines, long parameters, duplicate labels, groups, loop diagnostics, invalid snapshots and JavaScript's integer serialization.
+- `bun test tests/evaluator-text.test.ts tests/guide-topics.test.ts`: 11 passed. Covers worker reply correlation/restart rejection, compact defaults/canonical panel reads, candidate parsing and `find` lines/details.
+- `cargo clippy -p ve-evaluator --all-targets --no-deps` passed with two existing warnings in `attachments.rs`; no warnings in the new text code. The wasm build also reports existing geometry/modeling warnings.
+- Non-browser smoke of the rebuilt wasm passed: compact pipes/degrees, standalone node lines, all five examples extracted from the actual guide topic, and evaluation of a sample solid. The guide CLI lists and serves `compact`; the browser bundle builds successfully.
+- `bun tools/batch-run-test.mjs` was attempted but the sandbox refused its listener on port 8791 (`EADDRINUSE`). An independent ephemeral loopback listener (`port: 0`) failed identically, so this check remains pending outside the sandbox; the waiting test process was stopped.
+- `bunx tsc -b --pretty false` remains blocked by existing errors outside this change: `src/engine/mesh-upload.ts:67`, `src/engine/snapshot.ts:14`, `tests/shader-expr.test.ts:84`, and `tests/surface-signals.test.ts:30,34,37`. No errors were reported in the new or changed text wiring.
+- No browser checks or `cargo xtask` commands were run, as instructed. Browser checks and the owner's strict gate remain pending. No files were staged or committed; pre-existing work was preserved.

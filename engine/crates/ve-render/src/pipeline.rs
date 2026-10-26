@@ -27,11 +27,7 @@ use crate::prepare::{InstanceBatches, InstanceData, ViewUniform};
 use crate::quality::RenderQuality;
 use crate::targets::{DEPTH_FORMAT, render_format};
 
-/// Source of the forward shader, compiled at runtime by the shader pipeline.
-pub(crate) const FORWARD_SHADER: &str = concat!(
-    include_str!("shaders/wind.wgsl"),
-    include_str!("shaders/forward.wgsl")
-);
+pub(crate) use sim::FORWARD_SHADER;
 
 /// The forward shader for meshes without texture coordinates: the same source with the vertex input and its
 /// copy removed (plain WGSL has no preprocessor here). Meshes without baked maps use it, which keeps their
@@ -40,6 +36,30 @@ pub(crate) fn forward_shader_without_uv() -> String {
     FORWARD_SHADER
         .replace("    @location(11) uv: vec2<f32>,\n", "")
         .replace("    out.uv = input.uv;\n", "    out.uv = vec2<f32>(0.0);\n")
+}
+
+/// Coloured meshes use the occlusion attribute's location for the four water channels,
+/// keeping the total at WebGL2's sixteen vertex attributes.
+pub(crate) fn forward_shader_with_color(has_uv: bool) -> String {
+    let source = if has_uv {
+        FORWARD_SHADER.to_owned()
+    } else {
+        forward_shader_without_uv()
+    };
+    source
+        .replace(
+            "@location(2) occlusion: f32,",
+            "@location(2) color: vec4<f32>,",
+        )
+        .replace("unpack_occlusion(input.occlusion)", "1.0")
+        .replace(
+            "outline_normal(input.occlusion, input.normal)",
+            "input.normal",
+        )
+        .replace(
+            "out.water_data = vec4<f32>(0.5, 0.5, 0.4, 0.0);",
+            "out.water_data = input.color;",
+        )
 }
 
 /// Which draw of a batch a pipeline serves.
@@ -55,7 +75,14 @@ pub(crate) enum PassKind {
     TwoSided,
 }
 
-type PipelineKey = (MeshVertexBufferLayoutRef, TextureFormat, u32, PassKind);
+type PipelineKey = (
+    MeshVertexBufferLayoutRef,
+    TextureFormat,
+    u32,
+    PassKind,
+    bool,
+    bool,
+);
 
 /// The forward pipeline family: shared layouts and shader, specialised lazily.
 #[derive(Resource)]
@@ -63,8 +90,12 @@ pub(crate) struct ForwardPipelines {
     pub(crate) view_layout: BindGroupLayoutDescriptor,
     pub(crate) lights_layout: BindGroupLayoutDescriptor,
     pub(crate) textures_layout: BindGroupLayoutDescriptor,
+    pub(crate) water_layout: BindGroupLayoutDescriptor,
+    pub(crate) sim_shaders: Option<[Handle<Shader>; 4]>,
     shader: Handle<Shader>,
     shader_without_uv: Handle<Shader>,
+    colored: Handle<Shader>,
+    colored_without_uv: Handle<Shader>,
     cache: HashMap<PipelineKey, CachedRenderPipelineId>,
 }
 
@@ -81,7 +112,12 @@ pub(crate) fn uniform_only_view_layout() -> BindGroupLayoutDescriptor {
 }
 
 impl ForwardPipelines {
-    pub(crate) fn new(shader: Handle<Shader>, shader_without_uv: Handle<Shader>) -> Self {
+    pub(crate) fn new(
+        shader: Handle<Shader>,
+        shader_without_uv: Handle<Shader>,
+        colored: Handle<Shader>,
+        colored_without_uv: Handle<Shader>,
+    ) -> Self {
         let view_layout = BindGroupLayoutDescriptor::new(
             "ve_view_layout",
             &BindGroupLayoutEntries::sequential(
@@ -116,8 +152,12 @@ impl ForwardPipelines {
             view_layout,
             lights_layout,
             textures_layout: crate::textures::textures_layout(),
+            water_layout: crate::water_gpu::layout(),
+            sim_shaders: None,
             shader,
             shader_without_uv,
+            colored,
+            colored_without_uv,
             cache: HashMap::new(),
         }
     }
@@ -129,9 +169,18 @@ impl ForwardPipelines {
         format: TextureFormat,
         samples: u32,
         kind: PassKind,
+        water: bool,
+        sim: bool,
     ) -> Option<CachedRenderPipelineId> {
         self.cache
-            .get(&(layout.clone(), format, samples, kind))
+            .get(&(
+                layout.clone(),
+                format,
+                samples,
+                kind,
+                water && layout.0.contains(Mesh::ATTRIBUTE_COLOR),
+                sim,
+            ))
             .copied()
     }
 
@@ -142,14 +191,35 @@ impl ForwardPipelines {
         samples: u32,
         has_uv: bool,
         kind: PassKind,
+        has_color: bool,
+        sim: bool,
     ) -> RenderPipelineDescriptor {
         let transparent = kind == PassKind::Transparent;
         let outline = kind == PassKind::Outline;
         // Meshes without baked maps carry no texture coordinates; their variant reads none.
-        let shader = if has_uv {
+        let shader = if has_color {
+            if has_uv {
+                self.colored.clone()
+            } else {
+                self.colored_without_uv.clone()
+            }
+        } else if has_uv {
             self.shader.clone()
         } else {
             self.shader_without_uv.clone()
+        };
+        let shader = if sim {
+            self.sim_shaders.as_ref().map_or(shader.clone(), |shaders| {
+                shaders[match (has_color, has_uv) {
+                    (false, true) => 0,
+                    (false, false) => 1,
+                    (true, true) => 2,
+                    (true, false) => 3,
+                }]
+                .clone()
+            })
+        } else {
+            shader
         };
         RenderPipelineDescriptor {
             label: Some("ve_forward".into()),
@@ -157,6 +227,11 @@ impl ForwardPipelines {
                 self.view_layout.clone(),
                 self.lights_layout.clone(),
                 self.textures_layout.clone(),
+                if sim {
+                    crate::water_gpu::sim_layout()
+                } else {
+                    self.water_layout.clone()
+                },
             ],
             vertex: VertexState {
                 shader: shader.clone(),
@@ -254,10 +329,16 @@ pub(crate) fn queue_forward_pipelines(
         };
         let layout = &render_mesh.layout;
         let has_uv = layout.0.contains(Mesh::ATTRIBUTE_UV_0);
+        let has_color =
+            batches.water_surface(batch).is_some() && layout.0.contains(Mesh::ATTRIBUTE_COLOR);
         let mut wanted = vec![
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
             Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
-            crate::ATTRIBUTE_OCCLUSION.at_shader_location(2),
+            if has_color {
+                Mesh::ATTRIBUTE_COLOR.at_shader_location(2)
+            } else {
+                crate::ATTRIBUTE_OCCLUSION.at_shader_location(2)
+            },
         ];
         if has_uv {
             wanted.push(Mesh::ATTRIBUTE_UV_0.at_shader_location(11));
@@ -278,12 +359,20 @@ pub(crate) fn queue_forward_pipelines(
                 .into_iter()
                 .filter_map(|(kind, wanted)| wanted.then_some(kind))
             {
-                let key = (layout.clone(), format, samples, kind);
+                let sim = batches.water_surface(batch).is_some_and(|w| w.sim_id != 0);
+                let key = (layout.clone(), format, samples, kind, has_color, sim);
                 if pipelines.cache.contains_key(&key) {
                     continue;
                 }
-                let descriptor =
-                    pipelines.descriptor(mesh_layout.clone(), format, samples, has_uv, kind);
+                let descriptor = pipelines.descriptor(
+                    mesh_layout.clone(),
+                    format,
+                    samples,
+                    has_uv,
+                    kind,
+                    has_color,
+                    sim,
+                );
                 let id = pipeline_cache.queue_render_pipeline(descriptor);
                 pipelines.cache.insert(key, id);
             }
@@ -292,48 +381,9 @@ pub(crate) fn queue_forward_pipelines(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+#[path = "pipeline_tests.rs"]
+mod tests;
 
-    #[test]
-    fn the_shader_without_texture_coordinates_drops_exactly_the_uv_input() {
-        let plain = forward_shader_without_uv();
-        assert!(FORWARD_SHADER.contains("@location(11) uv: vec2<f32>,"));
-        assert!(
-            !plain.contains("@location(11) uv"),
-            "the vertex input is gone"
-        );
-        assert!(
-            !plain.contains("out.uv = input.uv"),
-            "the vertex stage no longer copies it"
-        );
-        assert!(plain.contains("out.uv = vec2<f32>(0.0);"));
-        // Everything else is the same source.
-        assert_eq!(
-            plain.lines().count() + 1,
-            FORWARD_SHADER.lines().count(),
-            "one line fewer"
-        );
-    }
-
-    #[test]
-    fn only_the_foliage_draw_skips_culling() {
-        let pipelines = ForwardPipelines::new(Handle::default(), Handle::default());
-        let cull = |kind| {
-            pipelines
-                .descriptor(
-                    VertexBufferLayout::default(),
-                    TextureFormat::Rgba8UnormSrgb,
-                    1,
-                    false,
-                    kind,
-                )
-                .primitive
-                .cull_mode
-        };
-        assert_eq!(cull(PassKind::Opaque), Some(Face::Back));
-        assert_eq!(cull(PassKind::Transparent), Some(Face::Back));
-        assert_eq!(cull(PassKind::Outline), Some(Face::Front));
-        assert_eq!(cull(PassKind::TwoSided), None);
-    }
-}
+#[path = "pipeline_sim.rs"]
+mod sim;
+pub(crate) use sim::without_sim;

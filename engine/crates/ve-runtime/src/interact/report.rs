@@ -9,7 +9,7 @@ use ve_interact::{Event, PointerId, TargetId};
 
 use super::{Interactable, InteractionState, Label, entity_of, target_of};
 
-fn label_of(target: TargetId, labels: &Query<&Label>) -> String {
+pub(super) fn label_of(target: TargetId, labels: &Query<&Label>) -> String {
     entity_of(target)
         .and_then(|entity| labels.get(entity).ok())
         .map_or_else(|| "?".to_owned(), |label| label.0.clone())

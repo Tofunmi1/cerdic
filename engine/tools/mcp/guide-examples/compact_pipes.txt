@@ -1,0 +1,4 @@
+post = solid.box(size=[0.08, 1.2, 0.08]) |
+  xform.move(by=[0, 0.6, 0]) |
+  xform.array(count_x=3, spacing=[0.75, 0, 0])
+output fence = post

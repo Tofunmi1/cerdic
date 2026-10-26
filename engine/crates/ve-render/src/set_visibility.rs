@@ -48,6 +48,9 @@ pub(crate) fn visible_runs(
     let flush = |run: &mut Option<(usize, Vec3, std::ops::Range<u32>)>, out: &mut Vec<Batch>| {
         if let Some((level, centre, range)) = run.take() {
             out.push(Batch {
+                grass: None,
+                water: None,
+                terrain: None,
                 mesh: shape.levels[level].0,
                 instances: range,
                 transparent: false,

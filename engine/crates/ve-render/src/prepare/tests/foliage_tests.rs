@@ -15,6 +15,7 @@ const CUTOUT: FoliageStyle = FoliageStyle {
     alpha_cutoff: 0.5,
     sway: 0.0,
     flutter: 0.0,
+    ..FoliageStyle::plain()
 };
 
 #[test]
@@ -44,6 +45,7 @@ fn wind_alone_is_not_a_cutout() {
         alpha_cutoff: 0.0,
         sway: 0.8,
         flutter: 0.3,
+        ..FoliageStyle::plain()
     };
     let (data, batches) = group_into_batches(&[with_foliage(1, 0.0, swaying)]);
     assert!(!batches[0].cutout);
@@ -56,6 +58,7 @@ fn any_foliage_makes_the_batch_two_sided_but_only_a_cutoff_makes_it_a_cutout() {
         alpha_cutoff: 0.0,
         sway: 0.5,
         flutter: 0.0,
+        ..FoliageStyle::plain()
     };
     let (_, wind) = group_into_batches(&[instance(1, 0.0), with_foliage(1, 1.0, swaying)]);
     assert!(wind[0].foliage && !wind[0].cutout);
@@ -80,6 +83,7 @@ fn the_foliage_lane_is_clamped_and_off_by_default() {
             alpha_cutoff: 7.0,
             sway: -3.0,
             flutter: 9.0,
+            ..FoliageStyle::plain()
         },
         ..VeMaterial::default()
     }
