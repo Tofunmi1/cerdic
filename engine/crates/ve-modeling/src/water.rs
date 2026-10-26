@@ -51,6 +51,9 @@ fn build(node: &Node, context: &ExecutionContext) -> Result<Value, Fail> {
             .map_err(|error| fail("kernel.failed", error.to_string()))?,
         solid.volume(),
     );
+    // Lakes have no current or shore foam; depth uses the river shader's units of six metres.
+    let depth01 = f32_point([0.0, params.depth / 6.0, 0.0])[1].clamp(0.0, 1.0);
+    value.colors = vec![[0.5, 0.5, depth01, 0.0]; value.mesh.positions.len()];
     value.material = Some(Material {
         color: params.color,
         opacity: params.opacity,
@@ -61,11 +64,21 @@ fn build(node: &Node, context: &ExecutionContext) -> Result<Value, Fail> {
         recipe: MaterialRecipe::Water,
         texture_scale: params.ripple_speed,
         texture_tile: 0.0,
+        no_repeat: false,
+        no_repeat_scale: 1.0,
         texture_size: 0,
         toon: None,
         texture_program: None,
         texture_style: None,
         foliage: None,
+        finish: Some(crate::finish::Finish {
+            water: Some(crate::water_look::lake_look(
+                node,
+                params.color,
+                params.ripple_speed,
+            )?),
+            ..crate::finish::Finish::plain()
+        }),
     });
     Ok(value)
 }

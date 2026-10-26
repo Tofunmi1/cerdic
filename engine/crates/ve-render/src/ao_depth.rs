@@ -40,6 +40,9 @@ use crate::targets::DEPTH_FORMAT;
 /// Source of the depth shader.
 pub(crate) const SHADER: &str = concat!(
     include_str!("shaders/wind.wgsl"),
+    include_str!("shaders/grass.wgsl"),
+    include_str!("shaders/surface_types.wgsl"),
+    "@group(2) @binding(0) var<uniform> water: WaterWaves;\n",
     include_str!("shaders/ao_depth.wgsl")
 );
 
@@ -140,7 +143,11 @@ impl AoDepthPipelines {
     fn descriptor(&self, mesh_layout: VertexBufferLayout) -> RenderPipelineDescriptor {
         RenderPipelineDescriptor {
             label: Some("ve_ao_depth".into()),
-            layout: vec![self.view_layout.clone()],
+            layout: vec![
+                self.view_layout.clone(),
+                crate::textures::textures_layout(),
+                crate::water_gpu::layout(),
+            ],
             vertex: VertexState {
                 shader: self.shader.clone(),
                 entry_point: Some("vertex".into()),
@@ -215,6 +222,8 @@ pub(crate) fn ao_depth_pass(
     pipelines: Res<AoDepthPipelines>,
     cutouts: Res<crate::cutout::CutoutPipelines>,
     textures: Res<crate::textures::TexturesGpu>,
+    surfaces: Res<crate::water_gpu::WaterGpu>,
+    grass_bounds: Res<crate::grass_gpu::GrassBounds>,
     pipeline_cache: Res<PipelineCache>,
     view_uniforms: Res<ViewUniforms>,
     render_meshes: Res<RenderAssets<RenderMesh>>,
@@ -252,6 +261,9 @@ pub(crate) fn ao_depth_pass(
         occlusion_query_set: None,
         multiview_mask: None,
     });
+    if let Some(maps) = textures.bind_group.as_ref() {
+        pass.set_bind_group(1, maps, &[]);
+    }
     for batch in batches.main_batches().filter(|batch| !batch.transparent) {
         let Some(render_mesh) = render_meshes.get(batch.mesh) else {
             continue;
@@ -274,6 +286,14 @@ pub(crate) fn ao_depth_pass(
             continue;
         };
         pass.set_render_pipeline(pipeline);
+        let Some(surface) = surfaces.binding(
+            batches.water_surface(batch),
+            batches.terrain_surface(batch),
+            grass_bounds.uniform(batches.grass_surface(batch), batch.mesh),
+        ) else {
+            continue;
+        };
+        pass.set_bind_group(2, surface, &[]);
         let Some(instance_buffer) = batches.instance_buffer(batch) else {
             continue;
         };

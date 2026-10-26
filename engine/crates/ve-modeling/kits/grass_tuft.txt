@@ -1,0 +1,20 @@
+group grass_tuft
+  blade = solid.cone@1(height=0.45, radius=0.015, top_radius=0.0, segments=4)
+  blade_up = xform.move@1(blade, by=[0, 0.225, 0])
+  bent = xform.bend@1(blade_up, angle=0.5)
+  lean = xform.rotate@1(bent, angles=[0.25, 0, 0])
+  ring = inst.radial@1(lean, count=7, radius=0.04)
+  tuft = inst.realize@1(ring)
+  green = solid.material@1(tuft, color=[0.28, 0.45, 0.15], roughness=0.8)
+  expose count = ring.count
+  grass = solid.foliage@1(green, alpha_cutoff=0, grass=true, ground_blend=0.6, fade_near=25, fade_far=70, translucency=0.5)
+  expose color = green.color
+  expose grass = grass.grass
+  expose ground_color = grass.ground_color
+  expose ground_blend = grass.ground_blend
+  expose fade_near = grass.fade_near
+  expose fade_far = grass.fade_far
+  expose translucency = grass.translucency
+  expose exposure_boost = grass.exposure_boost
+  result grass
+end

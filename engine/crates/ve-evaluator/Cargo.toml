@@ -9,10 +9,14 @@ publish.workspace = true
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-ve-modeling = { path = "../ve-modeling" }
+[dependencies]
+ve-game = { path = "../ve-game" }
+ve-measure = { path = "../ve-measure" }
 ve-graph = { path = "../ve-graph" }
 serde_json.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+ve-modeling = { path = "../ve-modeling" }
 wasm-bindgen.workspace = true
 
 [lints]

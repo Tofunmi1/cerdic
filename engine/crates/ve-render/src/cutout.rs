@@ -123,7 +123,11 @@ impl CutoutPipelines {
                 }
                 .into(),
             ),
-            layout: vec![view_layout, self.textures_layout.clone()],
+            layout: vec![
+                view_layout,
+                self.textures_layout.clone(),
+                crate::water_gpu::layout(),
+            ],
             vertex: VertexState {
                 shader: shader.clone(),
                 entry_point: Some("vertex_cutout".into()),

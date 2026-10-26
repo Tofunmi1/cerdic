@@ -147,6 +147,24 @@ pub(crate) fn state() -> String {
     with_host(|host| state_of(host).to_string())
 }
 
+/// Reads a historical document without moving the session's undo/redo cursor.
+pub(crate) fn at_revision(revision: u64) -> String {
+    with_host(|host| {
+        let session = &host.session;
+        match session.document_at_revision(revision) {
+            Some(document) => match ve_graph::to_text_node_lines(session.registry(), document) {
+                Ok(lines) => json!({ "document": document, "lines": lines }),
+                Err(error) => json!({ "error": error.message }),
+            },
+            None => json!({ "error": format!(
+                "revision {revision} is unavailable; retained revisions: {}..={}; use a revision in that range",
+                session.oldest_revision(), session.document().revision
+            ) }),
+        }
+        .to_string()
+    })
+}
+
 /// Applies a command batch given as JSON; returns the [`Outcome`] as JSON.
 pub(crate) fn apply(batch_json: &str) -> String {
     with_host(|host| {

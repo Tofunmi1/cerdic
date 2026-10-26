@@ -38,6 +38,43 @@ fn a_new_session_has_no_history() {
 }
 
 #[test]
+fn revision_documents_include_undo_redo_and_diverging_edits() {
+    let mut session = Session::with_builtin(1);
+    let initial = session.document().clone();
+    commit_labelled(&mut session, Some("one"));
+    let first = session.document().clone();
+    commit_labelled(&mut session, Some("two"));
+    let second = session.document().clone();
+    session.undo().unwrap();
+    let undone = session.document().clone();
+    session.redo().unwrap();
+    let redone = session.document().clone();
+    session.undo().unwrap();
+    commit_labelled(&mut session, Some("branch"));
+    let history = session.history();
+    for expected in [&initial, &first, &second, &undone, &redone] {
+        assert_eq!(
+            session.document_at_revision(expected.revision),
+            Some(expected)
+        );
+    }
+    assert_eq!(session.history(), history, "reading history never moves it");
+    assert!(session.document_at_revision(99).is_none());
+}
+
+#[test]
+fn old_revision_documents_are_bounded() {
+    let mut session = Session::with_builtin(1);
+    // Session history retains at most 200 prior documents.
+    for _ in 0..=200 {
+        commit_labelled(&mut session, None);
+    }
+    assert!(session.document_at_revision(0).is_none());
+    assert_eq!(session.oldest_revision(), 1);
+    assert!(session.document_at_revision(1).is_some());
+}
+
+#[test]
 fn every_transaction_is_listed_oldest_first_with_its_label() {
     let mut s = Session::with_builtin(1);
     commit_labelled(&mut s, Some("Add base"));

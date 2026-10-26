@@ -59,6 +59,11 @@ impl ViewUniform {
     }
 
     pub(crate) fn set_quality(&mut self, quality: &RenderQuality) {
+        self.grading.w = if quality.tier == crate::QualityTier::Low {
+            0.0
+        } else {
+            1.0
+        };
         self.effects.x = if quality.specular_aa_enabled {
             1.0
         } else {
@@ -66,6 +71,11 @@ impl ViewUniform {
         };
         self.effects.y = if quality.ssao_enabled { 1.0 } else { 0.0 };
         self.effects.z = if quality.bloom_enabled { 1.0 } else { 0.0 };
+        self.effects.w = if quality.stochastic_sampling_enabled() {
+            1.0
+        } else {
+            0.0
+        };
     }
 
     /// Writes how much of the exposure correction this frame applies and the brightness it aims for (both zero when off).
@@ -120,6 +130,15 @@ impl ViewUniform {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_low_quality_disables_stochastic_sampling() {
+        for tier in crate::QualityTier::ALL {
+            let mut uniform = ViewUniform::new(Mat4::IDENTITY, Mat4::IDENTITY);
+            uniform.set_quality(&RenderQuality::for_tier(tier));
+            assert_eq!(uniform.effects.w > 0.5, tier != crate::QualityTier::Low);
+        }
+    }
 
     #[test]
     fn specular_aa_is_opt_in_in_the_per_view_uniform() {

@@ -41,7 +41,8 @@ fn the_settings_land_on_the_surface() {
         Some(Foliage {
             alpha_cutoff: 0.4,
             sway: 0.3,
-            flutter: 0.2
+            flutter: 0.2,
+            ..Foliage::default()
         })
     );
 }
@@ -122,4 +123,64 @@ fn a_setting_survives_a_json_round_trip_and_old_results_load_without_it() {
     value.as_object_mut().unwrap().remove("foliage");
     let old: ve_modeling::Material = serde_json::from_value(value).unwrap();
     assert_eq!(old.foliage, None);
+}
+
+#[test]
+fn grass_parameters_reach_placement_materials_and_round_trip() {
+    let result = ok(&format!(
+        "{CARD}ring = inst.radial@1(paint, count=6, radius=1)\nleaf = solid.foliage@1(ring, alpha_cutoff=0, grass=true, ground_color=[0.4,0.3,0.2], ground_blend=0.6, fade_near=25, fade_far=70, translucency=0.5, exposure_boost=1.2)\noutput leaf"
+    ));
+    let part = &result.parts[0];
+    assert_eq!(part.transforms.as_ref().map_or(0, Vec::len), 6);
+    let f = part.material.as_ref().unwrap().foliage.unwrap();
+    assert!(f.grass);
+    assert_eq!(f.ground_color, [0.4, 0.3, 0.2]);
+    assert_eq!(
+        (
+            f.ground_blend,
+            f.fade_near,
+            f.fade_far,
+            f.translucency,
+            f.exposure_boost
+        ),
+        (0.6, 25.0, 70.0, 0.5, 1.2)
+    );
+    let back: Foliage = serde_json::from_str(&serde_json::to_string(&f).unwrap()).unwrap();
+    assert_eq!(back, f);
+    let old: Foliage =
+        serde_json::from_str(r#"{"alpha_cutoff":0.5,"sway":0.2,"flutter":0.1}"#).unwrap();
+    assert!(!old.grass);
+    assert_eq!(old.exposure_boost, 1.0);
+}
+
+#[test]
+fn grass_schema_rejects_invalid_ranges() {
+    for param in [
+        "ground_blend=-0.1",
+        "ground_blend=1.1",
+        "translucency=1.1",
+        "fade_near=-1",
+        "fade_far=-1",
+        "exposure_boost=11",
+        "ground_color=[1.1,0,0]",
+    ] {
+        let source =
+            format!("{CARD}leaf = solid.foliage@1(paint, grass=true, {param})\noutput leaf");
+        // Some bounds are refused while parsing, others while the transaction is checked.
+        let registry = builtin_registry();
+        if let Ok(batch) = parse_text(&registry, &source) {
+            let mut session = Session::with_builtin(2);
+            let outcome = session.apply(&CommandBatch {
+                doc: session.document().id.clone(),
+                base_revision: 0,
+                transaction: TransactionId::parse("t_bad_grass").unwrap(),
+                label: None,
+                commands: batch.commands,
+            });
+            assert!(
+                !matches!(outcome, Outcome::Committed { .. }),
+                "accepted {param}"
+            );
+        }
+    }
 }

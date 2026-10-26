@@ -30,6 +30,9 @@ pub(crate) use crate::shadow_pipelines::{
 /// Source of the shadow shader.
 pub(crate) const SHADOW_SHADER: &str = concat!(
     include_str!("shaders/wind.wgsl"),
+    include_str!("shaders/grass.wgsl"),
+    include_str!("shaders/surface_types.wgsl"),
+    "@group(2) @binding(0) var<uniform> water: WaterWaves;\n",
     include_str!("shaders/shadow.wgsl")
 );
 
@@ -153,6 +156,8 @@ pub(crate) fn shadow_pass(
     pipelines: Res<ShadowPipelines>,
     cutouts: Res<CutoutPipelines>,
     textures: Res<crate::textures::TexturesGpu>,
+    surfaces: Res<crate::water_gpu::WaterGpu>,
+    grass_bounds: Res<crate::grass_gpu::GrassBounds>,
     pipeline_cache: Res<PipelineCache>,
     batches: Res<InstanceBatches>,
     render_meshes: Res<RenderAssets<RenderMesh>>,
@@ -202,6 +207,9 @@ pub(crate) fn shadow_pass(
         );
         pass.set_scissor_rect(tile, 0, target.resolution, target.resolution);
         pass.set_bind_group(0, view_bind_group, &[*offset]);
+        if let Some(maps) = textures.bind_group.as_ref() {
+            pass.set_bind_group(1, maps, &[]);
+        }
         for batch in batches.cascade_batches(index) {
             let Some(render_mesh) = render_meshes.get(batch.mesh) else {
                 continue;
@@ -224,6 +232,14 @@ pub(crate) fn shadow_pass(
                 continue;
             };
             pass.set_render_pipeline(pipeline);
+            let Some(surface) = surfaces.binding(
+                batches.water_surface(batch),
+                batches.terrain_surface(batch),
+                grass_bounds.uniform(batches.grass_surface(batch), batch.mesh),
+            ) else {
+                continue;
+            };
+            pass.set_bind_group(2, surface, &[]);
             let Some(instance_buffer) = batches.instance_buffer(batch) else {
                 continue;
             };

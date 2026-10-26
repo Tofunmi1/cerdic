@@ -82,6 +82,8 @@ pub struct Session {
     redo: Vec<RedoEntry>,
     seen: VecDeque<(TransactionId, u64)>,
     log: VecDeque<(u64, Vec<NodeId>)>,
+    revisions: VecDeque<(Document, usize)>,
+    revision_bytes: usize,
 }
 
 impl Session {
@@ -96,6 +98,8 @@ impl Session {
             redo: Vec::new(),
             seen: VecDeque::new(),
             log: VecDeque::new(),
+            revisions: VecDeque::new(),
+            revision_bytes: 0,
         }
     }
 
@@ -109,6 +113,38 @@ impl Session {
     #[must_use]
     pub fn document(&self) -> &Document {
         &self.doc
+    }
+
+    /// A retained revision, including states reached by undo and redo. Never changes history.
+    #[must_use]
+    pub fn document_at_revision(&self, revision: u64) -> Option<&Document> {
+        if revision == self.doc.revision {
+            return Some(&self.doc);
+        }
+        self.revisions
+            .iter()
+            .find(|(doc, _)| doc.revision == revision)
+            .map(|(doc, _)| doc)
+    }
+
+    /// Earliest revision still available for a text difference.
+    #[must_use]
+    pub fn oldest_revision(&self) -> u64 {
+        self.revisions
+            .front()
+            .map_or(self.doc.revision, |(doc, _)| doc.revision)
+    }
+
+    fn retain_document(&mut self) {
+        let bytes = self.doc.canonical_json().len();
+        self.revisions.push_back((self.doc.clone(), bytes));
+        self.revision_bytes += bytes;
+        while self.revisions.len() > MAX_HISTORY || self.revision_bytes > MAX_HISTORY_BYTES {
+            let Some((_, old_bytes)) = self.revisions.pop_front() else {
+                break;
+            };
+            self.revision_bytes = self.revision_bytes.saturating_sub(old_bytes);
+        }
     }
 
     /// The operators this session validates against.
@@ -233,6 +269,7 @@ impl Session {
             self.undo_bytes = self.undo_bytes.saturating_sub(old.bytes);
         }
         self.redo.clear();
+        self.retain_document();
         self.doc = applied.doc;
         self.doc.revision += 1;
         self.remember_revision(&applied.changed);
@@ -261,6 +298,7 @@ impl Session {
     fn install(&mut self, mut next: Document, changed: &[NodeId]) -> Moved {
         next.revision = self.doc.revision + 1;
         next.ids = self.doc.ids;
+        self.retain_document();
         self.doc = next;
         self.remember_revision(changed);
         Moved {

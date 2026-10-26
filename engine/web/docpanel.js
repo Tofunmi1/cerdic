@@ -62,7 +62,7 @@ export function startDocPanel({ api, name = "default", evaluation = null, runtim
     $("doc-redo").disabled = !s.can_redo || s.read_only;
     $("doc-json").textContent = JSON.stringify(s.document, null, 1);
     if (api.text) {
-      // The canonical text form, which is also what a model reads and writes.
+      // Keep the Text panel canonical; model-facing text uses the compact printer.
       $("doc-text-box").hidden = false;
       $("doc-text").textContent = api.text().text ?? "";
     }

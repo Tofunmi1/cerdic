@@ -90,7 +90,7 @@ struct Reader<'a> {
 }
 
 /// The value of `text`, which must be a complete expression with a finite result.
-pub(super) fn evaluate(text: &str, span: Span, env: &Env) -> Result<f64, Fail> {
+pub(in crate::text) fn evaluate(text: &str, span: Span, env: &Env) -> Result<f64, Fail> {
     let mut reader = Reader {
         tokens: tokens(text, span)?,
         at: 0,

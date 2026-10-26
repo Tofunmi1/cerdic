@@ -11,6 +11,7 @@ export const TOPICS = [
   { id: 'groups', start: 'Groups (build once', summary: 'groups and kits, instances, rigid alignment and assembly sockets' },
   { id: 'look', start: 'Colour and finish', summary: 'materials, styles, procedural textures' },
   { id: 'animation', start: 'Animation:', summary: 'tracks, waves, clips, colour and visibility animation' },
+  { id: 'scripts', start: 'Scripts (behaviour you write)', summary: 'behaviour in JavaScript: the script tool, the script.js node, the world tool, batching' },
   { id: 'rigging', start: 'Bendy things', summary: 'bones, skin weights and inverse kinematics' },
   { id: 'behaviour', start: 'Assemblies:', summary: 'parenting, behaviours and physics: parts that react in play mode' },
 ];
@@ -45,13 +46,14 @@ export function splitGuide(guide, topics = TOPICS, tail = TAIL) {
 export function coreWithMenu(split) {
   if (split.sections.size === 0) return split.core;
   const menu = split.topics.map(topic => `- ${topic.id}: ${topic.summary}`).join('\n');
-  return `${split.core}\n\nMore guidance by topic: call get_guide with topic set to one of these (topic="all" returns everything):\n${menu}`;
+  return `${split.core}\n\nMore guidance: call get_guide with topics=["core", ...] and operators={query, family, ids, detail} to read topics and operator docs together. topic still selects one; topic="all" returns everything.\n- core: language and workflow\n${menu}\n\nFast start:\n1. Call get_guide once with the topics and operators you need; begin with start_from for a matching template and edit its working skeleton.\n2. Write programs with pipes and loops (topic="compact"); batch a known sequence of calls, or use run for loops and conditions, returning only what you need.\n3. Look with ONE snapshot of several cameras, labelled by angle.\n4. Use edit by label for small changes; run check before finishing and repair any problems.`;
 }
 
 /** The text for one topic, or an explanation listing the topics when the name is unknown. */
 export function topicText(split, topic) {
+  if (topic === 'core') return coreWithMenu(split);
   if (topic === 'all') return [split.core, ...split.sections.values()].join('\n\n');
   const text = split.sections.get(topic);
   if (text !== undefined) return text;
-  return `There is no guide topic "${topic}". Topics: ${[...split.sections.keys()].join(', ')}, all.`;
+  return `There is no guide topic "${topic}". Topics: core, ${[...split.sections.keys()].join(', ')}, all.`;
 }

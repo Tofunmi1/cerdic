@@ -50,7 +50,7 @@ impl Parser {
                     }
                     result = Some(self.word("the member that is the group's result")?);
                 }
-                _ => body.push(self.statement()?),
+                _ => body.extend(self.statement()?),
             }
             match self.peek() {
                 None

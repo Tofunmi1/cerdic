@@ -9,15 +9,20 @@
 //! `key=value`. Lengths are metres (`mm` and `cm` suffixes allowed); angles are degrees unless
 //! written with `rad`, and canonical text always uses `rad`. Only `ready` operators are accepted.
 
+mod batch;
 mod build;
 mod coerce;
+mod compact;
 mod expr;
 mod group;
 mod instance;
 mod lex;
+mod near;
 mod node;
 mod parse;
 mod print;
+mod repeat;
 
 pub use build::{TextBatch, parse_text, parse_text_in};
-pub use print::to_text;
+pub use compact::to_text_compact;
+pub use print::{to_text, to_text_node_lines};

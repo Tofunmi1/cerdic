@@ -98,6 +98,7 @@ fn lower_member<'s>(
         op,
         op_span,
         args,
+        ..
     } = statement
     else {
         return None;

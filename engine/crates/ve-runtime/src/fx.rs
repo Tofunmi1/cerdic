@@ -178,7 +178,7 @@ pub(crate) fn step(
     }
 }
 
-fn quad_mesh() -> Mesh {
+pub(crate) fn quad_mesh() -> Mesh {
     let mut mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::default(),

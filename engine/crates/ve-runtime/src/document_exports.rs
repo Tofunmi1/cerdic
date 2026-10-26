@@ -25,6 +25,25 @@ pub fn doc_state() -> String {
     document::state()
 }
 
+/// Returns a retained revision document without undoing or redoing any transaction.
+#[wasm_bindgen]
+#[must_use]
+pub fn doc_at_revision(revision: f64) -> String {
+    if !revision.is_finite()
+        || revision < 0.0
+        || revision.fract() != 0.0
+        || revision > 9_007_199_254_740_991.0
+    {
+        return serde_json::json!({ "error": "since must be a non-negative safe integer revision number" }).to_string();
+    }
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "validated non-negative safe integer"
+    )]
+    document::at_revision(revision as u64)
+}
+
 /// Applies a typed command batch and returns its outcome.
 #[wasm_bindgen]
 #[must_use]

@@ -1,0 +1,5 @@
+let height = 1.5
+for i in 0..4
+  post_{i} = solid.box(size=[0.1, {height}, 0.1]) | xform.move(by=[{i * 0.75}, {height / 2}, 0])
+  output post_{i}
+end
