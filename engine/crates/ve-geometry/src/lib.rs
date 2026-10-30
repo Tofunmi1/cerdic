@@ -27,7 +27,8 @@ pub use poly::{
     MAX_MERGES, MAX_NETWORK_BEVEL_SEGMENTS, NetworkBevel, NetworkBevelOffset, WeldResult,
     auto_seams, bevel_edges, bevel_network, blender_edit, bridge_loops, delete_faces,
     dissolve_edge, dissolve_faces, dissolve_vertex, extrude_each, extrude_faces, flip_component,
-    flip_faces, grid, inset_each, inset_face, merge_coplanar, pack_uv, unwrap_uv, weld,
+    flip_faces, grid, inset_each, inset_face, merge_coplanar, merge_coplanar_keeping_holes,
+    pack_uv, unwrap_uv, weld,
 };
 pub use poly::{UvMethod, UvQuality, UvUnwrap, uv_quality};
 pub use subdivide::{Subdivided, SubdivisionOptions, subdivide};

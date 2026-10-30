@@ -106,6 +106,25 @@ pub(crate) enum FieldExpr {
         child: Box<Self>,
         half_width: f64,
     },
+    Noise {
+        child: Box<Self>,
+        amplitude: f64,
+        scale: f64,
+        octaves: u8,
+        persistence: f64,
+        seed: u32,
+        ridged: bool,
+    },
+    Warp {
+        child: Box<Self>,
+        kind: u8,
+        axis: u8,
+        toward: u8,
+        from: f64,
+        to: f64,
+        start: f64,
+        end: f64,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

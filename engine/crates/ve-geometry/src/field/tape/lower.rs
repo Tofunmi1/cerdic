@@ -94,6 +94,46 @@ fn compile_expr(expr: &FieldExpr, tape: &mut Vec<FieldInstruction>) -> Result<u3
             let child = compile_expr(child, tape)?;
             FieldInstruction::unary(FieldOp::Shell, child, [*half_width, 0.0, 0.0, 0.0])
         }
+        FieldExpr::Noise {
+            child,
+            amplitude,
+            scale,
+            octaves,
+            persistence,
+            seed,
+            ridged,
+        } => {
+            let child = compile_expr(child, tape)?;
+            let mut instruction = FieldInstruction::unary(
+                FieldOp::Noise,
+                child,
+                [
+                    *amplitude,
+                    *scale,
+                    *persistence,
+                    f64::from(*octaves) + if *ridged { 8.0 } else { 0.0 },
+                ],
+            );
+            instruction.input_b = *seed;
+            instruction
+        }
+        FieldExpr::Warp {
+            child,
+            kind,
+            axis,
+            toward,
+            from,
+            to,
+            start,
+            end,
+        } => {
+            let child = compile_expr(child, tape)?;
+            let mut instruction =
+                FieldInstruction::unary(FieldOp::Warp, child, [*from, *to, *start, *end]);
+            instruction.input_b =
+                u32::from(*kind) | (u32::from(*axis) << 8) | (u32::from(*toward) << 16);
+            instruction
+        }
     };
     append(tape, instruction)
 }

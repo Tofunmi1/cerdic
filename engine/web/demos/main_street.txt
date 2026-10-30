@@ -1,0 +1,297 @@
+# Main Street: a walkable example block assembled from the procedural building asset,
+# the street kit, engine-grown trees and hand-placed facade awnings. All geometry and
+# materials are generated here; no imported models.
+
+sky = scene.sky@1(sun_elevation=18, sun_azimuth=145, sun_intensity=3.6, turbidity=3.4, ground_color=[0.26, 0.22, 0.19], clouds=true, cloud_cover=0.30, seed=37)
+output sky = sky
+fill = scene.environment@1(sky_color=[0.48, 0.57, 0.70], ground_color=[0.30, 0.27, 0.23], intensity=0.78, reflection=0.26, bounce=0.40, bounce_color=[0.82, 0.68, 0.50])
+output fill = fill
+
+ground = solid.box@1(size=[170, 0.2, 80])
+ground_at = xform.move@1(ground, by=[0, -0.1, 4])
+ground_mat = solid.material@1(ground_at, color=[0.22, 0.22, 0.20], roughness=0.94)
+output ground = ground_mat
+
+# Road: asphalt -12..-4 in z, with a 1.5 m pavement reaching the building fronts at -2.5.
+road_asphalt = street.road@1(at=[0, 0, -8], length=150, width=8, lanes=2, axis="x", part="asphalt")
+road_asphalt_mat = solid.material@1(road_asphalt, color=[0.23, 0.22, 0.22], roughness=0.92)
+output road_asphalt = road_asphalt_mat
+road_markings = street.road@1(at=[0, 0, -8], length=150, width=8, lanes=2, axis="x", part="markings")
+road_markings_mat = solid.material@1(road_markings, color=[0.90, 0.82, 0.55], roughness=0.76)
+output road_markings = road_markings_mat
+road_crosswalk = street.road@1(at=[0, 0, -8], length=150, width=8, lanes=2, axis="x", part="crosswalk")
+road_crosswalk_mat = solid.material@1(road_crosswalk, color=[0.84, 0.84, 0.80], roughness=0.86)
+output road_crosswalk = road_crosswalk_mat
+road_kerb = street.road@1(at=[0, 0, -8], length=150, width=8, lanes=2, axis="x", part="kerb")
+road_kerb_mat = solid.material@1(road_kerb, color=[0.58, 0.56, 0.50], roughness=0.88, recipe="concrete")
+output road_kerb = road_kerb_mat
+road_pavement = street.road@1(at=[0, 0, -8], length=150, width=8, lanes=2, axis="x", part="pavement")
+road_pavement_mat = solid.material@1(road_pavement, color=[0.54, 0.51, 0.46], roughness=0.9, recipe="concrete")
+output road_pavement = road_pavement_mat
+
+# A green verge on the near side of the road gives the long street a foreground and depth.
+verge = solid.box@1(size=[160, 0.08, 9])
+verge_at = xform.move@1(verge, by=[0, 0.04, -22.5])
+verge_mat = solid.material@1(verge_at, color=[0.13, 0.21, 0.10], roughness=0.92)
+output verge = verge_mat
+verge_hedge = solid.box@1(size=[160, 0.55, 0.5])
+verge_hedge_at = xform.move@1(verge_hedge, by=[0, 0.32, -18.3])
+verge_hedge_mat = solid.material@1(verge_hedge_at, color=[0.10, 0.19, 0.08], roughness=0.9)
+output verge_hedge = verge_hedge_mat
+verge_shrub = flora.tree@1(kind="shrub", height=1.4, seed=403, lod=2, sides=5, bark=[0.22, 0.14, 0.08], leaves=[0.16, 0.28, 0.09], leaf_style="crossed", leaf_size=0.7, sway=0.2)
+verge_shrub_at = inst.place@1(verge_shrub, at=[[-35, 0, -24], [-5, 0, -24], [25, 0, -24], [45, 0, -24]])
+output verge_trees = verge_shrub_at
+verge_bench_body = street.prop@1(at=[8, 0, -21], height=1.2, axis="x", kind="bench", part="body")
+verge_bench_body_mat = solid.material@1(verge_bench_body, color=[0.18, 0.14, 0.10], metallic=0.1, roughness=0.7)
+output verge_bench_body = verge_bench_body_mat
+verge_bench_accent = street.prop@1(at=[8, 0, -21], height=1.2, axis="x", kind="bench", part="accent")
+verge_bench_accent_mat = solid.material@1(verge_bench_accent, color=[0.30, 0.25, 0.18], roughness=0.55)
+output verge_bench_accent = verge_bench_accent_mat
+
+# A single parked sedan in the near lane gives the road a human scale.
+car_body = solid.box@1(size=[4.2, 0.70, 1.8])
+car_body_at = xform.move@1(car_body, by=[-4, 0.60, -10.6])
+car_body_mat = solid.material@1(car_body_at, color=[0.32, 0.08, 0.07], metallic=0.4, roughness=0.35)
+output car_body = car_body_mat
+car_cabin = solid.box@1(size=[2.2, 0.62, 1.6])
+car_cabin_at = xform.move@1(car_cabin, by=[-4.2, 1.20, -10.6])
+car_cabin_mat = solid.material@1(car_cabin_at, color=[0.08, 0.10, 0.12], metallic=0.5, roughness=0.15)
+output car_cabin = car_cabin_mat
+car_wheel = solid.cylinder@1(radius=0.32, height=0.22, segments=12)
+car_wheel_turn = xform.rotate@1(car_wheel, angles=[90, 0, 0])
+car_wheel_at = inst.place@1(car_wheel_turn, at=[[-5.4, 0.32, -11.5], [-5.4, 0.32, -9.7], [-2.6, 0.32, -11.5], [-2.6, 0.32, -9.7]])
+car_wheel_mat = solid.material@1(car_wheel_at, color=[0.04, 0.04, 0.04], roughness=0.82)
+output car_wheels = car_wheel_mat
+
+# Classical limestone block, seven storeys and a wide stone entrance canopy.
+cl_m = building.asset@1(at=[-30, 0, 6.5], width=24, depth=18, floors=7, bays=7, floor_height=3.6, detail=2, style="classical", part="masonry", seed=301)
+cl_m_mat = solid.material@1(cl_m, color=[0.70, 0.66, 0.56], roughness=0.78, recipe="concrete")
+output classical_masonry = cl_m_mat
+cl_g = building.asset@1(at=[-30, 0, 6.5], width=24, depth=18, floors=7, bays=7, floor_height=3.6, detail=2, style="classical", part="glass", seed=301)
+cl_g_mat = solid.material@1(cl_g, color=[0.10, 0.15, 0.17], metallic=0.22, roughness=0.2, emissive=[0.10, 0.055, 0.018])
+output classical_glass = cl_g_mat
+cl_t = building.asset@1(at=[-30, 0, 6.5], width=24, depth=18, floors=7, bays=7, floor_height=3.6, detail=2, style="classical", part="trim", seed=301)
+cl_t_mat = solid.material@1(cl_t, color=[0.82, 0.78, 0.68], roughness=0.68, recipe="concrete")
+output classical_trim = cl_t_mat
+cl_r = building.asset@1(at=[-30, 0, 6.5], width=24, depth=18, floors=7, bays=7, floor_height=3.6, detail=2, style="classical", part="roof", seed=301)
+cl_r_mat = solid.material@1(cl_r, color=[0.31, 0.31, 0.30], roughness=0.85)
+output classical_roof = cl_r_mat
+cl_d = building.asset@1(at=[-30, 0, 6.5], width=24, depth=18, floors=7, bays=7, floor_height=3.6, detail=2, style="classical", part="doors", seed=301)
+cl_d_mat = solid.material@1(cl_d, color=[0.19, 0.10, 0.05], roughness=0.55)
+output classical_doors = cl_d_mat
+cl_canopy = solid.box@1(size=[5.0, 0.18, 1.5])
+cl_canopy_at = xform.move@1(cl_canopy, by=[-30, 3.45, -3.25])
+cl_canopy_mat = solid.material@1(cl_canopy_at, color=[0.80, 0.76, 0.66], roughness=0.78)
+output classical_canopy = cl_canopy_mat
+
+# Brick tenement with green canvas awnings and iron balconies from the grammar.
+tn_m = building.asset@1(at=[-8, 0, 5.0], width=16, depth=15, floors=6, bays=5, floor_height=3.4, detail=2, style="tenement", part="masonry", seed=302)
+tn_m_mat = solid.material@1(tn_m, color=[0.50, 0.26, 0.17], roughness=0.84, recipe="brick")
+output tenement_masonry = tn_m_mat
+tn_g = building.asset@1(at=[-8, 0, 5.0], width=16, depth=15, floors=6, bays=5, floor_height=3.4, detail=2, style="tenement", part="glass", seed=302)
+tn_g_mat = solid.material@1(tn_g, color=[0.09, 0.13, 0.15], metallic=0.2, roughness=0.22, emissive=[0.09, 0.05, 0.016])
+output tenement_glass = tn_g_mat
+tn_t = building.asset@1(at=[-8, 0, 5.0], width=16, depth=15, floors=6, bays=5, floor_height=3.4, detail=2, style="tenement", part="trim", seed=302)
+tn_t_mat = solid.material@1(tn_t, color=[0.30, 0.18, 0.11], metallic=0.28, roughness=0.48)
+output tenement_trim = tn_t_mat
+tn_r = building.asset@1(at=[-8, 0, 5.0], width=16, depth=15, floors=6, bays=5, floor_height=3.4, detail=2, style="tenement", part="roof", seed=302)
+tn_r_mat = solid.material@1(tn_r, color=[0.26, 0.26, 0.25], roughness=0.86)
+output tenement_roof = tn_r_mat
+tn_d = building.asset@1(at=[-8, 0, 5.0], width=16, depth=15, floors=6, bays=5, floor_height=3.4, detail=2, style="tenement", part="doors", seed=302)
+tn_d_mat = solid.material@1(tn_d, color=[0.18, 0.09, 0.04], roughness=0.55)
+output tenement_doors = tn_d_mat
+tn_awning = solid.box@1(size=[4.4, 0.12, 1.7])
+tn_awning_turn = xform.rotate@1(tn_awning, angles=[10, 0, 0])
+tn_awning_at = xform.move@1(tn_awning_turn, by=[-8, 3.15, -3.3])
+tn_awning_mat = solid.material@1(tn_awning_at, color=[0.12, 0.24, 0.18], roughness=0.82)
+output tenement_awning = tn_awning_mat
+
+# Art Deco tower: warm stone piers, bronze spandrels and a projecting entrance canopy.
+ad_m = building.asset@1(at=[12, 0, 5.5], width=20, depth=16, floors=9, bays=6, floor_height=3.5, detail=2, style="art_deco", part="masonry", seed=303)
+ad_m_mat = solid.material@1(ad_m, color=[0.64, 0.55, 0.42], roughness=0.76, recipe="concrete")
+output deco_masonry = ad_m_mat
+ad_g = building.asset@1(at=[12, 0, 5.5], width=20, depth=16, floors=9, bays=6, floor_height=3.5, detail=2, style="art_deco", part="glass", seed=303)
+ad_g_mat = solid.material@1(ad_g, color=[0.07, 0.13, 0.16], metallic=0.26, roughness=0.19, emissive=[0.11, 0.06, 0.02])
+output deco_glass = ad_g_mat
+ad_t = building.asset@1(at=[12, 0, 5.5], width=20, depth=16, floors=9, bays=6, floor_height=3.5, detail=2, style="art_deco", part="trim", seed=303)
+ad_t_mat = solid.material@1(ad_t, color=[0.38, 0.26, 0.13], metallic=0.42, roughness=0.4)
+output deco_trim = ad_t_mat
+ad_r = building.asset@1(at=[12, 0, 5.5], width=20, depth=16, floors=9, bays=6, floor_height=3.5, detail=2, style="art_deco", part="roof", seed=303)
+ad_r_mat = solid.material@1(ad_r, color=[0.29, 0.29, 0.28], roughness=0.84)
+output deco_roof = ad_r_mat
+ad_d = building.asset@1(at=[12, 0, 5.5], width=20, depth=16, floors=9, bays=6, floor_height=3.5, detail=2, style="art_deco", part="doors", seed=303)
+ad_d_mat = solid.material@1(ad_d, color=[0.16, 0.075, 0.035], roughness=0.5)
+output deco_doors = ad_d_mat
+ad_canopy = solid.box@1(size=[5.0, 0.18, 1.4])
+ad_canopy_at = xform.move@1(ad_canopy, by=[12, 3.55, -3.2])
+ad_canopy_mat = solid.material@1(ad_canopy_at, color=[0.36, 0.25, 0.13], metallic=0.42, roughness=0.42)
+output deco_canopy = ad_canopy_mat
+
+# Brownstone row house with a dark red awning and a stoop.
+br_m = building.asset@1(at=[30, 0, 4.5], width=15, depth=14, floors=5, bays=5, floor_height=3.4, detail=2, style="brownstone", part="masonry", seed=304)
+br_m_mat = solid.material@1(br_m, color=[0.43, 0.29, 0.21], roughness=0.86, recipe="brick")
+output brownstone_masonry = br_m_mat
+br_g = building.asset@1(at=[30, 0, 4.5], width=15, depth=14, floors=5, bays=5, floor_height=3.4, detail=2, style="brownstone", part="glass", seed=304)
+br_g_mat = solid.material@1(br_g, color=[0.085, 0.12, 0.14], metallic=0.2, roughness=0.24, emissive=[0.08, 0.045, 0.014])
+output brownstone_glass = br_g_mat
+br_t = building.asset@1(at=[30, 0, 4.5], width=15, depth=14, floors=5, bays=5, floor_height=3.4, detail=2, style="brownstone", part="trim", seed=304)
+br_t_mat = solid.material@1(br_t, color=[0.58, 0.45, 0.33], roughness=0.7, recipe="painted_wall")
+output brownstone_trim = br_t_mat
+br_r = building.asset@1(at=[30, 0, 4.5], width=15, depth=14, floors=5, bays=5, floor_height=3.4, detail=2, style="brownstone", part="roof", seed=304)
+br_r_mat = solid.material@1(br_r, color=[0.25, 0.25, 0.24], roughness=0.86)
+output brownstone_roof = br_r_mat
+br_d = building.asset@1(at=[30, 0, 4.5], width=15, depth=14, floors=5, bays=5, floor_height=3.4, detail=2, style="brownstone", part="doors", seed=304)
+br_d_mat = solid.material@1(br_d, color=[0.15, 0.06, 0.03], roughness=0.52)
+output brownstone_doors = br_d_mat
+br_awning = solid.box@1(size=[3.8, 0.12, 1.5])
+br_awning_turn = xform.rotate@1(br_awning, angles=[10, 0, 0])
+br_awning_at = xform.move@1(br_awning_turn, by=[30, 3.1, -3.2])
+br_awning_mat = solid.material@1(br_awning_at, color=[0.28, 0.09, 0.07], roughness=0.84)
+output brownstone_awning = br_awning_mat
+
+# Low warehouse at the corner: broad floors, loading canopy and industrial glazing.
+wh_m = building.asset@1(at=[47, 0, 4.5], width=18, depth=14, floors=3, bays=6, floor_height=4.4, detail=2, style="warehouse", part="masonry", seed=305)
+wh_m_mat = solid.material@1(wh_m, color=[0.54, 0.41, 0.32], roughness=0.84, recipe="brick")
+output warehouse_masonry = wh_m_mat
+wh_g = building.asset@1(at=[47, 0, 4.5], width=18, depth=14, floors=3, bays=6, floor_height=4.4, detail=2, style="warehouse", part="glass", seed=305)
+wh_g_mat = solid.material@1(wh_g, color=[0.10, 0.14, 0.15], metallic=0.18, roughness=0.25, emissive=[0.07, 0.04, 0.012])
+output warehouse_glass = wh_g_mat
+wh_t = building.asset@1(at=[47, 0, 4.5], width=18, depth=14, floors=3, bays=6, floor_height=4.4, detail=2, style="warehouse", part="trim", seed=305)
+wh_t_mat = solid.material@1(wh_t, color=[0.27, 0.23, 0.19], metallic=0.24, roughness=0.55)
+output warehouse_trim = wh_t_mat
+wh_r = building.asset@1(at=[47, 0, 4.5], width=18, depth=14, floors=3, bays=6, floor_height=4.4, detail=2, style="warehouse", part="roof", seed=305)
+wh_r_mat = solid.material@1(wh_r, color=[0.24, 0.24, 0.23], roughness=0.88)
+output warehouse_roof = wh_r_mat
+wh_d = building.asset@1(at=[47, 0, 4.5], width=18, depth=14, floors=3, bays=6, floor_height=4.4, detail=2, style="warehouse", part="doors", seed=305)
+wh_d_mat = solid.material@1(wh_d, color=[0.12, 0.08, 0.05], roughness=0.6)
+output warehouse_doors = wh_d_mat
+wh_canopy = solid.box@1(size=[6.0, 0.2, 2.2])
+wh_canopy_at = xform.move@1(wh_canopy, by=[47, 4.4, -3.6])
+wh_canopy_mat = solid.material@1(wh_canopy_at, color=[0.16, 0.24, 0.20], metallic=0.2, roughness=0.6)
+output warehouse_canopy = wh_canopy_mat
+
+# Pocket park at the west end: grass, path, hedge, two oaks and a bench.
+park_ground = solid.box@1(size=[15, 0.08, 12])
+park_ground_at = xform.move@1(park_ground, by=[-50, 0.04, 6])
+park_ground_mat = solid.material@1(park_ground_at, color=[0.12, 0.22, 0.10], roughness=0.92)
+output park_ground = park_ground_mat
+park_path = solid.box@1(size=[15, 0.02, 2.0])
+park_path_at = xform.move@1(park_path, by=[-50, 0.09, 1.5])
+park_path_mat = solid.material@1(park_path_at, color=[0.56, 0.52, 0.44], roughness=0.9)
+output park_path = park_path_mat
+park_hedge = solid.box@1(size=[15, 0.65, 0.45])
+park_hedge_at = xform.move@1(park_hedge, by=[-50, 0.32, 11.6])
+park_hedge_mat = solid.material@1(park_hedge_at, color=[0.10, 0.20, 0.09], roughness=0.9)
+output park_hedge = park_hedge_mat
+park_oak = flora.tree@1(kind="oak", height=5.2, seed=402, lod=1, sides=6, bark=[0.25, 0.16, 0.09], leaves=[0.18, 0.33, 0.10], leaf_style="crossed", leaf_size=0.9, sway=0.3)
+park_oak_at = inst.place@1(park_oak, at=[[-54, 0, 7], [-46, 0, 7]])
+output park_trees = park_oak_at
+park_bench_body = street.prop@1(at=[-50, 0, 1.5], height=1.2, axis="x", kind="bench", part="body")
+park_bench_body_mat = solid.material@1(park_bench_body, color=[0.19, 0.14, 0.09], metallic=0.1, roughness=0.7)
+output park_bench_body = park_bench_body_mat
+park_bench_accent = street.prop@1(at=[-50, 0, 1.5], height=1.2, axis="x", kind="bench", part="accent")
+park_bench_accent_mat = solid.material@1(park_bench_accent, color=[0.30, 0.25, 0.18], roughness=0.55)
+output park_bench_accent = park_bench_accent_mat
+
+# Street trees in the pavement, one shared tree and five instance placements.
+street_oak = flora.tree@1(kind="oak", height=4.3, seed=401, lod=2, sides=6, bark=[0.25, 0.16, 0.09], leaves=[0.18, 0.32, 0.10], leaf_style="crossed", leaf_size=0.9, sway=0.3)
+street_oak_at = inst.place@1(street_oak, at=[[-36, 0, -3.8], [-16, 0, -3.8], [4, 0, -3.8], [24, 0, -3.8], [44, 0, -3.8]])
+output street_trees = street_oak_at
+
+# Streetlights: body, accent and emissive lens at four positions.
+lamp_a_body = street.prop@1(at=[-40, 0, -4.6], height=7.5, axis="x", kind="streetlight", part="body")
+lamp_a_body_mat = solid.material@1(lamp_a_body, color=[0.16, 0.17, 0.18], metallic=0.65, roughness=0.5)
+output lamp_a_body = lamp_a_body_mat
+lamp_a_accent = street.prop@1(at=[-40, 0, -4.6], height=7.5, axis="x", kind="streetlight", part="accent")
+lamp_a_accent_mat = solid.material@1(lamp_a_accent, color=[0.32, 0.33, 0.34], metallic=0.62, roughness=0.46)
+output lamp_a_accent = lamp_a_accent_mat
+lamp_a_lens = street.prop@1(at=[-40, 0, -4.6], height=7.5, axis="x", kind="streetlight", part="lens")
+lamp_a_lens_mat = solid.material@1(lamp_a_lens, color=[1.0, 0.78, 0.42], roughness=0.22, emissive=[3.2, 1.7, 0.55])
+output lamp_a_lens = lamp_a_lens_mat
+lamp_b_body = street.prop@1(at=[-10, 0, -4.6], height=7.5, axis="x", kind="streetlight", part="body")
+lamp_b_body_mat = solid.material@1(lamp_b_body, color=[0.16, 0.17, 0.18], metallic=0.65, roughness=0.5)
+output lamp_b_body = lamp_b_body_mat
+lamp_b_accent = street.prop@1(at=[-10, 0, -4.6], height=7.5, axis="x", kind="streetlight", part="accent")
+lamp_b_accent_mat = solid.material@1(lamp_b_accent, color=[0.32, 0.33, 0.34], metallic=0.62, roughness=0.46)
+output lamp_b_accent = lamp_b_accent_mat
+lamp_b_lens = street.prop@1(at=[-10, 0, -4.6], height=7.5, axis="x", kind="streetlight", part="lens")
+lamp_b_lens_mat = solid.material@1(lamp_b_lens, color=[1.0, 0.78, 0.42], roughness=0.22, emissive=[3.2, 1.7, 0.55])
+output lamp_b_lens = lamp_b_lens_mat
+lamp_c_body = street.prop@1(at=[20, 0, -4.6], height=7.5, axis="x", kind="streetlight", part="body")
+lamp_c_body_mat = solid.material@1(lamp_c_body, color=[0.16, 0.17, 0.18], metallic=0.65, roughness=0.5)
+output lamp_c_body = lamp_c_body_mat
+lamp_c_accent = street.prop@1(at=[20, 0, -4.6], height=7.5, axis="x", kind="streetlight", part="accent")
+lamp_c_accent_mat = solid.material@1(lamp_c_accent, color=[0.32, 0.33, 0.34], metallic=0.62, roughness=0.46)
+output lamp_c_accent = lamp_c_accent_mat
+lamp_c_lens = street.prop@1(at=[20, 0, -4.6], height=7.5, axis="x", kind="streetlight", part="lens")
+lamp_c_lens_mat = solid.material@1(lamp_c_lens, color=[1.0, 0.78, 0.42], roughness=0.22, emissive=[3.2, 1.7, 0.55])
+output lamp_c_lens = lamp_c_lens_mat
+lamp_d_body = street.prop@1(at=[40, 0, -4.6], height=7.5, axis="x", kind="streetlight", part="body")
+lamp_d_body_mat = solid.material@1(lamp_d_body, color=[0.16, 0.17, 0.18], metallic=0.65, roughness=0.5)
+output lamp_d_body = lamp_d_body_mat
+lamp_d_accent = street.prop@1(at=[40, 0, -4.6], height=7.5, axis="x", kind="streetlight", part="accent")
+lamp_d_accent_mat = solid.material@1(lamp_d_accent, color=[0.32, 0.33, 0.34], metallic=0.62, roughness=0.46)
+output lamp_d_accent = lamp_d_accent_mat
+lamp_d_lens = street.prop@1(at=[40, 0, -4.6], height=7.5, axis="x", kind="streetlight", part="lens")
+lamp_d_lens_mat = solid.material@1(lamp_d_lens, color=[1.0, 0.78, 0.42], roughness=0.22, emissive=[3.2, 1.7, 0.55])
+output lamp_d_lens = lamp_d_lens_mat
+
+# Sidewalk furniture: benches, bins, hydrant, bus shelter, bollards and a sign.
+bench_west_body = street.prop@1(at=[-24, 0, -4.0], height=1.2, axis="x", kind="bench", part="body")
+bench_west_body_mat = solid.material@1(bench_west_body, color=[0.18, 0.14, 0.10], metallic=0.1, roughness=0.7)
+output bench_west_body = bench_west_body_mat
+bench_west_accent = street.prop@1(at=[-24, 0, -4.0], height=1.2, axis="x", kind="bench", part="accent")
+bench_west_accent_mat = solid.material@1(bench_west_accent, color=[0.30, 0.25, 0.18], roughness=0.55)
+output bench_west_accent = bench_west_accent_mat
+bench_east_body = street.prop@1(at=[14, 0, -4.0], height=1.2, axis="x", kind="bench", part="body")
+bench_east_body_mat = solid.material@1(bench_east_body, color=[0.18, 0.14, 0.10], metallic=0.1, roughness=0.7)
+output bench_east_body = bench_east_body_mat
+bench_east_accent = street.prop@1(at=[14, 0, -4.0], height=1.2, axis="x", kind="bench", part="accent")
+bench_east_accent_mat = solid.material@1(bench_east_accent, color=[0.30, 0.25, 0.18], roughness=0.55)
+output bench_east_accent = bench_east_accent_mat
+bin_west_body = street.prop@1(at=[-22, 0, -4.0], height=1.2, axis="z", kind="bin", part="body")
+bin_west_body_mat = solid.material@1(bin_west_body, color=[0.16, 0.17, 0.18], metallic=0.55, roughness=0.55)
+output bin_west_body = bin_west_body_mat
+bin_west_accent = street.prop@1(at=[-22, 0, -4.0], height=1.2, axis="z", kind="bin", part="accent")
+bin_west_accent_mat = solid.material@1(bin_west_accent, color=[0.30, 0.31, 0.32], metallic=0.5, roughness=0.5)
+output bin_west_accent = bin_west_accent_mat
+hydrant_body = street.prop@1(at=[6, 0, -4.0], height=1.5, axis="x", kind="hydrant", part="body")
+hydrant_body_mat = solid.material@1(hydrant_body, color=[0.48, 0.12, 0.08], metallic=0.3, roughness=0.6)
+output hydrant_body = hydrant_body_mat
+hydrant_accent = street.prop@1(at=[6, 0, -4.0], height=1.5, axis="x", kind="hydrant", part="accent")
+hydrant_accent_mat = solid.material@1(hydrant_accent, color=[0.68, 0.20, 0.12], metallic=0.3, roughness=0.5)
+output hydrant_accent = hydrant_accent_mat
+shelter_body = street.prop@1(at=[34, 0, -4.2], height=3.1, axis="x", kind="bus_shelter", part="body")
+shelter_body_mat = solid.material@1(shelter_body, color=[0.16, 0.18, 0.19], metallic=0.6, roughness=0.5)
+output shelter_body = shelter_body_mat
+shelter_accent = street.prop@1(at=[34, 0, -4.2], height=3.1, axis="x", kind="bus_shelter", part="accent")
+shelter_accent_mat = solid.material@1(shelter_accent, color=[0.34, 0.36, 0.37], metallic=0.55, roughness=0.45)
+output shelter_accent = shelter_accent_mat
+bollard_west_body = street.prop@1(at=[-42, 0, -4.2], height=1.2, axis="z", kind="bollard", part="body")
+bollard_west_body_mat = solid.material@1(bollard_west_body, color=[0.16, 0.17, 0.18], metallic=0.55, roughness=0.55)
+output bollard_west_body = bollard_west_body_mat
+bollard_west_accent = street.prop@1(at=[-42, 0, -4.2], height=1.2, axis="z", kind="bollard", part="accent")
+bollard_west_accent_mat = solid.material@1(bollard_west_accent, color=[0.32, 0.33, 0.34], metallic=0.5, roughness=0.5)
+output bollard_west_accent = bollard_west_accent_mat
+bollard_east_body = street.prop@1(at=[42, 0, -4.2], height=1.2, axis="z", kind="bollard", part="body")
+bollard_east_body_mat = solid.material@1(bollard_east_body, color=[0.16, 0.17, 0.18], metallic=0.55, roughness=0.55)
+output bollard_east_body = bollard_east_body_mat
+bollard_east_accent = street.prop@1(at=[42, 0, -4.2], height=1.2, axis="z", kind="bollard", part="accent")
+bollard_east_accent_mat = solid.material@1(bollard_east_accent, color=[0.32, 0.33, 0.34], metallic=0.5, roughness=0.5)
+output bollard_east_accent = bollard_east_accent_mat
+sign_body = street.prop@1(at=[52, 0, -4.2], height=4.2, axis="z", kind="sign", part="body")
+sign_body_mat = solid.material@1(sign_body, color=[0.16, 0.17, 0.18], metallic=0.62, roughness=0.5)
+output sign_body = sign_body_mat
+sign_accent = street.prop@1(at=[52, 0, -4.2], height=4.2, axis="z", kind="sign", part="accent")
+sign_accent_mat = solid.material@1(sign_accent, color=[0.30, 0.31, 0.32], metallic=0.58, roughness=0.46)
+output sign_accent = sign_accent_mat
+
+# Four warm practicals make the pavement pools of light under the lenses.
+lamp_light_a = light.point@1(position=[-40, 6.8, -4.6], color=[1.0, 0.72, 0.38], intensity=12, range=20)
+output lamp_light_a = lamp_light_a
+lamp_light_b = light.point@1(position=[-10, 6.8, -4.6], color=[1.0, 0.72, 0.38], intensity=12, range=20)
+output lamp_light_b = lamp_light_b
+lamp_light_c = light.point@1(position=[20, 6.8, -4.6], color=[1.0, 0.72, 0.38], intensity=12, range=20)
+output lamp_light_c = lamp_light_c
+lamp_light_d = light.point@1(position=[40, 6.8, -4.6], color=[1.0, 0.72, 0.38], intensity=12, range=20)
+output lamp_light_d = lamp_light_d

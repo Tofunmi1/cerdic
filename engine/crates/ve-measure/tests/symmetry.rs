@@ -56,7 +56,10 @@ fn the_best_plane_is_the_least_wrong_one() {
         largest = largest.max(error);
     }
     assert!((best.max - smallest).abs() < 1e-6);
-    assert!(largest > best.max + 1e-3, "at least one plane is clearly worse");
+    assert!(
+        largest > best.max + 1e-3,
+        "at least one plane is clearly worse"
+    );
 }
 
 #[test]

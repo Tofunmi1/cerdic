@@ -25,11 +25,17 @@ fn cube(half: f32) -> (Vec<[f32; 3]>, Vec<u32>) {
 fn a_ray_hits_the_near_face() {
     let (positions, indices) = cube(0.5);
     let mesh = Mesh::new(&positions, &indices);
-    let hit = raycast(&mesh, [-2.0, 0.0, 0.0], [1.0, 0.0, 0.0]).expect("valid").expect("hit");
+    let hit = raycast(&mesh, [-2.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+        .expect("valid")
+        .expect("hit");
     assert!((hit.distance - 1.5).abs() < 1e-4, "{}", hit.distance);
     assert!((hit.point[0] + 0.5).abs() < 1e-4);
     // A ray that misses the cube entirely.
-    assert!(raycast(&mesh, [-2.0, 2.0, 0.0], [1.0, 0.0, 0.0]).expect("valid").is_none());
+    assert!(
+        raycast(&mesh, [-2.0, 2.0, 0.0], [1.0, 0.0, 0.0])
+            .expect("valid")
+            .is_none()
+    );
 }
 
 #[test]
@@ -37,7 +43,11 @@ fn the_closest_point_is_on_the_surface() {
     let (positions, indices) = cube(0.5);
     let mesh = Mesh::new(&positions, &indices);
     let closest = closest_point(&mesh, [2.0, 0.0, 0.0]).expect("valid");
-    assert!((closest.distance - 1.5).abs() < 1e-4, "{}", closest.distance);
+    assert!(
+        (closest.distance - 1.5).abs() < 1e-4,
+        "{}",
+        closest.distance
+    );
     assert!((closest.point[0] - 0.5).abs() < 1e-4);
     // A point inside the cube is half a metre from the nearest face.
     let inside = closest_point(&mesh, [0.0, 0.0, 0.0]).expect("valid");
@@ -56,7 +66,10 @@ fn identical_meshes_are_zero_apart() {
 #[test]
 fn a_shifted_mesh_is_apart_by_the_shift() {
     let (positions, indices) = cube(0.5);
-    let shifted: Vec<[f32; 3]> = positions.iter().map(|p| [p[0] + 0.25, p[1], p[2]]).collect();
+    let shifted: Vec<[f32; 3]> = positions
+        .iter()
+        .map(|p| [p[0] + 0.25, p[1], p[2]])
+        .collect();
     let a = Mesh::new(&positions, &indices);
     let b = Mesh::new(&shifted, &indices);
     let hausdorff = distance_between(&a, &b).expect("valid");

@@ -4,6 +4,15 @@
 //! Units are metres and per-metre coefficients. Colours are linear RGB. Directions are in a frame whose +y is straight up at the
 //! point being looked from.
 
+mod clouds;
+mod cubemap;
+
+pub use clouds::{cloud_amount, hash_cell, noise2};
+pub use cubemap::{
+    CubeFaces, SkyColors, gradient_cubemap, irradiance_cubemap, prefiltered_mips, sky_radiance,
+    texel_direction, texel_solid_angle,
+};
+
 /// The planet and its air.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Atmosphere {
