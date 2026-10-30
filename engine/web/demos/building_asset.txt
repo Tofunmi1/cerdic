@@ -1,0 +1,31 @@
+# A close-view procedural building asset assembled from a deterministic facade grammar.
+# Keep the material groups separate so the asset can be reused and re-skinned in graph programs.
+sky = scene.sky@1(sun_elevation=31, sun_azimuth=135, sun_intensity=3.2, turbidity=3, ground_color=[0.22, 0.25, 0.29], clouds=false, seed=7)
+output sky = sky
+fill = scene.environment@1(sky_color=[0.56, 0.65, 0.78], ground_color=[0.32, 0.33, 0.34], intensity=0.88, reflection=0.3, bounce=0.44, bounce_color=[0.80, 0.75, 0.65])
+output fill = fill
+
+ground = solid.box@1(size=[100, 0.2, 100])
+ground_at = xform.move@1(ground, by=[0, -0.11, 0])
+ground_mat = solid.material@1(ground_at, color=[0.24, 0.25, 0.26], roughness=0.92)
+output ground = ground_mat
+
+stone = building.asset@1(width=24, depth=18, floors=8, bays=6, floor_height=3.6, detail=3, style="art_deco", part="masonry", seed=17)
+stone_mat = solid.material@1(stone, color=[0.68, 0.59, 0.45], roughness=0.74, recipe="concrete")
+output building_masonry = stone_mat
+
+glass = building.asset@1(width=24, depth=18, floors=8, bays=6, floor_height=3.6, detail=3, style="art_deco", part="glass", seed=17)
+glass_mat = solid.material@1(glass, color=[0.075, 0.17, 0.22], metallic=0.32, roughness=0.19, emissive=[0.015, 0.028, 0.035])
+output building_glass = glass_mat
+
+trim = building.asset@1(width=24, depth=18, floors=8, bays=6, floor_height=3.6, detail=3, style="art_deco", part="trim", seed=17)
+trim_mat = solid.material@1(trim, color=[0.36, 0.25, 0.14], metallic=0.48, roughness=0.42)
+output building_trim = trim_mat
+
+roof = building.asset@1(width=24, depth=18, floors=8, bays=6, floor_height=3.6, detail=3, style="art_deco", part="roof", seed=17)
+roof_mat = solid.material@1(roof, color=[0.29, 0.3, 0.3], roughness=0.82)
+output building_roof = roof_mat
+
+doors = building.asset@1(width=24, depth=18, floors=8, bays=6, floor_height=3.6, detail=3, style="art_deco", part="doors", seed=17)
+door_mat = solid.material@1(doors, color=[0.19, 0.095, 0.045], roughness=0.52)
+output building_doors = door_mat

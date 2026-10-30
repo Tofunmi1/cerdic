@@ -31,6 +31,42 @@ fn g6_42_a_curved_mesh_has_no_coplanar_patches_and_is_unchanged() {
 }
 
 #[test]
+fn g6_42_keeping_holes_merges_what_it_can_and_leaves_a_ring_of_faces_alone() {
+    // A wall with a window: the two long faces have a hole (one patch that is not one loop), the four sides of the box and of the opening
+    // are plain quads. Strict merging refuses it; merging that keeps holes merges every patch that can merge and leaves the others.
+    let wall = Solid::cube([6.0, 2.8, 0.5], true)
+        .unwrap()
+        .difference(&Solid::cube([1.2, 1.2, 1.0], true).unwrap())
+        .unwrap();
+    let triangles = solid_to_polymesh(&wall).unwrap();
+    assert!(
+        merge_coplanar(&triangles, 0.01, &context()).is_err(),
+        "strict merging refuses the faces with a hole"
+    );
+    let kept = ve_geometry::merge_coplanar_keeping_holes(&triangles, 0.01, &context()).unwrap();
+    assert!(
+        kept.face_count() < triangles.face_count(),
+        "the plain patches merged: {} of {}",
+        kept.face_count(),
+        triangles.face_count()
+    );
+    let report = validate(&kept, &context()).unwrap();
+    assert_eq!(
+        report.euler_characteristic, 0,
+        "still a solid with a hole through it"
+    );
+    assert!(report.nonmanifold_edges.is_empty() && report.inconsistent_winding_edges.is_empty());
+}
+
+#[test]
+fn g6_42_keeping_holes_gives_the_same_as_merging_when_there_are_none() {
+    let triangles = solid_to_polymesh(&Solid::cube([1.0, 2.0, 3.0], true).unwrap()).unwrap();
+    let strict = merge_coplanar(&triangles, 0.01, &context()).unwrap();
+    let kept = ve_geometry::merge_coplanar_keeping_holes(&triangles, 0.01, &context()).unwrap();
+    assert_eq!(kept.face_count(), strict.face_count());
+}
+
+#[test]
 fn g6_42_a_flat_patch_with_a_hole_is_refused_not_repaired() {
     // A ring of eight coplanar quads around an empty middle: one patch whose union is not one loop.
     let mut positions = Vec::new();

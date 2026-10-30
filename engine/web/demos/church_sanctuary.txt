@@ -1,0 +1,193 @@
+# An old Gothic parish church in the last light of day: weathered limestone, slate courses,
+# deep bell openings, pointed entry, a stone rose window, buttresses, and a quiet garden.
+
+sky = scene.sky@1(sun_elevation=16, sun_azimuth=-35, sun_intensity=4.0, turbidity=3.0, ground_color=[0.22, 0.25, 0.26], clouds=true, cloud_cover=0.2, seed=17)
+output sky = sky
+env = scene.environment@1(sky_color=[0.48, 0.58, 0.72], ground_color=[0.30, 0.33, 0.29], intensity=0.92, reflection=0.24, bounce=0.44, bounce_color=[0.78, 0.73, 0.60])
+output environment = env
+
+# Garden plinth and processional approach
+ground = solid.box@1(size=[34, 0.35, 38])
+ground_at = xform.move@1(ground, by=[0, -0.18, -1])
+ground_mat = solid.texture@1(ground_at, tile=1.4, program="g = fbm(scale_x=12, scale_y=12); f = fbm(scale_x=48, scale_y=48); albedo = colorize(g, gradient=[0:#202b24, 0.5:#303a2e, 1:#424438]); roughness = colorize(f, gradient=[0:#d0d0d0, 1:#f0f0f0]); height = f")
+output grounds = ground_mat
+walk = solid.box@1(size=[4.2, 0.12, 15])
+walk_at = xform.move@1(walk, by=[0, 0.03, 8.4])
+walk_mat = solid.texture@1(walk_at, tile=2.4, program="b = bricks(rows=10, columns=4, mortar=0.07, bevel=0.12, round=0.08, row_offset=0.5); g = fbm(scale_x=18, scale_y=18); albedo = colorize(g, gradient=[0:#68645a, 0.5:#8b8372, 1:#a99d87]); roughness = colorize(g, gradient=[0:#d0d0d0, 1:#f0f0f0]); height = b")
+output path = walk_mat
+step = solid.box@1(size=[5.2, 0.16, 1.15])
+step_a = xform.move@1(step, by=[0, 0.13, 4.3])
+step_b = xform.move@1(step, by=[0, 0.13, 5.45])
+steps = solid.union@1(step_a, step_b)
+steps_mat = solid.texture@1(steps, tile=1.6, program="b = bricks(rows=4, columns=3, mortar=0.06, bevel=0.14, round=0.12, row_offset=0.5); g = fbm(scale_x=8, scale_y=8); albedo = colorize(g, gradient=[0:#756d5d, 0.5:#948a77, 1:#b2a58e]); roughness = colorize(g, gradient=[0:#d8d8d8, 1:#f0f0f0]); height = b")
+output entrance_steps = steps_mat
+
+# Main nave and projecting transept, built in warm limestone
+nave = solid.box@1(size=[8.2, 5.4, 13.5])
+nave_at = xform.move@1(nave, by=[0, 2.85, -1.1])
+stone = solid.texture@1(nave_at, tile=1, program="b = bricks(rows=13, columns=5, mortar=0.055, bevel=0.11, round=0.04, row_offset=0.5); g = fbm(scale_x=9, scale_y=9); f = fbm(scale_x=42, scale_y=42); albedo = colorize(g, gradient=[0:#655f55, 0.5:#827a6c, 1:#a79b85]); roughness = colorize(f, gradient=[0:#d0d0d0, 1:#f2f2f2]); height = b")
+output nave = stone
+transept = solid.box@1(size=[13.2, 4.7, 5.0])
+transept_at = xform.move@1(transept, by=[0, 2.5, -3.0])
+transept_mat = solid.texture@1(transept_at, tile=1, program="b = bricks(rows=10, columns=7, mortar=0.06, bevel=0.1, round=0.035, row_offset=0.5); g = fbm(scale_x=11, scale_y=11); f = fbm(scale_x=48, scale_y=48); albedo = colorize(g, gradient=[0:#5e5b53, 0.5:#7b766b, 1:#9d9380]); roughness = colorize(f, gradient=[0:#d0d0d0, 1:#f2f2f2]); height = b")
+output transept = transept_mat
+front_gable_profile = profile.polygon@1(points=[[-4.2, 0], [4.2, 0], [0, 2.85]])
+front_gable = solid.extrude@1(front_gable_profile, height=0.32)
+front_gable_turn = xform.rotate@1(front_gable, angles=[90, 0, 0])
+front_gable_at = xform.move@1(front_gable_turn, by=[0, 5.52, 5.68])
+gable_mat = solid.texture@1(front_gable_at, tile=1, program="b = bricks(rows=6, columns=6, mortar=0.05, bevel=0.12, round=0.05, row_offset=0.5); g = fbm(scale_x=10, scale_y=10); albedo = colorize(g, gradient=[0:#686257, 0.5:#898171, 1:#a99d87]); roughness = 0.92; height = b")
+output front_gable = gable_mat
+
+# Slate pitched roof with raised ridge cap
+roof_slab = solid.box@1(size=[4.7, 0.28, 14.1])
+roof_l_turn = xform.rotate@1(roof_slab, angles=[0, 0, 34])
+roof_l_at = xform.move@1(roof_l_turn, by=[-1.91, 5.55, -1.1])
+roof_r_turn = xform.rotate@1(roof_slab, angles=[0, 0, -34])
+roof_r_at = xform.move@1(roof_r_turn, by=[1.91, 5.55, -1.1])
+roof_pair = solid.union@1(roof_l_at, roof_r_at)
+transept_roof_slab = solid.box@1(size=[3.6, 0.24, 5.4])
+transept_roof_l_turn = xform.rotate@1(transept_roof_slab, angles=[0, 0, 16])
+transept_roof_l_at = xform.move@1(transept_roof_l_turn, by=[-1.7, 5.35, -3.0])
+transept_roof_r_turn = xform.rotate@1(transept_roof_slab, angles=[0, 0, -16])
+transept_roof_r_at = xform.move@1(transept_roof_r_turn, by=[1.7, 5.35, -3.0])
+roof_all = solid.union@1(roof_pair, transept_roof_l_at, transept_roof_r_at)
+slate = solid.texture@1(roof_all, tile=1, program="b = bricks(rows=24, columns=14, mortar=0.045, bevel=0.18, round=0.04, row_offset=0.5); g = fbm(scale_x=22, scale_y=22); albedo = colorize(g, gradient=[0:#2b3439, 0.5:#3e494e, 1:#59666b]); roughness = colorize(g, gradient=[0:#d0d0d0, 1:#f0f0f0]); height = b")
+output slate_roof = slate
+ridge = solid.box@1(size=[0.2, 0.2, 14.2])
+ridge_at = xform.move@1(ridge, by=[0, 6.9, -1.1])
+transept_ridge = solid.box@1(size=[0.18, 0.18, 5.5])
+transept_ridge_at = xform.move@1(transept_ridge, by=[0, 5.84, -3.0])
+ridge_all = solid.union@1(ridge_at, transept_ridge_at)
+ridge_mat = solid.material@1(ridge_all, color=[0.33, 0.39, 0.42], metallic=0.25, roughness=0.6)
+output ridge = ridge_mat
+
+# Twin square bell towers and steep copper-dark spires
+tower = solid.box@1(size=[1.85, 7.0, 2.15])
+tower_l_at = xform.move@1(tower, by=[-3.25, 3.62, 5.45])
+tower_r_at = xform.move@1(tower, by=[3.25, 3.62, 5.45])
+towers = solid.union@1(tower_l_at, tower_r_at)
+tower_stone = solid.texture@1(towers, tile=1, program="b = bricks(rows=12, columns=4, mortar=0.05, bevel=0.12, round=0.04, row_offset=0.5); g = fbm(scale_x=10, scale_y=10); albedo = colorize(g, gradient=[0:#625d54, 0.5:#837b6d, 1:#a89b83]); roughness = 0.92; height = b")
+output towers = tower_stone
+spire = solid.cone@1(radius=1.28, height=3.9, segments=12)
+spire_l_at = xform.move@1(spire, by=[-3.25, 9.0, 5.45])
+spire_r_at = xform.move@1(spire, by=[3.25, 9.0, 5.45])
+spires = solid.union@1(spire_l_at, spire_r_at)
+spire_mat = solid.material@1(spires, color=[0.23, 0.28, 0.29], metallic=0.12, roughness=0.84)
+output spires = spire_mat
+spire_finial = solid.sphere@1(radius=0.16, segments=20)
+finial_l = xform.move@1(spire_finial, by=[-3.25, 11.05, 5.45])
+finial_r = xform.move@1(spire_finial, by=[3.25, 11.05, 5.45])
+finials = solid.union@1(finial_l, finial_r)
+finial_gold = solid.material@1(finials, color=[0.77, 0.56, 0.24], metallic=0.72, roughness=0.3)
+output finials = finial_gold
+
+# Deep arched entrance, dark oak doors, and a rose window with stone tracery
+door = solid.box@1(size=[2.2, 3.45, 0.24])
+door_at = xform.move@1(door, by=[0, 1.78, 5.79])
+oak = solid.material@1(door_at, color=[0.20, 0.105, 0.055], roughness=0.55)
+output entrance_door = oak
+door_seam = solid.box@1(size=[0.045, 3.2, 0.04])
+door_seam_at = xform.move@1(door_seam, by=[0, 1.78, 5.94])
+door_seam_mat = solid.material@1(door_seam_at, color=[0.08, 0.055, 0.04], roughness=0.75)
+output door_seam = door_seam_mat
+arch_path = curve.spline@1(points=[[-1.2, 3.5, 5.88], [-1.2, 4.35, 5.88], [-0.82, 4.9, 5.88], [0, 5.12, 5.88], [0.82, 4.9, 5.88], [1.2, 4.35, 5.88], [1.2, 3.5, 5.88]], steps=8)
+arch_profile = profile.circle@1(radius=0.16, segments=16)
+arch_stone = solid.sweep@1(arch_path, arch_profile)
+arch_trim = solid.material@1(arch_stone, color=[0.84, 0.79, 0.67], roughness=0.72)
+output entrance_arch = arch_trim
+rose_back = solid.cylinder@1(radius=0.92, height=0.14, segments=48)
+rose_turn = xform.rotate@1(rose_back, angles=[90, 0, 0])
+rose_at = xform.move@1(rose_turn, by=[0, 6.28, 6.04])
+rose_glass = solid.material@1(rose_at, color=[0.13, 0.34, 0.46], roughness=0.28, metallic=0.12, emissive=[0.035, 0.09, 0.14])
+output rose_window = rose_glass
+rose_ring = solid.torus@1(major=0.87, minor=0.075, segments=48)
+rose_ring_turn = xform.rotate@1(rose_ring, angles=[90, 0, 0])
+rose_ring_at = xform.move@1(rose_ring_turn, by=[0, 6.28, 6.11])
+rose_stone = solid.material@1(rose_ring_at, color=[0.82, 0.77, 0.65], roughness=0.68)
+output rose_tracery_outer = rose_stone
+rose_spoke = solid.box@1(size=[0.08, 0.08, 1.55])
+rose_spoke_x = xform.rotate@1(rose_spoke, angles=[0, 0, 90])
+rose_spoke_turn = xform.rotate@1(rose_spoke_x, angles=[90, 0, 0])
+rose_spoke_at = xform.move@1(rose_spoke_turn, by=[0, 6.28, 6.08])
+rose_spokes = inst.radial@1(rose_spoke_at, count=8, radius=0)
+rose_spoke_mat = solid.material@1(rose_spokes, color=[0.66, 0.62, 0.54], roughness=0.86)
+output rose_tracery = rose_spoke_mat
+
+# Tall lancet windows in deep blue glass along the nave sides
+lancet = solid.box@1(size=[0.92, 2.15, 0.12])
+window_front_a = xform.move@1(lancet, by=[-1.75, 3.65, 5.79])
+window_front_b = xform.move@1(lancet, by=[1.75, 3.65, 5.79])
+window_mid_a = xform.move@1(lancet, by=[-2.65, 3.65, 1.4])
+window_mid_b = xform.move@1(lancet, by=[2.65, 3.65, 1.4])
+window_back_a = xform.move@1(lancet, by=[-2.65, 3.65, -2.8])
+window_back_b = xform.move@1(lancet, by=[2.65, 3.65, -2.8])
+window_set = solid.union@1(window_front_a, window_front_b, window_mid_a, window_mid_b, window_back_a, window_back_b)
+window_glass = solid.material@1(window_set, color=[0.10, 0.27, 0.38], roughness=0.3, metallic=0.12, emissive=[0.025, 0.065, 0.10])
+output lancet_windows = window_glass
+
+# Deep shadowed belfry openings make the towers read as masonry, not solid props.
+belfry_slot = solid.box@1(size=[0.52, 1.4, 0.08])
+belfry_l = xform.move@1(belfry_slot, by=[-3.25, 5.55, 6.56])
+belfry_r = xform.move@1(belfry_slot, by=[3.25, 5.55, 6.56])
+belfry_pair = solid.union@1(belfry_l, belfry_r)
+belfry_dark = solid.material@1(belfry_pair, color=[0.055, 0.065, 0.065], roughness=0.98)
+output belfry_openings = belfry_dark
+belfry_lintel = solid.box@1(size=[0.72, 0.18, 0.22])
+belfry_lintel_l = xform.move@1(belfry_lintel, by=[-3.25, 6.34, 6.59])
+belfry_lintel_r = xform.move@1(belfry_lintel, by=[3.25, 6.34, 6.59])
+belfry_lintels = solid.union@1(belfry_lintel_l, belfry_lintel_r)
+belfry_lintel_stone = solid.material@1(belfry_lintels, color=[0.58, 0.55, 0.49], roughness=0.94)
+output belfry_lintels = belfry_lintel_stone
+
+# A visible aged-bronze cross above the front gable, set forward of the stone face.
+cross_post = solid.box@1(size=[0.075, 0.8, 0.075])
+cross_post_at = xform.move@1(cross_post, by=[0, 8.7, 6.1])
+cross_arm = solid.box@1(size=[0.46, 0.075, 0.075])
+cross_arm_at = xform.move@1(cross_arm, by=[0, 8.88, 6.1])
+cross_shape = solid.union@1(cross_post_at, cross_arm_at)
+cross_iron = solid.material@1(cross_shape, color=[0.62, 0.48, 0.27], metallic=0.58, roughness=0.5)
+output ridge_cross = cross_iron
+
+# Buttresses and pale stone string courses
+buttress = solid.box@1(size=[0.62, 4.5, 0.9])
+buttress_l1 = xform.move@1(buttress, by=[-4.1, 2.45, 3.1])
+buttress_r1 = xform.move@1(buttress, by=[4.1, 2.45, 3.1])
+buttress_l2 = xform.move@1(buttress, by=[-4.1, 2.45, -1.0])
+buttress_r2 = xform.move@1(buttress, by=[4.1, 2.45, -1.0])
+buttress_l3 = xform.move@1(buttress, by=[-4.1, 2.45, -5.1])
+buttress_r3 = xform.move@1(buttress, by=[4.1, 2.45, -5.1])
+buttress_set = solid.union@1(buttress_l1, buttress_r1, buttress_l2, buttress_r2, buttress_l3, buttress_r3)
+buttress_mat = solid.texture@1(buttress_set, tile=1, program="b = bricks(rows=8, columns=2, mortar=0.045, bevel=0.12, round=0.035, row_offset=0.5); g = fbm(scale_x=8, scale_y=8); albedo = colorize(g, gradient=[0:#635f56, 0.5:#817a6c, 1:#a89d89]); roughness = 0.92; height = b")
+output buttresses = buttress_mat
+course = solid.box@1(size=[8.45, 0.16, 13.75])
+course_at = xform.move@1(course, by=[0, 1.1, -1.1])
+course_mat = solid.material@1(course_at, color=[0.84, 0.79, 0.67], roughness=0.76)
+output lower_string_course = course_mat
+
+# Warm lanterns beside the door and engine-grown garden trees
+lantern_body = solid.box@1(size=[0.28, 0.42, 0.24])
+lantern_l_at = xform.move@1(lantern_body, by=[-1.7, 2.15, 6.08])
+lantern_r_at = xform.move@1(lantern_body, by=[1.7, 2.15, 6.08])
+lantern_pair = solid.union@1(lantern_l_at, lantern_r_at)
+lantern_glow = solid.material@1(lantern_pair, color=[0.98, 0.62, 0.25], roughness=0.28, emissive=[1.2, 0.43, 0.10], emits_light=true)
+output lanterns = lantern_glow
+lamp = solid.sphere@1(radius=0.09, segments=16)
+lamp_l_at = xform.move@1(lamp, by=[-1.7, 2.2, 6.23])
+lamp_r_at = xform.move@1(lamp, by=[1.7, 2.2, 6.23])
+lamps = solid.union@1(lamp_l_at, lamp_r_at)
+lamp_mat = solid.material@1(lamps, color=[1.0, 0.79, 0.45], emissive=[3.0, 1.3, 0.35])
+output lantern_light = lamp_mat
+oak_front = flora.tree@1(kind="oak", height=6.4, seed=42, lod=1, sides=7, bark=[0.25, 0.16, 0.095], leaves=[0.19, 0.34, 0.12], sway=0.22)
+oak_front_at = inst.place@1(oak_front, at=[[-13.2, 0, 1.0], [13.2, 0, 1.0]])
+output garden_oaks_front = oak_front_at
+birch_back = flora.tree@1(kind="birch", height=7.2, seed=19, lod=1, sides=7, bark=[0.76, 0.72, 0.63], leaves=[0.28, 0.38, 0.16], sway=0.28)
+birch_back_at = inst.place@1(birch_back, at=[[-11.0, 0, -7.0], [11.0, 0, -7.0]])
+output garden_birches = birch_back_at
+
+# Evening key and warm entrance fill
+sun = light.point@1(position=[-9, 13, 8], color=[1.0, 0.78, 0.55], intensity=22, range=38)
+output key_light = sun
+fill = light.point@1(position=[8, 8, -9], color=[0.45, 0.61, 0.88], intensity=12, range=32)
+output cool_fill = fill
+entry_light = light.point@1(position=[0, 4.5, 8], color=[1.0, 0.64, 0.30], intensity=8, range=14)
+output entry_light = entry_light

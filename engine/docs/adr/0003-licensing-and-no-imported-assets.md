@@ -1,5 +1,5 @@
 # 0003: Licensing and no imported assets
-- Status: accepted; "permissive code only" superseded by 0005 and the GPL exclusion superseded by 0024 (no-imported-assets stands)
+- Status: partially superseded by [ADR 0071](0071-hybrid-world-content.md) for licensed world-content assets; the historical restrictions remain in force for non-world content unless separately changed. "Permissive code only" was superseded by 0005 and the GPL exclusion by 0024.
 - Date: 2026-10-11
 
 ## Decision

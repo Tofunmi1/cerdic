@@ -1,0 +1,21 @@
+# A small forest lake for exercising the existing water.fill simulation path.
+# Use water.disturb at (30, 30) to send a ripple across the basin.
+sky = scene.sky(sun_elevation=24, sun_azimuth=-35, sun_intensity=5, turbidity=3, clouds=true, cloud_cover=0.32, seed=8)
+output sky = sky
+env = scene.environment(intensity=0.85, reflection=0.5, bounce=0.5)
+output env = env
+
+basin = terrain.tile(size=[60, 60], cell=1, seed=21, height=6, scale=22, octaves=4, roughness=0.48) | terrain.flatten(at=[30, 30], radius=11, blend=10, to="height", height=-1.2)
+ground = basin | terrain.material(grass=[0.22, 0.38, 0.16], rock=[0.38, 0.37, 0.32], sand=[0.78, 0.68, 0.46], rock_slope=32, sand_line=1.8, sand_blend=1, no_repeat=true)
+lake = basin | water.fill(at=[30, 30], level=-0.3, shore=2.3, shallow=[0.25, 0.57, 0.55], deep=[0.025, 0.17, 0.24], clarity=2.5, ripple=0.75, foam=0.35, direction=32deg, seed=8, sim=true, sim_resolution=128, sim_damping=0.25)
+output ground = ground
+output lake = lake
+
+# Keep trees above the shoreline so the basin stays visible from the default camera.
+tree_ring = field.expr(code="out = smoothstep(13.0, 19.0, length(p.xz - vec2(30.0, 30.0)))")
+oak = flora.tree(height=6.5, seed=42, sides=7, leaves=[0.18, 0.34, 0.12], sway=0.1, lod=3)
+pine = flora.tree(kind="pine", height=8, seed=18, sides=7, leaves=[0.11, 0.25, 0.16], sway=0.08, lod=3)
+oaks = scatter.place(oak, ground, tree_ring, radius=10, density=0.18, seed=30, max_slope=35, scale=[0.8, 1.15], sink=0.04)
+pines = scatter.place(pine, ground, tree_ring, radius=12, density=0.13, seed=60, max_slope=35, scale=[0.8, 1.12], sink=0.04)
+output oaks = oaks
+output pines = pines

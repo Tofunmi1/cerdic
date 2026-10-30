@@ -1,0 +1,561 @@
+# KESTREL YARD — original compact live-fire multiplayer map.
+# Three connected combat lanes, opposing gates, central cover, an office power position,
+# cargo containers, a junkyard and a rough training-house flank.
+
+sky = scene.sky@1(sun_elevation=13, sun_azimuth=-32, sun_intensity=5.2, turbidity=3.8, ground_color=[0.19,0.17,0.16], clouds=true, cloud_cover=0.38, seed=38, haze=0.38)
+output sky = sky
+air = scene.environment@1(sky_color=[0.38,0.43,0.52], ground_color=[0.20,0.18,0.16], intensity=0.55, reflection=0.22, bounce=0.38, bounce_color=[0.74,0.52,0.34])
+output air = air
+
+# Dusty compound and the main firing lane.
+ground = solid.box@1(size=[72,0.55,64])
+ground_at = xform.move@1(ground, by=[0,-0.275,0])
+ground_base = solid.material@1(ground_at, color=[1,1,1], roughness=1)
+ground_pbr = solid.texture@1(ground_base, program="one = expr(code=\"out = vec3(1.0)\"); a = image(name=\"Asphalt033_Color\", repeat_x=11, repeat_y=9); r = image(name=\"Asphalt033_Roughness\", repeat_x=11, repeat_y=9); n = image(name=\"Asphalt033_Normal\", repeat_x=11, repeat_y=9); dirt = expr(code=\"out = vec3(0.62 + 0.38 * fbm(p * 4.0))\"); albedo = blend(dirt, a, one, blend_type=multiply, amount=1.0); roughness = r; normal = n", size="1024")
+output compound_floor = ground_pbr
+lane = solid.box@1(size=[9,0.025,52])
+lane_at = xform.move@1(lane, by=[0,0.012,0])
+lane_base = solid.material@1(lane_at, color=[0.9,0.9,0.86], roughness=1)
+lane_mat = solid.texture@1(lane_base, program="asphalt = image(name=\"Asphalt033_Color\", repeat_x=2, repeat_y=11); rough = image(name=\"Asphalt033_Roughness\", repeat_x=2, repeat_y=11); normal_map = image(name=\"Asphalt033_Normal\", repeat_x=2, repeat_y=11); albedo = asphalt; roughness = rough; normal = normal_map", size="1024")
+output main_lane = lane_mat
+paint_mark = solid.box@1(size=[0.12,0.03,2.4])
+paint_at = xform.move@1(paint_mark, by=[-2.8,0.02,-22])
+paint_rows = xform.array@1(paint_at, count_z=10, spacing=[0,0,5])
+paint_mat = solid.material@1(paint_rows, color=[0.72,0.56,0.22], roughness=0.92)
+output faded_lane_marks = paint_mat
+
+# Perimeter walls, set back from two opposing spawn gates.
+end_wall = solid.box@1(size=[72,2.8,0.55])
+north_wall = xform.move@1(end_wall, by=[0,1.4,31.7])
+south_wall = xform.move@1(end_wall, by=[0,1.4,-31.7])
+side_wall = solid.box@1(size=[0.55,2.8,63])
+west_wall = xform.move@1(side_wall, by=[-35.7,1.4,0])
+east_wall = xform.move@1(side_wall, by=[35.7,1.4,0])
+walls = solid.union@1(north_wall,south_wall,west_wall,east_wall)
+walls_mat = solid.material@1(walls, color=[0.38,0.39,0.36], roughness=0.98, recipe="concrete", texture_scale=2.5)
+output perimeter = walls_mat
+gate = solid.box@1(size=[0.45,3.4,0.5])
+gate_a = xform.move@1(gate, by=[-5.5,1.7,-29])
+gate_b = xform.move@1(gate, by=[5.5,1.7,-29])
+gate_c = xform.move@1(gate, by=[-5.5,1.7,29])
+gate_d = xform.move@1(gate, by=[5.5,1.7,29])
+gate_posts = solid.union@1(gate_a,gate_b,gate_c,gate_d)
+gate_stone = solid.material@1(gate_posts, color=[0.47,0.46,0.42], roughness=0.94, recipe="concrete", texture_scale=1.4)
+output spawn_gate_posts = gate_stone
+pad = solid.box@1(size=[6,0.04,3.2])
+pad_a = xform.move@1(pad, by=[0,0.04,-27.2])
+pad_b = xform.move@1(pad, by=[0,0.04,27.2])
+blue_spawn = solid.material@1(pad_a, color=[0.12,0.31,0.43], roughness=0.92)
+red_spawn = solid.material@1(pad_b, color=[0.48,0.19,0.13], roughness=0.92)
+output alpha_spawn = blue_spawn
+output bravo_spawn = red_spawn
+
+# WEST LANE: offset corrugated freight containers create a tight route and head-glitch cover.
+container_box = solid.box@1(size=[12,2.8,2.65])
+container = solid.chamfer@1(container_box, width=0.045)
+container_blue_at = xform.move@1(container, by=[-21,1.4,-15])
+container_blue_base = solid.material@1(container_blue_at, color=[0.58,0.78,0.88], roughness=1, metallic=0.03)
+container_blue = solid.texture@1(container_blue_base, program="steel = image(name=\"CorrugatedSteel009_Color\", repeat_x=4, repeat_y=1); r = image(name=\"CorrugatedSteel009_Roughness\", repeat_x=4, repeat_y=1); n = image(name=\"CorrugatedSteel009_Normal\", repeat_x=4, repeat_y=1); albedo = steel; roughness = r; normal = n", size="1024")
+output blue_container = container_blue
+container_red_at = xform.move@1(container, by=[-21,1.4,12])
+container_red_base = solid.material@1(container_red_at, color=[0.9,0.57,0.39], roughness=1, metallic=0.02)
+container_red = solid.texture@1(container_red_base, program="steel = image(name=\"CorrugatedSteel009_Color\", repeat_x=4, repeat_y=1); r = image(name=\"CorrugatedSteel009_Roughness\", repeat_x=4, repeat_y=1); n = image(name=\"CorrugatedSteel009_Normal\", repeat_x=4, repeat_y=1); albedo = steel; roughness = r; normal = n", size="1024")
+output rust_container = container_red
+container_stack_at = xform.move@1(container, by=[-21,4.25,12])
+container_stack_base = solid.material@1(container_stack_at, color=[0.76,0.78,0.70], roughness=1, metallic=0.02)
+container_stack = solid.texture@1(container_stack_base, program="steel = image(name=\"CorrugatedSteel009_Color\", repeat_x=4, repeat_y=1); r = image(name=\"CorrugatedSteel009_Roughness\", repeat_x=4, repeat_y=1); n = image(name=\"CorrugatedSteel009_Normal\", repeat_x=4, repeat_y=1); albedo = steel; roughness = r; normal = n", size="1024")
+output stacked_container = container_stack
+rib = solid.box@1(size=[0.085,2.55,0.07])
+rib_at = xform.move@1(rib, by=[-26.4,1.4,-13.62])
+rib_array = xform.array@1(rib_at, count_x=22, spacing=[0.5,0,0])
+rib_mat = solid.material@1(rib_array, color=[0.22,0.33,0.37], roughness=0.94)
+output container_ribs = rib_mat
+rib_red_at = xform.move@1(rib, by=[-26.4,1.4,13.38])
+rib_red_array = xform.array@1(rib_red_at, count_x=22, spacing=[0.5,0,0])
+rib_red_mat = solid.material@1(rib_red_array, color=[0.56,0.29,0.20], roughness=0.96)
+output rust_container_ribs = rib_red_mat
+rib_stack_at = xform.move@1(rib, by=[-26.4,4.25,13.38])
+rib_stack_array = xform.array@1(rib_stack_at, count_x=22, spacing=[0.5,0,0])
+rib_stack_mat = solid.material@1(rib_stack_array, color=[0.52,0.54,0.49], roughness=0.96)
+output stacked_container_ribs = rib_stack_mat
+door_rod = solid.cylinder@1(radius=0.035, height=2.15, segments=24)
+rod_turn = xform.rotate@1(door_rod, angles=[90,0,0])
+rod_a = xform.move@1(rod_turn, by=[-15.0,1.4,-15])
+rod_b = xform.move@1(rod_turn, by=[-15.0,1.4,12])
+rod_c = xform.move@1(rod_turn, by=[-15.0,4.25,12])
+container_rods = solid.union@1(rod_a,rod_b,rod_c)
+rod_metal = solid.material@1(container_rods, color=[0.13,0.15,0.15], metallic=0.62, roughness=0.58)
+output container_locking_rods = rod_metal
+
+# CENTER: battered chest-high barriers and the objective mark; several cuts through the cover keep routes open.
+barrier = solid.box@1(size=[4.4,1.05,0.7])
+barrier_bevel = solid.chamfer@1(barrier, width=0.08)
+barrier_a = xform.rotate@1(barrier_bevel, angles=[0,-8,0])
+barrier_a_at = xform.move@1(barrier_a, by=[0,0.52,-9])
+barrier_b = xform.rotate@1(barrier_bevel, angles=[0,10,0])
+barrier_b_at = xform.move@1(barrier_b, by=[0,0.52,7])
+barrier_c_at = xform.move@1(barrier_bevel, by=[0,0.52,18])
+barriers = solid.union@1(barrier_a_at,barrier_b_at,barrier_c_at)
+barrier_mat = solid.material@1(barriers, color=[0.43,0.43,0.39], roughness=0.97, recipe="concrete", texture_scale=1.7)
+output central_cover = barrier_mat
+objective = solid.torus@1(major=2.1, minor=0.055, segments=64)
+objective_at = xform.move@1(objective, by=[0,0.08,0])
+objective_mat = solid.material@1(objective_at, color=[0.7,0.5,0.2], roughness=0.9)
+output objective_mark = objective_mat
+tires = solid.torus@1(major=0.44, minor=0.15, segments=28)
+tires_flat = xform.rotate@1(tires, angles=[90,0,0])
+tire_a = xform.move@1(tires_flat, by=[-5.5,0.43,-1])
+tire_b = xform.move@1(tires_flat, by=[-4.6,0.43,-1])
+tire_c = xform.move@1(tires_flat, by=[-3.7,0.43,-1])
+tire_d = xform.move@1(tires_flat, by=[-4.6,1.31,-1])
+tire_stack = solid.union@1(tire_a,tire_b,tire_c,tire_d)
+tire_mat = solid.material@1(tire_stack, color=[0.075,0.078,0.073], roughness=0.98)
+output tire_stack = tire_mat
+bag_seed = solid.sphere@1(radius=0.5, segments=24)
+bag_flat = xform.scale@1(bag_seed, by=[0.62,0.42,0.38])
+bag_worn = xform.noise@1(bag_flat, amplitude=0.045, scale=2.8, seed=31, tolerance=0.04)
+bag_cloth = solid.material@1(bag_worn, color=[0.44,0.37,0.24], roughness=0.98, recipe="fabric", texture_scale=2.5)
+bag_line_w = inst.place@1(bag_cloth, at=[[-8,0.21,-13],[-8,0.21,-12.05],[-8,0.21,-11.1],[-8,0.21,-10.15],[-8,0.21,-9.2],[-8,0.21,-8.25],[-8,0.21,-7.3],[-8,0.21,-6.35],[-8,0.21,-5.4]])
+output west_sandbags = bag_line_w
+bag_line_e = inst.place@1(bag_cloth, at=[[8,0.21,5],[8,0.21,5.95],[8,0.21,6.9],[8,0.21,7.85],[8,0.21,8.8],[8,0.21,9.75],[8,0.21,10.7],[8,0.21,11.65]])
+output east_sandbags = bag_line_e
+
+# Elevated west-side office gives a risky overwatch position across containers and the middle lane.
+office_deck = solid.box@1(size=[11,0.35,7])
+office_deck_at = xform.move@1(office_deck, by=[-24,3.3,-2])
+office_deck_mat = solid.material@1(office_deck_at, color=[0.37,0.37,0.34], roughness=0.98, recipe="concrete", texture_scale=2)
+output office_platform = office_deck_mat
+office_leg = solid.box@1(size=[0.36,3.2,0.36])
+leg_a = xform.move@1(office_leg, by=[-28.9,1.65,-4.9])
+leg_b = xform.move@1(office_leg, by=[-19.1,1.65,-4.9])
+leg_c = xform.move@1(office_leg, by=[-28.9,1.65,0.9])
+leg_d = xform.move@1(office_leg, by=[-19.1,1.65,0.9])
+office_legs = solid.union@1(leg_a,leg_b,leg_c,leg_d)
+office_support = solid.material@1(office_legs, color=[0.31,0.32,0.30], roughness=0.96)
+output office_supports = office_support
+office_box = solid.box@1(size=[10.6,2.8,6.6])
+office_bevel = solid.chamfer@1(office_box, width=0.035)
+office_at = xform.move@1(office_bevel, by=[-24,4.85,-2])
+office_base = solid.material@1(office_at, color=[1,1,1], roughness=1)
+office_textured = solid.texture@1(office_base, tile=1, program="one = expr(code=\"out = vec3(1.0)\"); wall = image(name=\"Concrete048_Color\", repeat_x=4, repeat_y=2); r = image(name=\"Concrete048_Roughness\", repeat_x=4, repeat_y=2); n = image(name=\"Concrete048_Normal\", repeat_x=4, repeat_y=2); grime = expr(code=\"out = vec3(0.72 + 0.28 * fbm(p * vec2(8.0, 2.0)))\"); albedo = blend(grime, wall, one, blend_type=multiply, amount=1.0); roughness = r; normal = n", size="1024")
+output elevated_office = office_textured
+office_window = solid.box@1(size=[2,0.72,0.08])
+window_a = xform.move@1(office_window, by=[-26.8,5.05,1.36])
+window_b = xform.move@1(office_window, by=[-23.6,5.05,1.36])
+window_c = xform.move@1(office_window, by=[-20.8,5.05,1.36])
+office_windows = solid.union@1(window_a,window_b,window_c)
+office_glass = solid.material@1(office_windows, color=[0.06,0.09,0.1], roughness=0.75)
+output office_windows = office_glass
+office_roof_box = solid.box@1(size=[12,0.24,8])
+office_roof = solid.chamfer@1(office_roof_box, width=0.04)
+office_roof_at = xform.move@1(office_roof, by=[-24,6.38,-2])
+office_roof_mat = solid.material@1(office_roof_at, color=[0.19,0.22,0.21], roughness=0.92, recipe="painted_wall", texture_scale=2)
+output office_roof = office_roof_mat
+stair = solid.box@1(size=[3.3,0.25,0.48])
+stair_a = xform.move@1(stair, by=[-17.8,0.45,-5.1])
+stair_b = xform.move@1(stair, by=[-18.3,0.72,-4.65])
+stair_c = xform.move@1(stair, by=[-18.8,0.99,-4.2])
+stair_d = xform.move@1(stair, by=[-19.3,1.26,-3.75])
+stair_e = xform.move@1(stair, by=[-19.8,1.53,-3.3])
+stairs = solid.union@1(stair_a,stair_b,stair_c,stair_d,stair_e)
+stair_mat = solid.material@1(stairs, color=[0.38,0.38,0.35], roughness=0.97, recipe="concrete", texture_scale=1.5)
+output office_stairs = stair_mat
+
+# EAST LANE: service shed and close-quarters timber shooting house.
+shed_box = solid.box@1(size=[13,4.4,14])
+shed = solid.chamfer@1(shed_box, width=0.04)
+shed_at = xform.move@1(shed, by=[22,2.2,1])
+shed_base = solid.material@1(shed_at, color=[1,1,1], roughness=1)
+shed_wall = solid.texture@1(shed_base, tile=1, program="one = expr(code=\"out = vec3(1.0)\"); wall = image(name=\"Concrete034_Color\", repeat_x=3, repeat_y=2); r = image(name=\"Concrete034_Roughness\", repeat_x=3, repeat_y=2); n = image(name=\"Concrete034_Normal\", repeat_x=3, repeat_y=2); grime = expr(code=\"out = vec3(0.68 + 0.32 * fbm(p * vec2(10.0, 2.0)))\"); albedo = blend(grime, wall, one, blend_type=multiply, amount=1.0); roughness = r; normal = n", size="1024")
+output east_shed = shed_wall
+loading_bay = solid.box@1(size=[4,3.1,0.12])
+loading_at = xform.move@1(loading_bay, by=[15.42,1.7,-1])
+loading_dark = solid.material@1(loading_at, color=[0.13,0.15,0.15], roughness=0.95)
+output loading_bay = loading_dark
+awning = solid.box@1(size=[5.4,0.22,2.3])
+awning_at = xform.move@1(awning, by=[16.8,3.5,0.2])
+awning_mat = solid.material@1(awning_at, color=[0.48,0.22,0.12], roughness=0.93)
+output loading_awning = awning_mat
+shack_box = solid.box@1(size=[6.8,3.6,5])
+shack = solid.chamfer@1(shack_box, width=0.025)
+shack_at = xform.move@1(shack, by=[23,1.8,-13])
+shack_base = solid.material@1(shack_at, color=[0.9,0.85,0.76], roughness=1)
+shack_wall = solid.texture@1(shack_base, tile=1, program="one = expr(code=\"out = vec3(1.0)\"); steel = image(name=\"CorrugatedSteel009_Color\", repeat_x=3, repeat_y=2); r = image(name=\"CorrugatedSteel009_Roughness\", repeat_x=3, repeat_y=2); n = image(name=\"CorrugatedSteel009_Normal\", repeat_x=3, repeat_y=2); grime = expr(code=\"out = vec3(0.6 + 0.4 * fbm(p * vec2(7.0, 2.0)))\"); albedo = blend(grime, steel, one, blend_type=multiply, amount=1.0); roughness = r; normal = n", size="1024")
+output shanty_house = shack_wall
+shack_door = solid.box@1(size=[1.0,2.35,0.10])
+shack_door_at = xform.move@1(shack_door, by=[19.55,1.2,-13])
+shack_door_wood = solid.material@1(shack_door_at, color=[0.16,0.13,0.10], roughness=0.96, recipe="wood", texture_scale=1.5)
+output shanty_door = shack_door_wood
+shack_window = solid.box@1(size=[1.25,0.9,0.08])
+shack_window_at = xform.move@1(shack_window, by=[19.54,2.35,-11.5])
+shack_window_dark = solid.material@1(shack_window_at, color=[0.045,0.06,0.065], roughness=0.82)
+output shanty_window = shack_window_dark
+shack_rib = solid.box@1(size=[0.06,3.2,0.06])
+shack_rib_at = xform.move@1(shack_rib, by=[19.58,1.8,-15.2])
+shack_ribs = xform.array@1(shack_rib_at, count_x=12, spacing=[0.58,0,0])
+shack_rib_mat = solid.material@1(shack_ribs, color=[0.49,0.46,0.38], roughness=0.94)
+output shanty_corrugation = shack_rib_mat
+shack_roof = solid.box@1(size=[8,0.25,6.2])
+shack_roof_at = xform.move@1(shack_roof, by=[23,3.7,-13])
+shack_roof_mat = solid.material@1(shack_roof_at, color=[0.26,0.23,0.19], roughness=0.97, recipe="painted_wall", texture_scale=2)
+output shanty_roof = shack_roof_mat
+plywood = solid.box@1(size=[0.16,2.4,3.2])
+plywood_a = xform.move@1(plywood, by=[19.5,1.25,-8.6])
+plywood_b = xform.rotate@1(plywood, angles=[0,16,0])
+plywood_b_at = xform.move@1(plywood_b, by=[27,1.25,-8.6])
+plywood_cover = solid.union@1(plywood_a,plywood_b_at)
+plywood_mat = solid.material@1(plywood_cover, color=[0.39,0.30,0.20], roughness=0.98, recipe="wood", texture_scale=1.2)
+output leaning_plywood = plywood_mat
+
+# JUNKYARD lane: abandoned utility vehicle, crates and fuel drums.
+car_box = solid.box@1(size=[4.9,1.25,2.25])
+car_shape = solid.chamfer@1(car_box, width=0.16)
+car_at = xform.move@1(car_shape, by=[20,0.85,17])
+car_mat = solid.material@1(car_at, color=[0.23,0.25,0.22], roughness=0.78, metallic=0.18)
+output utility_wreck = car_mat
+cab = solid.box@1(size=[2.6,1,1.95])
+cab_at = xform.move@1(cab, by=[19.8,1.95,17])
+cab_mat = solid.material@1(cab_at, color=[0.09,0.13,0.14], roughness=0.45, metallic=0.1)
+output wreck_cab = cab_mat
+hood = solid.box@1(size=[2.65,0.35,0.72])
+hood_at = xform.move@1(hood, by=[20,1.52,18.05])
+hood_mat = solid.material@1(hood_at, color=[0.18,0.2,0.18], roughness=0.82, metallic=0.14)
+output utility_hood = hood_mat
+windshield = solid.box@1(size=[2.15,0.62,0.075])
+windshield_turn = xform.rotate@1(windshield, angles=[-14,0,0])
+windshield_at = xform.move@1(windshield_turn, by=[19.8,2.16,18.0])
+windshield_mat = solid.material@1(windshield_at, color=[0.035,0.055,0.06], metallic=0.18, roughness=0.32)
+output cracked_windshield = windshield_mat
+bumper = solid.box@1(size=[5.2,0.23,0.26])
+bumper_at = xform.move@1(bumper, by=[20,0.53,18.27])
+bumper_metal = solid.material@1(bumper_at, color=[0.23,0.25,0.24], metallic=0.68, roughness=0.48)
+output front_bumper = bumper_metal
+grille = solid.box@1(size=[1.2,0.55,0.06])
+grille_at = xform.move@1(grille, by=[20,1.02,18.18])
+grille_dark = solid.material@1(grille_at, color=[0.045,0.055,0.052], metallic=0.24, roughness=0.74)
+output front_grille = grille_dark
+headlight = solid.sphere@1(radius=0.16, segments=24)
+headlight_l = xform.scale@1(headlight, by=[1,0.72,0.4])
+headlight_a = xform.move@1(headlight_l, by=[18.42,1.05,18.18])
+headlight_b = xform.move@1(headlight_l, by=[21.58,1.05,18.18])
+headlights = solid.union@1(headlight_a,headlight_b)
+headlight_mat = solid.material@1(headlights, color=[0.58,0.5,0.34], roughness=0.3, emissive=[0.08,0.05,0.02])
+output clouded_headlights = headlight_mat
+wheel = solid.cylinder@1(radius=0.48, height=0.32, segments=48)
+wheel_turn = xform.rotate@1(wheel, angles=[0,0,90])
+wheel_a = xform.move@1(wheel_turn, by=[18.4,0.48,15.85])
+wheel_b = xform.move@1(wheel_turn, by=[21.6,0.48,15.85])
+wheel_c = xform.move@1(wheel_turn, by=[18.4,0.48,18.15])
+wheel_d = xform.move@1(wheel_turn, by=[21.6,0.48,18.15])
+car_wheels = solid.union@1(wheel_a,wheel_b,wheel_c,wheel_d)
+rubber = solid.material@1(car_wheels, color=[0.055,0.06,0.058], roughness=0.98)
+output vehicle_wheels = rubber
+wheel_hub = solid.cylinder@1(radius=0.2, height=0.34, segments=32)
+hub_turn = xform.rotate@1(wheel_hub, angles=[0,0,90])
+hub_a = xform.move@1(hub_turn, by=[18.4,0.48,15.85])
+hub_b = xform.move@1(hub_turn, by=[21.6,0.48,15.85])
+hub_c = xform.move@1(hub_turn, by=[18.4,0.48,18.15])
+hub_d = xform.move@1(hub_turn, by=[21.6,0.48,18.15])
+hubs = solid.union@1(hub_a,hub_b,hub_c,hub_d)
+hub_metal = solid.material@1(hubs, color=[0.39,0.4,0.38], metallic=0.82, roughness=0.46)
+output wheel_hubs = hub_metal
+crate = solid.box@1(size=[1.15,1.05,1.05])
+crate_a = xform.move@1(crate, by=[5.6,0.53,-15])
+crate_b = xform.move@1(crate, by=[6.8,0.53,-15])
+crate_c = xform.move@1(crate, by=[6.2,1.59,-15])
+crate_stack = solid.union@1(crate_a,crate_b,crate_c)
+crate_mat = solid.material@1(crate_stack, color=[0.36,0.27,0.18], roughness=0.97, recipe="wood", texture_scale=1)
+output supply_crates = crate_mat
+drum = solid.cylinder@1(radius=0.43, height=0.9, segments=24)
+drum_a = xform.move@1(drum, by=[-8,0.45,20])
+drum_b = xform.move@1(drum, by=[-6.95,0.45,20.1])
+drums = solid.union@1(drum_a,drum_b)
+drum_mat = solid.material@1(drums, color=[0.35,0.31,0.24], roughness=0.8, metallic=0.08)
+output fuel_drums = drum_mat
+
+# Chain-link style fence posts and rails silhouette the training range.
+fence_post = solid.box@1(size=[0.12,2.4,0.12])
+fence_post_at = xform.move@1(fence_post, by=[-32,1.2,-24])
+fence_posts = xform.array@1(fence_post_at, count_z=17, spacing=[0,0,3])
+fence_mat = solid.material@1(fence_posts, color=[0.22,0.25,0.24], metallic=0.42, roughness=0.84)
+output fence_posts = fence_mat
+fence_rail = solid.box@1(size=[0.08,0.09,50])
+fence_low = xform.move@1(fence_rail, by=[-32,0.55,0])
+fence_high = xform.move@1(fence_rail, by=[-32,2.3,0])
+fence_rails = solid.union@1(fence_low,fence_high)
+fence_rails_mat = solid.material@1(fence_rails, color=[0.24,0.26,0.24], metallic=0.4, roughness=0.86)
+output fence_rails = fence_rails_mat
+mesh_wire = solid.cylinder@1(radius=0.009, height=2.25, segments=6)
+wire_at = xform.move@1(mesh_wire, by=[-32,1.2,-24])
+wire_row = inst.array@1(wire_at, count_z=256, spacing=[0,0,0.19])
+wire_mat = solid.material@1(wire_row, color=[0.18,0.21,0.20], metallic=0.28, roughness=0.8)
+output chainlink_wires = wire_mat
+
+sun = light.point@1(position=[-20,24,17], color=[1,0.82,0.64], intensity=34, range=58)
+output sun = sun
+fill = light.point@1(position=[18,16,-20], color=[0.63,0.72,0.78], intensity=14, range=48)
+output fill = fill
+
+
+# URBAN ENVELOPE: broken three-storey blocks make this a street fight, not an open training pad.
+# The facades use real CC0 brick/concrete maps with separate window, sill, parapet and rooftop geometry.
+west_block = solid.box@1(size=[3.4,10.8,50])
+west_block_at = xform.move@1(west_block, by=[-33.9,5.4,0])
+west_block_m = solid.material@1(west_block_at, color=[1,1,1], roughness=0.96)
+west_block_t = solid.texture@1(west_block_m, tile=1, program="wall = image(name=\"Bricks113A_Color\", repeat_x=7, repeat_y=4); r = image(name=\"Bricks113A_Roughness\", repeat_x=7, repeat_y=4); n = image(name=\"Bricks113A_Normal\", repeat_x=7, repeat_y=4); dirt = expr(code=\"out = vec3(0.48 + 0.52 * fbm(p * vec2(9.0, 2.0)))\"); albedo = blend(dirt, wall, expr(code=\"out = vec3(1.0)\"), blend_type=multiply, amount=1.0); roughness = r; normal = n", size="1024")
+output west_urban_block = west_block_t
+east_block = solid.box@1(size=[3.4,12.6,48])
+east_block_at = xform.move@1(east_block, by=[33.9,6.3,-1])
+east_block_m = solid.material@1(east_block_at, color=[1,1,1], roughness=0.96)
+east_block_t = solid.texture@1(east_block_m, tile=1, program="wall = image(name=\"Concrete034_Color\", repeat_x=5, repeat_y=5); r = image(name=\"Concrete034_Roughness\", repeat_x=5, repeat_y=5); n = image(name=\"Concrete034_Normal\", repeat_x=5, repeat_y=5); grime = expr(code=\"out = vec3(0.5 + 0.5 * fbm(p * vec2(7.0, 1.7)))\"); albedo = blend(grime, wall, expr(code=\"out = vec3(1.0)\"), blend_type=multiply, amount=1.0); roughness = r; normal = n", size="1024")
+output east_urban_block = east_block_t
+# Parapets and floor bands give the silhouettes readable scale and catch the low sun.
+band = solid.box@1(size=[0.22,0.34,50.5])
+west_band_1 = xform.move@1(band, by=[-32.08,3.6,0])
+west_band_2 = xform.move@1(band, by=[-32.08,7.15,0])
+east_band = solid.box@1(size=[0.22,0.34,48.5])
+east_band_1 = xform.move@1(east_band, by=[32.08,4.1,-1])
+east_band_2 = xform.move@1(east_band, by=[32.08,8.2,-1])
+all_bands = solid.union@1(west_band_1,west_band_2,east_band_1,east_band_2)
+band_m = solid.material@1(all_bands, color=[0.48,0.42,0.34], roughness=0.92, recipe="concrete", texture_scale=1.4)
+output facade_bands = band_m
+parapet = solid.box@1(size=[4.1,0.72,0.52])
+west_parapet = xform.move@1(parapet, by=[-33.9,10.85,-24.7])
+east_parapet = xform.move@1(parapet, by=[33.9,12.65,22.7])
+parapets = solid.union@1(west_parapet,east_parapet)
+parapet_m = solid.material@1(parapets, color=[0.27,0.29,0.29], roughness=0.85, recipe="concrete", texture_scale=2)
+output broken_rooflines = parapet_m
+# Window bays: deep reveals, dark glazing, metal mullions and projecting sills. Repeated bays stay in rhythm.
+window_dark = solid.box@1(size=[0.09,1.42,2.15])
+west_window_at = xform.move@1(window_dark, by=[-32.12,2.1,-20])
+west_window_row = inst.array@1(west_window_at, count_z=8, spacing=[0,0,5.45])
+west_window_at_2 = xform.move@1(window_dark, by=[-32.12,5.65,-20])
+west_windows_2 = inst.array@1(west_window_at_2, count_z=8, spacing=[0,0,5.45])
+west_window_at_3 = xform.move@1(window_dark, by=[-32.12,9.2,-20])
+west_windows_3 = inst.array@1(west_window_at_3, count_z=8, spacing=[0,0,5.45])
+east_window = solid.box@1(size=[0.09,1.62,2.05])
+east_window_at = xform.move@1(east_window, by=[32.12,2.35,-20])
+east_window_row = inst.array@1(east_window_at, count_z=8, spacing=[0,0,5.35])
+east_window_at_2 = xform.move@1(east_window, by=[32.12,6.4,-20])
+east_windows_2 = inst.array@1(east_window_at_2, count_z=8, spacing=[0,0,5.35])
+east_window_at_3 = xform.move@1(east_window, by=[32.12,10.45,-20])
+east_windows_3 = inst.array@1(east_window_at_3, count_z=8, spacing=[0,0,5.35])
+glass_west_1 = solid.material@1(west_window_row, color=[0.035,0.055,0.065], roughness=0.32, metallic=0.14)
+glass_west_2 = solid.material@1(west_windows_2, color=[0.035,0.055,0.065], roughness=0.32, metallic=0.14)
+glass_west_3 = solid.material@1(west_windows_3, color=[0.035,0.055,0.065], roughness=0.32, metallic=0.14)
+glass_east_1 = solid.material@1(east_window_row, color=[0.035,0.055,0.065], roughness=0.32, metallic=0.14)
+glass_east_2 = solid.material@1(east_windows_2, color=[0.035,0.055,0.065], roughness=0.32, metallic=0.14)
+glass_east_3 = solid.material@1(east_windows_3, color=[0.035,0.055,0.065], roughness=0.32, metallic=0.14)
+output shadowed_window_bays_west = glass_west_1
+output shadowed_window_bays_west_2 = glass_west_2
+output shadowed_window_bays_west_3 = glass_west_3
+output shadowed_window_bays_east = glass_east_1
+output shadowed_window_bays_east_2 = glass_east_2
+output shadowed_window_bays_east_3 = glass_east_3
+# Sills and steel lintels break up the flat elevations; selective warm panes imply occupied interiors.
+sill = solid.box@1(size=[0.34,0.12,2.48])
+west_sill_at = xform.move@1(sill, by=[-31.98,1.34,-20])
+west_sills = inst.array@1(west_sill_at, count_z=8, spacing=[0,0,5.45])
+west_sill_at_2 = xform.move@1(sill, by=[-31.98,4.89,-20])
+west_sills_2 = inst.array@1(west_sill_at_2, count_z=8, spacing=[0,0,5.45])
+west_sill_at_3 = xform.move@1(sill, by=[-31.98,8.44,-20])
+west_sills_3 = inst.array@1(west_sill_at_3, count_z=8, spacing=[0,0,5.45])
+east_sill_at = xform.move@1(sill, by=[31.98,1.58,-20])
+east_sills = inst.array@1(east_sill_at, count_z=8, spacing=[0,0,5.35])
+east_sill_at_2 = xform.move@1(sill, by=[31.98,5.63,-20])
+east_sills_2 = inst.array@1(east_sill_at_2, count_z=8, spacing=[0,0,5.35])
+east_sill_at_3 = xform.move@1(sill, by=[31.98,9.68,-20])
+east_sills_3 = inst.array@1(east_sill_at_3, count_z=8, spacing=[0,0,5.35])
+sill_west_1 = solid.material@1(west_sills, color=[0.35,0.36,0.34], roughness=0.82, metallic=0.22)
+sill_west_2 = solid.material@1(west_sills_2, color=[0.35,0.36,0.34], roughness=0.82, metallic=0.22)
+sill_west_3 = solid.material@1(west_sills_3, color=[0.35,0.36,0.34], roughness=0.82, metallic=0.22)
+sill_east_1 = solid.material@1(east_sills, color=[0.35,0.36,0.34], roughness=0.82, metallic=0.22)
+sill_east_2 = solid.material@1(east_sills_2, color=[0.35,0.36,0.34], roughness=0.82, metallic=0.22)
+sill_east_3 = solid.material@1(east_sills_3, color=[0.35,0.36,0.34], roughness=0.82, metallic=0.22)
+output cast_window_sills_west = sill_west_1
+output cast_window_sills_west_2 = sill_west_2
+output cast_window_sills_west_3 = sill_west_3
+output cast_window_sills_east = sill_east_1
+output cast_window_sills_east_2 = sill_east_2
+output cast_window_sills_east_3 = sill_east_3
+mullion = solid.box@1(size=[0.13,1.45,0.075])
+west_mullion_at = xform.move@1(mullion, by=[-32.01,2.1,-20])
+west_mullions = inst.array@1(west_mullion_at, count_z=8, spacing=[0,0,5.45])
+east_mullion_at = xform.move@1(mullion, by=[32.01,2.35,-20])
+east_mullions = inst.array@1(east_mullion_at, count_z=8, spacing=[0,0,5.35])
+mullion_west = solid.material@1(west_mullions, color=[0.12,0.14,0.14], roughness=0.6, metallic=0.58)
+mullion_east = solid.material@1(east_mullions, color=[0.12,0.14,0.14], roughness=0.6, metallic=0.58)
+output steel_window_mullions_west = mullion_west
+output steel_window_mullions_east = mullion_east
+# Two storefront clusters at street level make distinct close, mid and long engagements.
+market_wall = solid.box@1(size=[0.28,3.25,11.8])
+market_w = xform.move@1(market_wall, by=[-31.95,1.62,-10])
+market_e = xform.move@1(market_wall, by=[31.95,1.62,10])
+market_fronts = solid.union@1(market_w,market_e)
+market_front_m = solid.material@1(market_fronts, color=[0.48,0.32,0.19], roughness=0.88, recipe="wood", texture_scale=1.6)
+output shuttered_shopfronts = market_front_m
+shop_glass = solid.box@1(size=[0.08,1.95,4.2])
+shop_w = xform.move@1(shop_glass, by=[-31.78,1.55,-10])
+shop_e = xform.move@1(shop_glass, by=[31.78,1.55,10])
+shop_panes = solid.union@1(shop_w,shop_e)
+shop_panes_m = solid.material@1(shop_panes, color=[0.055,0.074,0.08], roughness=0.22, metallic=0.1)
+output dark_shop_windows = shop_panes_m
+urban_awning = solid.box@1(size=[2.5,0.22,5.8])
+awning_w = xform.move@1(urban_awning, by=[-30.55,3.28,-10])
+awning_e = xform.move@1(urban_awning, by=[30.55,3.28,10])
+awning_pair = solid.union@1(awning_w,awning_e)
+awning_m = solid.material@1(awning_pair, color=[0.43,0.16,0.09], roughness=0.9, recipe="fabric", texture_scale=2)
+output torn_market_awnings = awning_m
+awning_brace = solid.cylinder@1(radius=0.065,height=2.4,segments=12)
+brace_w = xform.rotate@1(awning_brace, angles=[0,0,55])
+brace_w_at = xform.move@1(brace_w, by=[-31,2.6,-12.3])
+brace_e = xform.rotate@1(awning_brace, angles=[0,0,-55])
+brace_e_at = xform.move@1(brace_e, by=[31,2.6,12.3])
+brace_pair = solid.union@1(brace_w_at,brace_e_at)
+brace_m = solid.material@1(brace_pair, color=[0.14,0.15,0.14], roughness=0.7, metallic=0.55)
+output awning_brackets = brace_m
+# Elevated walkable-looking fire escapes and balcony rails add the vertical combat route silhouette.
+balcony = solid.box@1(size=[2.35,0.18,6.1])
+west_balcony_at = xform.move@1(balcony, by=[-30.5,5.05,-4])
+west_balconies = inst.array@1(west_balcony_at, count_z=3, spacing=[0,0,10])
+east_balcony = solid.box@1(size=[2.1,0.18,5.8])
+east_balcony_at = xform.move@1(east_balcony, by=[30.5,6.85,3])
+east_balconies = inst.array@1(east_balcony_at, count_z=3, spacing=[0,0,10])
+balcony_west_m = solid.material@1(west_balconies, color=[0.23,0.25,0.25], roughness=0.62, metallic=0.72)
+balcony_east_m = solid.material@1(east_balconies, color=[0.23,0.25,0.25], roughness=0.62, metallic=0.72)
+output steel_fire_escape_landings_west = balcony_west_m
+output steel_fire_escape_landings_east = balcony_east_m
+rail_h = solid.box@1(size=[0.09,0.95,6.1])
+west_rail_at = xform.move@1(rail_h, by=[-29.38,5.56,-4])
+west_rails = inst.array@1(west_rail_at, count_z=3, spacing=[0,0,10])
+east_rail_at = xform.move@1(rail_h, by=[29.48,7.36,3])
+east_rails = inst.array@1(east_rail_at, count_z=3, spacing=[0,0,10])
+rails_west_m = solid.material@1(west_rails, color=[0.11,0.13,0.14], roughness=0.55, metallic=0.78)
+rails_east_m = solid.material@1(east_rails, color=[0.11,0.13,0.14], roughness=0.55, metallic=0.78)
+output fire_escape_guardrails_west = rails_west_m
+output fire_escape_guardrails_east = rails_east_m
+# Roof clutter: HVAC condensers, duct elbows, vents, water tanks and antenna masts.
+ac_unit = solid.box@1(size=[1.5,0.78,1.15])
+ac_w_at = xform.move@1(ac_unit, by=[-33.8,11.5,-17])
+ac_w_row = inst.array@1(ac_w_at, count_z=5, spacing=[0,0,7.8])
+ac_e_at = xform.move@1(ac_unit, by=[33.8,13.5,-18])
+ac_e_row = inst.array@1(ac_e_at, count_z=5, spacing=[0,0,7.8])
+ac_w_m = solid.material@1(ac_w_row, color=[0.34,0.38,0.38], roughness=0.68, metallic=0.58)
+ac_e_m = solid.material@1(ac_e_row, color=[0.34,0.38,0.38], roughness=0.68, metallic=0.58)
+output roof_hvac_units_west = ac_w_m
+output roof_hvac_units_east = ac_e_m
+vent = solid.cylinder@1(radius=0.34,height=1.15,segments=20)
+vent_w = xform.move@1(vent, by=[-34.1,12.3,19])
+vent_e = xform.move@1(vent, by=[34.1,14.1,-17])
+vents = solid.union@1(vent_w,vent_e)
+vent_m = solid.material@1(vents, color=[0.2,0.22,0.22], roughness=0.72, metallic=0.65)
+output roof_exhausts = vent_m
+water_tank = solid.cylinder@1(radius=1.15,height=1.8,segments=32)
+tank_w = xform.move@1(water_tank, by=[-33.7,12.05,2])
+tank_e = xform.move@1(water_tank, by=[33.7,14.05,16])
+tanks = solid.union@1(tank_w,tank_e)
+tank_m = solid.material@1(tanks, color=[0.31,0.34,0.33], roughness=0.76, metallic=0.35)
+output rooftop_water_tanks = tank_m
+mast = solid.cylinder@1(radius=0.045,height=5.5,segments=10)
+mast_w = xform.move@1(mast, by=[-34.4,13.3,20])
+mast_e = xform.move@1(mast, by=[34.4,15.3,-20])
+masts = solid.union@1(mast_w,mast_e)
+mast_m = solid.material@1(masts, color=[0.13,0.14,0.14], roughness=0.5, metallic=0.8)
+output roof_antenna_masts = mast_m
+# Utility cables over the central lane; staggered heights preserve sightlines while framing the skyline.
+cable_path_1 = curve.bezier@1(points=[[-32,10.8,-14],[-14,12.1,-8],[13,11.8,6],[32,10.6,12]],steps=36)
+cable_1 = curve.tube@1(cable_path_1,radius=0.035,end_radius=0.028,sides=8)
+cable_path_2 = curve.bezier@1(points=[[-32,11.6,14],[-18,10.3,9],[16,10.4,-8],[32,12.0,-15]],steps=36)
+cable_2 = curve.tube@1(cable_path_2,radius=0.027,end_radius=0.022,sides=8)
+cable_bundle = solid.union@1(cable_1,cable_2)
+cable_m = solid.material@1(cable_bundle, color=[0.055,0.063,0.064], roughness=0.55, metallic=0.4)
+output overhead_utility_cables = cable_m
+# Street-level kit: concrete Jersey barriers, damaged curb islands, scattered drums and pallet stacks.
+jersey = solid.box@1(size=[3.1,0.95,0.95])
+jersey_a = xform.rotate@1(jersey, angles=[0,12,0])
+jersey_a_at = xform.move@1(jersey_a, by=[-11,0.47,2])
+jersey_b = xform.rotate@1(jersey, angles=[0,-9,0])
+jersey_b_at = xform.move@1(jersey_b, by=[12,0.47,-5])
+jersey_c = xform.move@1(jersey, by=[3,0.47,22])
+jerseys = solid.union@1(jersey_a_at,jersey_b_at,jersey_c)
+jersey_m = solid.material@1(jerseys, color=[0.35,0.35,0.32], roughness=0.96, recipe="concrete", texture_scale=1.3)
+output jersey_blocks = jersey_m
+urban_curb = solid.box@1(size=[0.7,0.24,18])
+curb_w = xform.move@1(urban_curb, by=[-27.2,0.12,-2])
+curb_e = xform.move@1(urban_curb, by=[27.2,0.12,2])
+curbs = solid.union@1(curb_w,curb_e)
+curb_m = solid.material@1(curbs, color=[0.39,0.38,0.35], roughness=0.97, recipe="concrete", texture_scale=1.8)
+output broken_side_curbs = curb_m
+pallet = solid.box@1(size=[1.15,0.12,0.95])
+pallet_base = xform.move@1(pallet, by=[13,0.12,15])
+pallet_slat = solid.box@1(size=[0.12,0.09,0.98])
+pallet_slats_at = xform.move@1(pallet_slat, by=[12.55,0.22,15])
+pallet_slats = inst.array@1(pallet_slats_at,count_x=7,spacing=[0.15,0,0])
+pallet_base_m = solid.material@1(pallet_base, color=[0.30,0.20,0.12], roughness=0.97, recipe="wood", texture_scale=1.5)
+pallet_slats_m = solid.material@1(pallet_slats, color=[0.34,0.22,0.13], roughness=0.97, recipe="wood", texture_scale=1.5)
+output broken_pallet_base = pallet_base_m
+output broken_pallet_slats = pallet_slats_m
+# Warm practicals against the cool overcast fill give strong focal contrast around the lane.
+market_lamp_w = light.point@1(position=[-29.8,3.9,-10],color=[1.0,0.46,0.20],intensity=20,range=14)
+market_lamp_e = light.point@1(position=[29.8,3.9,10],color=[1.0,0.51,0.24],intensity=18,range=13)
+mid_lamp = light.point@1(position=[-27.5,7.7,12],color=[0.62,0.76,1.0],intensity=16,range=20)
+output warm_market_practicals = market_lamp_w
+output east_market_practical = market_lamp_e
+output cool_facade_practical = mid_lamp
+
+# End-of-lane blocks: staggered market warehouses shape the two spawn approaches and keep the arena enclosed.
+north_market = solid.box@1(size=[19,8.8,4.2])
+north_market_at = xform.move@1(north_market, by=[-23,4.4,28.4])
+north_market_m = solid.material@1(north_market_at, color=[1,1,1], roughness=0.95)
+north_market_t = solid.texture@1(north_market_m, tile=1, program="wall = image(name=\"Bricks106A_Color\", repeat_x=4, repeat_y=3); r = image(name=\"Bricks106A_Roughness\", repeat_x=4, repeat_y=3); n = image(name=\"Bricks106A_Normal\", repeat_x=4, repeat_y=3); stain = expr(code=\"out = vec3(0.58 + 0.42 * fbm(p * vec2(8.0, 2.0)))\"); albedo = blend(stain, wall, expr(code=\"out = vec3(1.0)\"), blend_type=multiply, amount=1.0); roughness = r; normal = n", size="1024")
+output north_market_warehouse = north_market_t
+south_depot = solid.box@1(size=[20,7.2,4.6])
+south_depot_at = xform.move@1(south_depot, by=[23,3.6,-28.3])
+south_depot_m = solid.material@1(south_depot_at, color=[1,1,1], roughness=0.96)
+south_depot_t = solid.texture@1(south_depot_m, tile=1, program="wall = image(name=\"Concrete048_Color\", repeat_x=4, repeat_y=3); r = image(name=\"Concrete048_Roughness\", repeat_x=4, repeat_y=3); n = image(name=\"Concrete048_Normal\", repeat_x=4, repeat_y=3); grime = expr(code=\"out = vec3(0.48 + 0.52 * fbm(p * vec2(9.0, 2.0)))\"); albedo = blend(grime, wall, expr(code=\"out = vec3(1.0)\"), blend_type=multiply, amount=1.0); roughness = r; normal = n", size="1024")
+output south_market_depot = south_depot_t
+# Deep shop glazing on the inward-facing ends, set into concrete lintels with metal roller shutters.
+end_glass = solid.box@1(size=[3.7,2.1,0.08])
+north_glass_at = xform.move@1(end_glass, by=[-28.2,2.05,26.25])
+north_glass_row = inst.array@1(north_glass_at, count_x=3, spacing=[5.2,0,0])
+south_glass_at = xform.move@1(end_glass, by=[28.3,1.65,-25.94])
+south_glass_row = inst.array@1(south_glass_at, count_x=3, spacing=[-5.3,0,0])
+north_glass_m = solid.material@1(north_glass_row, color=[0.035,0.055,0.068], roughness=0.24, metallic=0.12)
+south_glass_m = solid.material@1(south_glass_row, color=[0.035,0.055,0.068], roughness=0.24, metallic=0.12)
+output north_shop_glazing = north_glass_m
+output south_shop_glazing = south_glass_m
+roller = solid.box@1(size=[4.4,2.4,0.12])
+north_roller_at = xform.move@1(roller, by=[-28.2,1.55,26.18])
+north_roller_row = inst.array@1(north_roller_at,count_x=3,spacing=[5.2,0,0])
+south_roller_at = xform.move@1(roller, by=[28.3,1.25,-25.88])
+south_roller_row = inst.array@1(south_roller_at,count_x=3,spacing=[-5.3,0,0])
+north_roller_m = solid.material@1(north_roller_row, color=[0.28,0.31,0.31], roughness=0.73, metallic=0.55, recipe="painted_wall", texture_scale=2)
+south_roller_m = solid.material@1(south_roller_row, color=[0.25,0.27,0.27], roughness=0.76, metallic=0.6, recipe="painted_wall", texture_scale=2)
+output north_roller_shutters = north_roller_m
+output south_roller_shutters = south_roller_m
+end_sign = solid.box@1(size=[7.8,0.78,0.2])
+north_sign_at = xform.move@1(end_sign, by=[-23,3.9,26.1])
+south_sign_at = xform.move@1(end_sign, by=[23,3.45,-25.78])
+end_signs = solid.union@1(north_sign_at,south_sign_at)
+end_sign_m = solid.material@1(end_signs, color=[0.55,0.25,0.09], roughness=0.82, recipe="painted_wall", texture_scale=1.4)
+output faded_market_signboards = end_sign_m
+end_awning = solid.box@1(size=[5.2,0.2,2.1])
+north_awning_at = xform.move@1(end_awning, by=[-23,3.2,24.9])
+south_awning_at = xform.move@1(end_awning, by=[23,2.7,-24.6])
+end_awnings = solid.union@1(north_awning_at,south_awning_at)
+end_awning_m = solid.material@1(end_awnings, color=[0.34,0.12,0.075], roughness=0.94, recipe="fabric", texture_scale=2.4)
+output spawn_market_canopies = end_awning_m
+# Roofline clutter and vents on the end blocks; their different heights break the mirrored silhouette.
+end_vent = solid.cylinder@1(radius=0.52,height=1.2,segments=32)
+north_vent_at = xform.move@1(end_vent, by=[-28,9.35,28])
+north_vent_row = inst.array@1(north_vent_at,count_x=4,spacing=[3.3,0,0])
+south_vent_at = xform.move@1(end_vent, by=[17,7.75,-28])
+south_vent_row = inst.array@1(south_vent_at,count_x=4,spacing=[3.5,0,0])
+north_vent_m = solid.material@1(north_vent_row, color=[0.22,0.24,0.24], roughness=0.68, metallic=0.62)
+south_vent_m = solid.material@1(south_vent_row, color=[0.25,0.25,0.23], roughness=0.72, metallic=0.55)
+output north_roof_exhausts = north_vent_m
+output south_roof_exhausts = south_vent_m
+north_lamp = light.point@1(position=[-22,4.1,24.8],color=[1.0,0.48,0.22],intensity=22,range=16)
+south_lamp = light.point@1(position=[22,3.6,-24.6],color=[1.0,0.56,0.3],intensity=20,range=15)
+output north_spawn_practical = north_lamp
+output south_spawn_practical = south_lamp

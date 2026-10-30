@@ -1,0 +1,296 @@
+# Procedural architecture and streetscape study: every structure is generated from dimensions, storeys,
+# bays and a style grammar. No imported building meshes.
+sky = scene.sky@1(sun_elevation=32, sun_azimuth=35, sun_intensity=4.6, turbidity=2.6, ground_color=[0.24, 0.26, 0.28], clouds=false, seed=19)
+output sky = sky
+fill = scene.environment@1(sky_color=[0.56, 0.65, 0.78], ground_color=[0.32, 0.33, 0.34], intensity=0.78, reflection=0.28, bounce=0.42, bounce_color=[0.80, 0.75, 0.65])
+output fill = fill
+ground = solid.box@1(size=[180, 0.2, 180])
+ground_mat = solid.material@1(ground, color=[0.24, 0.25, 0.26], roughness=0.94)
+output ground = ground_mat
+
+# Art Deco: stepped crown, vertical piers and warm stone; tall, compact footprint.
+a_m = building.asset@1(at=[-39, 0, -24], width=18, depth=14, floors=9, bays=5, floor_height=3.5, detail=2, style="art_deco", part="masonry", seed=31)
+a_m_mat = solid.material@1(a_m, color=[0.66, 0.57, 0.44], roughness=0.74, recipe="concrete")
+output deco_stone = a_m_mat
+a_g = building.asset@1(at=[-39, 0, -24], width=18, depth=14, floors=9, bays=5, floor_height=3.5, detail=2, style="art_deco", part="glass", seed=31)
+a_g_mat = solid.material@1(a_g, color=[0.07, 0.16, 0.20], metallic=0.24, roughness=0.2)
+output deco_glass = a_g_mat
+a_t = building.asset@1(at=[-39, 0, -24], width=18, depth=14, floors=9, bays=5, floor_height=3.5, detail=2, style="art_deco", part="trim", seed=31)
+a_t_mat = solid.material@1(a_t, color=[0.36, 0.25, 0.14], metallic=0.28, roughness=0.45)
+output deco_trim = a_t_mat
+a_r = building.asset@1(at=[-39, 0, -24], width=18, depth=14, floors=9, bays=5, floor_height=3.5, detail=2, style="art_deco", part="roof", seed=31)
+a_r_mat = solid.material@1(a_r, color=[0.29, 0.30, 0.30], roughness=0.82)
+output deco_roof = a_r_mat
+a_d = building.asset@1(at=[-39, 0, -24], width=18, depth=14, floors=9, bays=5, floor_height=3.5, detail=2, style="art_deco", part="doors", seed=31)
+a_d_mat = solid.material@1(a_d, color=[0.17, 0.08, 0.04], roughness=0.52)
+output deco_door = a_d_mat
+
+# Classical: broad stone base, repeated pilasters and a wider mid-rise plan.
+c_m = building.asset@1(at=[-8, 0, -24], width=25, depth=16, floors=7, bays=7, floor_height=3.7, detail=2, style="classical", part="masonry", seed=43)
+c_m_mat = solid.material@1(c_m, color=[0.65, 0.63, 0.56], roughness=0.78, recipe="concrete")
+output classical_stone = c_m_mat
+c_g = building.asset@1(at=[-8, 0, -24], width=25, depth=16, floors=7, bays=7, floor_height=3.7, detail=2, style="classical", part="glass", seed=43)
+c_g_mat = solid.material@1(c_g, color=[0.11, 0.19, 0.21], metallic=0.15, roughness=0.24)
+output classical_glass = c_g_mat
+c_t = building.asset@1(at=[-8, 0, -24], width=25, depth=16, floors=7, bays=7, floor_height=3.7, detail=2, style="classical", part="trim", seed=43)
+c_t_mat = solid.material@1(c_t, color=[0.77, 0.73, 0.64], roughness=0.68)
+output classical_trim = c_t_mat
+c_r = building.asset@1(at=[-8, 0, -24], width=25, depth=16, floors=7, bays=7, floor_height=3.7, detail=2, style="classical", part="roof", seed=43)
+c_r_mat = solid.material@1(c_r, color=[0.31, 0.32, 0.31], roughness=0.85)
+output classical_roof = c_r_mat
+c_d = building.asset@1(at=[-8, 0, -24], width=25, depth=16, floors=7, bays=7, floor_height=3.7, detail=2, style="classical", part="doors", seed=43)
+c_d_mat = solid.material@1(c_d, color=[0.20, 0.10, 0.055], roughness=0.53)
+output classical_door = c_d_mat
+
+# Tenement: long red-brick residential block with narrow, regularly spaced windows.
+t_m = building.asset@1(at=[27, 0, -24], width=30, depth=13, floors=5, bays=8, floor_height=3.25, detail=2, style="tenement", part="masonry", seed=53)
+t_m_mat = solid.material@1(t_m, color=[0.43, 0.19, 0.14], roughness=0.86, recipe="brick")
+output tenement_brick = t_m_mat
+t_g = building.asset@1(at=[27, 0, -24], width=30, depth=13, floors=5, bays=8, floor_height=3.25, detail=2, style="tenement", part="glass", seed=53)
+t_g_mat = solid.material@1(t_g, color=[0.075, 0.15, 0.19], metallic=0.1, roughness=0.23)
+output tenement_glass = t_g_mat
+t_t = building.asset@1(at=[27, 0, -24], width=30, depth=13, floors=5, bays=8, floor_height=3.25, detail=2, style="tenement", part="trim", seed=53)
+t_t_mat = solid.material@1(t_t, color=[0.31, 0.14, 0.11], roughness=0.83)
+output tenement_trim = t_t_mat
+t_r = building.asset@1(at=[27, 0, -24], width=30, depth=13, floors=5, bays=8, floor_height=3.25, detail=2, style="tenement", part="roof", seed=53)
+t_r_mat = solid.material@1(t_r, color=[0.27, 0.28, 0.28], roughness=0.9)
+output tenement_roof = t_r_mat
+t_d = building.asset@1(at=[27, 0, -24], width=30, depth=13, floors=5, bays=8, floor_height=3.25, detail=2, style="tenement", part="doors", seed=53)
+t_d_mat = solid.material@1(t_d, color=[0.16, 0.07, 0.035], roughness=0.6)
+output tenement_door = t_d_mat
+
+# Brownstone: short, narrow residential frontage with masonry stoops and dark wood entry.
+b_m = building.asset@1(at=[-35, 0, 12], width=17, depth=14, floors=4, bays=5, floor_height=3.4, detail=2, style="brownstone", part="masonry", seed=61)
+b_m_mat = solid.material@1(b_m, color=[0.42, 0.28, 0.20], roughness=0.85, recipe="concrete")
+output brownstone_walls = b_m_mat
+b_g = building.asset@1(at=[-35, 0, 12], width=17, depth=14, floors=4, bays=5, floor_height=3.4, detail=2, style="brownstone", part="glass", seed=61)
+b_g_mat = solid.material@1(b_g, color=[0.07, 0.13, 0.16], roughness=0.24)
+output brownstone_glass = b_g_mat
+b_t = building.asset@1(at=[-35, 0, 12], width=17, depth=14, floors=4, bays=5, floor_height=3.4, detail=2, style="brownstone", part="trim", seed=61)
+b_t_mat = solid.material@1(b_t, color=[0.68, 0.56, 0.43], roughness=0.78)
+output brownstone_trim = b_t_mat
+b_r = building.asset@1(at=[-35, 0, 12], width=17, depth=14, floors=4, bays=5, floor_height=3.4, detail=2, style="brownstone", part="roof", seed=61)
+b_r_mat = solid.material@1(b_r, color=[0.25, 0.26, 0.26], roughness=0.9)
+output brownstone_roof = b_r_mat
+b_d = building.asset@1(at=[-35, 0, 12], width=17, depth=14, floors=4, bays=5, floor_height=3.4, detail=2, style="brownstone", part="doors", seed=61)
+b_d_mat = solid.material@1(b_d, color=[0.13, 0.055, 0.028], roughness=0.58)
+output brownstone_door = b_d_mat
+
+# Precast: wide modern panel block, deep repeating grid and broad floors.
+p_m = building.asset@1(at=[-6, 0, 12], width=22, depth=18, floors=8, bays=6, floor_height=3.5, detail=2, style="precast", part="masonry", seed=71)
+p_m_mat = solid.material@1(p_m, color=[0.54, 0.56, 0.55], roughness=0.84, recipe="concrete")
+output precast_walls = p_m_mat
+p_g = building.asset@1(at=[-6, 0, 12], width=22, depth=18, floors=8, bays=6, floor_height=3.5, detail=2, style="precast", part="glass", seed=71)
+p_g_mat = solid.material@1(p_g, color=[0.08, 0.17, 0.20], metallic=0.2, roughness=0.23)
+output precast_glass = p_g_mat
+p_t = building.asset@1(at=[-6, 0, 12], width=22, depth=18, floors=8, bays=6, floor_height=3.5, detail=2, style="precast", part="trim", seed=71)
+p_t_mat = solid.material@1(p_t, color=[0.42, 0.44, 0.43], roughness=0.78)
+output precast_trim = p_t_mat
+p_r = building.asset@1(at=[-6, 0, 12], width=22, depth=18, floors=8, bays=6, floor_height=3.5, detail=2, style="precast", part="roof", seed=71)
+p_r_mat = solid.material@1(p_r, color=[0.30, 0.31, 0.31], roughness=0.9)
+output precast_roof = p_r_mat
+p_d = building.asset@1(at=[-6, 0, 12], width=22, depth=18, floors=8, bays=6, floor_height=3.5, detail=2, style="precast", part="doors", seed=71)
+p_d_mat = solid.material@1(p_d, color=[0.15, 0.08, 0.045], roughness=0.56)
+output precast_door = p_d_mat
+
+# Curtainwall: slender glazed tower with narrow bays and tightly repeated mullions.
+f_m = building.asset@1(at=[24, 0, 12], width=17, depth=16, floors=14, bays=5, floor_height=3.5, detail=2, style="curtainwall", part="masonry", seed=83)
+f_m_mat = solid.material@1(f_m, color=[0.42, 0.44, 0.44], roughness=0.76, recipe="concrete")
+output tower_base = f_m_mat
+f_g = building.asset@1(at=[24, 0, 12], width=17, depth=16, floors=14, bays=5, floor_height=3.5, detail=2, style="curtainwall", part="glass", seed=83)
+f_g_mat = solid.material@1(f_g, color=[0.07, 0.16, 0.22], metallic=0.42, roughness=0.17)
+output tower_glass = f_g_mat
+f_t = building.asset@1(at=[24, 0, 12], width=17, depth=16, floors=14, bays=5, floor_height=3.5, detail=2, style="curtainwall", part="trim", seed=83)
+f_t_mat = solid.material@1(f_t, color=[0.17, 0.21, 0.22], metallic=0.55, roughness=0.38)
+output tower_mullions = f_t_mat
+f_r = building.asset@1(at=[24, 0, 12], width=17, depth=16, floors=14, bays=5, floor_height=3.5, detail=2, style="curtainwall", part="roof", seed=83)
+f_r_mat = solid.material@1(f_r, color=[0.26, 0.29, 0.3], roughness=0.83)
+output tower_roof = f_r_mat
+f_d = building.asset@1(at=[24, 0, 12], width=17, depth=16, floors=14, bays=5, floor_height=3.5, detail=2, style="curtainwall", part="doors", seed=83)
+f_d_mat = solid.material@1(f_d, color=[0.12, 0.08, 0.05], roughness=0.55)
+output tower_door = f_d_mat
+
+# Industrial: low, long warehouse form, wide lower-level openings and roof equipment.
+i_m = building.asset@1(at=[0, 0, 42], width=32, depth=22, floors=3, bays=7, floor_height=4.2, detail=2, style="industrial", part="masonry", seed=97)
+i_m_mat = solid.material@1(i_m, color=[0.48, 0.46, 0.40], roughness=0.88, recipe="concrete")
+output industrial_walls = i_m_mat
+i_g = building.asset@1(at=[0, 0, 42], width=32, depth=22, floors=3, bays=7, floor_height=4.2, detail=2, style="industrial", part="glass", seed=97)
+i_g_mat = solid.material@1(i_g, color=[0.08, 0.14, 0.16], roughness=0.3)
+output industrial_glass = i_g_mat
+i_t = building.asset@1(at=[0, 0, 42], width=32, depth=22, floors=3, bays=7, floor_height=4.2, detail=2, style="industrial", part="trim", seed=97)
+i_t_mat = solid.material@1(i_t, color=[0.32, 0.31, 0.28], metallic=0.18, roughness=0.7)
+output industrial_trim = i_t_mat
+i_r = building.asset@1(at=[0, 0, 42], width=32, depth=22, floors=3, bays=7, floor_height=4.2, detail=2, style="industrial", part="roof", seed=97)
+i_r_mat = solid.material@1(i_r, color=[0.25, 0.27, 0.27], roughness=0.9)
+output industrial_roof = i_r_mat
+i_d = building.asset@1(at=[0, 0, 42], width=32, depth=22, floors=3, bays=7, floor_height=4.2, detail=2, style="industrial", part="doors", seed=97)
+i_d_mat = solid.material@1(i_d, color=[0.16, 0.10, 0.05], roughness=0.62)
+output industrial_door = i_d_mat
+
+# A real street kit connects the building study into a walkable block frontage.
+road_asphalt = street.road@1(at=[0,0,-6], length=160, width=10, lanes=2, axis="x", part="asphalt")
+road_asphalt_mat = solid.material@1(road_asphalt, color=[0.15, 0.16, 0.17], roughness=0.92)
+output road_asphalt = road_asphalt_mat
+road_markings = street.road@1(at=[0,0,-6], length=160, width=10, lanes=2, axis="x", part="markings")
+road_markings_mat = solid.material@1(road_markings, color=[0.88, 0.79, 0.52], roughness=0.76)
+output road_markings = road_markings_mat
+crosswalk = street.road@1(at=[0,0,-6], length=160, width=10, lanes=2, axis="x", part="crosswalk")
+crosswalk_mat = solid.material@1(crosswalk, color=[0.82, 0.83, 0.8], roughness=0.86)
+output crosswalk = crosswalk_mat
+road_kerb = street.road@1(at=[0,0,-6], length=160, width=10, lanes=2, axis="x", part="kerb")
+road_kerb_mat = solid.material@1(road_kerb, color=[0.56, 0.56, 0.52], roughness=0.88, recipe="concrete")
+output road_kerb = road_kerb_mat
+road_pavement = street.road@1(at=[0,0,-6], length=160, width=10, lanes=2, axis="x", part="pavement")
+road_pavement_mat = solid.material@1(road_pavement, color=[0.46, 0.46, 0.43], roughness=0.9, recipe="concrete")
+output road_pavement = road_pavement_mat
+lamp_west_body = street.prop@1(at=[-46,0,-12.8], height=8, axis="x", kind="streetlight", part="body")
+lamp_west_body_mat = solid.material@1(lamp_west_body, color=[0.16,0.18,0.19], metallic=0.62, roughness=0.54)
+output lamp_west_body = lamp_west_body_mat
+lamp_west_accent = street.prop@1(at=[-46,0,-12.8], height=8, axis="x", kind="streetlight", part="accent")
+lamp_west_accent_mat = solid.material@1(lamp_west_accent, color=[0.32,0.34,0.35], metallic=0.62, roughness=0.48)
+output lamp_west_accent = lamp_west_accent_mat
+lamp_west_lens = street.prop@1(at=[-46,0,-12.8], height=8, axis="x", kind="streetlight", part="lens")
+lamp_west_lens_mat = solid.material@1(lamp_west_lens, color=[0.96,0.72,0.34], metallic=0.18, roughness=0.24)
+output lamp_west_lens = lamp_west_lens_mat
+lamp_east_body = street.prop@1(at=[46,0,0.8], height=8, axis="z", kind="streetlight", part="body")
+lamp_east_body_mat = solid.material@1(lamp_east_body, color=[0.16,0.18,0.19], metallic=0.62, roughness=0.54)
+output lamp_east_body = lamp_east_body_mat
+lamp_east_accent = street.prop@1(at=[46,0,0.8], height=8, axis="z", kind="streetlight", part="accent")
+lamp_east_accent_mat = solid.material@1(lamp_east_accent, color=[0.32,0.34,0.35], metallic=0.62, roughness=0.48)
+output lamp_east_accent = lamp_east_accent_mat
+lamp_east_lens = street.prop@1(at=[46,0,0.8], height=8, axis="z", kind="streetlight", part="lens")
+lamp_east_lens_mat = solid.material@1(lamp_east_lens, color=[0.96,0.72,0.34], metallic=0.18, roughness=0.24)
+output lamp_east_lens = lamp_east_lens_mat
+signal_body = street.prop@1(at=[-12,0,-11.6], height=6.2, axis="z", kind="traffic_signal", part="body")
+signal_body_mat = solid.material@1(signal_body, color=[0.16,0.18,0.19], metallic=0.62, roughness=0.54)
+output signal_body = signal_body_mat
+signal_accent = street.prop@1(at=[-12,0,-11.6], height=6.2, axis="z", kind="traffic_signal", part="accent")
+signal_accent_mat = solid.material@1(signal_accent, color=[0.32,0.34,0.35], metallic=0.62, roughness=0.48)
+output signal_accent = signal_accent_mat
+signal_lens = street.prop@1(at=[-12,0,-11.6], height=6.2, axis="z", kind="traffic_signal", part="lens")
+signal_lens_mat = solid.material@1(signal_lens, color=[0.96,0.72,0.34], metallic=0.18, roughness=0.24)
+output signal_lens = signal_lens_mat
+power_mast_body = street.prop@1(at=[51,0,-2.0], height=12, axis="x", kind="utility_mast", part="body")
+power_mast_body_mat = solid.material@1(power_mast_body, color=[0.16,0.18,0.19], metallic=0.62, roughness=0.54)
+output power_mast_body = power_mast_body_mat
+power_mast_accent = street.prop@1(at=[51,0,-2.0], height=12, axis="x", kind="utility_mast", part="accent")
+power_mast_accent_mat = solid.material@1(power_mast_accent, color=[0.32,0.34,0.35], metallic=0.62, roughness=0.48)
+output power_mast_accent = power_mast_accent_mat
+stop_sign_body = street.prop@1(at=[17,0,-11.2], height=4.2, axis="z", kind="sign", part="body")
+stop_sign_body_mat = solid.material@1(stop_sign_body, color=[0.16,0.18,0.19], metallic=0.62, roughness=0.54)
+output stop_sign_body = stop_sign_body_mat
+stop_sign_accent = street.prop@1(at=[17,0,-11.2], height=4.2, axis="z", kind="sign", part="accent")
+stop_sign_accent_mat = solid.material@1(stop_sign_accent, color=[0.32,0.34,0.35], metallic=0.62, roughness=0.48)
+output stop_sign_accent = stop_sign_accent_mat
+fire_hydrant_body = street.prop@1(at=[-17,0,1.0], height=1.5, axis="x", kind="hydrant", part="body")
+fire_hydrant_body_mat = solid.material@1(fire_hydrant_body, color=[0.16,0.18,0.19], metallic=0.62, roughness=0.54)
+output fire_hydrant_body = fire_hydrant_body_mat
+fire_hydrant_accent = street.prop@1(at=[-17,0,1.0], height=1.5, axis="x", kind="hydrant", part="accent")
+fire_hydrant_accent_mat = solid.material@1(fire_hydrant_accent, color=[0.32,0.34,0.35], metallic=0.62, roughness=0.48)
+output fire_hydrant_accent = fire_hydrant_accent_mat
+bench_body = street.prop@1(at=[1,0,2.4], height=1.2, axis="x", kind="bench", part="body")
+bench_body_mat = solid.material@1(bench_body, color=[0.16,0.18,0.19], metallic=0.62, roughness=0.54)
+output bench_body = bench_body_mat
+bench_accent = street.prop@1(at=[1,0,2.4], height=1.2, axis="x", kind="bench", part="accent")
+bench_accent_mat = solid.material@1(bench_accent, color=[0.32,0.34,0.35], metallic=0.62, roughness=0.48)
+output bench_accent = bench_accent_mat
+bus_stop_body = street.prop@1(at=[12,0,2.3], height=3.1, axis="x", kind="bus_shelter", part="body")
+bus_stop_body_mat = solid.material@1(bus_stop_body, color=[0.16,0.18,0.19], metallic=0.62, roughness=0.54)
+output bus_stop_body = bus_stop_body_mat
+bus_stop_accent = street.prop@1(at=[12,0,2.3], height=3.1, axis="x", kind="bus_shelter", part="accent")
+bus_stop_accent_mat = solid.material@1(bus_stop_accent, color=[0.32,0.34,0.35], metallic=0.62, roughness=0.48)
+output bus_stop_accent = bus_stop_accent_mat
+bollard_a_body = street.prop@1(at=[8,0,1.0], height=1.2, axis="z", kind="bollard", part="body")
+bollard_a_body_mat = solid.material@1(bollard_a_body, color=[0.16,0.18,0.19], metallic=0.62, roughness=0.54)
+output bollard_a_body = bollard_a_body_mat
+bollard_a_accent = street.prop@1(at=[8,0,1.0], height=1.2, axis="z", kind="bollard", part="accent")
+bollard_a_accent_mat = solid.material@1(bollard_a_accent, color=[0.32,0.34,0.35], metallic=0.62, roughness=0.48)
+output bollard_a_accent = bollard_a_accent_mat
+litter_bin_body = street.prop@1(at=[16,0,1.1], height=1.2, axis="z", kind="bin", part="body")
+litter_bin_body_mat = solid.material@1(litter_bin_body, color=[0.16,0.18,0.19], metallic=0.62, roughness=0.54)
+output litter_bin_body = litter_bin_body_mat
+litter_bin_accent = street.prop@1(at=[16,0,1.1], height=1.2, axis="z", kind="bin", part="accent")
+litter_bin_accent_mat = solid.material@1(litter_bin_accent, color=[0.32,0.34,0.35], metallic=0.62, roughness=0.48)
+output litter_bin_accent = litter_bin_accent_mat
+
+# More architectural families: monolithic, ribbon-window, balcony and warehouse rules.
+# Brutalist family
+brutalist_stone = building.asset@1(at=[-66,0,62], width=20, depth=15, floors=7, bays=6, floor_height=3.5, detail=2, style="brutalist", part="masonry", seed=101)
+brutalist_stone_mat = solid.material@1(brutalist_stone, color=[0.35,0.36,0.35], roughness=0.83, recipe="concrete")
+output brutalist_stone = brutalist_stone_mat
+brutalist_glass = building.asset@1(at=[-66,0,62], width=20, depth=15, floors=7, bays=6, floor_height=3.5, detail=2, style="brutalist", part="glass", seed=101)
+brutalist_glass_mat = solid.material@1(brutalist_glass, color=[0.055,0.09,0.1], metallic=0.18, roughness=0.22)
+output brutalist_glass = brutalist_glass_mat
+brutalist_trim = building.asset@1(at=[-66,0,62], width=20, depth=15, floors=7, bays=6, floor_height=3.5, detail=2, style="brutalist", part="trim", seed=101)
+brutalist_trim_mat = solid.material@1(brutalist_trim, color=[0.25,0.27,0.26], metallic=0.12, roughness=0.55)
+output brutalist_trim = brutalist_trim_mat
+brutalist_roof = building.asset@1(at=[-66,0,62], width=20, depth=15, floors=7, bays=6, floor_height=3.5, detail=2, style="brutalist", part="roof", seed=101)
+brutalist_roof_mat = solid.material@1(brutalist_roof, color=[0.26, 0.27, 0.27], roughness=0.88)
+output brutalist_roof = brutalist_roof_mat
+brutalist_door = building.asset@1(at=[-66,0,62], width=20, depth=15, floors=7, bays=6, floor_height=3.5, detail=2, style="brutalist", part="doors", seed=101)
+brutalist_door_mat = solid.material@1(brutalist_door, color=[0.17, 0.08, 0.04], roughness=0.58)
+output brutalist_door = brutalist_door_mat
+# Modernist family
+modernist_stone = building.asset@1(at=[-36,0,62], width=23, depth=15, floors=6, bays=7, floor_height=3.3, detail=2, style="modernist", part="masonry", seed=109)
+modernist_stone_mat = solid.material@1(modernist_stone, color=[0.75,0.72,0.64], roughness=0.83)
+output modernist_stone = modernist_stone_mat
+modernist_glass = building.asset@1(at=[-36,0,62], width=23, depth=15, floors=6, bays=7, floor_height=3.3, detail=2, style="modernist", part="glass", seed=109)
+modernist_glass_mat = solid.material@1(modernist_glass, color=[0.08,0.17,0.2], metallic=0.18, roughness=0.22)
+output modernist_glass = modernist_glass_mat
+modernist_trim = building.asset@1(at=[-36,0,62], width=23, depth=15, floors=6, bays=7, floor_height=3.3, detail=2, style="modernist", part="trim", seed=109)
+modernist_trim_mat = solid.material@1(modernist_trim, color=[0.27,0.29,0.29], metallic=0.12, roughness=0.55)
+output modernist_trim = modernist_trim_mat
+modernist_roof = building.asset@1(at=[-36,0,62], width=23, depth=15, floors=6, bays=7, floor_height=3.3, detail=2, style="modernist", part="roof", seed=109)
+modernist_roof_mat = solid.material@1(modernist_roof, color=[0.26, 0.27, 0.27], roughness=0.88)
+output modernist_roof = modernist_roof_mat
+modernist_door = building.asset@1(at=[-36,0,62], width=23, depth=15, floors=6, bays=7, floor_height=3.3, detail=2, style="modernist", part="doors", seed=109)
+modernist_door_mat = solid.material@1(modernist_door, color=[0.17, 0.08, 0.04], roughness=0.58)
+output modernist_door = modernist_door_mat
+# Mediterranean family
+mediterranean_stone = building.asset@1(at=[-5,0,62], width=19, depth=15, floors=5, bays=5, floor_height=3.4, detail=2, style="mediterranean", part="masonry", seed=113)
+mediterranean_stone_mat = solid.material@1(mediterranean_stone, color=[0.68,0.39,0.22], roughness=0.83)
+output mediterranean_stone = mediterranean_stone_mat
+mediterranean_glass = building.asset@1(at=[-5,0,62], width=19, depth=15, floors=5, bays=5, floor_height=3.4, detail=2, style="mediterranean", part="glass", seed=113)
+mediterranean_glass_mat = solid.material@1(mediterranean_glass, color=[0.08,0.14,0.16], metallic=0.18, roughness=0.22)
+output mediterranean_glass = mediterranean_glass_mat
+mediterranean_trim = building.asset@1(at=[-5,0,62], width=19, depth=15, floors=5, bays=5, floor_height=3.4, detail=2, style="mediterranean", part="trim", seed=113)
+mediterranean_trim_mat = solid.material@1(mediterranean_trim, color=[0.85,0.67,0.42], metallic=0.12, roughness=0.55)
+output mediterranean_trim = mediterranean_trim_mat
+mediterranean_roof = building.asset@1(at=[-5,0,62], width=19, depth=15, floors=5, bays=5, floor_height=3.4, detail=2, style="mediterranean", part="roof", seed=113)
+mediterranean_roof_mat = solid.material@1(mediterranean_roof, color=[0.26, 0.27, 0.27], roughness=0.88)
+output mediterranean_roof = mediterranean_roof_mat
+mediterranean_door = building.asset@1(at=[-5,0,62], width=19, depth=15, floors=5, bays=5, floor_height=3.4, detail=2, style="mediterranean", part="doors", seed=113)
+mediterranean_door_mat = solid.material@1(mediterranean_door, color=[0.17, 0.08, 0.04], roughness=0.58)
+output mediterranean_door = mediterranean_door_mat
+# Victorian family
+victorian_stone = building.asset@1(at=[25,0,62], width=18, depth=14, floors=5, bays=5, floor_height=3.4, detail=2, style="victorian", part="masonry", seed=127)
+victorian_stone_mat = solid.material@1(victorian_stone, color=[0.43,0.27,0.20], roughness=0.83)
+output victorian_stone = victorian_stone_mat
+victorian_glass = building.asset@1(at=[25,0,62], width=18, depth=14, floors=5, bays=5, floor_height=3.4, detail=2, style="victorian", part="glass", seed=127)
+victorian_glass_mat = solid.material@1(victorian_glass, color=[0.065,0.12,0.15], metallic=0.18, roughness=0.22)
+output victorian_glass = victorian_glass_mat
+victorian_trim = building.asset@1(at=[25,0,62], width=18, depth=14, floors=5, bays=5, floor_height=3.4, detail=2, style="victorian", part="trim", seed=127)
+victorian_trim_mat = solid.material@1(victorian_trim, color=[0.76,0.59,0.41], metallic=0.12, roughness=0.55)
+output victorian_trim = victorian_trim_mat
+victorian_roof = building.asset@1(at=[25,0,62], width=18, depth=14, floors=5, bays=5, floor_height=3.4, detail=2, style="victorian", part="roof", seed=127)
+victorian_roof_mat = solid.material@1(victorian_roof, color=[0.26, 0.27, 0.27], roughness=0.88)
+output victorian_roof = victorian_roof_mat
+victorian_door = building.asset@1(at=[25,0,62], width=18, depth=14, floors=5, bays=5, floor_height=3.4, detail=2, style="victorian", part="doors", seed=127)
+victorian_door_mat = solid.material@1(victorian_door, color=[0.17, 0.08, 0.04], roughness=0.58)
+output victorian_door = victorian_door_mat
+# Warehouse family
+warehouse_stone = building.asset@1(at=[57,0,62], width=23, depth=18, floors=3, bays=6, floor_height=4.0, detail=2, style="warehouse", part="masonry", seed=139)
+warehouse_stone_mat = solid.material@1(warehouse_stone, color=[0.48,0.45,0.38], roughness=0.83, recipe="concrete")
+output warehouse_stone = warehouse_stone_mat
+warehouse_glass = building.asset@1(at=[57,0,62], width=23, depth=18, floors=3, bays=6, floor_height=4.0, detail=2, style="warehouse", part="glass", seed=139)
+warehouse_glass_mat = solid.material@1(warehouse_glass, color=[0.08,0.14,0.16], metallic=0.18, roughness=0.22)
+output warehouse_glass = warehouse_glass_mat
+warehouse_trim = building.asset@1(at=[57,0,62], width=23, depth=18, floors=3, bays=6, floor_height=4.0, detail=2, style="warehouse", part="trim", seed=139)
+warehouse_trim_mat = solid.material@1(warehouse_trim, color=[0.31,0.30,0.27], metallic=0.12, roughness=0.55)
+output warehouse_trim = warehouse_trim_mat
+warehouse_roof = building.asset@1(at=[57,0,62], width=23, depth=18, floors=3, bays=6, floor_height=4.0, detail=2, style="warehouse", part="roof", seed=139)
+warehouse_roof_mat = solid.material@1(warehouse_roof, color=[0.26, 0.27, 0.27], roughness=0.88)
+output warehouse_roof = warehouse_roof_mat
+warehouse_door = building.asset@1(at=[57,0,62], width=23, depth=18, floors=3, bays=6, floor_height=4.0, detail=2, style="warehouse", part="doors", seed=139)
+warehouse_door_mat = solid.material@1(warehouse_door, color=[0.17, 0.08, 0.04], roughness=0.58)
+output warehouse_door = warehouse_door_mat

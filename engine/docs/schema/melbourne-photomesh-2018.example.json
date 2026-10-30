@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "id": "city.melbourne.photomesh.2018",
+      "kind": "arcgis_i3s",
+      "uri": "https://tiles.arcgis.com/tiles/KGdHCCUjGBpOPPac/arcgis/rest/services/City_of_Melbourne_3D_Textured_Mesh_June_2018/SceneServer/layers/0",
+      "revision": {
+        "sourceVersion": "2018-05; I3S service layer version 1.5"
+      },
+      "source": {
+        "title": "City of Melbourne 3D Textured Mesh (Photomesh) 2018",
+        "publisher": "City of Melbourne",
+        "url": "https://data.melbourne.vic.gov.au/explore/dataset/city-of-melbourne-3d-textured-mesh-photomesh-2018/",
+        "license": {
+          "name": "Creative Commons Attribution 4.0 International",
+          "url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+          "termsReviewedAt": "2026-10-28",
+          "notes": "Dataset listing states CC BY. Preserve attribution and verify current download/service terms before bundling or redistributing derived tiles."
+        },
+        "attribution": "City of Melbourne, 3D Textured Mesh (Photomesh) 2018, CC BY 4.0",
+        "capturePeriod": "2018-05"
+      },
+      "spatial": {
+        "crs": "EPSG:28355",
+        "verticalDatum": "AHD (EPSG:5773)",
+        "units": "metres",
+        "localOrigin": [319000, 5813000, 0]
+      },
+      "usage": {
+        "display": true,
+        "modify": true,
+        "redistribute": true,
+        "aiProcessing": "review_required",
+        "attributionRequired": true,
+        "cachePolicy": "no_cache"
+      }
+    }
+  ]
+}

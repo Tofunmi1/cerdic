@@ -162,10 +162,21 @@ fn open_cards_scatter_and_move_as_a_set() {
 }
 
 #[test]
-fn unioning_open_copies_is_refused_without_a_crash() {
-    let error = run(&format!(
+fn realizing_open_copies_joins_them_as_one_open_mesh_without_a_union() {
+    // Open meshes cannot be unioned, so `inst.realize` appends the copies (changed deliberately: it used to refuse).
+    let result = run(&format!(
         "{CARD}\nleaves = inst.array@1(card, count_x=3, spacing=[1, 0, 0])\nsolid = inst.realize@1(leaves)\noutput solid = solid"
     ))
-    .unwrap_err();
-    assert!(!error.is_empty());
+    .unwrap();
+    assert_eq!(result.parts.len(), 1);
+    assert_eq!(
+        result.parts[0].indices.len() / 3,
+        6,
+        "three cards of two triangles each"
+    );
+    assert_eq!(
+        result.parts[0].positions.len(),
+        12,
+        "four corners per card, nothing welded"
+    );
 }

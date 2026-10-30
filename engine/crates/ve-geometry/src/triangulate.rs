@@ -23,10 +23,14 @@ pub(crate) fn face(
     mode: TriangulationMode,
     context: &ExecutionContext,
 ) -> Result<Vec<[u32; 3]>, GeometryError> {
-    if vertices.len() < 3 {
+    let [a, b, c, ..] = *vertices else {
         return Err(GeometryError::TriangulationUnsupported(
             "fewer than three corners",
         ));
+    };
+    // A triangle is already triangulated, however thin (field meshes carry slivers below the planarity tolerance of larger polygons).
+    if vertices.len() == 3 {
+        return Ok(vec![[a, b, c]]);
     }
     let mut points = Vec::with_capacity(vertices.len());
     for (index, &vertex) in vertices.iter().enumerate() {
@@ -49,7 +53,17 @@ pub(crate) fn face(
         .iter()
         .all(|point| dot(sub(*point, points[0]), unit).abs() <= tolerance);
     if !planar && mode == TriangulationMode::CurvedQuads && vertices.len() == 4 {
-        return curved_quad(vertices, &points, normal);
+        return curved_quad(vertices, &points, normal).or_else(|_| {
+            Ok(vec![
+                [vertices[0], vertices[1], vertices[2]],
+                [vertices[0], vertices[2], vertices[3]],
+            ])
+        });
+    }
+    if !planar && mode == TriangulationMode::CurvedQuads && vertices.len() > 4 {
+        return Ok((1..vertices.len() - 1)
+            .map(|i| [vertices[0], vertices[i], vertices[i + 1]])
+            .collect());
     }
     if !planar {
         return Err(GeometryError::TriangulationUnsupported(

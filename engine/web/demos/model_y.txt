@@ -1,0 +1,203 @@
+# about: A pearl-white electric crossover, built in the studio as a full-size procedural car: a smooth fastback body with cut wheel arches, a dark glass canopy, black trim, aero wheels and lit front and rear bars.
+# kind: model
+
+# The body is the shared volume of a side silhouette and a rounded plan, so the bonnet, the
+# fastback deck and the tapered nose all come from one clean solid.
+side_pts = profile.polygon@1(points=[[2.30, 0.20], [2.37, 0.34], [2.38, 0.50], [2.34, 0.64], [2.22, 0.76], [1.90, 0.82], [1.55, 0.88], [1.08, 0.98], [-1.60, 0.98], [-1.90, 0.95], [-2.22, 0.88], [-2.35, 0.76], [-2.37, 0.40], [-2.28, 0.20]])
+side = profile.smooth@1(side_pts, iterations=1)
+side_solid = solid.extrude@1(side, height=1.92)
+side_rot = xform.rotate@1(side_solid, angles=[90, 0, 0])
+side_at = xform.move@1(side_rot, by=[0, 0, -0.96])
+
+plan_pts = profile.polygon@1(points=[[2.30, 0.60], [2.36, 0.40], [2.38, 0.0], [2.36, -0.40], [2.30, -0.60], [1.90, -0.80], [1.0, -0.92], [0.0, -0.96], [-1.0, -0.95], [-1.8, -0.90], [-2.15, -0.78], [-2.32, -0.55], [-2.37, 0.0], [-2.32, 0.55], [-2.15, 0.78], [-1.8, 0.90], [-1.0, 0.95], [0.0, 0.96], [1.0, 0.92], [1.90, 0.80]])
+s0 = profile.polygon@1(points=[[2.162, 0.492], [2.2184, 0.328], [2.2372, 0], [2.2184, -0.328], [2.162, -0.492], [1.786, -0.656], [0.94, -0.7544], [0, -0.7872], [-0.94, -0.779], [-1.692, -0.738], [-2.021, -0.6396], [-2.1808, -0.451], [-2.2278, 0], [-2.1808, 0.451], [-2.021, 0.6396], [-1.692, 0.738], [-0.94, 0.779], [0, 0.7872], [0.94, 0.7544], [1.786, 0.656]])
+s1 = profile.polygon@1(points=[[2.254, 0.564], [2.3128, 0.376], [2.3324, 0], [2.3128, -0.376], [2.254, -0.564], [1.862, -0.752], [0.98, -0.8648], [0, -0.9024], [-0.98, -0.893], [-1.764, -0.846], [-2.107, -0.7332], [-2.2736, -0.517], [-2.3226, 0], [-2.2736, 0.517], [-2.107, 0.7332], [-1.764, 0.846], [-0.98, 0.893], [0, 0.9024], [0.98, 0.8648], [1.862, 0.752]])
+s2 = profile.polygon@1(points=[[2.3, 0.6], [2.36, 0.4], [2.38, 0], [2.36, -0.4], [2.3, -0.6], [1.9, -0.8], [1, -0.92], [0, -0.96], [-1, -0.95], [-1.8, -0.9], [-2.15, -0.78], [-2.32, -0.55], [-2.37, 0], [-2.32, 0.55], [-2.15, 0.78], [-1.8, 0.9], [-1, 0.95], [0, 0.96], [1, 0.92], [1.9, 0.8]])
+s3 = profile.polygon@1(points=[[2.2885, 0.591], [2.3482, 0.394], [2.3681, 0], [2.3482, -0.394], [2.2885, -0.591], [1.8905, -0.788], [0.995, -0.9062], [0, -0.9456], [-0.995, -0.93575], [-1.791, -0.8865], [-2.1393, -0.7683], [-2.3084, -0.54175], [-2.3582, 0], [-2.3084, 0.54175], [-2.1393, 0.7683], [-1.791, 0.8865], [-0.995, 0.93575], [0, 0.9456], [0.995, 0.9062], [1.8905, 0.788]])
+s4 = profile.polygon@1(points=[[2.254, 0.57], [2.3128, 0.38], [2.3324, 0], [2.3128, -0.38], [2.254, -0.57], [1.862, -0.76], [0.98, -0.874], [0, -0.912], [-0.98, -0.9025], [-1.764, -0.855], [-2.107, -0.741], [-2.2736, -0.5225], [-2.3226, 0], [-2.2736, 0.5225], [-2.107, 0.741], [-1.764, 0.855], [-0.98, 0.9025], [0, 0.912], [0.98, 0.874], [1.862, 0.76]])
+s5 = profile.polygon@1(points=[[2.116, 0.528], [2.1712, 0.352], [2.1896, 0], [2.1712, -0.352], [2.116, -0.528], [1.748, -0.704], [0.92, -0.8096], [0, -0.8448], [-0.92, -0.836], [-1.656, -0.792], [-1.978, -0.6864], [-2.1344, -0.484], [-2.1804, 0], [-2.1344, 0.484], [-1.978, 0.6864], [-1.656, 0.792], [-0.92, 0.836], [0, 0.8448], [0.92, 0.8096], [1.748, 0.704]])
+body_loft = solid.loft@1(s0, s1, s2, s3, s4, s5, spacing=0.156, steps=2)
+body_loft_at = xform.move@1(body_loft, by=[0.0, 0.20, 0.0])
+body_raw = solid.intersect@1(side_at, body_loft_at)
+
+# Wheel wells are shallow pockets cut from each flank, not a tunnel through the floor.
+arch = solid.cylinder@1(radius=0.48, height=0.50, segments=40)
+arch_rot = xform.rotate@1(arch, angles=[90, 0, 0])
+arch_fl = xform.move@1(arch_rot, by=[1.445, 0.38, 0.82])
+arch_fr = xform.move@1(arch_rot, by=[1.445, 0.38, -0.82])
+arch_rl = xform.move@1(arch_rot, by=[-1.445, 0.38, 0.82])
+arch_rr = xform.move@1(arch_rot, by=[-1.445, 0.38, -0.82])
+body_cut = solid.difference@1(body_raw, arch_fl, arch_fr, arch_rl, arch_rr)
+body_paint = solid.material@1(body_cut, color=[0.87, 0.87, 0.84], metallic=0.38, roughness=0.28)
+body_finish = solid.finish@1(body_paint, clearcoat=0.85, clearcoat_roughness=0.04)
+output paint = body_finish
+
+# The greenhouse: a second, narrower silhouette-and-plan intersection, sitting on the beltline.
+cabin_side_pts = profile.polygon@1(points=[[1.08, 0.96], [0.98, 1.16], [0.72, 1.38], [0.35, 1.55], [0.10, 1.61], [-0.40, 1.62], [-0.70, 1.58], [-1.05, 1.46], [-1.35, 1.25], [-1.62, 1.02], [-1.58, 0.96]])
+cabin_side = profile.smooth@1(cabin_side_pts, iterations=1)
+cabin_side_solid = solid.extrude@1(cabin_side, height=1.58)
+cabin_side_rot = xform.rotate@1(cabin_side_solid, angles=[90, 0, 0])
+cabin_side_at = xform.move@1(cabin_side_rot, by=[0, 0, -0.79])
+
+cabin_plan_pts = profile.polygon@1(points=[[1.18, 0.50], [1.20, 0.25], [1.20, 0.0], [1.20, -0.25], [1.18, -0.50], [0.95, -0.68], [0.5, -0.76], [0.0, -0.78], [-0.6, -0.77], [-1.15, -0.70], [-1.50, -0.58], [-1.68, -0.35], [-1.70, 0.0], [-1.68, 0.35], [-1.50, 0.58], [-1.15, 0.70], [-0.6, 0.77], [0.0, 0.78], [0.5, 0.76], [0.95, 0.68]])
+cabin_plan = profile.smooth@1(cabin_plan_pts, iterations=2)
+cabin_plan_solid = solid.extrude@1(cabin_plan, height=2.0)
+cabin_raw = solid.intersect@1(cabin_side_at, cabin_plan_solid)
+cabin = solid.round@1(cabin_raw, radius=0.025, segments=6)
+cabin_glass = solid.material@1(cabin, color=[0.035, 0.050, 0.065], metallic=0.55, roughness=0.08)
+cabin_finish = solid.finish@1(cabin_glass, clearcoat=1.0, clearcoat_roughness=0.02)
+output glass = cabin_finish
+
+# Black trim: pillars, mirrors, sills, handles, aero arch lips, bumper details and the underside.
+a_pillar_box_l = solid.box@1(size=[0.92, 0.06, 0.035])
+a_pillar_rot_l = xform.rotate@1(a_pillar_box_l, angles=[0, 0, 141])
+a_pillar_l = xform.move@1(a_pillar_rot_l, by=[0.72, 1.26, 0.79])
+a_pillar_box_r = solid.box@1(size=[0.92, 0.06, 0.035])
+a_pillar_rot_r = xform.rotate@1(a_pillar_box_r, angles=[0, 0, 141])
+a_pillar_r = xform.move@1(a_pillar_rot_r, by=[0.72, 1.26, -0.79])
+
+b_pillar_box_l = solid.box@1(size=[0.07, 0.54, 0.035])
+b_pillar_l = xform.move@1(b_pillar_box_l, by=[-0.10, 1.27, 0.79])
+b_pillar_box_r = solid.box@1(size=[0.07, 0.54, 0.035])
+b_pillar_r = xform.move@1(b_pillar_box_r, by=[-0.10, 1.27, -0.79])
+
+c_pillar_box_l = solid.box@1(size=[0.68, 0.06, 0.035])
+c_pillar_rot_l = xform.rotate@1(c_pillar_box_l, angles=[0, 0, 43])
+c_pillar_l = xform.move@1(c_pillar_rot_l, by=[-1.10, 1.23, 0.75])
+c_pillar_box_r = solid.box@1(size=[0.68, 0.06, 0.035])
+c_pillar_rot_r = xform.rotate@1(c_pillar_box_r, angles=[0, 0, 43])
+c_pillar_r = xform.move@1(c_pillar_rot_r, by=[-1.10, 1.23, -0.75])
+
+roof_rail_box_l = solid.box@1(size=[1.00, 0.025, 0.04])
+roof_rail_l = xform.move@1(roof_rail_box_l, by=[-0.30, 1.605, 0.78])
+roof_rail_box_r = solid.box@1(size=[1.00, 0.025, 0.04])
+roof_rail_r = xform.move@1(roof_rail_box_r, by=[-0.30, 1.605, -0.78])
+
+belt_box_l = solid.box@1(size=[3.00, 0.035, 0.03])
+belt_l = xform.move@1(belt_box_l, by=[0.0, 0.975, 0.85])
+belt_box_r = solid.box@1(size=[3.00, 0.035, 0.03])
+belt_r = xform.move@1(belt_box_r, by=[0.0, 0.975, -0.85])
+
+cowl_box = solid.box@1(size=[0.06, 0.03, 1.50])
+cowl = xform.move@1(cowl_box, by=[1.08, 0.985, 0.0])
+deck_box = solid.box@1(size=[0.06, 0.03, 1.50])
+deck = xform.move@1(deck_box, by=[-1.62, 0.985, 0.0])
+
+mirror_box_l = solid.box@1(size=[0.15, 0.10, 0.12])
+mirror_l = xform.move@1(mirror_box_l, by=[0.92, 1.07, 0.96])
+mirror_box_r = solid.box@1(size=[0.15, 0.10, 0.12])
+mirror_r = xform.move@1(mirror_box_r, by=[0.92, 1.07, -0.96])
+stalk_box_l = solid.box@1(size=[0.06, 0.04, 0.10])
+stalk_l = xform.move@1(stalk_box_l, by=[0.92, 1.05, 0.89])
+stalk_box_r = solid.box@1(size=[0.06, 0.04, 0.10])
+stalk_r = xform.move@1(stalk_box_r, by=[0.92, 1.05, -0.89])
+
+handle_box_fl = solid.box@1(size=[0.20, 0.03, 0.02])
+handle_fl = xform.move@1(handle_box_fl, by=[0.55, 0.92, 0.89])
+handle_box_fr = solid.box@1(size=[0.20, 0.03, 0.02])
+handle_fr = xform.move@1(handle_box_fr, by=[0.55, 0.92, -0.89])
+handle_box_rl = solid.box@1(size=[0.20, 0.03, 0.02])
+handle_rl = xform.move@1(handle_box_rl, by=[-0.65, 0.92, 0.89])
+handle_box_rr = solid.box@1(size=[0.20, 0.03, 0.02])
+handle_rr = xform.move@1(handle_box_rr, by=[-0.65, 0.92, -0.89])
+
+rocker_box_l = solid.box@1(size=[1.90, 0.09, 0.03])
+rocker_l = xform.move@1(rocker_box_l, by=[0.0, 0.27, 0.845])
+rocker_box_r = solid.box@1(size=[1.90, 0.09, 0.03])
+rocker_r = xform.move@1(rocker_box_r, by=[0.0, 0.27, -0.845])
+
+under_box = solid.box@1(size=[4.40, 0.07, 1.70])
+under = xform.move@1(under_box, by=[0.0, 0.19, 0.0])
+splitter_box = solid.box@1(size=[0.12, 0.04, 1.20])
+splitter = xform.move@1(splitter_box, by=[2.34, 0.22, 0.0])
+intake_box = solid.box@1(size=[0.06, 0.14, 1.02])
+intake = xform.move@1(intake_box, by=[2.37, 0.41, 0.0])
+diffuser_box = solid.box@1(size=[0.08, 0.14, 1.10])
+diffuser = xform.move@1(diffuser_box, by=[-2.35, 0.29, 0.0])
+rear_recess_box = solid.box@1(size=[0.02, 0.16, 0.34])
+rear_recess = xform.move@1(rear_recess_box, by=[-2.39, 0.52, 0.0])
+tail_surround_box = solid.box@1(size=[0.04, 0.13, 1.45])
+tail_surround = xform.move@1(tail_surround_box, by=[-2.37, 0.82, 0.0])
+spoiler_box = solid.box@1(size=[0.22, 0.035, 1.20])
+spoiler = xform.move@1(spoiler_box, by=[-1.75, 1.01, 0.0])
+
+arch_trim = solid.torus@1(major=0.445, minor=0.025, segments=48, tube_segments=12)
+arch_trim_rot = xform.rotate@1(arch_trim, angles=[90, 0, 0])
+arch_trim_fl = xform.move@1(arch_trim_rot, by=[1.445, 0.38, 0.945])
+arch_trim_fr = xform.move@1(arch_trim_rot, by=[1.445, 0.38, -0.945])
+arch_trim_rl = xform.move@1(arch_trim_rot, by=[-1.445, 0.38, 0.945])
+arch_trim_rr = xform.move@1(arch_trim_rot, by=[-1.445, 0.38, -0.945])
+
+port_cyl = solid.cylinder@1(radius=0.080, height=0.02, segments=24)
+port_rot = xform.rotate@1(port_cyl, angles=[90, 0, 0])
+port = xform.move@1(port_rot, by=[-1.72, 0.78, -0.93])
+port_ring_src = solid.torus@1(major=0.080, minor=0.007, segments=32, tube_segments=8)
+port_ring_rot = xform.rotate@1(port_ring_src, angles=[90, 0, 0])
+port_ring = xform.move@1(port_ring_rot, by=[-1.72, 0.78, -0.93])
+
+black_parts = solid.union@1(a_pillar_l, a_pillar_r, b_pillar_l, b_pillar_r, c_pillar_l, c_pillar_r, roof_rail_l, roof_rail_r, belt_l, belt_r, cowl, deck, mirror_l, mirror_r, stalk_l, stalk_r, handle_fl, handle_fr, handle_rl, handle_rr, rocker_l, rocker_r, under, splitter, intake, diffuser, rear_recess, tail_surround, spoiler, arch_trim_fl, arch_trim_fr, arch_trim_rl, arch_trim_rr, port)
+black = solid.material@1(black_parts, color=[0.022, 0.024, 0.028], metallic=0.30, roughness=0.42)
+output trim = black
+
+# Tyres, rims, aero covers, silver rings and centre caps, each placed once and instanced four times.
+tyre = solid.cylinder@1(radius=0.375, height=0.24, segments=48)
+tyre_rot = xform.rotate@1(tyre, angles=[90, 0, 0])
+tyre_at = inst.place@1(tyre_rot, at=[[1.445, 0.375, 0.82], [1.445, 0.375, -0.82], [-1.445, 0.375, 0.82], [-1.445, 0.375, -0.82]])
+tyre_mat = solid.material@1(tyre_at, color=[0.018, 0.018, 0.020], roughness=0.86)
+output tyres = tyre_mat
+
+rim = solid.cylinder@1(radius=0.255, height=0.25, segments=40)
+rim_rot = xform.rotate@1(rim, angles=[90, 0, 0])
+rim_at = inst.place@1(rim_rot, at=[[1.445, 0.375, 0.82], [1.445, 0.375, -0.82], [-1.445, 0.375, 0.82], [-1.445, 0.375, -0.82]])
+rim_mat = solid.material@1(rim_at, color=[0.52, 0.55, 0.58], metallic=0.88, roughness=0.24)
+output rims = rim_mat
+
+cover = solid.cylinder@1(radius=0.22, height=0.02, segments=40)
+cover_rot = xform.rotate@1(cover, angles=[90, 0, 0])
+cover_at = inst.place@1(cover_rot, at=[[1.445, 0.375, 0.955], [1.445, 0.375, -0.955], [-1.445, 0.375, 0.955], [-1.445, 0.375, -0.955]])
+cover_mat = solid.material@1(cover_at, color=[0.10, 0.11, 0.13], metallic=0.55, roughness=0.36)
+output covers = cover_mat
+
+ring = solid.torus@1(major=0.235, minor=0.012, segments=48, tube_segments=10)
+ring_rot = xform.rotate@1(ring, angles=[90, 0, 0])
+ring_fl = xform.move@1(ring_rot, by=[1.445, 0.375, 0.962])
+ring_fr = xform.move@1(ring_rot, by=[1.445, 0.375, -0.962])
+ring_rl = xform.move@1(ring_rot, by=[-1.445, 0.375, 0.962])
+ring_rr = xform.move@1(ring_rot, by=[-1.445, 0.375, -0.962])
+cap = solid.cylinder@1(radius=0.045, height=0.02, segments=24)
+cap_rot = xform.rotate@1(cap, angles=[90, 0, 0])
+cap_fl = xform.move@1(cap_rot, by=[1.445, 0.375, 0.968])
+cap_fr = xform.move@1(cap_rot, by=[1.445, 0.375, -0.968])
+cap_rl = xform.move@1(cap_rot, by=[-1.445, 0.375, 0.968])
+cap_rr = xform.move@1(cap_rot, by=[-1.445, 0.375, -0.968])
+edge_ring_src = solid.torus@1(major=2.95, minor=0.010, segments=96, tube_segments=8)
+edge_ring = xform.move@1(edge_ring_src, by=[0.0, 0.004, 0.0])
+silver_parts = solid.union@1(ring_fl, ring_fr, ring_rl, ring_rr, cap_fl, cap_fr, cap_rl, cap_rr, port_ring, edge_ring)
+silver = solid.material@1(silver_parts, color=[0.62, 0.64, 0.67], metallic=0.90, roughness=0.18)
+output silver = silver
+
+platform_src = solid.cylinder@1(radius=3.00, height=0.10, segments=64)
+platform_at = xform.move@1(platform_src, by=[0.0, -0.05, 0.0])
+platform_mat = solid.material@1(platform_at, color=[0.055, 0.060, 0.070], metallic=0.22, roughness=0.32)
+output platform = platform_mat
+
+# Slim front signature and a full-width rear bar; both are emissive so they read in the studio.
+head_box_l = solid.box@1(size=[0.05, 0.07, 0.24])
+head_rot_l = xform.rotate@1(head_box_l, angles=[0, -18, 0])
+head_l = xform.move@1(head_rot_l, by=[2.33, 0.70, 0.42])
+head_box_r = solid.box@1(size=[0.05, 0.07, 0.24])
+head_rot_r = xform.rotate@1(head_box_r, angles=[0, 18, 0])
+head_r = xform.move@1(head_rot_r, by=[2.33, 0.70, -0.42])
+front_lights = solid.union@1(head_l, head_r)
+front_light_mat = solid.material@1(front_lights, color=[0.92, 0.94, 0.98], emissive=[3.2, 3.3, 3.6], metallic=0.1, roughness=0.22)
+output headlights = front_light_mat
+
+tail_box = solid.box@1(size=[0.03, 0.05, 1.30])
+tail = xform.move@1(tail_box, by=[-2.39, 0.82, 0.0])
+tail_mat = solid.material@1(tail, color=[0.30, 0.02, 0.02], emissive=[2.8, 0.06, 0.035], metallic=0.1, roughness=0.28)
+output taillights = tail_mat
+
+plate_box = solid.box@1(size=[0.02, 0.13, 0.30])
+plate = xform.move@1(plate_box, by=[-2.40, 0.52, 0.0])
+plate_mat = solid.material@1(plate, color=[0.72, 0.75, 0.78], metallic=0.1, roughness=0.45)
+output plate = plate_mat
