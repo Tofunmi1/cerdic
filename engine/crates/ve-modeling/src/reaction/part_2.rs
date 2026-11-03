@@ -23,6 +23,7 @@ fn kinds(trigger: &str, action: &str) -> Result<(Trigger, Action), Fail> {
         "play" => Action::Play,
         "toggle" => Action::Toggle,
         "follow" => Action::Follow,
+        "ragdoll" => Action::Ragdoll,
         other => {
             return Err(fail(
                 "param.range",
@@ -130,6 +131,12 @@ pub(crate) fn behavior(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail>
         }
         _ => (None, String::new()),
     };
+    if action == Action::Ragdoll && target.is_none() {
+        return Err(fail(
+            "behavior.ragdoll",
+            "action=\"ragdoll\" needs target=<the name of a phys.ragdoll> to say who goes limp",
+        ));
+    }
     if trigger == Trigger::Signal && target.is_some() {
         return Err(fail(
             "behavior.signal_target",

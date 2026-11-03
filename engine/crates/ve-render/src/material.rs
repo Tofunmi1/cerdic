@@ -1,10 +1,24 @@
 //! Surface materials: a small physically based parameter set.
 
+use crate::surface_terrain::SurfaceTerrain;
+use crate::surface_water::SurfaceWater;
 use bevy_color::{Color, LinearRgba};
-use bevy_ecs::component::Component;
+use bevy_ecs::{component::Component, reflect::ReflectComponent};
+use bevy_reflect::{ReflectDeserialize, ReflectSerialize};
 
 /// Procedural shader pattern selected by the typed `solid.material` recipe.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    bevy_reflect::Reflect,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[reflect(Serialize, Deserialize)]
 pub enum ProceduralRecipe {
     /// Uniform PBR material.
     #[default]
@@ -51,7 +65,10 @@ impl ProceduralRecipe {
 
 /// Cel ("toon") shading of a surface: light falls into a few flat bands with a tinted shadow colour, an optional rim and a
 /// small hard highlight, instead of the smooth physically based response. `bands` of 0 leaves the surface physically based.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, bevy_reflect::Reflect, serde::Serialize, serde::Deserialize,
+)]
+#[reflect(Serialize, Deserialize)]
 pub struct ToonStyle {
     /// Steps between the shadow colour and the lit colour: 1 is two-tone, 2 adds a mid tone, up to 4. 0 turns toon off.
     pub bands: u32,
@@ -86,23 +103,72 @@ impl Default for ToonStyle {
     }
 }
 
-/// Leaf-like behaviour of a surface: cut away where its albedo map is transparent, and moving in the wind. All zero is an
-/// ordinary surface.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct FoliageStyle {
-    /// Pixels whose albedo-map alpha is below this are discarded (0 keeps everything).
-    pub alpha_cutoff: f32,
-    /// How far the whole shape bends with the wind, 0 to 1 (more the higher a point is above the shape's origin).
-    pub sway: f32,
-    /// How much the surface trembles at a small scale, 0 to 1.
-    pub flutter: f32,
+pub use crate::foliage::FoliageStyle;
+
+/// Extra layers on top of the base surface: the forward renderer supports water, while Bevy also draws a clear coat (car
+/// paint, wet skin, glazed ceramic), stretched highlights (brushed metal, hair, silk) and light scattered through a thin body (leaves,
+/// wax, ears). All zero is the ordinary surface.
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    bevy_reflect::Reflect,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[reflect(Serialize, Deserialize)]
+pub struct SurfaceFinish {
+    /// Strength of a glossy clear layer over the surface, 0 to 1.
+    pub clearcoat: f32,
+    /// Roughness of that layer, 0 (mirror) to 1.
+    pub clearcoat_roughness: f32,
+    /// How much highlights stretch along the surface, 0 to 1.
+    pub anisotropy: f32,
+    /// Share of diffuse light that passes through to the other side, 0 to 1.
+    pub translucency: f32,
+    /// Steepness of procedural relief drawn in the pixel shader (wrinkles, scales, pores finer than the mesh), 0 to 1; 0 is none.
+    pub relief: f32,
+    /// Features per metre of that relief.
+    pub relief_scale: f32,
+    /// 0 smooth lumps, 1 ridges and creases, 2 round scales.
+    pub relief_style: f32,
+    /// How wet the surface is, 0 to 1: darker and glossy, most of all in the low parts of the relief.
+    pub wetness: f32,
+    /// Colour that shifts with the viewing angle (beetle shell, soap film, fish scale), 0 to 1.
+    pub iridescence: f32,
+    /// Soft brightening at grazing angles (velvet, peach fuzz, fine hair), 0 to 1.
+    pub sheen: f32,
+    /// Light that scatters under the skin and softens the shadow edge with a warm tint (skin, wax, ears), 0 to 1.
+    pub subsurface: f32,
+    /// Sunlight passing through a thin body, glowing on the side that faces the viewer when the sun is behind it, 0 to 1 (wing membranes, leaves, wax).
+    pub thickness: f32,
+    /// A terrain surface (grass, sand, rock and snow blended by slope and height in the pixel shader); `None` for every other surface.
+    pub terrain: Option<SurfaceTerrain>,
+    /// A water surface (flowing, depth-tinted, foamy, drawn in the pixel shader from the flow, depth and foam in the vertex colour); `None` for every other surface.
+    pub water: Option<SurfaceWater>,
+    /// Drawn as a particle (Bevy renderer only): 0 is an ordinary surface; 1 is unlit, takes its colour and opacity from the mesh's vertex
+    /// colours and blends like ordinary transparency (smoke, dust); 2 does the same but adds its light to what is behind it (fire, sparks).
+    #[serde(default)]
+    pub particle: u8,
 }
 
 /// Metallic-roughness surface parameters of a mesh instance.
 ///
 /// Parameters are plain numbers (no textures yet): the material language in a later track will
-/// generate them procedurally. They travel with each instance, so batching only depends on the mesh.
-#[derive(Component, Clone, Copy, Debug, PartialEq)]
+/// generate them procedurally. They travel with each instance; water also shares a per-material wave uniform.
+#[derive(
+    Component,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    bevy_reflect::Reflect,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[reflect(Component, Serialize, Deserialize)]
 pub struct VeMaterial {
     /// Albedo for dielectrics, specular colour for metals.
     pub base_color: Color,
@@ -122,6 +188,12 @@ pub struct VeMaterial {
     pub recipe: ProceduralRecipe,
     /// Object-space frequency multiplier, clamped when packed.
     pub texture_scale: f32,
+    /// Blend three shifted samples to hide texture repetition (ignored at Low quality).
+    #[serde(default)]
+    pub no_repeat: bool,
+    /// Grid cells per texture tile, clamped to 0.25..=8 when packed.
+    #[serde(default = "no_repeat_scale_default")]
+    pub no_repeat_scale: f32,
     /// Layers of the shared [`MaterialTextures`](crate::MaterialTextures) array holding this surface's
     /// baked albedo, tangent-space normal, packed metallic-roughness and emissive maps; -1 for none.
     pub map_layers: [i32; 4],
@@ -129,6 +201,8 @@ pub struct VeMaterial {
     pub toon: ToonStyle,
     /// Cutout and wind, or none when all of it is 0.
     pub foliage: FoliageStyle,
+    /// Clear coat, stretched highlights and translucency (Bevy renderer only).
+    pub finish: SurfaceFinish,
 }
 
 impl Default for VeMaterial {
@@ -143,16 +217,22 @@ impl Default for VeMaterial {
             emissive: Color::BLACK,
             recipe: ProceduralRecipe::None,
             texture_scale: 1.0,
+            no_repeat: false,
+            no_repeat_scale: 1.0,
             map_layers: [-1; 4],
             toon: ToonStyle::default(),
             foliage: FoliageStyle::default(),
+            finish: SurfaceFinish::default(),
         }
     }
 }
 
-/// The three `vec4` slots a material occupies in the instance buffer.
+/// Material instance attributes and the water/terrain looks used to select the shared surface uniform.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct PackedMaterial {
+    pub(crate) grass: Option<FoliageStyle>,
+    pub(crate) water: Option<SurfaceWater>,
+    pub(crate) terrain: Option<SurfaceTerrain>,
     pub(crate) base_color: [f32; 4],
     /// x: metallic, y: roughness (both clamped to 0..=1).
     pub(crate) params: [f32; 4],
@@ -165,11 +245,25 @@ pub(crate) struct PackedMaterial {
     pub(crate) toon_b: [f32; 4],
     /// rgb: outline colour (linear), w: outline width in screen pixels (0 is none).
     pub(crate) toon_c: [f32; 4],
-    /// x: alpha cutoff (0 keeps every pixel), y: sway, z: flutter, w unused.
+    /// x: alpha cutoff (0 keeps every pixel), y: sway, z: flutter, w: stochastic scale (0 is off).
     pub(crate) foliage: [f32; 4],
 }
 
 impl VeMaterial {
+    /// Water recipes and water finishes share the same forward shading path.
+    pub(crate) fn water_surface(&self) -> Option<SurfaceWater> {
+        self.finish.water.or_else(|| {
+            (self.recipe == ProceduralRecipe::Water).then(|| {
+                let base = self.base_color.to_srgba();
+                SurfaceWater {
+                    shallow: [base.red, base.green, base.blue],
+                    flow: self.texture_scale,
+                    ..SurfaceWater::default()
+                }
+            })
+        })
+    }
+
     /// Adds a stable instance index to the packed variation lane.
     pub(crate) fn pack_for_instance(&self, instance_index: u32) -> PackedMaterial {
         let base = LinearRgba::from(self.base_color);
@@ -180,6 +274,9 @@ impl VeMaterial {
         )]
         let seed = instance_index as f32;
         PackedMaterial {
+            grass: self.foliage.grass.then_some(self.foliage),
+            water: self.water_surface(),
+            terrain: self.finish.terrain,
             base_color: [
                 base.red,
                 base.green,
@@ -187,14 +284,18 @@ impl VeMaterial {
                 (base.alpha * self.opacity).clamp(0.0, 1.0),
             ],
             params: [
-                if self.recipe == ProceduralRecipe::Water {
+                if self.water_surface().is_some() {
                     self.water_time
                 } else {
                     self.metallic.clamp(0.0, 1.0)
                 },
                 self.roughness.clamp(0.0, 1.0),
-                self.recipe.code(),
-                if self.recipe == ProceduralRecipe::Water {
+                if self.water_surface().is_some() {
+                    10.0
+                } else {
+                    self.recipe.code()
+                },
+                if self.water_surface().is_some() {
                     self.texture_scale.clamp(0.0, 10.0)
                 } else {
                     self.texture_scale.clamp(0.01, 100.0)
@@ -238,114 +339,22 @@ impl VeMaterial {
                 self.foliage.alpha_cutoff.clamp(0.0, 1.0),
                 self.foliage.sway.clamp(0.0, 1.0),
                 self.foliage.flutter.clamp(0.0, 1.0),
-                0.0,
+                if self.no_repeat && self.no_repeat_scale.is_finite() {
+                    self.no_repeat_scale.clamp(0.25, 8.0)
+                } else if self.no_repeat {
+                    1.0
+                } else {
+                    0.0
+                },
             ],
         }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn packs_to_linear_and_clamps_parameters() {
-        let material = VeMaterial {
-            base_color: Color::srgb(1.0, 0.0, 0.0),
-            opacity: 1.0,
-            sort_key: 0,
-            metallic: 3.0,
-            roughness: -1.0,
-            emissive: Color::BLACK,
-            water_time: 0.0,
-            recipe: ProceduralRecipe::None,
-            texture_scale: 1.0,
-            map_layers: [-1; 4],
-            toon: ToonStyle::default(),
-            foliage: FoliageStyle::default(),
-        };
-        let packed = material.pack_for_instance(0);
-        assert!((packed.base_color[0] - 1.0).abs() < 1e-6);
-        assert!(packed.base_color[1].abs() < 1e-6);
-        assert_eq!(packed.params[0].to_bits(), 1.0_f32.to_bits());
-        assert_eq!(packed.params[1].to_bits(), 0.0_f32.to_bits());
-    }
-
-    #[test]
-    fn toon_style_packs_into_its_own_lanes_and_is_off_by_default() {
-        assert_eq!(
-            VeMaterial::default().pack_for_instance(0).toon_a[0].to_bits(),
-            0.0_f32.to_bits()
-        );
-        let packed = VeMaterial {
-            toon: ToonStyle {
-                bands: 9,
-                feather: 3.0,
-                shift: -4.0,
-                spec: 0.5,
-                rim: 0.4,
-                ..ToonStyle::default()
-            },
-            ..VeMaterial::default()
-        }
-        .pack_for_instance(0);
-        assert_eq!(packed.toon_a, [4.0, 1.0, -1.0, 0.5]);
-        assert!((packed.toon_b[3] - 0.4).abs() < 1e-6);
-        assert!(
-            packed.toon_b[2] > packed.toon_b[0],
-            "the default shadow colour is cool: {:?}",
-            packed.toon_b
-        );
-        assert_eq!(
-            packed.toon_c[3].to_bits(),
-            0.0_f32.to_bits(),
-            "no outline unless asked for"
-        );
-        let outlined = VeMaterial {
-            toon: ToonStyle {
-                outline_width: 99.0,
-                ..ToonStyle::default()
-            },
-            ..VeMaterial::default()
-        }
-        .pack_for_instance(0);
-        assert_eq!(
-            outlined.toon_c[3].to_bits(),
-            16.0_f32.to_bits(),
-            "the width is clamped"
-        );
-    }
-
-    #[test]
-    fn opacity_is_packed_into_the_fragment_alpha_lane() {
-        let packed = VeMaterial {
-            opacity: 0.35,
-            ..VeMaterial::default()
-        }
-        .pack_for_instance(0);
-        assert!((packed.base_color[3] - 0.35).abs() < 1e-6);
-    }
-
-    #[test]
-    fn srgb_mid_grey_becomes_darker_linear() {
-        let packed = VeMaterial::default().pack_for_instance(0);
-        // sRGB 0.8 is about 0.604 in linear space.
-        assert!((packed.base_color[0] - 0.604).abs() < 0.01);
-    }
-
-    #[test]
-    fn procedural_recipe_scale_and_instance_seed_use_the_reserved_material_lanes() {
-        let material = VeMaterial {
-            recipe: ProceduralRecipe::Fabric,
-            texture_scale: 2.5,
-            ..VeMaterial::default()
-        };
-        let packed = material.pack_for_instance(37);
-        assert_eq!(
-            packed.params[2].to_bits(),
-            ProceduralRecipe::Fabric.code().to_bits()
-        );
-        assert_eq!(packed.params[3].to_bits(), 2.5_f32.to_bits());
-        assert_eq!(packed.emissive[3].to_bits(), 37.0_f32.to_bits());
-    }
+const fn no_repeat_scale_default() -> f32 {
+    1.0
 }
+
+#[cfg(test)]
+#[path = "material_tests.rs"]
+mod tests;

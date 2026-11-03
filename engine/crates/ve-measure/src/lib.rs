@@ -19,6 +19,7 @@
     reason = "cross product, barycentric and grid maths index with small counts and short names"
 )]
 
+mod attach;
 mod bake;
 mod bake_tool;
 mod bvh;
@@ -27,6 +28,7 @@ mod error;
 mod geom;
 mod hull;
 mod mesh;
+pub mod motion;
 mod problem;
 mod report;
 mod shapes;
@@ -35,6 +37,10 @@ mod thickness;
 mod tool;
 mod uv;
 
+pub use attach::{
+    ATTACHMENT_WORK_BUDGET, Attachment, MAX_ATTACHMENT_TRIANGLES, MAX_PARTS, NamedMesh, attachments,
+    attachments_json, attachments_within,
+};
 pub use bake::{Bake, LowMesh, MAX_RAYS, MAX_SIZE, MIN_SIZE, PADDING, bake_ao, bake_normals};
 pub use bake_tool::bake_maps_json;
 pub use bvh::{Bvh, Hausdorff, closest_point, distance_between, raycast};

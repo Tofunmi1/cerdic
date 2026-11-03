@@ -97,6 +97,8 @@ fn suggestion(error: &MeasureError) -> &'static str {
         MeasureError::NonFinite(_) => "a vertex coordinate was not finite: check the geometry",
         MeasureError::UvLength { .. } => "uvs must hold one [u, v] per vertex, or none at all",
         MeasureError::TriangleBudget { .. } => "the mesh is too large to measure in one call",
+        MeasureError::PartBudget { .. } => "the scene has too many parts to check at once",
+        MeasureError::WorkBudget { .. } => "the parts are too big to check in the browser: measure fewer or smaller parts",
         MeasureError::PointBudget { .. } => "the point set is too large to hull",
         MeasureError::MissingUv => {
             "the mesh has no uvs: unwrap it (poly.unwrap_uv) before measuring UVs"
@@ -105,6 +107,15 @@ fn suggestion(error: &MeasureError) -> &'static str {
         MeasureError::Degenerate(_) => "the input is degenerate: check positions and uvs",
         MeasureError::Bake(_) => {
             "check the bake settings (image side 8 to 2048, rays 1 to 256) and that the low mesh is unwrapped (poly.unwrap_uv)"
+        }
+        MeasureError::MotionFrames { .. }
+        | MeasureError::MotionSetting { .. }
+        | MeasureError::MotionNonFinite { .. }
+        | MeasureError::MotionPointCount { .. }
+        | MeasureError::MotionNoPoints
+        | MeasureError::MotionLengthMismatch { .. }
+        | MeasureError::MotionZeroLength => {
+            "check the sampled motion frames, tracked points, and bone endpoints"
         }
     }
 }

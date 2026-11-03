@@ -5,6 +5,10 @@
 //! from its distance to the bones' segments. Everything is authored at the rest pose in world coordinates, so a
 //! bone's rest transform is the identity and the deformation is just `sum(weight * pose * vertex)`.
 
+mod limb;
+pub(crate) use limb::aim;
+pub use limb::{AimSettings, TwoBoneSettings};
+
 include!("rig/part_1.rs");
 include!("rig/part_2.rs");
 include!("rig/part_3.rs");

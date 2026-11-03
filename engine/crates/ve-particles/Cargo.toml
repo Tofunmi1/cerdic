@@ -10,8 +10,10 @@ publish.workspace = true
 glam = "0.33"
 serde.workspace = true
 thiserror.workspace = true
+ve-world = { path = "../ve-world" }
 
 [dev-dependencies]
+serde_json.workspace = true
 
 [lints]
 workspace = true

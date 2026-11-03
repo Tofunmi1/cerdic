@@ -49,6 +49,8 @@ pub enum Action {
     Toggle,
     /// With `trigger="flag"`: run forward while the watched flag is on and backward while it is off.
     Follow,
+    /// Makes the character whose `phys.ragdoll` is named by `target` go limp. Plays no clip.
+    Ragdoll,
 }
 
 /// A response attached to a part: when `trigger` happens, `action` runs the part's own tracks.
@@ -168,6 +170,7 @@ impl Reaction {
                 self.forward = !self.forward;
                 self.running = true;
             }
+            Action::Ragdoll => {}
         }
     }
 

@@ -2,6 +2,7 @@
 //!
 //! The integrator uses a fixed 1/120 second step, a splitmix64 integer random stream and arithmetic-only
 //! approximations. It deliberately avoids platform libm trigonometric, exponential and power functions.
+pub mod fx;
 mod preset;
 mod simulation;
 mod spec;

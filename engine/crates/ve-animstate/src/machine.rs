@@ -26,6 +26,8 @@ pub struct Machine {
     /// Current weight of every active state; sums to one.
     weights: BTreeMap<usize, f32>,
     fade: Option<Fade>,
+    /// The overlay layers' clocks and weights.
+    extras_runtime: crate::machine_extras::Runtime,
 }
 
 /// An in-progress crossfade from a snapshot of the weights to `to`.
@@ -60,6 +62,7 @@ impl Machine {
             weights.insert(current, 1.0);
         }
         Self {
+            extras_runtime: crate::machine_extras::Runtime::new(&graph.extras),
             graph,
             lengths: clip_lengths.clone(),
             params: Params::new(),
@@ -110,11 +113,17 @@ impl Machine {
         } else {
             0.0
         };
+        let before = self.times.clone();
         self.advance(dt);
         if let Some(index) = self.select() {
             self.fire(index);
         }
-        self.pose()
+        let mut pose = self.pose();
+        pose.events = crate::machine_extras::events(&self.graph, &self.lengths, &before, &self.times, &self.weights, dt);
+        self.extras_runtime
+            .advance(&self.graph.extras, &self.params, &self.lengths, dt);
+        pose.overlays = self.extras_runtime.overlays(&self.graph.extras);
+        pose
     }
 
     /// Advances every active clip clock and the running crossfade.
@@ -310,7 +319,10 @@ impl Machine {
                 layer.weight /= total;
             }
         }
-        Pose { layers }
+        Pose {
+            layers,
+            ..Pose::default()
+        }
     }
 
     /// The state's clip time for output, wrapped or clamped when its length is known.

@@ -24,6 +24,12 @@ pub struct ClipWeight {
 pub struct Pose {
     /// One entry per clip.
     pub layers: Vec<ClipWeight>,
+    /// Overlay layers with a weight this step, in the machine's order (a wave over the walk).
+    #[serde(default)]
+    pub overlays: Vec<crate::layers::OverlayWeight>,
+    /// Clip events that happened during this step.
+    #[serde(default)]
+    pub events: Vec<crate::layers::FiredEvent>,
 }
 
 /// A clip's length, when it was given and is usable.

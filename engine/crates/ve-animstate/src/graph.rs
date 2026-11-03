@@ -142,4 +142,7 @@ pub struct StateMachine {
     pub transitions: Vec<Transition>,
     /// Name of the state the machine starts in.
     pub entry: String,
+    /// Overlay layers (a wave over a walk) and clip events (footsteps).
+    #[serde(default)]
+    pub extras: crate::layers::Extras,
 }

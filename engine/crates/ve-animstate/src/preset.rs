@@ -81,6 +81,7 @@ fn edge(from: Option<&str>, to: &str, conditions: Vec<Condition>, duration: f32)
 fn locomotion() -> StateMachine {
     StateMachine {
         entry: "locomotion".to_owned(),
+        extras: crate::Extras::default(),
         states: vec![
             State {
                 name: "locomotion".to_owned(),
@@ -159,6 +160,7 @@ fn flyer() -> StateMachine {
     };
     StateMachine {
         entry: "idle".to_owned(),
+        extras: crate::Extras::default(),
         states: vec![
             clip("idle", IDLE, 1.0, true),
             clip("flap", FLY, 1.0, true),
@@ -189,6 +191,7 @@ fn door() -> StateMachine {
     };
     StateMachine {
         entry: "closed".to_owned(),
+        extras: crate::Extras::default(),
         states: vec![
             clip("closed", IDLE, 1.0, true),
             clip("opening", WALK, 1.0, false),

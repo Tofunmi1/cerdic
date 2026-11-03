@@ -60,6 +60,7 @@ impl StateMachine {
         }
         self.check_parameters()?;
         self.check_cycles(&by_name)?;
+        self.extras.validate()?;
         Ok(())
     }
 
