@@ -25,13 +25,24 @@
 //! ```
 
 mod blend;
+mod events;
 mod graph;
+mod layers;
 mod machine;
+mod machine_extras;
 mod params;
 mod preset;
+mod text;
+mod text_extras;
+mod trs;
 mod validate;
 
 pub use blend::{ClipWeight, Pose};
+pub use events::crossed;
+pub use layers::{
+    ClipEvent, EVENT_WEIGHT, Extras, FiredEvent, Layer, LayerWeight, MAX_EVENTS, MAX_OVERLAYS,
+    OverlayWeight, plain_name,
+};
 pub use graph::{
     BlendPoint, Condition, Error, MAX_BLEND_POINTS, MAX_LAYERS, MAX_STATES, MAX_TRANSITIONS,
     Motion, State, StateMachine, Transition,
@@ -39,6 +50,8 @@ pub use graph::{
 pub use machine::{MAX_STEP, Machine};
 pub use params::Params;
 pub use preset::{FALL, FLY, IDLE, JUMP, Preset, RUN, WALK};
+pub use text::ParseError;
+pub use trs::{Trs, apply_additive, apply_override, blend_trs};
 
 #[cfg(test)]
 mod tests;

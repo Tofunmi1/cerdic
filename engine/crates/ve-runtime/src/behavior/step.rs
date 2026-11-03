@@ -162,6 +162,12 @@ pub(super) fn step(behaviors: &mut Behaviors, parts: &mut Query<(Entity, &mut Re
             .copied()
             .unwrap_or(false);
         run_own_clip(&mut part, &behavior, held, watched_on);
+        if behavior.action == Action::Ragdoll
+            && held != Some(false)
+            && let Some(name) = &behavior.target
+        {
+            crate::world_api::request_ragdoll(name);
+        }
         if let Some(name) = &behavior.target {
             for (_, mut listener) in &mut *parts {
                 if &listener.name == name

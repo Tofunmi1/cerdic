@@ -1,3 +1,7 @@
+#[path = "appearance/foliage.rs"]
+mod foliage;
+#[path = "appearance/texture.rs"]
+mod texture;
 use super::{COLOURABLE, number, single, spec, triple};
 use crate::spec::{OperatorSpec, OutputSpec, ParamSpec};
 use crate::value::{ParamType, Unit, Value};
@@ -85,38 +89,79 @@ pub(super) fn specs() -> Vec<Option<OperatorSpec>> {
                 ),
             ],
         ),
+        texture::specification(),
         spec(
-            "solid.texture@1",
-            "Attaches a procedural Material Maker texture program to a solid. The base material and geometry are preserved. \
-                     By default the texture is laid out once over the part, which blurs on big surfaces (a wall, a floor, the ground); \
-                     set tile to the size in metres of ONE repeat (0.5 to 4) and it repeats across the surface in world space at full \
-                     sharpness, so write a pattern that tiles (bricks, noise at whole-number scales).",
+            "material.preset@1",
+            "Applies a named tiled procedural surface with optional edge wear, crease dirt, top-facing moss and wetness. oak: warm wood; planks: boards; red_brick: fired brick; cobblestone: rounded stone; concrete: cast grey stone; plaster: pale wall; rusted_iron: oxidized metal; brushed_steel: satin steel; leather: pebbled hide; linen: woven cloth; sand: fine grains; mud: damp earth; snow: soft snow; ice: blue ice; asphalt: dark road surface (give it wet for a night street); corrugated_metal: ribbed steel sheet; painted_metal: dark painted panel that shows bare metal on its edges; wall_tile: small glazed tiles.",
             vec![single("in", COLOURABLE)],
             OutputSpec::SameAsInput("in"),
             vec![
                 ParamSpec {
-                    name: "program",
-                    ty: ParamType::Str { max_len: 8192 },
-                    default: None,
-                    doc: "Procedural texture DSL with albedo, roughness, metallic, height and emissive channels.",
+                    name: "name",
+                    ty: ParamType::Choice {
+                        options: &[
+                            "oak",
+                            "planks",
+                            "red_brick",
+                            "cobblestone",
+                            "concrete",
+                            "plaster",
+                            "rusted_iron",
+                            "brushed_steel",
+                            "leather",
+                            "linen",
+                            "sand",
+                            "mud",
+                            "snow",
+                            "ice",
+                            "asphalt",
+                            "corrugated_metal",
+                            "painted_metal",
+                            "wall_tile",
+                        ],
+                    },
+                    default: Some(Value::Str("oak".to_owned())),
+                    doc: "Named surface look.",
                 },
                 ParamSpec {
                     name: "tile",
                     ty: ParamType::Num {
                         unit: Unit::Length,
-                        min: 0.0,
-                        max: 100.0,
+                        min: 0.1,
+                        max: 10.0,
                     },
-                    default: Some(Value::Num(0.0)),
-                    doc: "0 lays the texture out once over the part. Above 0 it repeats every this many metres in world space (use 1 to 4 for ground, 0.5 to 2 for walls) so big surfaces stay sharp.",
+                    default: Some(Value::Num(1.0)),
+                    doc: "Length in metres of one repeat.",
                 },
+                number("wear", Unit::None, (0.0, 1.0), 0.3, "Edge wear amount."),
+                number(
+                    "dirt",
+                    Unit::None,
+                    (0.0, 1.0),
+                    0.2,
+                    "Dirt gathered in creases.",
+                ),
+                number(
+                    "moss",
+                    Unit::None,
+                    (0.0, 1.0),
+                    0.0,
+                    "Moss on upward-facing surfaces.",
+                ),
+                number(
+                    "wet",
+                    Unit::None,
+                    (0.0, 1.0),
+                    0.0,
+                    "Wetness darkening and gloss.",
+                ),
                 ParamSpec {
                     name: "size",
                     ty: ParamType::Choice {
-                        options: &["auto", "256", "512", "1024"],
+                        options: &["256", "512", "1024"],
                     },
-                    default: Some(Value::Str("auto".to_owned())),
-                    doc: "Side in pixels of the maps the viewer bakes: auto is 1024. The viewer holds a fixed amount of texture memory, so small things (a leaf, a pebble, a distant prop) can say 256 or 512 and leave room for many more textured parts; when memory still runs out the viewer shrinks the biggest maps first and tells you. It does not change the exported file.",
+                    default: Some(Value::Str("512".to_owned())),
+                    doc: "Side in pixels of the baked maps.",
                 },
             ],
         ),
@@ -219,36 +264,100 @@ pub(super) fn specs() -> Vec<Option<OperatorSpec>> {
                 ),
             ],
         ),
+        foliage::spec(),
         spec(
-            "solid.foliage@1",
-            "Makes a surface behave like leaves, grass, a fence or any thin cut-out card. It is cut away wherever its albedo map's alpha is under alpha_cutoff, so a leaf shape drawn into a texture (a texture program or an expr node \
-                     that ends in a vec4 whose last number is the alpha) becomes a leaf-shaped silhouette in the picture, in its shadow and in the exported glTF (alphaMode MASK). It also moves in the wind: sway bends the whole shape \
-                     (more the higher a point is above the shape's base) and flutter makes the surface itself tremble. The wind's direction and strength come from scene.environment. Colours, roughness and textures are kept: put it \
-                     after solid.material and solid.texture. All three at 0 makes it an ordinary surface again. Without a texture map there is no alpha to cut, so only the wind has an effect.",
+            "solid.finish@1",
+            "Adds layers on top of a surface that the physically based renderer draws: a glossy clear coat (car paint, wet skin, glazed ceramic, scales, eyes), highlights stretched along the surface \
+                     (brushed metal, silk, hair) and translucency, light passing through a thin body (leaves, wax, ears, wings). Colours, roughness and textures are kept: put it after solid.material and solid.texture. \
+                     All zero makes it the plain surface again. It shows in the Bevy renderer (the WebGPU and WebGL2 bundles); the exported glTF does not carry it.",
             vec![single("in", COLOURABLE)],
             OutputSpec::SameAsInput("in"),
             vec![
                 number(
-                    "alpha_cutoff",
-                    Unit::None,
-                    (0.0, 1.0),
-                    0.5,
-                    "Pixels whose albedo alpha is below this are cut away: 0 keeps everything, 0.5 is the usual leaf edge, near 1 keeps only fully opaque pixels.",
-                ),
-                number(
-                    "sway",
+                    "clearcoat",
                     Unit::None,
                     (0.0, 1.0),
                     0.0,
-                    "How far the whole shape bends with the wind, 0 still to 1 strongly; a tree swings from its base, so tall parts move more.",
+                    "Strength of a glossy clear layer over the surface: 0 none, 1 a full lacquer. A wet look is about 0.6 with clearcoat_roughness 0.05.",
                 ),
                 number(
-                    "flutter",
+                    "clearcoat_roughness",
+                    Unit::None,
+                    (0.0, 1.0),
+                    0.1,
+                    "Roughness of the clear layer: 0 a mirror, 1 a satin finish.",
+                ),
+                number(
+                    "anisotropy",
                     Unit::None,
                     (0.0, 1.0),
                     0.0,
-                    "How much the surface trembles at a small scale (leaves in a breeze), 0 to 1.",
+                    "How much highlights stretch along the surface (brushed metal, silk), 0 to 1.",
                 ),
+                number(
+                    "translucency",
+                    Unit::None,
+                    (0.0, 1.0),
+                    0.0,
+                    "Share of diffuse light that passes through a thin body and lights the far side: 0 opaque, 0.4 leaves, wax and ears, 1 a lampshade.",
+                ),
+                number(
+                    "relief",
+                    Unit::None,
+                    (0.0, 1.0),
+                    0.0,
+                    "Procedural surface relief drawn in the pixel shader, finer than the mesh and free of texture memory: 0 none, 0.3 skin pores or leather, 1 deep scales or bark. It follows a part that moves as a whole; on a skinned part it slides, so use a baked normal map there.",
+                ),
+                number(
+                    "relief_scale",
+                    Unit::None,
+                    (0.1, 500.0),
+                    30.0,
+                    "How many relief features fit in a metre: 8 coarse bark, 30 scales on a lizard, 120 fine pores.",
+                ),
+                number(
+                    "wetness",
+                    Unit::None,
+                    (0.0, 1.0),
+                    0.0,
+                    "A wet look: the surface darkens and turns glossy, most of all in the low parts of its relief (crevices stay wet). 0.5 damp skin, 1 just out of the water.",
+                ),
+                number(
+                    "iridescence",
+                    Unit::None,
+                    (0.0, 1.0),
+                    0.0,
+                    "Colour that shifts with the viewing angle, like a beetle shell, fish scales or a soap film: 0.3 a hint, 1 strong rainbow.",
+                ),
+                number(
+                    "sheen",
+                    Unit::None,
+                    (0.0, 1.0),
+                    0.0,
+                    "A soft brightening at grazing angles (velvet, peach fuzz, fine hair, moss): 0.3 a soft edge glow, 1 strong.",
+                ),
+                number(
+                    "subsurface",
+                    Unit::None,
+                    (0.0, 1.0),
+                    0.0,
+                    "Light scattering under the surface, which softens the shadow edge with a warm tint (skin, wax, ears, jelly): 0.5 skin, 1 wax.",
+                ),
+                number(
+                    "thickness",
+                    Unit::None,
+                    (0.0, 1.0),
+                    0.0,
+                    "Sunlight passing through a thin body: with the sun behind it the surface glows in its own colour on the side facing you (wing membranes, leaves, ears, candle wax, paper, thin cloth): 0.4 a faint glow, 1 a lantern. Use it on thin parts only: it does not check whether something else shades the sun, so a thick body would glow too.",
+                ),
+                ParamSpec {
+                    name: "relief_style",
+                    ty: ParamType::Choice {
+                        options: &["smooth", "ridged", "scales"],
+                    },
+                    default: Some(Value::Str("smooth".to_owned())),
+                    doc: "smooth is soft lumps, ridged is creases and wrinkles, scales is round overlapping cells.",
+                },
             ],
         ),
     ]

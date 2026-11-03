@@ -87,10 +87,10 @@ pub(super) fn specs() -> Vec<Option<OperatorSpec>> {
             ParamSpec {
                 name: "action",
                 ty: ParamType::Choice {
-                    options: &["play", "toggle", "follow"],
+                    options: &["play", "toggle", "follow", "ragdoll"],
                 },
                 default: Some(Value::Str("toggle".to_owned())),
-                doc: "play runs the clip once and holds the end; toggle alternates forward and backward; follow (only with trigger=\"flag\") runs forward while the watched flag is on and backward while it is off, so a lamp always matches its switch.",
+                doc: "play runs the clip once and holds the end; toggle alternates forward and backward; follow (only with trigger=\"flag\") runs forward while the watched flag is on and backward while it is off, so a lamp always matches its switch; ragdoll (play mode) makes the character whose phys.ragdoll is named by target go limp when the trigger fires (a button, a thrown ball, a timer).",
             },
             ParamSpec {
                 name: "radius",

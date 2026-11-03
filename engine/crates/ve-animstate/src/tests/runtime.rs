@@ -31,6 +31,7 @@ fn hash(poses: &[Pose]) -> u64 {
 fn transition_fires_and_crossfades_to_zero() {
     let graph = StateMachine {
         entry: "a".to_owned(),
+        extras: crate::Extras::default(),
         states: vec![clip_state("a", IDLE, true), clip_state("b", RUN, true)],
         transitions: vec![Transition {
             from: Some("a".to_owned()),
@@ -73,6 +74,7 @@ fn transition_fires_and_crossfades_to_zero() {
 fn trigger_fires_once_and_clears() {
     let graph = StateMachine {
         entry: "a".to_owned(),
+        extras: crate::Extras::default(),
         states: vec![
             clip_state("a", IDLE, true),
             clip_state("once", "jump", false),
@@ -101,6 +103,7 @@ fn trigger_fires_once_and_clears() {
 fn one_shot_clamps_at_its_last_time() {
     let graph = StateMachine {
         entry: "once".to_owned(),
+        extras: crate::Extras::default(),
         states: vec![clip_state("once", "jump", false)],
         transitions: Vec::new(),
     };
@@ -121,6 +124,7 @@ fn one_shot_clamps_at_its_last_time() {
 fn exit_time_returns_after_the_one_shot() {
     let graph = StateMachine {
         entry: "a".to_owned(),
+        extras: crate::Extras::default(),
         states: vec![
             clip_state("a", IDLE, true),
             clip_state("once", "jump", false),
@@ -167,6 +171,7 @@ fn exit_time_returns_after_the_one_shot() {
 fn interrupting_a_crossfade_has_no_pop() {
     let graph = StateMachine {
         entry: "a".to_owned(),
+        extras: crate::Extras::default(),
         states: vec![
             clip_state("a", IDLE, true),
             clip_state("b", RUN, true),

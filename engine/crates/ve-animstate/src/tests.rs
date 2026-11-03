@@ -36,6 +36,7 @@ fn clip_state(name: &str, clip: &str, looping: bool) -> State {
 fn blend_graph() -> StateMachine {
     StateMachine {
         entry: "loc".to_owned(),
+        extras: crate::Extras::default(),
         states: vec![State {
             name: "loc".to_owned(),
             motion: Motion::Blend1D {

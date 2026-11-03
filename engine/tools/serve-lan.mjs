@@ -10,7 +10,7 @@
 // This tool is for private testing on a local network. It binds to the interfaces you ask for
 // (`--host`, default all) and serves only web/dist and a write-only /report endpoint.
 //
-//   node tools/serve-lan.mjs [--http] [--host 0.0.0.0] [--port 8443]
+//   node tools/serve-lan.mjs [--http] [--host 0.0.0.0] [--port 8443] [--dir web/dist-quest]
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
@@ -170,9 +170,11 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import
   const secure = !args.includes("--http");
   const host = option("--host", "0.0.0.0");
   const requested = Number(option("--port", 8443));
-  const { port } = await startServer({ host, port: requested, secure });
+  const directory = option("--dir", path.join("web", "dist"));
+  const dist = path.resolve(engine, directory);
+  const { port } = await startServer({ dist, host, port: requested, secure });
   const scheme = secure ? "https" : "http";
-  console.log(`serving web/dist on ${scheme}://${host}:${port} (Ctrl-C to stop)\n`);
+  console.log(`serving ${directory} on ${scheme}://${host}:${port} (Ctrl-C to stop)\n`);
   const queries = ["?scene=xr&xr=auto", "?scene=bench1&bench=1&seconds=60", "?scene=bench2&bench=1&seconds=60", "?scene=bench3&bench=1&seconds=60", "?scene=bench4&bench=1&seconds=60", "?scene=bench5&bench=1&seconds=60"];
   const hosts = host === "0.0.0.0" ? ["localhost", ...lanAddresses()] : [host];
   for (const name of hosts) {

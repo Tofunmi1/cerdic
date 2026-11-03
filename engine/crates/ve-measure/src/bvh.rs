@@ -2,6 +2,8 @@
 
 use glam::Vec3;
 
+mod proximity;
+
 use crate::error::MeasureError;
 use crate::geom::{ClosestPoint, RayHit, aabb_dist2, closest_on_triangle, hit_triangle, slab};
 use crate::mesh::Mesh;

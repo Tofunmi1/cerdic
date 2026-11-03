@@ -7,7 +7,7 @@ use bevy_ecs::{
     entity::Entity,
     query::Without,
     resource::Resource,
-    system::{Commands, Query, Res, ResMut},
+    system::{Commands, Local, Query, Res, ResMut},
 };
 use bevy_math::{EulerRot, Mat4, Quat, Vec3};
 use bevy_time::{Real, Time};
@@ -28,7 +28,13 @@ pub(crate) struct Animated {
     /// The authored node that makes the part, which its lights share.
     pub(crate) node: String,
     pub(crate) parent: Option<String>,
+    /// Set on the parts of a game entity's own copy of a model (ADR 0066): which entity, so the game's placement of it leads the chain.
+    pub(crate) instance: Option<u32>,
 }
+
+/// Where the game has put each instance of a model this frame (by game entity id): the matrix in front of its chain of parents.
+#[derive(Resource, Default)]
+pub(crate) struct InstancePlacement(pub(crate) HashMap<u32, Mat4>);
 
 /// The emissive colour a glowing part was authored with; its glow track scales it.
 #[derive(Component, Clone, Copy, Debug)]
@@ -54,85 +60,6 @@ impl PartPoses {
     /// The world pose of the part with this output name this frame; `None` for a part that does not move.
     pub(crate) fn matrix_of(&self, name: &str) -> Option<[f32; 16]> {
         self.1.get(name).copied()
-    }
-}
-
-/// Seconds into the clip shared by every animated part, and whether it is running.
-#[derive(Resource, Clone, Copy, Debug)]
-pub(crate) struct AnimationClock {
-    pub(crate) seconds: f32,
-    pub(crate) playing: bool,
-    /// Multiple of real time the clock runs at.
-    pub(crate) speed: f32,
-}
-
-impl Default for AnimationClock {
-    fn default() -> Self {
-        Self {
-            seconds: 0.0,
-            playing: true,
-            speed: 1.0,
-        }
-    }
-}
-
-/// Slowest and fastest the shared clock may run, as a multiple of real time.
-const SPEED_RANGE: (f32, f32) = (0.05, 8.0);
-
-thread_local! {
-    /// The page's latest request (play or pause, and a time to jump to), taken by [`apply_requested`].
-    static REQUEST: std::cell::Cell<Option<(bool, f32)>> = const { std::cell::Cell::new(None) };
-    /// The page's latest speed request.
-    static SPEED: std::cell::Cell<Option<f32>> = const { std::cell::Cell::new(None) };
-}
-
-/// Asks the clock to run at `speed` times real time (clamped to a sensible range).
-pub(crate) fn set_speed(speed: f32) {
-    SPEED.with(|request| request.set(Some(speed)));
-}
-
-/// Asks the clock to play or pause; a `seconds` of zero or more also jumps it there.
-pub(crate) fn control(playing: bool, seconds: f32) {
-    REQUEST.with(|request| request.set(Some((playing, seconds))));
-}
-
-/// Applies the page's request to the clock.
-pub(crate) fn apply_requested(mut clock: ResMut<AnimationClock>) {
-    if let Some((playing, seconds)) = REQUEST.with(std::cell::Cell::take) {
-        clock.playing = playing;
-        if seconds.is_finite() && seconds >= 0.0 {
-            clock.seconds = seconds;
-        }
-    }
-    if let Some(speed) = SPEED.with(std::cell::Cell::take)
-        && speed.is_finite()
-    {
-        clock.speed = speed.clamp(SPEED_RANGE.0, SPEED_RANGE.1);
-    }
-}
-
-/// Moves the clock on by the real time since the last frame (times its speed) while it is playing.
-pub(crate) fn advance(
-    time: Res<Time<Real>>,
-    mut clock: ResMut<AnimationClock>,
-    mut wind: ResMut<ve_render::WindField>,
-    mut materials: Query<&mut VeMaterial>,
-) {
-    if clock.playing {
-        clock.seconds += time.delta_secs() * clock.speed;
-    }
-    // Gusts and flutter run on the shared clock, so pausing it holds the foliage still.
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "the shaders only need the clock to a fraction of a second"
-    )]
-    {
-        wind.time = clock.seconds as f32;
-    }
-    for mut material in &mut materials {
-        if material.recipe == ve_render::ProceduralRecipe::Water {
-            material.water_time = clock.seconds;
-        }
     }
 }
 
@@ -220,11 +147,15 @@ pub(crate) fn shown(tracks: &[Track], time_of: ClipTime) -> bool {
 fn resolve_worlds(
     locals: &[(Entity, &Animated, Mat4, f32, bool, Option<[f32; 3]>)],
     by_name: &HashMap<&str, usize>,
+    placements: &HashMap<u32, Mat4>,
+    loose: &std::collections::HashSet<usize>,
 ) -> Vec<Mat4> {
     (0..locals.len())
         .map(|start| {
             let (mut world, mut at, mut depth) = (locals[start].2, start, 0);
-            while let Some(&parent) = locals[at]
+            // A part in `loose` (a limp ragdoll's bone) already has its world pose in its local matrix: the chain stops there.
+            while !loose.contains(&at)
+                && let Some(&parent) = locals[at]
                 .1
                 .parent
                 .as_deref()
@@ -237,7 +168,11 @@ fn resolve_worlds(
                 at = parent;
                 world = locals[at].2 * world;
             }
-            world
+            // A part of a game entity's own copy of a model is placed by the game: its matrix leads the whole chain.
+            match locals[start].1.instance.and_then(|id| placements.get(&id)) {
+                Some(placed) => *placed * world,
+                None => world,
+            }
         })
         .collect()
 }

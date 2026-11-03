@@ -61,6 +61,7 @@ fn bad_states_are_named() {
 fn zero_duration_cycle_is_refused() {
     let graph = StateMachine {
         entry: "a".to_owned(),
+        extras: crate::Extras::default(),
         states: vec![clip_state("a", IDLE, true), clip_state("b", RUN, true)],
         transitions: vec![
             Transition {
@@ -87,6 +88,7 @@ fn zero_duration_cycle_is_refused() {
 fn conflicting_parameter_kinds_are_named() {
     let graph = StateMachine {
         entry: "loc".to_owned(),
+        extras: crate::Extras::default(),
         states: vec![State {
             name: "loc".to_owned(),
             motion: Motion::Blend1D {
@@ -121,6 +123,7 @@ fn conflicting_parameter_kinds_are_named() {
 fn bounds_are_refused() {
     let mut graph = StateMachine {
         entry: "s0".to_owned(),
+        extras: crate::Extras::default(),
         states: Vec::new(),
         transitions: Vec::new(),
     };
