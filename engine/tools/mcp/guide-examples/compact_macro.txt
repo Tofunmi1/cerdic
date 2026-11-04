@@ -1,0 +1,6 @@
+def post(name, x, h)
+  p_{name} = solid.box(size=[0.1, {h}, 0.1]) | xform.move(by=[{x}, {h / 2}, 0])
+  output {name} = p_{name}
+end
+post("short", 0, 1)
+post("tall", 0.5, 2)

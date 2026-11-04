@@ -39,6 +39,14 @@ pub enum PortType {
     Selection,
     /// A single number. It plugs into a number parameter of another node (see `value.*`), not into a geometry input.
     Number,
+    /// A function of position (a mask, a density, a colour) written in the field-expression language (ADR 0060). It plugs into the
+    /// pattern inputs of nodes such as `scatter.place` (`where`) and of other `field.expr` nodes; it is not geometry.
+    Pattern,
+    /// A fragment of a deterministic game definition; it is not geometry.
+    Game,
+    /// A grid of signed distances (negative inside, positive outside) sampled from a closed mesh, for the `volume.*` nodes: combine, smooth, grow
+    /// and shrink it, and turn it back into a mesh. It is not geometry until `volume.to_mesh`.
+    Volume,
 }
 
 /// How many links an input port takes.
@@ -84,7 +92,7 @@ pub struct ParamSpec {
     pub name: &'static str,
     /// Its type and bounds.
     pub ty: ParamType,
-    /// The value used when none is given; `None` makes the parameter required.
+    /// The value used when none is given; `None` makes it required unless the operator computes a default from its input.
     pub default: Option<Value>,
     /// One line of help.
     pub doc: &'static str,
@@ -206,6 +214,13 @@ pub struct OperatorSpec {
 }
 
 impl OperatorSpec {
+    /// Whether an omitted parameter is computed from input geometry during evaluation.
+    /// `water.fill.at` uses the tile centre, which is unknown when a node is created.
+    #[must_use]
+    pub fn has_input_default(&self, name: &str) -> bool {
+        self.id.family().as_str() == "water.fill" && name == "at"
+    }
+
     /// The input port called `name`.
     #[must_use]
     pub fn input(&self, name: &str) -> Option<&PortSpec> {

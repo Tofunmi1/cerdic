@@ -1,0 +1,21 @@
+sky = scene.sky@1(sun_elevation=8, sun_azimuth=60, sun_intensity=6, turbidity=4, clouds=false, haze=0.05, haze_color=[1.0, 0.6, 0.35], haze_height=30)
+output sky = sky
+floor = solid.box@1(size=[80, 0.4, 80])
+floor_m = solid.material@1(floor, color=[0.18, 0.2, 0.12], roughness=0.95)
+floor_p = xform.move@1(floor_m, by=[0, -0.2, 0])
+output floor = floor_p
+
+# Shared geometry helpers for poly.script (plain JavaScript, spliced into each node's code). Every function adds faces to the mesh `m`, wound outward.
+let jbox = "function box(x0,y0,z0,x1,y1,z1){ const v=[m.vertex(x0,y0,z0),m.vertex(x1,y0,z0),m.vertex(x1,y1,z0),m.vertex(x0,y1,z0),m.vertex(x0,y0,z1),m.vertex(x1,y0,z1),m.vertex(x1,y1,z1),m.vertex(x0,y1,z1)]; m.face(v[0],v[3],v[2],v[1]); m.face(v[4],v[5],v[6],v[7]); m.face(v[0],v[1],v[5],v[4]); m.face(v[3],v[7],v[6],v[2]); m.face(v[1],v[2],v[6],v[5]); m.face(v[0],v[4],v[7],v[3]); }; "
+let jcyl = "function cyl(cx,cz,y0,y1,r0,r1,n){ const b=[],t=[]; for(let i=0;i<n;i++){ const a=i*6.283185/n,c=Math.cos(a),s=Math.sin(a); b.push(m.vertex(cx+c*r0,y0,cz+s*r0)); t.push(m.vertex(cx+c*r1,y1,cz+s*r1)); } for(let i=0;i<n;i++){ const j=(i+1)%n; m.face(b[i],t[i],t[j],b[j]); } m.face(...t.slice().reverse()); m.face(...b); }; "
+let jlathe = "function lathe(cx,cz,p,n){ const R=[]; for(let k=0;k<p.length;k++){ const row=[]; for(let i=0;i<n;i++){ const a=i*6.283185/n; row.push(m.vertex(cx+Math.cos(a)*p[k][1],p[k][0],cz+Math.sin(a)*p[k][1])); } R.push(row); } for(let k=0;k<p.length-1;k++){ for(let i=0;i<n;i++){ const j=(i+1)%n; m.face(R[k][i],R[k+1][i],R[k+1][j],R[k][j]); } } m.face(...R[p.length-1].slice().reverse()); m.face(...R[0]); }; "
+let jroof = "function roof(cx,cy,cz,A,B,H,L,T,rf,nx,nz,k){ const hg=function(x,z){ const ax=Math.abs(x),az=Math.abs(z),mx=Math.min(A-ax,B-az),R=Math.min(A,B)*rf,u=Math.min(mx/R,1); let y=H*Math.pow(u,k); y+=L*Math.pow((ax/A)*(az/B),5); const ac=(A-ax)<(B-az)?z:x; y+=0.035*Math.cos(ac*17)*Math.min(1,mx*1.5); return y; }; const top=[],bot=[]; for(let j=0;j<=nz;j++){ const rt=[],rb=[]; for(let i=0;i<=nx;i++){ const x=-A+2*A*i/nx,z=-B+2*B*j/nz,y=hg(x,z); rt.push(m.vertex(cx+x,cy+y,cz+z)); rb.push(m.vertex(cx+x*0.96,cy+y-T,cz+z*0.96)); } top.push(rt); bot.push(rb); } for(let j=0;j<nz;j++){ for(let i=0;i<nx;i++){ m.face(top[j][i],top[j+1][i],top[j+1][i+1],top[j][i+1]); m.face(bot[j][i],bot[j][i+1],bot[j+1][i+1],bot[j+1][i]); } } for(let i=0;i<nx;i++){ m.face(top[0][i],top[0][i+1],bot[0][i+1],bot[0][i]); m.face(top[nz][i+1],top[nz][i],bot[nz][i],bot[nz][i+1]); } for(let j=0;j<nz;j++){ m.face(top[j+1][0],top[j][0],bot[j][0],bot[j+1][0]); m.face(top[j][nx],top[j+1][nx],bot[j+1][nx],bot[j][nx]); } }; "
+
+roof_a = poly.script@1(code="const m = new Mesh(); ${jroof} roof(0, 0, 0, 13, 10, 5.5, 1.6, 0.45, 0.85, 150, 110, 1.35); m", budget=4000)
+roof_m = solid.material@1(roof_a, color=[0.07, 0.08, 0.1], roughness=0.35, metallic=0.15)
+roof_p = xform.move@1(roof_m, by=[0, 4, 0])
+output roof = roof_p
+
+post_a = poly.script@1(code="const m = new Mesh(); ${jbox} ${jcyl} ${jlathe} cyl(-9, -6, 0, 4, 0.3, 0.26, 16); lathe(9, -6, [[0,0.4],[0.15,0.42],[0.3,0.3],[4,0.26]], 16); box(-2, 0, -2, 2, 0.3, 2); m", budget=300)
+post_m = solid.material@1(post_a, color=[0.5, 0.06, 0.04], roughness=0.4)
+output posts = post_m

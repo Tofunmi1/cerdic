@@ -2,8 +2,32 @@ use super::{COLOURABLE, single, spec, triple};
 use crate::spec::{OperatorSpec, OutputSpec, ParamSpec};
 use crate::value::{ParamType, Unit, Value};
 
+/// `pivot_at`, on every node that turns a part about a point: take the point from the bone the part is.
+fn pivot_at() -> ParamSpec {
+    ParamSpec {
+        name: "pivot_at",
+        ty: ParamType::Choice {
+            options: &["none", "head", "tail"],
+        },
+        default: Some(Value::Str("none".to_owned())),
+        doc: "Take the pivot from the bone this part is instead of typing it: head is the joint the bone turns about (what an arm or a leg should rotate about), tail is where it ends. The part must be a bone (body.bone or rig.bone); `pivot` is then ignored. none: use `pivot`.",
+    }
+}
+
 pub(super) fn specs() -> Vec<Option<OperatorSpec>> {
     vec![
+        spec(
+            "anim.machine@1",
+            "Chooses which named animation clip a part plays in response to game parameters. Write one statement per line, or separate statements with `;`: `entry idle; state idle clip=idle; state run clip=run; transition idle -> run when speed > 1; transition run -> idle when speed < 1`. Conditions read named parameters such as `speed` and `grounded`; the game sets floats, booleans and triggers, and parameter names are yours to choose. Clips are the `clip=` names on anim.track or anim.wave nodes (empty is the main clip).",
+            vec![single("in", COLOURABLE)],
+            OutputSpec::SameAsInput("in"),
+            vec![ParamSpec {
+                name: "program",
+                ty: ParamType::Str { max_len: 4096 },
+                default: None,
+                doc: "State machine statements separated by semicolons or newlines.",
+            }],
+        ),
         spec(
             "anim.track@1",
             "Makes a shape move: attaches one keyframed track (position, rotation or scale over time) and passes the shape through unchanged. \
@@ -78,6 +102,91 @@ pub(super) fn specs() -> Vec<Option<OperatorSpec>> {
                     },
                     default: Some(triple(0.0, 0.0, 0.0)),
                     doc: "The point, in the shape's own coordinates, that rotation and scale act about.",
+                },
+                pivot_at(),
+            ],
+        ),
+        spec(
+            "anim.drop@1",
+            "Bakes a physical fall into ordinary animation keys: fixed-step gravity, floor contact, bounded bouncing and rest. Contact uses the rest bounding-box bottom, so tumbling does not change contact height. Integration uses a deterministic 1/480 s semi-implicit step; at most six bounces are modelled, horizontal speed and spin lose 40% per impact, and sub-millimetre rises stop. The output is a one-shot linear position track and, when spin is nonzero, a rotation track about the bounding-box centre.",
+            vec![single("in", COLOURABLE)],
+            OutputSpec::SameAsInput("in"),
+            vec![
+                ParamSpec {
+                    name: "start",
+                    ty: ParamType::Num {
+                        unit: Unit::None,
+                        min: 0.0,
+                        max: 60.0,
+                    },
+                    default: Some(Value::Num(0.0)),
+                    doc: "Seconds when the part is released.",
+                },
+                ParamSpec {
+                    name: "velocity",
+                    ty: ParamType::Vec3 {
+                        unit: Unit::None,
+                        min: -50.0,
+                        max: 50.0,
+                    },
+                    default: Some(triple(0.0, 0.0, 0.0)),
+                    doc: "Velocity at release in metres per second.",
+                },
+                ParamSpec {
+                    name: "spin",
+                    ty: ParamType::Vec3 {
+                        unit: Unit::None,
+                        min: -2000.0,
+                        max: 2000.0,
+                    },
+                    default: Some(triple(0.0, 0.0, 0.0)),
+                    doc: "Turning rate at release in degrees per second about the part's bounding-box centre.",
+                },
+                ParamSpec {
+                    name: "floor",
+                    ty: ParamType::Num {
+                        unit: Unit::Length,
+                        min: -1000.0,
+                        max: 1000.0,
+                    },
+                    default: Some(Value::Num(0.0)),
+                    doc: "World y height of the floor plane.",
+                },
+                ParamSpec {
+                    name: "bounce",
+                    ty: ParamType::Num {
+                        unit: Unit::Ratio,
+                        min: 0.0,
+                        max: 1.0,
+                    },
+                    default: Some(Value::Num(0.3)),
+                    doc: "Vertical restitution at impact.",
+                },
+                ParamSpec {
+                    name: "gravity",
+                    ty: ParamType::Num {
+                        unit: Unit::None,
+                        min: 0.1,
+                        max: 50.0,
+                    },
+                    default: Some(Value::Num(9.81)),
+                    doc: "Downward acceleration in metres per second squared.",
+                },
+                ParamSpec {
+                    name: "duration",
+                    ty: ParamType::Num {
+                        unit: Unit::None,
+                        min: 0.5,
+                        max: 60.0,
+                    },
+                    default: Some(Value::Num(4.0)),
+                    doc: "Length of the baked tracks in seconds.",
+                },
+                ParamSpec {
+                    name: "clip",
+                    ty: ParamType::Str { max_len: 24 },
+                    default: Some(Value::Str(String::new())),
+                    doc: "Named animation clip; empty is the main clip, following anim.track naming rules.",
                 },
             ],
         ),
@@ -181,13 +290,14 @@ pub(super) fn specs() -> Vec<Option<OperatorSpec>> {
                     default: Some(triple(0.0, 0.0, 0.0)),
                     doc: "The point, in the shape's own coordinates, that rotation and scale act about.",
                 },
+                pivot_at(),
             ],
         ),
         spec(
             "anim.parent@1",
             "Attaches a shape to another part so it moves with it, like a forearm on an upper arm or a wheel on a car. \
                      `parent` is the OUTPUT name of the part to follow. The shape keeps its own anim.track motion (an elbow bending) \
-                     on top of the parent's motion. A name that matches no part, a loop, or a chain longer than 8 is dropped with a warning.",
+                     on top of the parent's motion. A name that matches no part, a loop, or a chain longer than 20 is dropped with a warning.",
             vec![single("in", COLOURABLE)],
             OutputSpec::SameAsInput("in"),
             vec![ParamSpec {

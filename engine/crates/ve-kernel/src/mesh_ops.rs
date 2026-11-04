@@ -177,6 +177,88 @@ pub enum MeshOp {
         /// Subdivision smoothness, from 0 to 1.
         smooth: f64,
     },
+    /// Points every face outward (or inward) consistently, whatever the winding was.
+    RecalcNormals {
+        /// Point the faces inward instead of outward.
+        inside: bool,
+    },
+    /// Moves each vertex toward the average of its neighbours, evening out the surface.
+    Smooth {
+        /// How far each pass moves a vertex toward its neighbours, 0 to 1.
+        factor: f64,
+        /// Passes, 1 to 50.
+        iterations: u32,
+    },
+    /// Fills boundary loops with faces.
+    FillHoles {
+        /// The most sides a hole may have and still be filled, 3 to 1000.
+        sides: u32,
+    },
+    /// Rotates the edges between triangle pairs so the triangles are more even.
+    Beautify {
+        /// Judge by angle instead of area.
+        by_angle: bool,
+    },
+    /// Flattens each face toward its best-fit plane.
+    PlanarFaces {
+        /// Passes, 1 to 50 (neighbouring faces pull on each other).
+        iterations: u32,
+        /// How far each pass moves vertices toward the plane, 0 to 1.
+        factor: f64,
+    },
+    /// Joins triangle pairs into quads when the result is flat and square enough.
+    JoinTriangles {
+        /// Largest angle in radians between the two triangles' normals, 0 to pi.
+        face_angle: f64,
+        /// Largest deviation in radians of the quad's corners from right angles, 0 to pi.
+        shape_angle: f64,
+    },
+    /// Removes edges and faces shorter or smaller than a distance.
+    DissolveDegenerate {
+        /// Distance in metres under which an edge or face counts as degenerate.
+        distance: f64,
+    },
+    /// Disconnects the faces along the selected edges, so each side gets its own vertices and the edge becomes a hard seam.
+    SplitEdges,
+    /// Spins each selected edge to the other diagonal of the two faces it joins.
+    RotateEdges {
+        /// Turn counter-clockwise instead of clockwise.
+        counter_clockwise: bool,
+    },
+    /// Adds edges between the selected vertices of each face, splitting the face.
+    ConnectVertices {
+        /// Refuse splits that would overlap or intersect.
+        check_degenerate: bool,
+    },
+    /// Moves the vertices of selected edge loops to even spacing along each loop's own curve.
+    SpaceEdgeLoops {
+        /// How far toward even spacing, 0 to 1.
+        factor: f64,
+        /// Interpolate linearly instead of with a cubic curve.
+        linear: bool,
+    },
+    /// Smooths selected edge loops.
+    RelaxEdgeLoops {
+        /// Passes, 1 to 50.
+        iterations: u32,
+        /// Interpolate linearly instead of with a cubic curve.
+        linear: bool,
+        /// Also space the vertices evenly.
+        even_spacing: bool,
+    },
+    /// Reshapes selected edge loops into circles.
+    Circularize {
+        /// How far toward a circle, 0 to 1.
+        factor: f64,
+        /// Radius in metres, or 0 to fit one to the loop.
+        radius: f64,
+        /// Rotation of the vertices around the circle, in radians.
+        angle: f64,
+        /// How far the loop is flattened onto its best-fit plane, 0 to 1.
+        flatten: f64,
+        /// Space the vertices evenly around the circle.
+        regular: bool,
+    },
 }
 
 impl MeshOp {
@@ -280,6 +362,50 @@ impl MeshOp {
             Self::Spin { .. } => (13, [0.0; 4], 0),
             Self::Mirror { .. } => (14, [0.0; 4], 0),
             Self::LoopCut { .. } => (15, [0.0; 4], 0),
+            Self::RecalcNormals { inside } => (16, [0.0; 4], bits(&[(inside, 1)])),
+            Self::Smooth { factor, iterations } => {
+                (17, [factor, f64::from(iterations), 0.0, 0.0], 0)
+            }
+            Self::FillHoles { sides } => (18, [f64::from(sides), 0.0, 0.0, 0.0], 0),
+            Self::Beautify { by_angle } => (19, [if by_angle { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0], 0),
+            Self::PlanarFaces { iterations, factor } => {
+                (20, [f64::from(iterations), factor, 0.0, 0.0], 0)
+            }
+            Self::JoinTriangles {
+                face_angle,
+                shape_angle,
+            } => (21, [face_angle, shape_angle, 0.0, 0.0], 0),
+            Self::DissolveDegenerate { distance } => (22, [distance, 0.0, 0.0, 0.0], 0),
+            Self::SplitEdges => (23, [0.0; 4], 0),
+            Self::RotateEdges { counter_clockwise } => {
+                (24, [0.0; 4], bits(&[(counter_clockwise, 1)]))
+            }
+            Self::ConnectVertices { check_degenerate } => {
+                (25, [0.0; 4], bits(&[(check_degenerate, 1)]))
+            }
+            Self::SpaceEdgeLoops { factor, linear } => {
+                (26, [factor, 0.0, 0.0, 0.0], bits(&[(linear, 1)]))
+            }
+            Self::RelaxEdgeLoops {
+                iterations,
+                linear,
+                even_spacing,
+            } => (
+                27,
+                [f64::from(iterations), 0.0, 0.0, 0.0],
+                bits(&[(linear, 1), (even_spacing, 2)]),
+            ),
+            Self::Circularize {
+                factor,
+                radius,
+                angle,
+                flatten,
+                regular,
+            } => (
+                28,
+                [factor, radius, angle, flatten],
+                bits(&[(regular, 1)]),
+            ),
         }
     }
 }

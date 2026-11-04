@@ -1,0 +1,9 @@
+for i in 0..4
+  if i < 2
+    low_{i} = solid.box(size=[1, 1, 1]) | xform.move(by=[{i * 1.5}, 0.5, 0])
+    output low_{i} = low_{i}
+  else
+    high_{i} = solid.box(size=[1, 2, 1]) | xform.move(by=[{i * 1.5}, 1, 0])
+    output high_{i} = high_{i}
+  end
+end

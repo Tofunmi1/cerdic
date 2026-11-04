@@ -1,7 +1,10 @@
 //! Bounded vertex-space solid deformers.
-use super::{XFORMABLE, single, spec};
-use crate::spec::{OperatorSpec, OutputSpec, ParamSpec};
+use super::{single, spec};
+use crate::spec::{OperatorSpec, OutputSpec, ParamSpec, PortType};
 use crate::value::{ParamType, Unit, Value};
+
+/// What a deformer takes: a solid (refined and checked as a solid) or a polygon mesh (every vertex moved as it is).
+const XFORMABLE: &[PortType] = &[PortType::Solid, PortType::Poly];
 
 fn tolerance() -> ParamSpec {
     ParamSpec {

@@ -1,4 +1,7 @@
-use super::{BUDGET_BYTES, MaterialTextures, TIER_SIZES, TIER_STRIDE, map_cost, tier_of_len};
+use super::{
+    BUDGET_BYTES, MapCosts, MaterialTextures, TIER_SIZES, TIER_STRIDE, map_cost, map_digest,
+    tier_of_len,
+};
 use crate::textures_gpu::{allocated_layers, downsample, mip_levels};
 
 /// A map of the given side, filled with `fill`.
@@ -126,4 +129,81 @@ fn downsampling_averages_two_by_two_blocks() {
     ];
     let half = downsample(&pixels, 2);
     assert_eq!(half, vec![100, 100, 100, 255]);
+}
+
+// Costing the maps of a scene as they are staged: identical maps (tiled parts sharing a program) count once, and each map is looked at
+// once when it arrives, not again for every map after it (the viewer spent 14 s of a 123-part scene re-hashing maps). Written before the body.
+
+#[test]
+fn identical_maps_cost_once_and_different_maps_cost_each() {
+    let (a, b) = (map(256, 1), map(256, 2));
+    let one = map_cost(a.len()).unwrap_or(0);
+    let mut costs = MapCosts::default();
+    costs.add(&MapCosts::keys(&[&a, &a]));
+    assert_eq!(costs.bytes(), one, "the same pixels twice cost one layer");
+    costs.add(&MapCosts::keys(&[&a, &b]));
+    assert_eq!(costs.bytes(), 2 * one, "a new picture adds its own cost");
+}
+
+#[test]
+fn cost_after_does_not_change_what_was_added() {
+    let (a, b) = (map(512, 3), map(512, 4));
+    let mut costs = MapCosts::default();
+    costs.add(&MapCosts::keys(&[&a]));
+    let before = costs.bytes();
+    let after = costs.cost_after(&MapCosts::keys(&[&b, &b]));
+    assert_eq!(costs.bytes(), before);
+    assert_eq!(after, before + map_cost(b.len()).unwrap_or(0));
+}
+
+#[test]
+fn a_live_map_is_replaced_in_place_without_disturbing_the_others() {
+    let mut textures = MaterialTextures::default();
+    let first = textures.add(map(256, 1)).unwrap();
+    let second = textures.add(map(256, 2)).unwrap();
+    let generation = textures.generation();
+    let live = textures.live_generation();
+    assert_eq!(textures.layer_version(first), 0);
+    assert!(textures.set_layer(first, &map(256, 7)));
+    assert_eq!(textures.layer(first).unwrap().1, map(256, 7).as_slice(), "the pixels changed");
+    assert_eq!(textures.layer(second).unwrap().1, map(256, 2).as_slice(), "the other map did not");
+    assert_eq!(textures.generation(), generation, "images of other maps are kept");
+    assert_eq!(textures.live_generation(), live + 1);
+    assert_eq!((textures.layer_version(first), textures.layer_version(second)), (1, 0));
+    assert!(textures.set_layer(first, &map(256, 8)));
+    assert_eq!(textures.layer_version(first), 2);
+}
+
+#[test]
+fn a_live_map_refuses_a_missing_layer_and_a_picture_of_another_size() {
+    let mut textures = MaterialTextures::default();
+    let id = textures.add(map(256, 1)).unwrap();
+    assert!(!textures.set_layer(id, &map(512, 1)), "another size");
+    assert!(!textures.set_layer(id + 1, &map(256, 1)), "no such layer");
+    assert!(!textures.set_layer(-1, &map(256, 1)), "not a map id");
+    assert_eq!(textures.layer_version(id), 0, "a refused update changes nothing");
+    textures.clear();
+    assert!(!textures.set_layer(id, &map(256, 1)), "cleared");
+}
+
+#[test]
+fn maps_that_differ_in_one_texel_are_different_maps() {
+    let a = map(256, 9);
+    let mut b = a.clone();
+    let last = b.len() - 1;
+    b[last] ^= 1;
+    let mut middle = a.clone();
+    middle[a.len() / 2] ^= 1;
+    assert_eq!(map_digest(&a), map_digest(&a.clone()));
+    assert_ne!(map_digest(&a), map_digest(&b), "the last byte counts");
+    assert_ne!(
+        map_digest(&a),
+        map_digest(&middle),
+        "a byte in the middle counts"
+    );
+    assert_ne!(
+        map_digest(&map(256, 0)),
+        map_digest(&map(512, 0)),
+        "the same fill at another size is another map"
+    );
 }

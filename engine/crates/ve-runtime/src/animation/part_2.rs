@@ -7,7 +7,18 @@ pub(crate) fn animate(
     mut transforms: Query<&mut Transform>,
     targets: Query<(Entity, &IkTarget)>,
     mut poses: ResMut<PartPoses>,
+    time: Res<Time<Real>>,
+    mix: Res<MachineMix>,
+    placements: Res<InstancePlacement>,
+    physics: Res<crate::physics::Physics>,
+    mut springs: Local<HashMap<Entity, Option<ve_chain::Chain>>>,
+    mut gaits: Local<HashMap<Entity, GaitState>>,
 ) {
+    // Who hangs from whom, for the overlay masks of animation state machines.
+    let parent_of: HashMap<&str, Option<&str>> = parts
+        .iter()
+        .map(|(_, animated, _)| (animated.name.as_str(), animated.parent.as_deref()))
+        .collect();
     let mut locals: Vec<(Entity, &Animated, Mat4, f32, bool, Option<[f32; 3]>)> = parts
         .iter()
         .map(|(entity, animated, reactive)| {
@@ -22,7 +33,11 @@ pub(crate) fn animate(
                     |part| part.time_of(clip),
                 )
             };
-            let local = pose(&animated.tracks, &time_of).to_matrix();
+            // A part a state machine drives is posed from the blend of the clips the machine plays; any other from its own clips.
+            let local = match mix.0.get(&animated.name) {
+                Some(machine_pose) => layered_pose(&animated.tracks, machine_pose, &animated.name, &parent_of).to_matrix(),
+                None => pose(&animated.tracks, &time_of).to_matrix(),
+            };
             (
                 entity,
                 animated,
@@ -40,11 +55,44 @@ pub(crate) fn animate(
         .collect();
     poses.0.clear();
     poses.1.clear();
-    let mut worlds = resolve_worlds(&locals, &by_name);
+    let no_ragdoll = std::collections::HashSet::new();
+    let mut worlds = resolve_worlds(&locals, &by_name, &placements.0, &no_ragdoll);
     // Chains of bones reaching for a target: solve each, replace its bones' own poses, and resolve everything again.
     if !targets.is_empty() {
         for (entity, ik) in &targets {
-            let goal = transforms.get(entity).map(|t| t.translation + ik.centre);
+            if let Some(settings) = ik.chain.secondary {
+                let indices: Option<Vec<usize>> =
+                    ik.chain.bones.iter().map(|name| by_name.get(name.as_str()).copied()).collect();
+                let Some(indices) = indices else { continue };
+                let parent_world = locals[indices[0]]
+                    .1
+                    .parent
+                    .as_deref()
+                    .and_then(|name| by_name.get(name))
+                    .map_or(Mat4::IDENTITY, |&p| worlds[p]);
+                let dt = if clock.playing { time.delta_secs() * clock.speed } else { 0.0 };
+                let state = springs.entry(entity).or_default();
+                if let Some(solved) = secondary_locals(&ik.chain, settings, parent_world, dt, state) {
+                    for (&bone, local) in indices.iter().zip(solved) {
+                        locals[bone].2 = local;
+                    }
+                }
+                continue;
+            }
+            let goal = if let Some(settings) = &ik.chain.gait {
+                // A walking foot: the gait puts the target where the foot goes, from the body's motion, and the target part follows.
+                let body = by_name.get(settings.body.as_str()).map(|&b| worlds[b]);
+                let dt = if clock.playing { time.delta_secs() * clock.speed } else { 0.0 };
+                let placed = body.and_then(|body| gait_goal(&ik.chain, settings, ik.centre, body, dt, gaits.entry(entity).or_default()));
+                if let Some(goal) = placed
+                    && let Ok(mut transform) = transforms.get_mut(entity)
+                {
+                    transform.translation = goal - ik.centre;
+                }
+                placed.ok_or(())
+            } else {
+                transforms.get(entity).map(|t| t.translation + ik.centre).map_err(|_| ())
+            };
             let indices: Option<Vec<usize>> = ik
                 .chain
                 .bones
@@ -61,17 +109,55 @@ pub(crate) fn animate(
                 .as_deref()
                 .and_then(|name| by_name.get(name))
                 .map_or(Mat4::IDENTITY, |&p| worlds[p]);
-            let solved = ve_modeling::ik::solve_poses(
-                &ik.chain.segments,
-                parent_world.to_cols_array(),
-                goal.to_array(),
-                ik.chain.iterations,
-            );
+            let solved = if let Some(look) = &ik.chain.aim {
+                ve_modeling::ik::solve_aim_poses(
+                    &ik.chain.segments,
+                    parent_world.to_cols_array(),
+                    &ve_modeling::ik_limb::AimGoal {
+                        target: goal.as_dvec3(),
+                        pole: Vec3::from_array(look.pole).as_dvec3(),
+                        twist: f64::from(look.twist),
+                        weight: f64::from(look.weight),
+                    },
+                    look.up,
+                )
+            } else if let Some(two) = &ik.chain.two_bone {
+                ve_modeling::ik::solve_two_bone_poses(
+                    &ik.chain.segments,
+                    parent_world.to_cols_array(),
+                    &ve_modeling::ik_limb::TwoBoneGoal {
+                        target: goal.as_dvec3(),
+                        pole: Vec3::from_array(two.pole).as_dvec3(),
+                        soften: f64::from(two.soften),
+                        twist: f64::from(two.twist),
+                        weight: 1.0,
+                    },
+                )
+            } else {
+                ve_modeling::ik::solve_poses(
+                    &ik.chain.segments,
+                    parent_world.to_cols_array(),
+                    goal.to_array(),
+                    ik.chain.iterations,
+                    ik.chain.limit_degrees,
+                )
+            };
             for (&bone, pose) in indices.iter().zip(&solved) {
                 locals[bone].2 = Mat4::from_cols_array(pose);
             }
         }
-        worlds = resolve_worlds(&locals, &by_name);
+        worlds = resolve_worlds(&locals, &by_name, &placements.0, &no_ragdoll);
+    }
+    // Ragdolls that have gone limp: their bones take the pose of their physics bodies, and what hangs from a bone follows it.
+    if !physics.ragdoll_poses().is_empty() {
+        let mut limp = std::collections::HashSet::new();
+        for (name, pose) in physics.ragdoll_poses() {
+            if let Some(&index) = by_name.get(name.as_str()) {
+                locals[index].2 = *pose;
+                limp.insert(index);
+            }
+        }
+        worlds = resolve_worlds(&locals, &by_name, &placements.0, &limp);
     }
     for (start, (entity, animated, _, factor, visible, colour)) in locals.iter().enumerate() {
         let world = worlds[start];

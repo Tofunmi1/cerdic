@@ -1,0 +1,4 @@
+let pts = join(i in 0..24, "[{0.4 * cos(i * 0.5)}, {i * 0.06}, {0.4 * sin(i * 0.5)}]")
+let keys = join(i in 0..5, "{i * 0.5}:0,{i * 90},0", "; ")
+coil = curve.polyline(points=[${pts}]) | curve.tube(radius=0.04, sides=10) | anim.track(property="rotation", keys="${keys}") | solid.material(color=[0.8, 0.3, 0.2])
+output coil

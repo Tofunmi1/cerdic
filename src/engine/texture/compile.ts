@@ -10,6 +10,8 @@
 // become GLSL functions. Not supported (a clear error): attributes such as `.texture`, buffers that need a
 // render pass, iteration, polygons, splines, pixel and lattice parameters.
 import { expandExpressions } from './expr/node';
+import { expandImages, imagesIn } from './image-node';
+import { expandSimulations } from './simulate-node';
 import { flatten, type FlatNode, type FlatRef } from './flatten';
 import type { InputDef, Library, TexGraph } from './types';
 
@@ -69,6 +71,11 @@ function splitArguments(text: string): string[] {
 function floatLiterals(source: string): string {
   const call = /\b(?:clamp|max|min|pow|mix|mod|step|smoothstep)\s*\(/g;
   const isInt = (a: string) => /^\d+$/.test(a);
+  // A name declared only as int/uint/ivec in this shader (a parameter or a local) makes the call an int overload, unless a float() or vec cast turns it float.
+  const declared = (types: RegExp) => new Set([...source.matchAll(types)].map((m) => m[1]));
+  const intNames = declared(/\b(?:int|uint|ivec[234])\s+(\w+)/g);
+  const floatNames = declared(/\b(?:float|vec[234]|mat[234])\s+(\w+)/g);
+  const intTyped = (a: string) => !/\b(?:float|vec[234])\s*\(/.test(a) && (a.replace(/\.\w+/g, '').match(/[A-Za-z_]\w*/g) ?? []).some((w) => intNames.has(w) && !floatNames.has(w));
   let out = source;
   let from = 0;
   for (;;) {
@@ -81,7 +88,7 @@ function floatLiterals(source: string): string {
     if (close === -1) continue;
     const args = splitArguments(out.slice(open + 1, close));
     // A call that mixes in an int-typed argument is an int overload: leave it.
-    if (!args.some(isInt) || args.some((a) => /\bint\s*\(|\bivec\d|\buint\s*\(/.test(a))) continue;
+    if (!args.some(isInt) || args.some((a) => /\bint\s*\(|\bivec\d|\buint\s*\(/.test(a) || intTyped(a))) continue;
     out = `${out.slice(0, open + 1)}${args.map((a) => (isInt(a) ? `${a}.0` : a)).join(', ')}${out.slice(close)}`;
   }
 }
@@ -151,7 +158,9 @@ export type Compiled = {
   /** `3d` shaders read an object-space position map (`uPosition`, one position per texel) instead of the UV. */
   space: '2d' | '3d';
   /** Which maps of the mesh the shader reads: the position map (`uPosition`) and the surface signal map (`uSurface`). */
-  needs: { position: boolean; surface: boolean };
+  needs: { position: boolean; surface: boolean; /** The pictures (`image` nodes) the shader samples, by name. */ images: string[] };
+  /** True when the shader reads the clock (`uTime`, in seconds): the same shader gives a different picture each frame, so it can be run live. */
+  animated: boolean;
 };
 
 class Compiler {
@@ -173,7 +182,7 @@ class Compiler {
     const output = f.model.outputs?.[ref.output];
     if (!output) throw new Error(`node "${f.type}" has no output ${ref.output}`);
     const name = identifier(f.id);
-    const vars: Record<string, Value> = { uv, time: '0.0', name, seed: float(f.seed), node_id: '0', '?1': '0.0', '?2': '0.0', '?3': '0.0', '?4': '0.0' };
+    const vars: Record<string, Value> = { uv, time: 'uTime', name, seed: float(f.seed), node_id: '0', '?1': '0.0', '?2': '0.0', '?3': '0.0', '?4': '0.0' };
     for (const [key, value] of Object.entries(f.env)) if (typeof value === 'number') vars[key] = float(value);
     const declare = !this.declared.has(f.id);
     this.declared.add(f.id);
@@ -403,9 +412,15 @@ class Compiler {
     const colour = preview.replace('$(value)', result.values[rootType]);
     // Nodes that read the mesh (the surface nodes) name their maps in their expressions; the shader declares what is used.
     const body = [main.hoisted, result.code, ...this.defs, ...this.globals.values()].join('\n');
-    const needs = { position: is3d || body.includes('uPosition'), surface: body.includes('uSurface') };
+    const images = imagesIn([functions, body].join('\n'));
+    const needs = { position: is3d || body.includes('uPosition'), surface: body.includes('uSurface'), images };
+    // A shader that reads the clock (`t` in an expr node, `$time` in a Material Maker node) is animated: it declares `uTime` and the baker sets it each frame.
+    const animated = /\buTime\b/.test([functions, body].join('\n'));
     const source = [
       '#version 300 es', 'precision highp float;', 'precision highp int;',
+      animated ? 'uniform float uTime;' : '',
+      // Pictures (`image` nodes) are declared before the functions that sample them.
+      ...images.map((name) => `uniform sampler2D uImg_${name};`),
       // Godot built-ins the nodes use, and the variation inputs nodes take (no variation here).
       'const float PI = 3.14159265359;', 'const float TAU = 6.28318530718;',
       'float _seed_variation_ = 0.0;', 'vec4 _controlled_variation_ = vec4(0.0);', 'const float elapsed_time = 0.0;',
@@ -417,7 +432,7 @@ class Compiler {
       is3d ? `  ${TYPES[rootType].params} = ${position};` : '  vec2 uv = vUv;',
       main.hoisted, result.code, `  fragColor = ${colour};`, '}', '',
     ].join('\n');
-    return { source: typedFunctionLiterals(floatLiterals(arrayInitialisers(source))), space: is3d ? '3d' : '2d', needs };
+    return { source: typedFunctionLiterals(floatLiterals(arrayInitialisers(source))), space: is3d ? '3d' : '2d', needs, animated };
   }
 }
 
@@ -429,8 +444,12 @@ class Compiler {
 export function compileTexture(library: Library, graph: TexGraph, functions: string): Compiled {
   // `expr` nodes (shader expressions) become ordinary nodes of an extended library, with their helper functions added once.
   const expressions = expandExpressions(library, graph);
-  const flat = flatten(expressions.library, expressions.graph);
-  return new Compiler(expressions.library, flat.nodes).assemble(expressions.helpers ? `${functions}\n${expressions.helpers}\n` : functions, flat.root);
+  // `image` nodes (pictures from the CC0 library) become nodes that sample a texture the baker binds.
+  // `reaction_diffusion` nodes run their simulation once and become nodes that sample the result as a picture.
+  const simulated = expandSimulations(expressions.library, expressions.graph);
+  const pictures = expandImages(simulated.library, simulated.graph);
+  const flat = flatten(pictures.library, pictures.graph);
+  return new Compiler(pictures.library, flat.nodes).assemble(expressions.helpers ? `${functions}\n${expressions.helpers}\n` : functions, flat.root);
 }
 
 /** The helper code from a `shader_functions.tres` file. */

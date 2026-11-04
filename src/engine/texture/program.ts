@@ -12,10 +12,12 @@
 // curve `[0:0, 0.5:0.8, 1:1]`. `n.1` is the second output of node `n`. Channels: albedo, roughness, metallic,
 // height (becomes a normal map), emissive.
 import { EXPR_NODE, EXPR_TYPE } from './expr/node';
+import { IMAGE_NODE, IMAGE_TYPE } from './image-node';
+import { SIM_NODE, SIM_TYPE } from './simulate-node';
 import { expandGeneric } from './generic';
 import type { InputDef, Library, NodeDef, ParamDef, TexNode, ParamValue } from './types';
 
-export const CHANNELS = ['albedo', 'roughness', 'metallic', 'height', 'emissive'] as const;
+export const CHANNELS = ['albedo', 'roughness', 'metallic', 'height', 'emissive', 'normal'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
 export type TextureProgram = {
@@ -161,7 +163,7 @@ export function parseTextureProgram(text: string, library: Library): TextureProg
     const open = right.indexOf('(');
     if (open < 1 || !right.endsWith(')')) throw new TextureError(`"${right}" is not a node call like fbm(scale_x=4)`, lineNumber);
     const type = right.slice(0, open).trim();
-    const def = type === EXPR_TYPE ? EXPR_NODE : library[type];
+    const def = type === EXPR_TYPE ? EXPR_NODE : type === IMAGE_TYPE ? IMAGE_NODE : type === SIM_TYPE ? SIM_NODE : library[type];
     if (!def) throw new TextureError(`unknown texture node "${type}"`, lineNumber);
     if (known.has(name)) throw new TextureError(`"${name}" is defined twice`, lineNumber);
     const args = split(right.slice(open + 1, -1), ',').map((a) => a.trim()).filter(Boolean);

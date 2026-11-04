@@ -1,6 +1,14 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import type { Command } from './generated';
 import { host, mountEngine } from './host';
+import { runConsole, type ConsoleResult } from './console';
+import { callPageTool } from './mcp-bridge';
+
+const CONSOLE_EXAMPLE = `// tools.<name>(args) are the same tools the model has; log() prints.
+const text = await tools.get_text({});
+log(text.slice(0, 200));
+await tools.apply_text({ text: 'b = solid.box@1(size=[1, 1, 1])\\noutput b = b' });
+return JSON.parse(await tools.scene_overview({})).parts;`;
 
 export default function Editor() {
   const pane = useRef<HTMLDivElement>(null);
@@ -8,6 +16,14 @@ export default function Editor() {
   const [command, setCommand] = useState('[]');
   const [notice, setNotice] = useState('');
   const [width, setWidth] = useState(280);
+  const [code, setCode] = useState(CONSOLE_EXAMPLE);
+  const [output, setOutput] = useState<ConsoleResult | null>(null);
+  const [running, setRunning] = useState(false);
+  const runCode = async () => {
+    setRunning(true);
+    try { setOutput(await runConsole(code, (name, args) => callPageTool(host, name, args))); }
+    finally { setRunning(false); }
+  };
   useEffect(() => {
     const unsubscribe = host.subscribe(refresh);
     if (pane.current) void mountEngine(pane.current);
@@ -36,6 +52,13 @@ export default function Editor() {
       <label htmlFor="commands">Command JSON</label>
       <textarea id="commands" value={command} onChange={e => setCommand(e.target.value)} spellCheck={false} />
       <button disabled={!host.ready} onClick={() => action(() => host.doc?.send(JSON.parse(command) as Command[], 'Manual batch'))}>Send commands</button>
+      <h2>Console</h2>
+      <label htmlFor="console-code">JavaScript (async function body)</label>
+      <textarea id="console-code" data-testid="console-code" value={code} spellCheck={false}
+        onChange={e => setCode(e.target.value)}
+        onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void runCode(); }} />
+      <button data-testid="console-run" disabled={!host.ready || running || !!state?.read_only} onClick={() => void runCode()}>{running ? 'Running…' : 'Run (Ctrl+Enter)'}</button>
+      {output && <pre data-testid="console-output" className="engine-status">{JSON.stringify(output, null, 2)}</pre>}
       <label htmlFor="panel-width">Panel width</label>
       <input id="panel-width" type="range" min="220" max="460" value={width} onChange={e => setWidth(Number(e.target.value))} />
       <h2>Evaluation</h2>

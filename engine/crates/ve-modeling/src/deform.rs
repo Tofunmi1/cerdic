@@ -1,5 +1,6 @@
 //! Bounded vertex-space solid deformers with Manifold validation after displacement.
 mod maps;
+mod poly;
 mod validate;
 
 use crate::{Fail, cache::Value, fail, operations};
@@ -46,6 +47,9 @@ fn build(node: &Node, inputs: &[Rc<Value>], context: &ExecutionContext) -> Resul
             .at_node(&node.id)
             .suggest("remove the sockets before deforming, or deform a shape without them"),
         ));
+    }
+    if let Some(polygons) = input.poly.as_ref() {
+        return poly::build(node, input, polygons, context);
     }
     let (minimum, maximum) = validate::bounds(&input.mesh)?;
     let map = Map::from_node(node)?;
