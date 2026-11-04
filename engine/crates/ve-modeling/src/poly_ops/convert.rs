@@ -79,6 +79,12 @@ pub(super) fn to_solid(
     let Some(poly) = input.poly.as_ref() else {
         return Ok(Value::nothing());
     };
+    if input.volume < 0.0 {
+        let mut value = Value::solid(input.mesh.clone(), 0.0);
+        value.material.clone_from(&input.material);
+        value.uvs.clone_from(&input.uvs);
+        return Ok(value);
+    }
     let (kernel, _) = poly
         .to_kernel_mesh_with_context(LossPolicy::Report, context)
         .map_err(|e| poly_fail(node, &e, Some(poly)))?;
@@ -102,7 +108,7 @@ pub(super) fn to_solid(
 
 /// A value holding `poly` and its triangles. The volume is the enclosed volume when the mesh is a
 /// closed, consistently wound manifold and zero otherwise (an open mesh encloses nothing).
-pub(super) fn value_from_poly(
+pub(crate) fn value_from_poly(
     node: &Node,
     poly: PolyMesh,
     material: Option<Material>,

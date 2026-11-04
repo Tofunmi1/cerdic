@@ -30,6 +30,24 @@ pub(crate) fn evaluate(node: &Node) -> Result<Value, Fail> {
             closed: true,
         }));
     }
+    if family == "curve.hang" {
+        let from = vector(node, "from", [0.0, 3.0, 0.0])?;
+        let to = vector(node, "to", [4.0, 3.0, 0.0])?;
+        let slack = number(node, "slack", 0.05)?;
+        let samples = count_or(node, "points", 32);
+        let points = sample::hang(from, to, slack, samples).map_err(|_| {
+            curve_error(
+                node,
+                "geometry.invalid_curve",
+                "curve endpoints must be distinct",
+                "adjust `from` and `to` so they name different tie points",
+            )
+        })?;
+        return Ok(Value::curve(Curve3 {
+            points,
+            closed: false,
+        }));
+    }
     let closed = matches!(node.params.get("closed"), Some(Param::Bool(true)));
     let controls = points(node)?;
     if closed && family == "curve.bezier" && distance(controls[0], controls[3]) > 1.0e-9 {
@@ -94,7 +112,9 @@ pub(crate) fn run(
     context: &ve_kernel::ExecutionContext,
 ) -> Option<Result<Value, Fail>> {
     match node.op.family().as_str() {
-        "curve.polyline" | "curve.bezier" | "curve.circle" => Some(evaluate(node)),
+        "curve.polyline" | "curve.bezier" | "curve.circle" | "curve.hang" => Some(evaluate(node)),
+        "curve.expr" => Some(crate::curve_expr::build(node)),
+        "curve.fit" => Some(crate::curve_fit::build(node)),
         family if tools::handles(family) => Some(tools::build(node, inputs)),
         "solid.sweep" => Some(sweep(node, inputs, context)),
         "curve.tube" => Some(tube::build(node, inputs, context)),
@@ -135,7 +155,9 @@ pub(crate) fn estimate_tool(node: &Node, input_samples: usize) -> usize {
 }
 
 pub(crate) fn estimate_curve(node: &Node) -> usize {
-    if node.op.family().as_str() == "curve.bezier" {
+    if node.op.family().as_str() == "curve.hang" {
+        count_or(node, "points", 32)
+    } else if node.op.family().as_str() == "curve.bezier" {
         count(node, "steps").saturating_add(1)
     } else if node.op.family().as_str() == "curve.circle" {
         count(node, "segments")
@@ -208,6 +230,13 @@ fn count(node: &Node, name: &str) -> usize {
     match node.params.get(name) {
         Some(Param::Int(value)) => usize::try_from(*value).unwrap_or(12),
         _ => 12,
+    }
+}
+
+fn count_or(node: &Node, name: &str, default: usize) -> usize {
+    match node.params.get(name) {
+        Some(Param::Int(value)) => usize::try_from(*value).unwrap_or(default),
+        _ => default,
     }
 }
 

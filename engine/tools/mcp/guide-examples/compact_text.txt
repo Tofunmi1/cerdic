@@ -1,0 +1,4 @@
+for [side, x] in [["left", -1], ["right", 1]]
+  hand_{side} = solid.sphere(radius=0.1) | xform.move(by=[{x * 0.4}, 1, 0])
+  output hand_{side} = hand_{side}
+end

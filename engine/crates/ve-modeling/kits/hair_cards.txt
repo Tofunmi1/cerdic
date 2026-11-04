@@ -1,0 +1,23 @@
+# Hair that moves, for any head. Paste this text once above your program, then one line makes the hair and gives it to the cloth solver:
+#   hair_cards("hair", "head", 0, 1.62, 0, 0.1, 0.35, 28, 0.045, 3)
+#     name, the bone part the roots follow, centre x y z of the ring of roots (just above the forehead), ring radius, strand length, strand count,
+#     strand width (all in metres), and a seed. The output is named like the hair (output hair); it has no colour yet: to colour it, copy the last
+#     lines of the macro, put solid.material on the node named hc_<name>_sim (hc_hair_sim here) and output that instead.
+# It builds `count` flat strips hanging from a ring (poly.script), pins each strip's root edge to the bone (cloth.sim with pin_bone), and lets the
+# strips swing, trail the head when it turns, and blow in the wind. The strips are one part simulated as one cloth: no strip-to-strip collision.
+# To keep the hair off the skull add collide_bones="head" to the cloth.sim line (copy the macro); the default ring already clears a head.
+
+# The strip builder, in pieces so the numbers can be spliced between them (braces in a macro body would be read as interpolation).
+let hair_js_1 = "const m = new Mesh(); const N = "
+let hair_js_2 = ", R = "
+let hair_js_3 = ", L = "
+let hair_js_4 = ", W = "
+let hair_js_5 = ", S = 10; for (let i = 0; i < N; i++) { const a = (i + 0.5 * Math.random()) * 2 * Math.PI / N; const tx = -Math.sin(a) * W / 2, tz = Math.cos(a) * W / 2; const base = m.vertex(R * Math.cos(a) - tx, 0, R * Math.sin(a) - tz); m.vertex(R * Math.cos(a) + tx, 0, R * Math.sin(a) + tz); const len = L * (0.8 + 0.4 * Math.random()); for (let k = 1; k <= S; k++) { const f = k / S; const o = 1 + 0.12 * Math.sin(f * 1.6); m.vertex(R * o * Math.cos(a) - tx, -len * f, R * o * Math.sin(a) - tz); m.vertex(R * o * Math.cos(a) + tx, -len * f, R * o * Math.sin(a) + tz); } for (let k = 0; k < S; k++) { const q = base + 2 * k; m.face(q, q + 1, q + 3, q + 2); } } m"
+
+def hair_cards(name, bone, cx, cy, cz, radius, length, count, width, seed)
+  hc_{name}_mesh = poly.script@1(code="${hair_js_1}${count}${hair_js_2}${radius}${hair_js_3}${length}${hair_js_4}${width}${hair_js_5}", seed={seed})
+  hc_{name}_at = xform.move@1(hc_{name}_mesh, by=[{cx}, {cy}, {cz}])
+  hc_{name}_roots = poly.select@1(hc_{name}_at, element="vertex", by="height", axis="y", height={cy}, tolerance=0.001)
+  hc_{name}_sim = cloth.sim@1(hc_{name}_at, hc_{name}_roots, pin_bone={bone}, density=0.05, bend=0.3, damping=1.2, thickness=0.005, friction=0.3, substeps=6)
+  output {name} = hc_{name}_sim
+end

@@ -1,6 +1,8 @@
 //! Shared instances; unioning patterns remain separate operators.
 use super::{EXTENT, single, spec};
-use crate::{OperatorSpec, OutputSpec, ParamSpec, ParamType, PortType, Unit, Value};
+use crate::{
+    Arity, OperatorSpec, OutputSpec, ParamSpec, ParamType, PortSpec, PortType, Unit, Value,
+};
 /// What can be placed: solids, other sets, and polygon meshes (open ones, like leaf cards, are placed without ever being unioned).
 const INPUT: &[PortType] = &[PortType::Solid, PortType::Inst, PortType::Poly];
 fn count(name: &'static str, default: Option<i64>) -> ParamSpec {
@@ -215,9 +217,39 @@ fn variation_ops() -> Vec<Option<OperatorSpec>> {
         ),
     ]
 }
+
+fn vary() -> Option<OperatorSpec> {
+    Some(OperatorSpec {
+        id: crate::OpId::parse("inst.vary@1").ok()?,
+        doc: "Varies every placement from patterns sampled at its position: scale, world-up yaw and lift. Example: `s = field.expr@1(code=\"out = 1.0 + step(10.0, p.x)\"); v = inst.vary@1(in, scale=s)` doubles copies to the right of x=10.",
+        inputs: vec![
+            single("in", &[PortType::Inst]),
+            PortSpec {
+                name: "scale",
+                accepts: &[PortType::Pattern],
+                arity: Arity::Optional,
+            },
+            PortSpec {
+                name: "yaw",
+                accepts: &[PortType::Pattern],
+                arity: Arity::Optional,
+            },
+            PortSpec {
+                name: "lift",
+                accepts: &[PortType::Pattern],
+                arity: Arity::Optional,
+            },
+        ],
+        output: OutputSpec::Fixed(PortType::Inst),
+        params: vec![],
+        readiness: crate::Readiness::Draft,
+    })
+}
+
 pub(super) fn all() -> Vec<Option<OperatorSpec>> {
     let output = OutputSpec::Fixed(PortType::Inst);
     let mut ops = variation_ops();
+    ops.push(vary());
     ops.extend(base_ops(output));
     ops
 }
@@ -225,7 +257,7 @@ fn base_ops(output: OutputSpec) -> Vec<Option<OperatorSpec>> {
     vec![
         spec(
             "inst.array@1",
-            "Shared grid; no union.",
+            "Shared grid of copies, no union. spacing is the distance between neighbours in metres, or with relative=true a multiple of the shape's own size along each axis (spacing [1.1, 0, 0] leaves a tenth of the width between copies, whatever the shape's size).",
             vec![single("in", INPUT)],
             output,
             vec![
@@ -233,6 +265,57 @@ fn base_ops(output: OutputSpec) -> Vec<Option<OperatorSpec>> {
                 count("count_y", Some(1)),
                 count("count_z", Some(1)),
                 vector("spacing", Unit::Length, false),
+                ParamSpec {
+                    name: "relative",
+                    ty: ParamType::Bool,
+                    default: Some(Value::Bool(false)),
+                    doc: "Read spacing as multiples of the shape's size (its bounding box) instead of metres.",
+                },
+            ],
+        ),
+        spec(
+            "inst.along_curve@1",
+            "Shared copies of a shape spaced evenly by length along a curve, each turned to follow it (a fence along a path, rungs along a rail, beads on a wire, links of a chain). An open curve gets one copy at each end and the rest evenly between; a closed curve spaces them all the way round. With align each copy's +X axis follows the curve and its +Y stays near world up, so build the shape lengthwise along X. No union: the shape is stored once.",
+            vec![single("in", INPUT), single("path", &[PortType::Curve])],
+            output,
+            vec![
+                count("count", Some(8)),
+                ParamSpec {
+                    name: "align",
+                    ty: ParamType::Bool,
+                    default: Some(Value::Bool(true)),
+                    doc: "Turn each copy to follow the curve; otherwise copies keep their orientation and only move.",
+                },
+            ],
+        ),
+        spec(
+            "inst.place@1",
+            "Copies of a shape at positions you list, as one shared set (the shape is stored once): six jars at chosen spots, a sack here, a lantern there. Add yaw_scale for a turn and size per copy.",
+            vec![single("in", INPUT)],
+            output,
+            vec![
+                ParamSpec {
+                    name: "at",
+                    ty: ParamType::Points3 {
+                        min_points: 1,
+                        max_points: 4096,
+                        min: -EXTENT,
+                        max: EXTENT,
+                    },
+                    default: None,
+                    doc: "Where each copy stands: [x, y, z] in metres, one entry per copy.",
+                },
+                ParamSpec {
+                    name: "yaw_scale",
+                    ty: ParamType::Points2 {
+                        min_points: 0,
+                        max_points: 4096,
+                        min: -3600.0,
+                        max: 3600.0,
+                    },
+                    default: Some(Value::List(Vec::new())),
+                    doc: "Optional, one [yaw, scale] per copy in the same order as `at`: yaw in degrees about the vertical axis, scale a size factor above 0 (1 is unchanged).",
+                },
             ],
         ),
         spec(
@@ -262,6 +345,33 @@ fn base_ops(output: OutputSpec) -> Vec<Option<OperatorSpec>> {
                     },
                     default: Some(Value::Num(0.0)),
                     doc: "Initial X offset.",
+                },
+            ],
+        ),
+        spec(
+            "inst.program@1",
+            "Shared copies placed by programs of the copy number, in the field-expression language of field.expr: `code` gives where each copy goes (`out` a vec3), `scale_code` its size (a number above 0), `yaw_code` its turn about Y in degrees. They see `i` (0 for the first copy), `count` and `f` (0 for the first copy, 1 for the last). A spiral of 40 trees: code=`out = vec3(cos(i * 0.5) * (1.0 + f * 5.0), 0.0, sin(i * 0.5) * (1.0 + f * 5.0))`, scale_code=`out = 1.0 - 0.5 * f`. No union.",
+            vec![single("in", INPUT)],
+            output,
+            vec![
+                count("count", Some(16)),
+                ParamSpec {
+                    name: "code",
+                    ty: ParamType::Str { max_len: 8192 },
+                    default: Some(Value::Str("out = vec3(i, 0.0, 0.0)".to_owned())),
+                    doc: "Where copy `i` goes: the last statement sets `out`, a vec3 in metres.",
+                },
+                ParamSpec {
+                    name: "scale_code",
+                    ty: ParamType::Str { max_len: 8192 },
+                    default: Some(Value::Str("out = 1.0".to_owned())),
+                    doc: "Size of copy `i`: `out` is a number above 0.",
+                },
+                ParamSpec {
+                    name: "yaw_code",
+                    ty: ParamType::Str { max_len: 8192 },
+                    default: Some(Value::Str("out = 0.0".to_owned())),
+                    doc: "Turn of copy `i` about Y in degrees: `out` is a number.",
                 },
             ],
         ),

@@ -5,6 +5,7 @@
 // UV space with their positions as colour; the result is a texture that wraps the mesh with no seams in the
 // pattern, whatever the unwrap looks like.
 import type { Compiled } from './compile';
+import { decodedPicture, rawPicture } from './outfit-images';
 
 const VERTEX = `#version 300 es
 out vec2 vUv;
@@ -148,6 +149,14 @@ void main() {
 const FINISH: Record<FinishKind, string> = { painterly: PAINTERLY, retro: RETRO, ink: INK };
 
 export type PositionMap = { texture: WebGLTexture; size: number };
+
+/** A texture shader kept compiled for drawing every frame (see `Baker.live`). */
+export type LiveBake = {
+  /** Draws the picture at `seconds` and returns its RGBA8 pixels (the same array every call). */
+  frame(seconds: number): Uint8Array;
+  /** Frees the GPU objects. */
+  dispose(): void;
+};
 
 /** A WebGL2 context that bakes textures. Create one and reuse it; call `dispose` when done. */
 export class Baker {
@@ -331,6 +340,14 @@ export class Baker {
       gl.uniform1i(gl.getUniformLocation(program, 'uSurface'), 1);
       gl.activeTexture(gl.TEXTURE0);
     }
+    // Pictures (`image` nodes) take the texture units after the mesh maps.
+    (compiled.needs?.images ?? []).forEach((name, i) => {
+      const texture = this.picture(name); // first: uploading a picture changes the active texture unit
+      gl.activeTexture(gl.TEXTURE2 + i);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.uniform1i(gl.getUniformLocation(program, `uImg_${name}`), 2 + i);
+    });
+    gl.activeTexture(gl.TEXTURE0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     const pixels = new Uint8Array(size * size * 4);
     gl.readPixels(0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
@@ -340,12 +357,91 @@ export class Baker {
     return pixels;
   }
 
+  /**
+   * A shader kept compiled and drawn again on demand, for textures that move: compiled once, then each `frame(seconds)` sets the clock (`uTime`), draws on the GPU and reads the
+   * picture back as RGBA8 (row 0 at v = 0). The returned array is reused by the next frame, so copy it if it must outlive that.
+   */
+  live(compiled: Compiled, size: number, positions?: PositionMap, surface?: PositionMap): LiveBake {
+    const { gl } = this;
+    const needsPosition = compiled.needs?.position ?? compiled.space === '3d';
+    const needsSurface = compiled.needs?.surface ?? false;
+    if (needsPosition && !positions) throw new Error('this texture reads the mesh (3D texture or surface node): it needs the mesh to be baked onto');
+    if (needsSurface && !surface) throw new Error('this texture uses surface nodes: it needs the mesh\'s surface signals');
+    const program = this.program(VERTEX, compiled.source);
+    const target = this.target(size, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE);
+    const images = (compiled.needs?.images ?? []).map((name) => ({ name, texture: this.picture(name) }));
+    const out = new Uint8Array(size * size * 4);
+    const frame = (seconds: number): Uint8Array => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+      gl.viewport(0, 0, size, size);
+      gl.disable(gl.BLEND);
+      gl.useProgram(program);
+      gl.uniform1f(gl.getUniformLocation(program, 'uTime'), seconds);
+      if (needsPosition && positions) {
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, positions.texture);
+        gl.uniform1i(gl.getUniformLocation(program, 'uPosition'), 0);
+      }
+      if (needsSurface && surface) {
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, surface.texture);
+        gl.uniform1i(gl.getUniformLocation(program, 'uSurface'), 1);
+      }
+      images.forEach(({ name, texture }, i) => {
+        gl.activeTexture(gl.TEXTURE2 + i);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1i(gl.getUniformLocation(program, `uImg_${name}`), 2 + i);
+      });
+      gl.activeTexture(gl.TEXTURE0);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.readPixels(0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, out);
+      return out;
+    };
+    const dispose = () => {
+      gl.deleteFramebuffer(target.framebuffer);
+      gl.deleteTexture(target.texture);
+      gl.deleteProgram(program);
+    };
+    return { frame, dispose };
+  }
+
   disposePositionMap(map: PositionMap) {
     this.gl.deleteTexture(map.texture);
   }
 
+  private pictures = new Map<string, WebGLTexture>();
+
+  /** The decoded picture `name` as a repeating, mipmapped texture (uploaded once per baker); row 0 of the picture is at v = 1, as UVs have it. */
+  private picture(name: string): WebGLTexture {
+    const cached = this.pictures.get(name);
+    if (cached) return cached;
+    const { gl } = this;
+    const texture = gl.createTexture() as WebGLTexture;
+    gl.activeTexture(gl.TEXTURE0 + 15);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    const made = rawPicture(name);
+    if (made) {
+      // A picture the engine made (a simulation): bytes with row 0 at v = 0 already, so no flip.
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, made.width, made.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, made.pixels);
+    } else {
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, decodedPicture(name));
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    }
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    this.pictures.set(name, texture);
+    return texture;
+  }
+
   /** Releases the offscreen WebGL context when a one-shot export baker is no longer needed. */
   dispose() {
+    for (const texture of this.pictures.values()) this.gl.deleteTexture(texture);
+    this.pictures.clear();
     this.gl.getExtension('WEBGL_lose_context')?.loseContext();
   }
 }

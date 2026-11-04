@@ -1,0 +1,27 @@
+{
+  "name": "hair_cards",
+  "version": "1.0.0",
+  "description": "Hair that moves: hair_cards builds strips hanging from a ring of roots and simulates them as cloth pinned to a head bone, so they swing, trail a turning head and blow in the wind.",
+  "license": "GPL-2.0-or-later",
+  "requires": {
+    "operators": [
+      "cloth.sim@1",
+      "poly.script@1",
+      "poly.select@1",
+      "xform.move@1"
+    ]
+  },
+  "provides": {
+    "macros": [
+      "hair_cards"
+    ],
+    "groups": [],
+    "scripts": []
+  },
+  "files": {
+    "hair_cards.txt": {
+      "kind": "macros",
+      "sha256": "2cd77f9810642bd771aa1a15639012527bba183994f51f4479b53c3c428a567a"
+    }
+  }
+}

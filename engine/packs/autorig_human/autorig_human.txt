@@ -1,0 +1,153 @@
+# Autorig for body.human. Paste this text once above your program, then a rigged, skinned character is a few lines:
+#   body = body.human@1(height=0.5)
+#   human_rig("body", 1, "")                bones for the whole body, with fingers (0 leaves the hands as one bone); the body is named as text
+#   human_skin("body", "person", 1, 0.86, 0.66, 0.52)  the pack's own skin weights, a material, and the output named person
+# Every bone is a part with its own output named exactly like the bone (root, spine01, upperarm01_l, ...), joined to its parent with anim.parent,
+# so anim.track, anim.wave, a state machine or the physics ragdoll can drive any bone. To animate a bone, name it in the last argument of human_rig
+# (the macro then leaves it out) and write its lines yourself with the track between the parent link and the output:
+#   human_rig("body", 0, "head")
+#   hb = body.bone@1(body, bone="head")
+#   hp = anim.parent@1(hb, parent="neck03")
+#   nod = anim.track@1(hp, property="rotation", keys="0:0,0,0; 1:20,0,0", pivot_at="head")
+#   output head = nod
+# One bone can be freed per call; call human_rig once and write the rest by hand with rbone(src, name, parent, "") if you need more.
+
+# One bone: the bone part, its link to its parent, and its output; nothing when it is the bone left free.
+def rbone(src, n, par, free)
+  if n != free
+    b_{n} = body.bone@1(${src}, bone={n})
+    if par == ""
+      output {n} = b_{n}
+    else
+      p_{n} = anim.parent@1(b_{n}, parent={par})
+      output {n} = p_{n}
+    end
+  end
+end
+
+# One arm without the hand: clavicle to wrist, side "l" or "r".
+def rarm(src, s, free)
+  rbone(src, "clavicle_${s}", "spine01", free)
+  rbone(src, "shoulder01_${s}", "clavicle_${s}", free)
+  rbone(src, "upperarm01_${s}", "shoulder01_${s}", free)
+  rbone(src, "upperarm02_${s}", "upperarm01_${s}", free)
+  rbone(src, "lowerarm01_${s}", "upperarm02_${s}", free)
+  rbone(src, "lowerarm02_${s}", "lowerarm01_${s}", free)
+  rbone(src, "wrist_${s}", "lowerarm02_${s}", free)
+end
+
+# The turns that curl a finger joint toward the palm, as x,y,z degrees: a turn of 60, 70 or 90 degrees about the line across the knuckles (index to
+# little finger) of the pack's hand, which hangs with the fingers pointing forward and down and the palm toward the body. Computed from the pack's
+# bones by tests/hand_axes_dump.rs; the right hand is the left one mirrored (y and z change sign).
+let curl_l_60 = "9.28,-31.86,-53.46"
+let curl_l_70 = "7.77,-37.40,-62.51"
+let curl_l_90 = "2.33,-47.39,-79.90"
+let curl_r_60 = "9.28,31.86,53.46"
+let curl_r_70 = "7.77,37.40,62.51"
+let curl_r_90 = "2.33,47.39,79.90"
+
+# One finger joint with two hand-pose clips on it: "fist" and "point" each turn it by the given x,y,z degrees ("0,0,0" keeps it straight).
+def rjoint(src, n, par, free, fist, point)
+  if n != free
+    b_{n} = body.bone@1(${src}, bone={n})
+    p_{n} = anim.parent@1(b_{n}, parent={par})
+    fist_{n} = anim.track@1(p_{n}, property="rotation", keys="0:0,0,0; 0.25:${fist}", interpolation="smooth", loop=false, clip="fist", pivot_at="head")
+    point_{n} = anim.track@1(fist_{n}, property="rotation", keys="0:0,0,0; 0.25:${point}", interpolation="smooth", loop=false, clip="point", pivot_at="head")
+    output {n} = point_{n}
+  end
+end
+
+# The fingers of one hand with their three joints each: base turn (70), middle (90) and tip (60) for a fist, passed as text.
+def rfingers(src, s, free, c70, c90, c60)
+  for [f, m] in [[2, 1], [3, 2], [4, 3], [5, 4]]
+    rbone(src, "metacarpal${m}_${s}", "wrist_${s}", free)
+    if f == 2
+      rjoint(src, "finger${f}_1_${s}", "metacarpal${m}_${s}", free, "${c70}", "0,0,0")
+      rjoint(src, "finger${f}_2_${s}", "finger${f}_1_${s}", free, "${c90}", "0,0,0")
+      rjoint(src, "finger${f}_3_${s}", "finger${f}_2_${s}", free, "${c60}", "0,0,0")
+    else
+      rjoint(src, "finger${f}_1_${s}", "metacarpal${m}_${s}", free, "${c70}", "${c70}")
+      rjoint(src, "finger${f}_2_${s}", "finger${f}_1_${s}", free, "${c90}", "${c90}")
+      rjoint(src, "finger${f}_3_${s}", "finger${f}_2_${s}", free, "${c60}", "${c60}")
+    end
+  end
+end
+
+# The bones of one hand: the thumb (left at rest) and four fingers that carry the clips "fist" (all curled) and "point" (the index finger stays straight).
+def rhand(src, s, free)
+  rbone(src, "finger1_1_${s}", "wrist_${s}", free)
+  rbone(src, "finger1_2_${s}", "finger1_1_${s}", free)
+  rbone(src, "finger1_3_${s}", "finger1_2_${s}", free)
+  if s == "l"
+    rfingers(src, "l", free, "${curl_l_70}", "${curl_l_90}", "${curl_l_60}")
+  else
+    rfingers(src, "r", free, "${curl_r_70}", "${curl_r_90}", "${curl_r_60}")
+  end
+end
+
+# One leg: pelvis to the first toe joint, side "l" or "r".
+def rleg(src, s, free)
+  rbone(src, "pelvis_${s}", "root", free)
+  rbone(src, "upperleg01_${s}", "pelvis_${s}", free)
+  rbone(src, "upperleg02_${s}", "upperleg01_${s}", free)
+  rbone(src, "lowerleg01_${s}", "upperleg02_${s}", free)
+  rbone(src, "lowerleg02_${s}", "lowerleg01_${s}", free)
+  rbone(src, "foot_${s}", "lowerleg02_${s}", free)
+  rbone(src, "toe1_1_${s}", "foot_${s}", free)
+end
+
+# The whole skeleton the autorig animates: root, spine, neck, head, both arms, both legs, and with hands=1 all fingers.
+def human_rig(src, hands, free)
+  rbone(src, "root", "", free)
+  rbone(src, "spine05", "root", free)
+  rbone(src, "spine04", "spine05", free)
+  rbone(src, "spine03", "spine04", free)
+  rbone(src, "spine02", "spine03", free)
+  rbone(src, "spine01", "spine02", free)
+  rbone(src, "neck01", "spine01", free)
+  rbone(src, "neck02", "neck01", free)
+  rbone(src, "neck03", "neck02", free)
+  rbone(src, "head", "neck03", free)
+  rarm(src, "l", free)
+  rarm(src, "r", free)
+  rleg(src, "l", free)
+  rleg(src, "r", free)
+  if hands > 0
+    rhand(src, "l", free)
+    rhand(src, "r", free)
+  end
+end
+
+# Reach targets for one side after human_rig: a small box at the wrist (output reach_hand_l) and one at the ankle (output reach_foot_l) that the arm
+# and the leg bend to follow when you move it (give the target an anim.track by writing its box lines yourself, or make it grabbable in play).
+def human_ik(s)
+  hx_{s} = value.point@1(b_wrist_{s}, at="head", axis="x")
+  hy_{s} = value.point@1(b_wrist_{s}, at="head", axis="y")
+  hz_{s} = value.point@1(b_wrist_{s}, at="head", axis="z")
+  hand_box_{s} = solid.box@1(size=[0.05, 0.05, 0.05])
+  hand_at_{s} = xform.move@1(hand_box_{s}, by=[0, 0, 0], by.x=hx_{s}, by.y=hy_{s}, by.z=hz_{s})
+  hand_ik_{s} = rig.ik@1(hand_at_{s}, bones="upperarm01_${s}; upperarm02_${s}; lowerarm01_${s}; lowerarm02_${s}")
+  output reach_hand_{s} = hand_ik_{s}
+  fx_{s} = value.point@1(b_foot_{s}, at="head", axis="x")
+  fy_{s} = value.point@1(b_foot_{s}, at="head", axis="y")
+  fz_{s} = value.point@1(b_foot_{s}, at="head", axis="z")
+  foot_box_{s} = solid.box@1(size=[0.05, 0.05, 0.05])
+  foot_at_{s} = xform.move@1(foot_box_{s}, by=[0, 0, 0], by.x=fx_{s}, by.y=fy_{s}, by.z=fz_{s})
+  foot_ik_{s} = rig.ik@1(foot_at_{s}, bones="upperleg01_${s}; upperleg02_${s}; lowerleg01_${s}; lowerleg02_${s}")
+  output reach_foot_{s} = foot_ik_{s}
+end
+
+# Skins the body to the rig's bones with the pack's weights, gives it a skin colour, and outputs it under `out`. Bones the rig leaves out hand their
+# weight to their nearest listed ancestor (pelvis, toes and metacarpals are left out so the list stays within body.skin's 64 bones); hands=0 skips the fingers.
+let core = "root; spine05; spine04; spine03; spine02; spine01; neck01; neck02; neck03; head; clavicle_l; shoulder01_l; upperarm01_l; upperarm02_l; lowerarm01_l; lowerarm02_l; wrist_l; clavicle_r; shoulder01_r; upperarm01_r; upperarm02_r; lowerarm01_r; lowerarm02_r; wrist_r; upperleg01_l; upperleg02_l; lowerleg01_l; lowerleg02_l; foot_l; upperleg01_r; upperleg02_r; lowerleg01_r; lowerleg02_r; foot_r"
+let fingers_l = "finger1_1_l; finger1_2_l; finger1_3_l; finger2_1_l; finger2_2_l; finger2_3_l; finger3_1_l; finger3_2_l; finger3_3_l; finger4_1_l; finger4_2_l; finger4_3_l; finger5_1_l; finger5_2_l; finger5_3_l"
+let fingers_r = "finger1_1_r; finger1_2_r; finger1_3_r; finger2_1_r; finger2_2_r; finger2_3_r; finger3_1_r; finger3_2_r; finger3_3_r; finger4_1_r; finger4_2_r; finger4_3_r; finger5_1_r; finger5_2_r; finger5_3_r"
+def human_skin(src, out, hands, r, g, b)
+  if hands > 0
+    skinned = body.skin@1(${src}, bones="${core}; ${fingers_l}; ${fingers_r}")
+  else
+    skinned = body.skin@1(${src}, bones="${core}")
+  end
+  skin_m = solid.material@1(skinned, color=[{r}, {g}, {b}], roughness=0.6)
+  output {out} = skin_m
+end

@@ -1,0 +1,12 @@
+# Facial expressions for body.human, as text constants. Paste this text once above your program, then pass one to the body's `face` parameter:
+#   body = body.human@1(face="${face_happy}")
+# Each is a set of the 52 ARKit-style face actions (0 to 1) that the body supports: happy, sad, angry, surprised, wink, blink, talk and disgust.
+# Mix by writing your own `face="name=value; name=value"` (the error for a wrong name lists the valid ones), or join two: face="${face_happy}; jawOpen=0.4".
+let face_happy = "mouthSmileLeft=0.8; mouthSmileRight=0.8; cheekSquintLeft=0.5; cheekSquintRight=0.5; eyeSquintLeft=0.3; eyeSquintRight=0.3"
+let face_sad = "mouthFrownLeft=0.7; mouthFrownRight=0.7; browInnerUp=0.8; mouthLowerDownLeft=0.2; mouthLowerDownRight=0.2; eyeLookDownLeft=0.3; eyeLookDownRight=0.3"
+let face_angry = "browDownLeft=0.9; browDownRight=0.9; noseSneerLeft=0.4; noseSneerRight=0.4; mouthPressLeft=0.5; mouthPressRight=0.5; eyeSquintLeft=0.4; eyeSquintRight=0.4"
+let face_surprised = "browInnerUp=0.8; browOuterUpLeft=0.8; browOuterUpRight=0.8; eyeWideLeft=0.9; eyeWideRight=0.9; jawOpen=0.6"
+let face_wink = "eyeBlinkLeft=1; mouthSmileLeft=0.5; mouthSmileRight=0.3; cheekSquintLeft=0.4"
+let face_blink = "eyeBlinkLeft=1; eyeBlinkRight=1"
+let face_talk = "jawOpen=0.4; mouthFunnel=0.3; mouthLowerDownLeft=0.2; mouthLowerDownRight=0.2"
+let face_disgust = "noseSneerLeft=0.8; noseSneerRight=0.8; mouthUpperUpLeft=0.6; mouthUpperUpRight=0.6; browDownLeft=0.5; browDownRight=0.5; eyeSquintLeft=0.5; eyeSquintRight=0.5"

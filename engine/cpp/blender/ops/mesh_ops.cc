@@ -210,6 +210,98 @@ bool run_remove_doubles(BMesh* bm, const ve_mesh_op_input& in) {
                       in.params[0]);
 }
 
+bool run_recalc_normals(BMesh* bm, const ve_mesh_op_input& in) {
+  if (!BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "recalc_face_normals faces=%hf", BM_ELEM_SELECT)) {
+    return false;
+  }
+  if (!flag(in, 1)) {
+    return true;
+  }
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "reverse_faces faces=%hf flip_multires=%b",
+                      BM_ELEM_SELECT, false);
+}
+
+bool run_smooth(BMesh* bm, const ve_mesh_op_input& in) {
+  for (int i = 0; i < static_cast<int>(in.params[1]); ++i) {
+    if (!BMO_op_callf(bm, BMO_FLAG_DEFAULTS,
+                      "smooth_vert verts=%hv factor=%f mirror_clip_x=%b mirror_clip_y=%b "
+                      "mirror_clip_z=%b clip_dist=%f use_axis_x=%b use_axis_y=%b use_axis_z=%b",
+                      BM_ELEM_SELECT, in.params[0], false, false, false, 1.0e-4, true, true,
+                      true)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool run_fill_holes(BMesh* bm, const ve_mesh_op_input& in) {
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "holes_fill edges=%he sides=%i", BM_ELEM_SELECT,
+                      static_cast<int>(in.params[0]));
+}
+
+bool run_beautify(BMesh* bm, const ve_mesh_op_input& in) {
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS,
+                      "beautify_fill faces=%hf edges=%he use_restrict_tag=%b method=%i",
+                      BM_ELEM_SELECT, BM_ELEM_SELECT, false, static_cast<int>(in.params[0]));
+}
+
+bool run_planar_faces(BMesh* bm, const ve_mesh_op_input& in) {
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "planar_faces faces=%hf iterations=%i factor=%f",
+                      BM_ELEM_SELECT, static_cast<int>(in.params[0]), in.params[1]);
+}
+
+bool run_join_triangles(BMesh* bm, const ve_mesh_op_input& in) {
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS,
+                      "join_triangles faces=%hf cmp_seam=%b cmp_sharp=%b cmp_uvs=%b cmp_vcols=%b "
+                      "cmp_materials=%b angle_face_threshold=%f angle_shape_threshold=%f "
+                      "topology_influence=%f deselect_joined=%b",
+                      BM_ELEM_SELECT, false, false, false, false, false, in.params[0], in.params[1],
+                      0.0, false);
+}
+
+bool run_split_edges(BMesh* bm) {
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "split_edges edges=%he use_verts=%b", BM_ELEM_SELECT,
+                      false);
+}
+
+bool run_rotate_edges(BMesh* bm, const ve_mesh_op_input& in) {
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "rotate_edges edges=%he use_ccw=%b", BM_ELEM_SELECT,
+                      flag(in, 1));
+}
+
+bool run_connect_vertices(BMesh* bm, const ve_mesh_op_input& in) {
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "connect_verts verts=%hv check_degenerate=%b",
+                      BM_ELEM_SELECT, flag(in, 1));
+}
+
+bool run_space_edge_loops(BMesh* bm, const ve_mesh_op_input& in) {
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS,
+                      "space_edge_loops_evenly geom=%he interpolation=%i factor=%f lock_x=%b "
+                      "lock_y=%b lock_z=%b",
+                      BM_ELEM_SELECT, flag(in, 1) ? 1 : 0, in.params[0], false, false, false);
+}
+
+bool run_relax_edge_loops(BMesh* bm, const ve_mesh_op_input& in) {
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS,
+                      "relax_edge_loops geom=%he interpolation=%i iterations=%i even_spacing=%b",
+                      BM_ELEM_SELECT, flag(in, 1) ? 1 : 0, static_cast<int>(in.params[0]),
+                      flag(in, 2));
+}
+
+bool run_circularize(BMesh* bm, const ve_mesh_op_input& in) {
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS,
+                      "circularize geom=%hvef factor=%f custom_radius=%f angle=%f fit_method=%i "
+                      "flatten=%f regular=%b lock_x=%b lock_y=%b lock_z=%b mirror_x=%b "
+                      "mirror_y=%b mirror_z=%b",
+                      BM_ELEM_SELECT, in.params[0], in.params[1], in.params[2], 0, in.params[3],
+                      flag(in, 1), false, false, false, false, false, false);
+}
+
+bool run_dissolve_degenerate(BMesh* bm, const ve_mesh_op_input& in) {
+  return BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "dissolve_degenerate dist=%f edges=%he", in.params[0],
+                      BM_ELEM_SELECT);
+}
+
 bool run_bisect(BMesh* bm, const ve_mesh_op_input& in) {
   const float point[3] = {static_cast<float>(in.params[0]), static_cast<float>(in.params[1]),
                           static_cast<float>(in.params[2])};
@@ -444,6 +536,34 @@ ve_status validate_params(const ve_mesh_op_input& in) {
     case VE_MESH_OP_LOOP_CUT:
       return in_range(p[3], 1.0, 32.0) && p[3] == std::floor(p[3]) && in_range(p[4], 0.0, 1.0)
                  ? VE_OK : VE_ERR_INVALID_ARG;
+    case VE_MESH_OP_RECALC_NORMALS:
+      return VE_OK;
+    case VE_MESH_OP_SMOOTH:
+      return in_range(p[0], 0.0, 1.0) && in_range(p[1], 1.0, 50.0) && p[1] == std::floor(p[1])
+                 ? VE_OK : VE_ERR_INVALID_ARG;
+    case VE_MESH_OP_FILL_HOLES:
+      return in_range(p[0], 3.0, 1000.0) && p[0] == std::floor(p[0]) ? VE_OK : VE_ERR_INVALID_ARG;
+    case VE_MESH_OP_BEAUTIFY:
+      return p[0] == 0.0 || p[0] == 1.0 ? VE_OK : VE_ERR_INVALID_ARG;
+    case VE_MESH_OP_PLANAR_FACES:
+      return in_range(p[0], 1.0, 50.0) && p[0] == std::floor(p[0]) && in_range(p[1], 0.0, 1.0)
+                 ? VE_OK : VE_ERR_INVALID_ARG;
+    case VE_MESH_OP_JOIN_TRIANGLES:
+      return in_range(p[0], 0.0, 3.141593) && in_range(p[1], 0.0, 3.141593) ? VE_OK
+                                                                              : VE_ERR_INVALID_ARG;
+    case VE_MESH_OP_DISSOLVE_DEGENERATE:
+      return in_range(p[0], 1.0e-9, 1.0e3) ? VE_OK : VE_ERR_INVALID_ARG;
+    case VE_MESH_OP_SPLIT_EDGES:
+    case VE_MESH_OP_ROTATE_EDGES:
+    case VE_MESH_OP_CONNECT_VERTICES:
+      return VE_OK;
+    case VE_MESH_OP_SPACE_EDGE_LOOPS:
+      return in_range(p[0], 0.0, 1.0) ? VE_OK : VE_ERR_INVALID_ARG;
+    case VE_MESH_OP_RELAX_EDGE_LOOPS:
+      return in_range(p[0], 1.0, 50.0) && p[0] == std::floor(p[0]) ? VE_OK : VE_ERR_INVALID_ARG;
+    case VE_MESH_OP_CIRCULARIZE:
+      return in_range(p[0], 0.0, 1.0) && in_range(p[1], 0.0, 1.0e3) && in_range(p[3], 0.0, 1.0)
+                 ? VE_OK : VE_ERR_INVALID_ARG;
     default:
       return VE_ERR_INVALID_ARG;
   }
@@ -467,6 +587,18 @@ ve_status select_for(const ve_mesh_op_input& in, const LoadedMesh& mesh) {
     case VE_MESH_OP_TRIANGULATE:
       return select_faces(in, mesh, true);
     case VE_MESH_OP_REMOVE_DOUBLES:
+      return select_vertices(in, mesh);
+    case VE_MESH_OP_SPLIT_EDGES:
+    case VE_MESH_OP_ROTATE_EDGES:
+    case VE_MESH_OP_SPACE_EDGE_LOOPS:
+    case VE_MESH_OP_RELAX_EDGE_LOOPS:
+    case VE_MESH_OP_CIRCULARIZE:
+      return select_edges(in, mesh);
+    case VE_MESH_OP_CONNECT_VERTICES:
+      // An empty selection would mean "every vertex" for remove doubles; connecting needs vertices chosen.
+      if (in.vertex_count < 2) {
+        return VE_ERR_INVALID_ARG;
+      }
       return select_vertices(in, mesh);
     default:
       BM_mesh_elem_hflag_enable_all(mesh.bm.get(), BM_VERT | BM_EDGE | BM_FACE, BM_ELEM_SELECT,
@@ -514,6 +646,32 @@ bool run_op(BMesh* bm, const ve_mesh_op_input& in, const LoadedMesh& mesh, const
       return run_mirror(bm, in);
     case VE_MESH_OP_LOOP_CUT:
       return run_loop_cut(bm, in);
+    case VE_MESH_OP_RECALC_NORMALS:
+      return run_recalc_normals(bm, in);
+    case VE_MESH_OP_SMOOTH:
+      return run_smooth(bm, in);
+    case VE_MESH_OP_FILL_HOLES:
+      return run_fill_holes(bm, in);
+    case VE_MESH_OP_BEAUTIFY:
+      return run_beautify(bm, in);
+    case VE_MESH_OP_PLANAR_FACES:
+      return run_planar_faces(bm, in);
+    case VE_MESH_OP_JOIN_TRIANGLES:
+      return run_join_triangles(bm, in);
+    case VE_MESH_OP_DISSOLVE_DEGENERATE:
+      return run_dissolve_degenerate(bm, in);
+    case VE_MESH_OP_SPLIT_EDGES:
+      return run_split_edges(bm);
+    case VE_MESH_OP_ROTATE_EDGES:
+      return run_rotate_edges(bm, in);
+    case VE_MESH_OP_CONNECT_VERTICES:
+      return run_connect_vertices(bm, in);
+    case VE_MESH_OP_SPACE_EDGE_LOOPS:
+      return run_space_edge_loops(bm, in);
+    case VE_MESH_OP_RELAX_EDGE_LOOPS:
+      return run_relax_edge_loops(bm, in);
+    case VE_MESH_OP_CIRCULARIZE:
+      return run_circularize(bm, in);
     default:
       return run_symmetrize(bm, in);
   }

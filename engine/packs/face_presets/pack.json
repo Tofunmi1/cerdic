@@ -1,0 +1,22 @@
+{
+  "name": "face_presets",
+  "version": "1.0.0",
+  "description": "Facial expressions for body.human as text constants: face_happy, face_sad, face_angry, face_surprised, face_wink, face_blink, face_talk and face_disgust, each a set of ARKit face actions.",
+  "license": "GPL-2.0-or-later",
+  "requires": {
+    "operators": [
+      "body.human@1"
+    ]
+  },
+  "provides": {
+    "macros": [],
+    "groups": [],
+    "scripts": []
+  },
+  "files": {
+    "face_presets.txt": {
+      "kind": "macros",
+      "sha256": "0424fed9f218fcb179464851a5e2958f82203b938bb991423a82025ad29933d9"
+    }
+  }
+}

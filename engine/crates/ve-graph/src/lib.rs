@@ -21,6 +21,7 @@ mod session;
 mod spec;
 mod store;
 mod text;
+mod typed_api;
 mod value;
 
 pub use builtin::builtin_registry;
@@ -44,5 +45,8 @@ pub use spec::{
     PortType, Readiness, Socket,
 };
 pub use store::{Backend, BackendError, DocStore, Loaded, MemoryBackend, MigrationStep, Migrator};
-pub use text::{TextBatch, parse_text, parse_text_in, to_text};
+pub use text::{
+    TextBatch, parse_text, parse_text_in, to_text, to_text_compact, to_text_node_lines,
+};
+pub use typed_api::operators_d_ts;
 pub use value::{ParamIssue, ParamType, Unit, Value};

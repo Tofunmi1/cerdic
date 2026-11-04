@@ -3,11 +3,12 @@
 /// Authored nodes in one document.
 pub const MAX_NODES: usize = 5_000;
 
-/// Commands in one batch.
-pub const MAX_COMMANDS: usize = 1_000;
+/// Commands in one batch. A text program costs one command per node, one per input link and one per output, so a detailed
+/// world (a model's first draft of a village is 1,500 commands) needs room; the node cap below still bounds the document.
+pub const MAX_COMMANDS: usize = 10_000;
 
 /// Bytes in one serialised batch.
-pub const MAX_BATCH_BYTES: usize = 1024 * 1024;
+pub const MAX_BATCH_BYTES: usize = 4 * 1024 * 1024;
 
 /// Bytes in a serialised document.
 pub const MAX_DOCUMENT_BYTES: usize = 2 * 1024 * 1024;
@@ -29,7 +30,7 @@ pub(crate) const MAX_STRING_BYTES: usize = 256;
 
 /// Most bytes any text parameter may declare for itself (a texture program, a list of paint stamps); each operator's spec
 /// states its own, smaller, limit.
-pub(crate) const MAX_PARAM_STRING_BYTES: usize = 16_384;
+pub(crate) const MAX_PARAM_STRING_BYTES: usize = 1_048_576;
 
 /// Transaction keys remembered for idempotency.
 pub(crate) const MAX_SEEN_TRANSACTIONS: usize = 1_024;
@@ -37,8 +38,9 @@ pub(crate) const MAX_SEEN_TRANSACTIONS: usize = 1_024;
 /// Revisions remembered for conflict reports.
 pub(crate) const MAX_REVISION_LOG: usize = 1_024;
 
-/// Named outputs in one document.
-pub(crate) const MAX_OUTPUTS: usize = 64;
+/// Named outputs in one document. Each is a part the renderer draws; a world of many props needs more than a few dozen,
+/// and the triangle and texture budgets bound what they cost.
+pub(crate) const MAX_OUTPUTS: usize = 256;
 
 /// Material definitions in one document.
 pub(crate) const MAX_MATERIALS: usize = 256;

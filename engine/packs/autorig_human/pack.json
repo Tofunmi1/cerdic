@@ -1,0 +1,41 @@
+{
+  "name": "autorig_human",
+  "version": "1.0.0",
+  "description": "Rigs a body.human in three lines: human_rig makes every bone a part with its parent link and output, human_skin skins it with the pack's weights, human_ik adds reach targets; the fingers carry fist and point clips.",
+  "license": "GPL-2.0-or-later",
+  "requires": {
+    "operators": [
+      "anim.parent@1",
+      "anim.track@1",
+      "body.bone@1",
+      "body.human@1",
+      "body.skin@1",
+      "rig.ik@1",
+      "solid.box@1",
+      "solid.material@1",
+      "value.point@1",
+      "xform.move@1"
+    ]
+  },
+  "provides": {
+    "macros": [
+      "rbone",
+      "rarm",
+      "rjoint",
+      "rfingers",
+      "rhand",
+      "rleg",
+      "human_rig",
+      "human_ik",
+      "human_skin"
+    ],
+    "groups": [],
+    "scripts": []
+  },
+  "files": {
+    "autorig_human.txt": {
+      "kind": "macros",
+      "sha256": "80a185852778780c81d430f2217a0025ea73d482064dc80c67670febd7c991f9"
+    }
+  }
+}

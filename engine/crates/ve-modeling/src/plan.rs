@@ -1,13 +1,13 @@
 //! Preflight completes before any kernel call or geometry allocation.
 mod estimate;
 mod fields;
+mod validate;
 
 use crate::{Fail, Quality, budget, fail, fail_suggest};
 use estimate::estimate;
 use std::collections::{BTreeMap, BTreeSet};
-use ve_graph::{
-    Arity, Document, Node, NodeId, Output, OutputSpec, PortRef, PortType, builtin_registry,
-};
+use validate::validate;
+use ve_graph::{Document, Node, NodeId, Output, OutputSpec, PortRef, PortType, builtin_registry};
 
 pub(crate) struct Plan {
     pub(crate) order: Vec<usize>,
@@ -47,6 +47,8 @@ fn plan_nodes(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
     let mut sizes = BTreeMap::new();
     let mut field_complexities = BTreeMap::new();
     let mut placements = BTreeMap::new();
+    // Nodes whose copies are drawn only inside a camera-distance band (`scatter.place` show_from / show_to, and whatever is built from it).
+    let mut banded = BTreeSet::new();
     let mut frames = BTreeMap::new();
     let mut order = Vec::new();
     let mut live_bytes = 0_usize;
@@ -85,10 +87,10 @@ fn plan_nodes(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
             live_bytes = live_bytes.saturating_add(estimate::auxiliary_bytes(node));
             live_bytes = live_bytes.saturating_add(instances.saturating_mul(128));
             live_bytes = live_bytes.saturating_add(sockets.saturating_mul(256));
-            if live_bytes > 256 * 1024 * 1024 {
+            if live_bytes > budget::MEMORY_LIMIT {
                 return Err(budget::exceeded(
                     "budget.memory",
-                    256 * 1024 * 1024,
+                    budget::MEMORY_LIMIT,
                     live_bytes,
                 ));
             }
@@ -98,6 +100,22 @@ fn plan_nodes(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
                 field_complexities.insert(node.id.clone(), complexity);
             }
             placements.insert(node.id.clone(), instances);
+            let own_band = node.op.family().as_str() == "scatter.place"
+                && ["show_from", "show_to"].iter().any(|name| {
+                    node.params
+                        .get(*name)
+                        .and_then(ve_graph::Value::as_f64)
+                        .is_some_and(|v| v > 0.0)
+                });
+            if own_band
+                || node
+                    .inputs
+                    .values()
+                    .flatten()
+                    .any(|r| banded.contains(&r.node))
+            {
+                banded.insert(node.id.clone());
+            }
             frames.insert(node.id.clone(), sockets);
             done.insert(node.id.clone());
             order.push(index);
@@ -110,7 +128,7 @@ fn plan_nodes(doc: &Document, quality: Quality) -> Result<Plan, Fail> {
         }
     }
     let outputs = outputs(doc, &types);
-    validate_outputs(&outputs, &types, &sizes, &placements, quality)?;
+    validate_outputs(doc, &outputs, &types, &sizes, &placements, &banded, quality)?;
     Ok(Plan { order, outputs })
 }
 
@@ -173,10 +191,12 @@ fn output_kind(
 }
 
 fn validate_outputs(
+    doc: &Document,
     outputs: &[Output],
     types: &BTreeMap<NodeId, PortType>,
     sizes: &BTreeMap<NodeId, usize>,
     placements: &BTreeMap<NodeId, usize>,
+    banded: &BTreeSet<NodeId>,
     quality: Quality,
 ) -> Result<(), Fail> {
     // Stored triangles count a placed shape once; drawn ones count every placement (see `budget::Triangles`).
@@ -186,6 +206,11 @@ fn validate_outputs(
     let mut lights = 0_usize;
     for output in outputs {
         let output_kind = types.get(&output.from.node);
+        let game_output = output_kind == Some(&PortType::Game)
+            && output.name == "rules"
+            && doc
+                .node(&output.from.node)
+                .is_some_and(|node| node.op.family().as_str() == "game.collect");
         if !matches!(
             output_kind,
             Some(
@@ -195,8 +220,39 @@ fn validate_outputs(
                     | PortType::Light
                     | PortType::Environment
             )
-        ) || output.from.port != "out"
+        ) && !game_output
+            || output.from.port != "out"
         {
+            if output_kind == Some(&PortType::Pattern) {
+                return Err(fail_suggest(
+                    "graph.port_type",
+                    format!(
+                        "{} is a pattern (a function of position), not geometry, so it cannot be a scene output",
+                        output.from.node
+                    ),
+                    "link it into a node that takes a pattern, such as the `where` input of scatter.place, and output that node",
+                ));
+            }
+            if output_kind == Some(&PortType::Volume) {
+                return Err(fail_suggest(
+                    "graph.port_type",
+                    format!(
+                        "{} is a volume (a grid of distances), not geometry, so it cannot be a scene output",
+                        output.from.node
+                    ),
+                    "turn it into a mesh with volume.to_mesh and output that",
+                ));
+            }
+            if output_kind == Some(&PortType::Game) {
+                return Err(fail_suggest(
+                    "graph.port_type",
+                    format!(
+                        "{} is a game definition, not geometry, so it cannot be a scene output",
+                        output.from.node
+                    ),
+                    "output a solid, or use this node as the `rules` output",
+                ));
+            }
             return Err(fail_suggest(
                 "graph.port_type",
                 "scene outputs must name geometry, a light or the environment",
@@ -217,11 +273,17 @@ fn validate_outputs(
         if output_kind == Some(&PortType::Environment) {
             continue;
         }
-        let count = placements
-            .get(&output.from.node)
-            .copied()
-            .unwrap_or(0)
-            .max(1);
+        // A banded set shows only the copies one camera reaches, which depends on where they stand; the check after evaluation
+        // (`budget::drawn_copies`) counts that exactly, so here it is counted once.
+        let count = if banded.contains(&output.from.node) {
+            1
+        } else {
+            placements
+                .get(&output.from.node)
+                .copied()
+                .unwrap_or(0)
+                .max(1)
+        };
         let stored = sizes.get(&output.from.node).copied().unwrap_or(0);
         let drawn = stored
             .checked_mul(count)
@@ -256,80 +318,6 @@ fn validate_outputs(
             quality.drawn_triangles(),
             total_drawn,
         ));
-    }
-    Ok(())
-}
-
-fn validate(
-    node: &Node,
-    spec: &ve_graph::OperatorSpec,
-    types: &BTreeMap<NodeId, PortType>,
-) -> Result<(), Fail> {
-    for (name, value) in &node.params {
-        let param = spec
-            .param(name)
-            .ok_or_else(|| fail("parse.unknown_param", name))?;
-        param
-            .ty
-            .check(value)
-            .map_err(|e| Box::new(ve_graph::Diagnostic::from_issue(e, Some(&node.id), name)))?;
-    }
-    for param in &spec.params {
-        if !node.params.contains_key(param.name) {
-            return Err(fail("parse.missing_param", param.name));
-        }
-    }
-    for (name, links) in &node.inputs {
-        if spec.input(name).is_some() {
-            continue;
-        }
-        // A number socket: a link into a number parameter, which must come from a value node.
-        if spec.socket(name).is_none() {
-            return Err(fail("graph.unknown_port", name));
-        }
-        for link in links {
-            if link.port != "out" || types.get(&link.node) != Some(&PortType::Number) {
-                return Err(fail_suggest(
-                    "graph.port_type",
-                    format!(
-                        "{} gets {name} from a node that does not produce a number",
-                        node.id
-                    ),
-                    "link a value.number, value.math or value.size node, or type the number in the parameter",
-                ));
-            }
-        }
-    }
-    if node.op.family().as_str() == "xform.align" {
-        crate::assembly::alignment(node).map_err(|e| crate::operations::kernel_fail(node, &e))?;
-    }
-    for port in &spec.inputs {
-        let links = node.inputs.get(port.name).map_or(&[][..], Vec::as_slice);
-        let valid = match port.arity {
-            Arity::One => links.len() == 1,
-            Arity::Optional => links.len() <= 1,
-            Arity::Variadic { min } => (usize::from(min)..=64).contains(&links.len()),
-        };
-        if !valid {
-            return Err(fail_suggest(
-                "graph.missing_input",
-                format!("{} requires {}", node.id, port.name),
-                format!("link the {} input of {}", port.name, node.id),
-            ));
-        }
-        for link in links {
-            if link.port != "out"
-                || !types
-                    .get(&link.node)
-                    .is_some_and(|kind| port.accepts.contains(kind))
-            {
-                return Err(fail_suggest(
-                    "graph.port_type",
-                    format!("incompatible input on {}", node.id),
-                    format!("link a value the {} input accepts", port.name),
-                ));
-            }
-        }
     }
     Ok(())
 }

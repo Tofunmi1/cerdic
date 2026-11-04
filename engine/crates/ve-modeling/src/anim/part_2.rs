@@ -77,6 +77,31 @@ pub(crate) fn pivot(node: &Node) -> [f32; 3] {
     out
 }
 
+/// The point a track turns about: the typed `pivot`, or with `pivot_at` the head or tail of the bone the input is.
+pub(crate) fn pivot_for(node: &Node, input: &Value) -> Result<[f32; 3], Fail> {
+    let at = match node.params.get("pivot_at") {
+        Some(Param::Str(at)) => at.as_str(),
+        _ => "none",
+    };
+    match at {
+        "none" => Ok(pivot(node)),
+        "head" | "tail" => {
+            let segment = input.bone.ok_or_else(|| {
+                fail_suggest(
+                    "anim.pivot_needs_bone",
+                    format!("pivot_at={at:?} needs the part to be a bone"),
+                    "put the track on a body.bone or rig.bone, or type the pivot",
+                )
+            })?;
+            Ok(if at == "head" { segment.head } else { segment.tail })
+        }
+        other => Err(fail(
+            "param.range",
+            format!("pivot_at {other:?} is none, head or tail"),
+        )),
+    }
+}
+
 /// Attaches the node's track to the input's tracks.
 pub(crate) fn track(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
     let input = inputs
@@ -138,7 +163,7 @@ pub(crate) fn track(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
         keys,
         interpolation,
         looped,
-        pivot: pivot(node),
+        pivot: pivot_for(node, input)?,
         clip: clip_name(node)?,
         phase_step,
         phase_jitter,

@@ -1,0 +1,7 @@
+ball = solid.sphere@1(radius=0.4, segments=48)
+body = xform.move@1(ball, by=[0, 0.8, 0])
+grid = poly.grid@1(width=1.2, height=1.2, columns=24, rows=24)
+flat = xform.rotate@1(grid, angles=[-90, 0, 0])
+panel = xform.move@1(flat, by=[0, 1.8, 0])
+cloth = cloth.drape@1(panel, with=body, seconds=3)
+output cloth = cloth
