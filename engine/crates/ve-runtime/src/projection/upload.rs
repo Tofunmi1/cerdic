@@ -13,6 +13,8 @@ pub(super) fn upload(
     chunk: Chunk,
     meshes: &mut Assets<Mesh>,
     corners: Option<&mut usize>,
+    skin: Option<&crate::skinning::SkinData>,
+    rest_in_colour: bool,
 ) -> Uploaded {
     let keep_rest = corners.is_some();
     let mut rest = Vec::new();
@@ -24,8 +26,18 @@ pub(super) fn upload(
     };
     let mut occlusion = Vec::new();
     let mut uvs = Vec::new();
-    let stride = if chunk.textured { 9 } else { 7 };
+    let mut vertex_colours: Vec<[f32; 4]> = Vec::new();
+    let uv_end = if chunk.textured { 9 } else { 7 };
+    let stride = uv_end + if chunk.coloured { 4 } else { 0 };
     for vertex in chunk.data.chunks_exact(stride) {
+        if chunk.coloured {
+            vertex_colours.push([
+                vertex[uv_end],
+                vertex[uv_end + 1],
+                vertex[uv_end + 2],
+                vertex[uv_end + 3],
+            ]);
+        }
         positions.push([vertex[0], vertex[1], vertex[2]]);
         normals.push([vertex[3], vertex[4], vertex[5]]);
         occlusion.push(vertex[6]);
@@ -44,6 +56,14 @@ pub(super) fn upload(
         pack_smooth_normals(&positions, &normals, &mut occlusion);
     }
     let positions_len = positions.len();
+    // Bevy's PBR applies a normal map only to a mesh that has tangents, and every texture's `height` is baked into one, so a textured part gets them. A skinned part
+    // keeps its rest-pose tangents and the skinning shader turns them with the bones, as it does the normals. Its vertices are triangle corners, so the indices are just 0, 1, 2 ...
+    let tangents = chunk.textured
+        .then(|| {
+            let indices: Vec<u32> = (0..u32::try_from(positions_len).unwrap_or(0)).collect();
+            ve_kernel::tangents(&positions, &normals, &uvs, &indices).ok()
+        })
+        .flatten();
     let mut mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::default(),
@@ -54,11 +74,40 @@ pub(super) fn upload(
     if chunk.textured {
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
     }
+    if let Some(tangents) = tangents {
+        mesh.insert_attribute(Mesh::ATTRIBUTE_TANGENT, tangents);
+    }
+    if chunk.coloured && !vertex_colours.is_empty() {
+        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vertex_colours);
+    } else if rest_in_colour && !rest.is_empty() {
+        let colours: Vec<[f32; 4]> = rest
+            .chunks_exact(6)
+            .map(|corner| {
+                [
+                    corner[0] / 32.0 + 0.5,
+                    corner[1] / 32.0 + 0.5,
+                    corner[2] / 32.0 + 0.5,
+                    1.0,
+                ]
+            })
+            .collect();
+        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colours);
+    }
     let corner_offset = corners.map_or(0, |seen| {
         let start = *seen;
         *seen += positions_len;
         start
     });
+    // The Bevy renderer skins linear skins on the GPU, so the mesh is born with its joints, weights and the vertex-averaged normal the
+    // outline hull follows (the mesh's skin can not change after a pipeline is made for it). See `skinning_gpu`.
+    #[cfg(any(feature = "bevy-webgl", feature = "bevy-webgpu"))]
+    if let Some(skin) =
+        skin.filter(|skin| skin.blend == ve_modeling::rig::Blend::Linear && !rest.is_empty())
+    {
+        crate::skinning_gpu::add_joint_attributes(&mut mesh, skin, corner_offset, &rest);
+    }
+    #[cfg(not(any(feature = "bevy-webgl", feature = "bevy-webgpu")))]
+    let _ = skin;
     Uploaded {
         group: chunk.group,
         region: chunk.region,

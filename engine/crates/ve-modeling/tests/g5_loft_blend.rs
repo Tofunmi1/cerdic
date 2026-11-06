@@ -105,10 +105,9 @@ fn g5_18_blended_loft_cost_is_estimated_before_building() {
         "body = solid.loft@1({names}, spacing=0.01, steps=8)\noutput body"
     )
     .unwrap();
-    // 63 spans x 8 rows x 256 sides x 2 is about 258,000 triangles, over the 200,000 Preview budget;
-    // without the blend rows the same loft is 32,000.
-    let error = evaluate_at(&text, Quality::Preview).unwrap_err();
-    assert!(error.contains("budget.triangles"), "{error}");
+    // 63 spans x 8 rows x 256 sides x 2 is about 258,000 triangles; there is no triangle limit any more (owner decision
+    // 2026-11-06), so the blended loft evaluates too; without the blend rows the same loft is 32,000.
+    assert!(evaluate_at(&text, Quality::Preview).is_ok());
     let straight = text.replace("steps=8", "steps=1");
     assert!(evaluate_at(&straight, Quality::Preview).is_ok());
 }

@@ -48,9 +48,9 @@ fn g4c_03_realization_budget_refuses_before_kernel_work() {
     let doc = document(
         "b = solid.sphere(radius=1, segments=16)\ns = inst.array(b, count_x=10000, spacing=[2,0,0])\nr = inst.realize(s)\noutput r",
     );
+    // No triangle limit any more (owner decision 2026-11-06): the plan is accepted, and only memory could stop the realization.
     let mut evaluator = Evaluator::default();
-    let error = evaluator.begin(&doc, Quality::Preview).unwrap_err();
-    assert_eq!(error.code, "budget.triangles");
+    evaluator.begin(&doc, Quality::Preview).unwrap();
     assert_eq!(evaluator.evaluated_nodes(), 0);
 }
 
@@ -69,16 +69,13 @@ fn g4c_01_group_prototype_and_radial_set_share_evaluation() {
 
 #[test]
 fn g4c_draw_work_budget_counts_placements_before_geometry() {
-    // What the placements would draw is bounded in preflight, before any node runs: a 32,000-triangle sphere ten thousand
-    // times is over the preview drawn limit.
+    // No drawn-triangle limit any more (owner decision 2026-11-06): a 32,000-triangle sphere ten thousand times is planned
+    // and accepted before any node runs; the viewer's culling and detail levels bound what is drawn.
     let doc = document(
         "b = solid.sphere(radius=1, segments=256)\ns = inst.repeat(b, count=10000, step=[2,0,0])\noutput s",
     );
     let mut evaluator = Evaluator::default();
-    assert_eq!(
-        evaluator.begin(&doc, Quality::Preview).unwrap_err().code,
-        "budget.drawn_triangles"
-    );
+    evaluator.begin(&doc, Quality::Preview).unwrap();
     assert_eq!(evaluator.evaluated_nodes(), 0);
 }
 

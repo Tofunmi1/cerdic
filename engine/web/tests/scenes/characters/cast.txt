@@ -1,0 +1,193 @@
+# THE CAST: eight characters from one style bible, built entirely from our own tools (smooth fields for bodies, scripts for armour, robes, hats and weapons).
+# STYLE BIBLE. Shape language: chunky and heroic, big heads and hands, thick limbs, simple readable masses; squares and rounds for the good (warrior, priest,
+# dwarf), angles and spikes for the dangerous (orc, dragon), a tall cone for the mage. Proportion canon (height in metres): elf 1.95 slender, human 1.8, orc 2.1
+# hunched and broad, dwarf 1.35 wide. Silhouette hooks: warrior = horned helm + shield + big pauldrons; wizard = tall pointed hat + long robe + staff;
+# priest = tall mitre + white robe + staff with a ring; rogue = deep hood + twin daggers; ranger = hood + bow + quiver; dwarf = huge braided beard + round shield + hammer;
+# orc = spiked shoulders + tusks + mohawk + axe; dragon = wings, horns, spine ridge, long tail. Palette: steel and gold for the warrior, deep blue and violet for the
+# wizard, white and gold for the priest, charcoal and wine for the rogue, forest green and leather for the ranger, rust and iron for the dwarf, bone and blood for the
+# orc. Every character faces +z, stands on y = 0, and is placed along x.
+sky = scene.sky@1(sun_elevation=48, sun_azimuth=35, sun_intensity=3.4, turbidity=2.5, clouds=false, seed=1)
+output sky = sky
+floor_b = solid.box@1(size=[80, 0.2, 60])
+floor_m = solid.material@1(floor_b, color=[0.2, 0.21, 0.23], roughness=0.85)
+floor_p = xform.move@1(floor_m, by=[0, -0.1, 10])
+output floor = floor_p
+
+# ---- helpers (every function adds outward-wound faces to the mesh m) ----
+let jbox = "function box(x0,y0,z0,x1,y1,z1){ const v=[m.vertex(x0,y0,z0),m.vertex(x1,y0,z0),m.vertex(x1,y1,z0),m.vertex(x0,y1,z0),m.vertex(x0,y0,z1),m.vertex(x1,y0,z1),m.vertex(x1,y1,z1),m.vertex(x0,y1,z1)]; m.face(v[0],v[3],v[2],v[1]); m.face(v[4],v[5],v[6],v[7]); m.face(v[0],v[1],v[5],v[4]); m.face(v[3],v[7],v[6],v[2]); m.face(v[1],v[2],v[6],v[5]); m.face(v[0],v[4],v[7],v[3]); }; "
+let jcyl = "function cyl(cx,cz,y0,y1,r0,r1,n){ const b=[],t=[]; for(let i=0;i<n;i++){ const a=i*6.283185/n,c=Math.cos(a),s=Math.sin(a); b.push(m.vertex(cx+c*r0,y0,cz+s*r0)); t.push(m.vertex(cx+c*r1,y1,cz+s*r1)); } for(let i=0;i<n;i++){ const j=(i+1)%n; m.face(b[i],t[i],t[j],b[j]); } m.face(...t.slice().reverse()); m.face(...b); }; "
+let jlathe = "function lathe(cx,cz,p,n){ const R=[]; for(let k=0;k<p.length;k++){ const row=[]; for(let i=0;i<n;i++){ const a=i*6.283185/n; row.push(m.vertex(cx+Math.cos(a)*p[k][1],p[k][0],cz+Math.sin(a)*p[k][1])); } R.push(row); } for(let k=0;k<p.length-1;k++){ for(let i=0;i<n;i++){ const j=(i+1)%n; m.face(R[k][i],R[k+1][i],R[k+1][j],R[k][j]); } } m.face(...R[p.length-1].slice().reverse()); m.face(...R[0]); }; "
+let jtube = "function tube(ax,ay,az,bx,by,bz,r0,r1,n){ let dx=bx-ax,dy=by-ay,dz=bz-az; const L=Math.sqrt(dx*dx+dy*dy+dz*dz)||1; dx/=L; dy/=L; dz/=L; let hx=0,hy=1,hz=0; if(Math.abs(dy)>0.9){ hx=1; hy=0; } let ux=dy*hz-dz*hy,uy=dz*hx-dx*hz,uz=dx*hy-dy*hx; const l=Math.sqrt(ux*ux+uy*uy+uz*uz)||1; ux/=l; uy/=l; uz/=l; const vx=uy*dz-uz*dy,vy=uz*dx-ux*dz,vz=ux*dy-uy*dx; const A=[],B=[]; for(let i=0;i<n;i++){ const t=i*6.283185/n,c=Math.cos(t),s=Math.sin(t); const ox=ux*c+vx*s,oy=uy*c+vy*s,oz=uz*c+vz*s; A.push(m.vertex(ax+ox*r0,ay+oy*r0,az+oz*r0)); B.push(m.vertex(bx+ox*r1,by+oy*r1,bz+oz*r1)); } for(let i=0;i<n;i++){ const j=(i+1)%n; m.face(A[i],B[i],B[j],A[j]); } m.face(...A.slice().reverse()); m.face(...B); }; "
+let jblob = "function blob(cx,cy,cz,r){ lathe(cx,cz,[[cy-r*0.95,r*0.3],[cy-r*0.75,r*0.62],[cy-r*0.4,r*0.9],[cy,r],[cy+r*0.4,r*0.92],[cy+r*0.75,r*0.64],[cy+r*0.95,r*0.3]],10); }; "
+# A disc or oval plate standing in the x-y plane, z0 to z1 thick, rx by ry (shields, medallions, symbols).
+let jplate = "function plate(cx,cy,z0,z1,rx,ry,n){ const f=[],b=[]; for(let i=0;i<n;i++){ const a=i*6.283185/n; f.push(m.vertex(cx+Math.cos(a)*rx,cy+Math.sin(a)*ry,z1)); b.push(m.vertex(cx+Math.cos(a)*rx,cy+Math.sin(a)*ry,z0)); } for(let i=0;i<n;i++){ const j=(i+1)%n; m.face(b[i],b[j],f[j],f[i]); } m.face(...f); m.face(...b.slice().reverse()); }; "
+let jall = "${jbox} ${jcyl} ${jlathe} ${jtube} ${jblob} ${jplate}"
+
+# ---- species bodies: smooth fields, chunky proportions. name, x, H (height), sw (shoulder half width), hw (hip half width), hr (head radius), belly, hunch, skin r g b ----
+def person(name, x, H, sw, hw, hr, belly, hunch, r, g, b)
+  n_{name}_torso = field.ellipsoid@1(radii=[{sw * 0.98}, {H * 0.2}, {H * 0.115 + belly}])
+  n_{name}_torso_m = field.move@1(n_{name}_torso, by=[0, {H * 0.63}, {hunch * 0.4}])
+  n_{name}_pelvis = field.ellipsoid@1(radii=[{hw * 1.55}, {H * 0.08}, {H * 0.1}])
+  n_{name}_pelvis_m = field.move@1(n_{name}_pelvis, by=[0, {H * 0.5}, 0])
+  n_{name}_neck = field.tube@1(points=[[0, {H * 0.76}, {hunch * 0.5}], [0, {H * 0.84}, {hunch}]], radius={H * 0.05}, end_radius={H * 0.045})
+  n_{name}_head = field.ellipsoid@1(radii=[{hr * 0.95}, {hr * 1.05}, {hr}])
+  n_{name}_head_m = field.move@1(n_{name}_head, by=[0, {H * 0.885}, {hunch}])
+  n_{name}_jaw = field.ellipsoid@1(radii=[{hr * 0.7}, {hr * 0.55}, {hr * 0.8}])
+  n_{name}_jaw_m = field.move@1(n_{name}_jaw, by=[0, {H * 0.885 - hr * 0.55}, {hunch + hr * 0.2}])
+  n_{name}_nose = field.ellipsoid@1(radii=[{hr * 0.16}, {hr * 0.2}, {hr * 0.25}])
+  n_{name}_nose_m = field.move@1(n_{name}_nose, by=[0, {H * 0.885 - hr * 0.1}, {hunch + hr * 0.95}])
+  n_{name}_leg_l = field.tube@1(points=[[{hw}, {H * 0.5}, 0], [{hw * 1.05}, {H * 0.27}, {H * 0.01}], [{hw * 1.05}, {H * 0.05}, 0]], radius={H * 0.085}, end_radius={H * 0.062})
+  n_{name}_leg_r = field.tube@1(points=[[{0 - hw}, {H * 0.5}, 0], [{0 - hw * 1.05}, {H * 0.27}, {H * 0.01}], [{0 - hw * 1.05}, {H * 0.05}, 0]], radius={H * 0.085}, end_radius={H * 0.062})
+  n_{name}_foot = field.ellipsoid@1(radii=[{H * 0.06}, {H * 0.035}, {H * 0.11}])
+  n_{name}_foot_l = field.move@1(n_{name}_foot, by=[{hw * 1.05}, {H * 0.035}, {H * 0.05}])
+  n_{name}_foot_r = field.move@1(n_{name}_foot, by=[{0 - hw * 1.05}, {H * 0.035}, {H * 0.05}])
+  n_{name}_arm_l = field.tube@1(points=[[{sw}, {H * 0.74}, 0], [{sw + H * 0.04}, {H * 0.59}, {H * 0.03}], [{sw + H * 0.06}, {H * 0.46}, {H * 0.1}]], radius={H * 0.055}, end_radius={H * 0.045})
+  n_{name}_arm_r = field.tube@1(points=[[{0 - sw}, {H * 0.74}, 0], [{0 - sw - H * 0.04}, {H * 0.59}, {H * 0.03}], [{0 - sw - H * 0.06}, {H * 0.46}, {H * 0.1}]], radius={H * 0.055}, end_radius={H * 0.045})
+  n_{name}_hand = field.sphere@1(radius={H * 0.05})
+  n_{name}_hand_l = field.move@1(n_{name}_hand, by=[{sw + H * 0.06}, {H * 0.44}, {H * 0.1}])
+  n_{name}_hand_r = field.move@1(n_{name}_hand, by=[{0 - sw - H * 0.06}, {H * 0.44}, {H * 0.1}])
+  n_{name}_s1 = field.smooth_union@1(n_{name}_torso_m, n_{name}_pelvis_m, radius={H * 0.06})
+  n_{name}_s2 = field.smooth_union@1(n_{name}_s1, n_{name}_neck, radius={H * 0.04})
+  n_{name}_s3 = field.smooth_union@1(n_{name}_s2, n_{name}_head_m, radius={H * 0.03})
+  n_{name}_s4 = field.smooth_union@1(n_{name}_s3, n_{name}_jaw_m, radius={H * 0.03})
+  n_{name}_s5 = field.smooth_union@1(n_{name}_s4, n_{name}_nose_m, radius={H * 0.015})
+  n_{name}_s6 = field.smooth_union@1(n_{name}_s5, n_{name}_leg_l, radius={H * 0.04})
+  n_{name}_s7 = field.smooth_union@1(n_{name}_s6, n_{name}_leg_r, radius={H * 0.04})
+  n_{name}_s8 = field.smooth_union@1(n_{name}_s7, n_{name}_foot_l, radius={H * 0.02})
+  n_{name}_s9 = field.smooth_union@1(n_{name}_s8, n_{name}_foot_r, radius={H * 0.02})
+  n_{name}_s10 = field.smooth_union@1(n_{name}_s9, n_{name}_arm_l, radius={H * 0.035})
+  n_{name}_s11 = field.smooth_union@1(n_{name}_s10, n_{name}_arm_r, radius={H * 0.035})
+  n_{name}_s12 = field.smooth_union@1(n_{name}_s11, n_{name}_hand_l, radius={H * 0.02})
+  n_{name}_s13 = field.smooth_union@1(n_{name}_s12, n_{name}_hand_r, radius={H * 0.02})
+  n_{name}_solid = field.to_solid@1(n_{name}_s13, min=[{0 - sw - H * 0.2}, {0 - H * 0.02}, {0 - H * 0.2}], max=[{sw + H * 0.2}, {H * 1.05}, {H * 0.3 + hunch}], edge_length={H * 0.014})
+  n_{name}_skin = solid.material@1(n_{name}_solid, color=[{r}, {g}, {b}], roughness=0.65)
+  n_{name}_body = xform.move@1(n_{name}_skin, by=[{x}, 0, 0])
+  output {name}_body = n_{name}_body
+end
+
+# ---- class kits: three scripts each (primary armour or robe, secondary leather or cloth, accent gold or glow); H height, S shoulder half width, W hip half width ----
+let jwarrior_a = "function kit(H,S,W){ lathe(0,0.008*H,[[0.84*H,0.125*H],[0.9*H,0.145*H],[0.97*H,0.135*H],[1.02*H,0.085*H],[1.06*H,0.025*H]],16); box(-0.014*H,0.84*H,0.135*H,0.014*H,0.93*H,0.15*H); for(const sx of [-1,1]){ tube(sx*0.12*H,0.97*H,0,sx*0.2*H,1.02*H,0,0.03*H,0.022*H,7); tube(sx*0.2*H,1.02*H,0,sx*0.24*H,1.15*H,0,0.022*H,0.008*H,7); lathe(sx*(S+0.01*H),0,[[0.69*H,0.105*H],[0.74*H,0.14*H],[0.79*H,0.13*H],[0.83*H,0.07*H]],12); lathe(sx*(S+0.04*H),0,[[0.7*H,0.11*H],[0.66*H,0.1*H]],12); } lathe(0,0.005*H,[[0.5*H,S*1.03],[0.58*H,S*1.12],[0.68*H,S*1.12],[0.76*H,S*0.85]],14); lathe(0,0,[[0.36*H,S*1.3],[0.44*H,S*1.12],[0.5*H,S*1.02]],14); for(const sx of [-1,1]){ cyl(sx*W*1.05,0.01*H,0.04*H,0.2*H,0.07*H,0.065*H,10); } plate(S+0.1*H,0.5*H,0.12*H,0.17*H,0.17*H,0.21*H,16); box(-S-0.06*H-0.016*H,0.52*H,0.082*H,-S-0.06*H+0.016*H,1.12*H,0.118*H); tube(-S-0.06*H,1.12*H,0.1*H,-S-0.06*H,1.2*H,0.1*H,0.016*H,0.002*H,4); }; "
+let jwarrior_b = "function kit(H,S,W){ lathe(0,0,[[0.49*H,S*0.98],[0.52*H,S*1.0]],14); box(-0.03*H,0.485*H,S*0.98,0.03*H,0.535*H,S*1.06); box(-S-0.06*H-0.012*H,0.44*H,0.09*H,-S-0.06*H+0.012*H,0.5*H,0.11*H); box(-S-0.06*H-0.012*H,0.4*H,0.092*H,-S-0.06*H+0.012*H,0.405*H,0.108*H); for(let i=0;i<4;i++){ box(-(0.14+i*0.04)*H,0.74*H-(i+1)*0.12*H,-0.17*H,(0.14+i*0.04)*H,0.74*H-i*0.12*H,-0.14*H); } tube(0,1.06*H,-0.02*H,0,1.16*H,-0.17*H,0.03*H,0.022*H,7); tube(0,1.16*H,-0.17*H,0,0.98*H,-0.32*H,0.022*H,0.006*H,7); plate(S+0.1*H,0.5*H,0.11*H,0.125*H,0.185*H,0.225*H,16); }; "
+let jwarrior_c = "function kit(H,S,W){ box(-S-0.06*H-0.1*H,0.5*H,0.075*H,-S-0.06*H+0.1*H,0.53*H,0.125*H); box(-S-0.06*H-0.02*H,0.37*H,0.08*H,-S-0.06*H+0.02*H,0.44*H,0.12*H); plate(S+0.1*H,0.5*H,0.17*H,0.19*H,0.06*H,0.06*H,10); for(let k=0;k<8;k++){ const a=k*0.785; box(S+0.1*H+Math.cos(a)*0.15*H-0.012*H,0.5*H+Math.sin(a)*0.18*H-0.012*H,0.17*H,S+0.1*H+Math.cos(a)*0.15*H+0.012*H,0.5*H+Math.sin(a)*0.18*H+0.012*H,0.19*H); } box(-0.035*H,0.495*H,S*1.0,0.035*H,0.525*H,S*1.07); }; "
+let jwizard_a = "function kit(H,S,W){ lathe(0,0,[[0.04*H,0.42*H],[0.2*H,0.3*H],[0.42*H,0.2*H],[0.6*H,0.19*H],[0.74*H,S*1.0],[0.78*H,0.08*H]],18); for(const sx of [-1,1]){ tube(sx*S,0.74*H,0,sx*(S+0.09*H),0.5*H,0.05*H,0.07*H,0.09*H,10); tube(sx*(S+0.09*H),0.5*H,0.05*H,sx*(S+0.12*H),0.43*H,0.1*H,0.09*H,0.1*H,10); } lathe(0,0,[[0.96*H,0.16*H],[0.975*H,0.36*H],[0.985*H,0.36*H],[1.0*H,0.1*H]],20); lathe(0,0,[[0.99*H,0.12*H],[1.12*H,0.095*H],[1.28*H,0.06*H],[1.45*H,0.02*H]],14); tube(0,1.43*H,0,0.08*H,1.5*H,-0.04*H,0.025*H,0.006*H,6); }; "
+let jwizard_b = "function kit(H,S,W){ cyl(-S-0.12*H,0.1*H,0.0,0.92*H,0.018*H,0.016*H,8); tube(-S-0.12*H,0.9*H,0.1*H,-S-0.14*H,1.0*H,0.1*H,0.02*H,0.012*H,6); lathe(0,0.095*H,[[0.7*H,0.09*H],[0.64*H,0.14*H],[0.55*H,0.09*H]],12); lathe(0,0.03*H,[[0.84*H,0.065*H],[0.7*H,0.12*H],[0.52*H,0.09*H],[0.4*H,0.02*H]],12); box(S*0.6,0.46*H,0.08*H,S*0.6+0.1*H,0.56*H,0.12*H); }; "
+let jwizard_c = "function kit(H,S,W){ blob(-S-0.14*H,1.04*H,0.1*H,0.055*H); for(let k=0;k<3;k++){ box(-0.2*H+k*0.0,0.58*H-k*0.17*H,0.115*H,0.2*H,0.6*H-k*0.17*H,0.125*H); } lathe(0,0.0,[[0.945*H,0.205*H],[0.955*H,0.205*H]],20); lathe(0,0.1*H,[[0.47*H,0.12*H],[0.46*H,0.12*H]],12); }; "
+let jpriest_a = "function kit(H,S,W){ lathe(0,0,[[0.04*H,0.22*H],[0.2*H,0.2*H],[0.42*H,0.18*H],[0.6*H,0.2*H],[0.74*H,S*1.05],[0.78*H,0.08*H]],18); for(const sx of [-1,1]){ tube(sx*S,0.74*H,0,sx*(S+0.08*H),0.5*H,0.05*H,0.07*H,0.085*H,10); tube(sx*(S+0.08*H),0.5*H,0.05*H,sx*(S+0.11*H),0.43*H,0.1*H,0.085*H,0.09*H,10); } lathe(0,0,[[0.96*H,0.125*H],[1.0*H,0.135*H],[1.04*H,0.11*H],[1.07*H,0.05*H]],16); lathe(0,0,[[0.58*H,S*1.55],[0.68*H,S*1.5],[0.78*H,S*1.05],[0.82*H,0.07*H]],18); }; "
+let jpriest_b = "function kit(H,S,W){ box(-0.06*H,0.0,0.25*H,0.06*H,0.62*H,0.255*H); box(-0.05*H,0.2*H,-0.25*H,0.05*H,0.7*H,-0.245*H); cyl(S+0.16*H,0.12*H,0.0,1.1*H,0.02*H,0.018*H,8); }; "
+let jpriest_c = "function kit(H,S,W){ box(-0.05*H,0.04*H,0.255*H,0.05*H,0.5*H,0.262*H); lathe(0,0,[[0.58*H,0.215*H],[0.6*H,0.215*H]],18); lathe(0,0,[[0.72*H,0.18*H],[0.74*H,0.18*H]],18); plate(S+0.16*H,1.18*H,0.115*H,0.14*H,0.08*H,0.08*H,16); plate(S+0.16*H,1.18*H,0.11*H,0.145*H,0.045*H,0.045*H,12); box(S+0.16*H-0.012*H,1.07*H,0.115*H,S+0.16*H+0.012*H,1.1*H,0.14*H); for(let k=0;k<16;k++){ const a=k*0.3927,b=(k+1)*0.3927; tube(Math.cos(a)*0.22*H,1.02*H+Math.sin(a)*0.22*H,-0.15*H,Math.cos(b)*0.22*H,1.02*H+Math.sin(b)*0.22*H,-0.15*H,0.014*H,0.014*H,6); } }; "
+let jrogue_a = "function kit(H,S,W){ lathe(0,-0.015*H,[[0.8*H,0.125*H],[0.88*H,0.15*H],[0.97*H,0.135*H],[1.03*H,0.06*H],[1.06*H,0.02*H]],14); tube(0,1.04*H,-0.03*H,0,1.02*H,-0.3*H,0.06*H,0.006*H,7); lathe(0,0,[[0.62*H,S*1.12],[0.74*H,S*1.2],[0.82*H,S*1.05]],14); for(let k=0;k<14;k++){ const a=k*0.4488; tube(Math.cos(a)*S*1.12,0.62*H,Math.sin(a)*S*1.12,Math.cos(a)*S*1.75,0.2*H,Math.sin(a)*S*1.75,0.05*H,0.003*H,5); } for(const sx of [-1,1]){ cyl(sx*W*1.05,0,0.02*H,0.28*H,0.075*H,0.068*H,10); } lathe(0,0.005*H,[[0.34*H,S*1.1],[0.5*H,S*0.99]],14); }; "
+let jrogue_b = "function kit(H,S,W){ tube(-S*0.9,0.74*H,0.06*H,S*0.9,0.5*H,0.08*H,0.018*H,0.018*H,6); tube(-S*1.1,0.5*H,-0.12*H,S*1.1,0.5*H,-0.12*H,0.02*H,0.02*H,6); box(-S-0.06*H-0.01*H,0.42*H,0.09*H,-S-0.06*H+0.01*H,0.55*H,0.115*H); box(S+0.06*H-0.01*H,0.42*H,0.09*H,S+0.06*H+0.01*H,0.55*H,0.115*H); box(-0.1*H,0.5*H,-0.14*H,0.1*H,0.64*H,-0.12*H); }; "
+let jrogue_c = "function kit(H,S,W){ box(-S-0.06*H-0.007*H,0.55*H,0.095*H,-S-0.06*H+0.007*H,0.74*H,0.11*H); box(S+0.06*H-0.007*H,0.55*H,0.095*H,S+0.06*H+0.007*H,0.74*H,0.11*H); box(-S-0.06*H-0.03*H,0.53*H,0.09*H,-S-0.06*H+0.03*H,0.56*H,0.115*H); box(S+0.06*H-0.03*H,0.53*H,0.09*H,S+0.06*H+0.03*H,0.56*H,0.115*H); box(-0.025*H,0.485*H,S*0.99,0.025*H,0.53*H,S*1.07); tube(-0.1*H,0.5*H,-0.17*H,0.12*H,1.0*H,-0.17*H,0.014*H,0.003*H,5); tube(0.1*H,0.5*H,-0.17*H,-0.12*H,1.0*H,-0.17*H,0.014*H,0.003*H,5); }; "
+let jranger_a = "function kit(H,S,W){ lathe(0,-0.02*H,[[0.8*H,0.12*H],[0.88*H,0.145*H],[0.98*H,0.13*H],[1.04*H,0.06*H],[1.07*H,0.02*H]],14); tube(0,1.06*H,-0.01*H,0,1.22*H,-0.12*H,0.06*H,0.006*H,7); for(const sx of [-1,1]){ tube(sx*0.1*H,0.9*H,0,sx*0.28*H,0.99*H,-0.03*H,0.025*H,0.004*H,5); } lathe(0,0,[[0.3*H,S*1.1],[0.5*H,S*1.06],[0.7*H,S*1.1],[0.8*H,S*0.9]],16); for(const sx of [-1,1]){ cyl(sx*W*1.05,0,0.02*H,0.3*H,0.075*H,0.07*H,10); } }; "
+let jranger_b = "function kit(H,S,W){ let p=null; for(let i=0;i<=14;i++){ const a=-1.25+2.5*i/14; const y=0.5*H+Math.sin(a)*0.42*H,x=S+0.06*H+0.2*H*(1-Math.cos(a)); if(p){ tube(p[1],p[0],0.1*H,x,y,0.1*H,0.016*H,0.016*H,6); } p=[y,x]; } cyl(0,-0.17*H,0.5*H,0.95*H,0.05*H,0.055*H,10); lathe(0,0,[[0.49*H,S*0.98],[0.52*H,S*1.0]],14); }; "
+let jranger_c = "function kit(H,S,W){ const ya=0.5*H-0.42*H*Math.sin(1.25),yb=0.5*H+0.42*H*Math.sin(1.25); tube(S+0.06*H,ya,0.1*H,S+0.06*H,yb,0.1*H,0.005*H,0.005*H,4); for(let k=0;k<5;k++){ tube(-0.07*H+k*0.03*H,0.94*H,-0.17*H,-0.07*H+k*0.03*H,1.1*H,-0.17*H,0.006*H,0.002*H,4); } }; "
+let jdwarf_a = "function kit(H,S,W){ lathe(0,0.0,[[0.84*H,0.145*H],[0.9*H,0.165*H],[0.98*H,0.15*H],[1.05*H,0.09*H],[1.1*H,0.03*H]],16); for(const sx of [-1,1]){ tube(sx*0.15*H,0.98*H,0,sx*0.2*H,1.04*H,0,0.03*H,0.02*H,7); lathe(sx*(S+0.01*H),0,[[0.68*H,0.12*H],[0.74*H,0.15*H],[0.79*H,0.13*H],[0.83*H,0.08*H]],12); } lathe(0,0.005*H,[[0.5*H,S*1.05],[0.6*H,S*1.12],[0.7*H,S*1.1],[0.76*H,S*0.9]],14); lathe(0,0,[[0.34*H,S*1.35],[0.43*H,S*1.15],[0.5*H,S*1.03]],14); plate(S+0.12*H,0.5*H,0.12*H,0.17*H,0.2*H,0.2*H,20); }; "
+let jdwarf_b = "function kit(H,S,W){ lathe(0,0.03*H,[[0.88*H,0.1*H],[0.74*H,0.2*H],[0.6*H,0.22*H],[0.5*H,0.16*H],[0.4*H,0.05*H]],14); for(const sx of [-1,1]){ cyl(sx*W*1.05,0.01*H,0.03*H,0.17*H,0.075*H,0.07*H,10); } lathe(0,0.005*H,[[0.49*H,S*1.0],[0.52*H,S*1.02]],14); }; "
+let jdwarf_c = "function kit(H,S,W){ cyl(-S-0.06*H,0.1*H,0.36*H,0.7*H,0.02*H,0.018*H,8); box(-S-0.06*H-0.08*H,0.68*H,0.08*H,-S-0.06*H+0.08*H,0.78*H,0.14*H); plate(S+0.12*H,0.5*H,0.17*H,0.19*H,0.07*H,0.07*H,12); for(let k=0;k<10;k++){ const a=k*0.628; box(S+0.12*H+Math.cos(a)*0.17*H-0.012*H,0.5*H+Math.sin(a)*0.17*H-0.012*H,0.17*H,S+0.12*H+Math.cos(a)*0.17*H+0.012*H,0.5*H+Math.sin(a)*0.17*H+0.012*H,0.19*H); } box(-0.04*H,0.49*H,S*1.02,0.04*H,0.53*H,S*1.08); }; "
+let jorc_a = "function kit(H,S,W){ for(const sx of [-1,1]){ lathe(sx*(S+0.01*H),-0.01*H,[[0.7*H,0.13*H],[0.76*H,0.17*H],[0.82*H,0.15*H],[0.86*H,0.08*H]],12); for(let k=0;k<3;k++){ tube(sx*(S+0.01*H)+sx*(k-1)*0.05*H,0.84*H,(k-1)*0.04*H,sx*(S+0.01*H)+sx*(k-1)*0.08*H,0.99*H,(k-1)*0.06*H,0.032*H,0.004*H,6); } } lathe(0,0.04*H,[[0.46*H,S*1.0],[0.58*H,S*1.0],[0.7*H,S*1.0],[0.76*H,S*0.9]],14); }; "
+let jorc_b = "function kit(H,S,W){ lathe(0,0.0,[[0.36*H,S*1.25],[0.44*H,S*1.1],[0.49*H,S*1.0]],14); lathe(0,0.03*H,[[0.49*H,S*0.98],[0.52*H,S*1.0]],14); for(let k=0;k<5;k++){ const x=-0.16*H+k*0.08*H; tube(x,0.97*H,0.13*H+0.04*H,x,1.1*H+((k%2)*0.04*H),0.13*H+0.04*H,0.018*H,0.002*H,5); } }; "
+let jorc_c = "function kit(H,S,W){ for(const sx of [-1,1]){ tube(sx*0.045*H,0.82*H,0.13*H+0.11*H,sx*0.05*H,0.9*H,0.13*H+0.13*H,0.012*H,0.003*H,5); } for(let k=0;k<6;k++){ const a=k*0.9; blob(Math.cos(a)*0.2*H,0.68*H-Math.abs(Math.sin(a))*0.04*H,0.12*H+Math.sin(a)*0.07*H,0.016*H); } }; "
+let jorc_weapon = "function kit(H,S,W){ const hx=S+0.06*H,hy=0.44*H,hz=0.1*H; tube(0-hx,hy-0.28*H,hz,0-hx,hy+0.6*H,hz,0.025*H,0.022*H,8); box(0-hx-0.06*H,hy+0.38*H,hz-0.012*H,0-hx+0.0,hy+0.64*H,hz+0.012*H); box(0-hx-0.2*H,hy+0.4*H,hz-0.014*H,0-hx-0.06*H,hy+0.62*H,hz+0.014*H); tube(0-hx-0.02*H,hy+0.64*H,hz,0-hx-0.02*H,hy+0.72*H,hz,0.02*H,0.003*H,6); }; "
+let jdwarf_weapon = "function weapon(H,S,W){ }; "
+
+# ---- the kits as macros: one call per script, material and placement. name, x, H, S (shoulder half width), W (hip half width), then colours ----
+def kit(name, kind, part, x, H, S, W, r, g, b, metal, e)
+  n_{name}_{part} = poly.script@1(code="const m = new Mesh(); ${jall} ${kind} kit(${H},${S},${W}); m", budget=900)
+  n_{name}_{part}_m = solid.material@1(n_{name}_{part}, color=[{r}, {g}, {b}], roughness=0.5, metallic={metal}, emissive=[{r * e}, {g * e}, {b * e}])
+  n_{name}_{part}_p = xform.move@1(n_{name}_{part}_m, by=[{x}, 0, 0])
+  output {name}_{part} = n_{name}_{part}_p
+end
+
+# ---- the cast (x spacing 2.6 m) ----
+person("warrior", -9.1, 1.8, 0.25, 0.1, 0.125, 0.02, 0, 0.8, 0.6, 0.48)
+kit("warrior", "${jwarrior_a}", "a", -9.1, 1.8, 0.25, 0.1, 0.62, 0.64, 0.68, 0.85, 0)
+kit("warrior", "${jwarrior_b}", "b", -9.1, 1.8, 0.25, 0.1, 0.55, 0.08, 0.06, 0.0, 0)
+kit("warrior", "${jwarrior_c}", "c", -9.1, 1.8, 0.25, 0.1, 0.85, 0.65, 0.18, 0.9, 0)
+
+person("wizard", -6.5, 1.75, 0.21, 0.09, 0.115, 0.03, 0.01, 0.85, 0.7, 0.58)
+kit("wizard", "${jwizard_a}", "a", -6.5, 1.75, 0.21, 0.09, 0.12, 0.16, 0.55, 0.0, 0)
+kit("wizard", "${jwizard_b}", "b", -6.5, 1.75, 0.21, 0.09, 0.3, 0.19, 0.1, 0.0, 0)
+kit("wizard", "${jwizard_c}", "c", -6.5, 1.75, 0.21, 0.09, 0.3, 0.8, 1.0, 0.0, 4)
+
+person("priest", -3.9, 1.78, 0.23, 0.095, 0.115, 0.03, 0, 0.75, 0.55, 0.42)
+kit("priest", "${jpriest_a}", "a", -3.9, 1.78, 0.23, 0.095, 0.92, 0.92, 0.88, 0.0, 0)
+kit("priest", "${jpriest_b}", "b", -3.9, 1.78, 0.23, 0.095, 0.55, 0.1, 0.12, 0.0, 0)
+kit("priest", "${jpriest_c}", "c", -3.9, 1.78, 0.23, 0.095, 0.95, 0.75, 0.25, 0.9, 0)
+
+person("rogue", -1.3, 1.75, 0.21, 0.09, 0.115, -0.01, 0.02, 0.55, 0.4, 0.3)
+kit("rogue", "${jrogue_a}", "a", -1.3, 1.75, 0.21, 0.09, 0.1, 0.1, 0.13, 0.0, 0)
+kit("rogue", "${jrogue_b}", "b", -1.3, 1.75, 0.21, 0.09, 0.4, 0.07, 0.12, 0.0, 0)
+kit("rogue", "${jrogue_c}", "c", -1.3, 1.75, 0.21, 0.09, 0.75, 0.77, 0.8, 0.95, 0)
+
+person("ranger", 1.3, 1.95, 0.2, 0.085, 0.105, -0.01, 0, 0.8, 0.65, 0.52)
+kit("ranger", "${jranger_a}", "a", 1.3, 1.95, 0.2, 0.085, 0.12, 0.3, 0.14, 0.0, 0)
+kit("ranger", "${jranger_b}", "b", 1.3, 1.95, 0.2, 0.085, 0.33, 0.2, 0.09, 0.0, 0)
+kit("ranger", "${jranger_c}", "c", 1.3, 1.95, 0.2, 0.085, 0.88, 0.82, 0.6, 0.0, 0)
+
+person("dwarf", 3.9, 1.35, 0.3, 0.13, 0.135, 0.06, 0, 0.78, 0.55, 0.42)
+kit("dwarf", "${jdwarf_a}", "a", 3.9, 1.35, 0.3, 0.13, 0.5, 0.3, 0.2, 0.6, 0)
+kit("dwarf", "${jdwarf_b}", "b", 3.9, 1.35, 0.3, 0.13, 0.62, 0.32, 0.1, 0.0, 0)
+kit("dwarf", "${jdwarf_c}", "c", 3.9, 1.35, 0.3, 0.13, 0.78, 0.6, 0.22, 0.85, 0)
+
+person("orc", 6.5, 2.1, 0.38, 0.15, 0.13, 0.06, 0.12, 0.28, 0.5, 0.22)
+kit("orc", "${jorc_a}", "a", 6.5, 2.1, 0.38, 0.15, 0.25, 0.25, 0.27, 0.7, 0)
+kit("orc", "${jorc_b}", "b", 6.5, 2.1, 0.38, 0.15, 0.28, 0.15, 0.1, 0.0, 0)
+kit("orc", "${jorc_c}", "c", 6.5, 2.1, 0.38, 0.15, 0.9, 0.88, 0.78, 0.0, 0)
+kit("orc", "${jorc_weapon}", "d", 6.5, 2.1, 0.38, 0.15, 0.4, 0.4, 0.43, 0.9, 0)
+
+# ---- the dragon: smooth-field body, neck, head, horns, four legs and a long tail; scripted wings, spine ridge and eyes. Built at the origin facing +z, scaled and placed ----
+dr_body = field.ellipsoid@1(radii=[0.55, 0.5, 1.0])
+dr_body_m = field.move@1(dr_body, by=[0, 1.25, 0])
+dr_chest = field.ellipsoid@1(radii=[0.52, 0.52, 0.55])
+dr_chest_m = field.move@1(dr_chest, by=[0, 1.35, 0.7])
+dr_neck = field.tube@1(points=[[0, 1.45, 0.9], [0, 1.9, 1.35], [0, 2.3, 1.6]], radius=0.3, end_radius=0.2)
+dr_head = field.ellipsoid@1(radii=[0.22, 0.2, 0.34])
+dr_head_m = field.move@1(dr_head, by=[0, 2.4, 1.85])
+dr_snout = field.ellipsoid@1(radii=[0.14, 0.12, 0.26])
+dr_snout_m = field.move@1(dr_snout, by=[0, 2.33, 2.2])
+dr_jaw = field.ellipsoid@1(radii=[0.17, 0.07, 0.3])
+dr_jaw_m = field.move@1(dr_jaw, by=[0, 2.2, 2.02])
+dr_horn_l = field.tube@1(points=[[0.12, 2.55, 1.72], [0.2, 2.8, 1.45], [0.22, 2.98, 1.1]], radius=0.06, end_radius=0.02)
+dr_horn_r = field.tube@1(points=[[-0.12, 2.55, 1.72], [-0.2, 2.8, 1.45], [-0.22, 2.98, 1.1]], radius=0.06, end_radius=0.02)
+dr_fl_l = field.tube@1(points=[[0.4, 1.2, 0.6], [0.46, 0.6, 0.7], [0.46, 0.1, 0.85]], radius=0.2, end_radius=0.1)
+dr_fl_r = field.tube@1(points=[[-0.4, 1.2, 0.6], [-0.46, 0.6, 0.7], [-0.46, 0.1, 0.85]], radius=0.2, end_radius=0.1)
+dr_hl_l = field.tube@1(points=[[0.45, 1.2, -0.6], [0.52, 0.7, -0.55], [0.5, 0.1, -0.75]], radius=0.26, end_radius=0.11)
+dr_hl_r = field.tube@1(points=[[-0.45, 1.2, -0.6], [-0.52, 0.7, -0.55], [-0.5, 0.1, -0.75]], radius=0.26, end_radius=0.11)
+dr_foot = field.ellipsoid@1(radii=[0.16, 0.08, 0.26])
+dr_foot_fl = field.move@1(dr_foot, by=[0.46, 0.08, 0.95])
+dr_foot_fr = field.move@1(dr_foot, by=[-0.46, 0.08, 0.95])
+dr_foot_hl = field.move@1(dr_foot, by=[0.5, 0.08, -0.65])
+dr_foot_hr = field.move@1(dr_foot, by=[-0.5, 0.08, -0.65])
+dr_tail = field.tube@1(points=[[0, 1.15, -0.9], [0, 1.0, -1.8], [0.25, 0.7, -2.8], [-0.1, 0.45, -3.6]], radius=0.4, end_radius=0.06)
+dr_u1 = field.smooth_union@1(dr_body_m, dr_chest_m, radius=0.25)
+dr_u2 = field.smooth_union@1(dr_u1, dr_neck, radius=0.2)
+dr_u3 = field.smooth_union@1(dr_u2, dr_head_m, radius=0.1)
+dr_u4 = field.smooth_union@1(dr_u3, dr_snout_m, radius=0.08)
+dr_u5 = field.smooth_union@1(dr_u4, dr_jaw_m, radius=0.06)
+dr_u6 = field.union@1(dr_u5, dr_horn_l, dr_horn_r)
+dr_u7 = field.smooth_union@1(dr_u6, dr_fl_l, radius=0.15)
+dr_u8 = field.smooth_union@1(dr_u7, dr_fl_r, radius=0.15)
+dr_u9 = field.smooth_union@1(dr_u8, dr_hl_l, radius=0.15)
+dr_u10 = field.smooth_union@1(dr_u9, dr_hl_r, radius=0.15)
+dr_u11 = field.smooth_union@1(dr_u10, dr_tail, radius=0.2)
+dr_u12 = field.union@1(dr_u11, dr_foot_fl, dr_foot_fr, dr_foot_hl, dr_foot_hr)
+dr_solid = field.to_solid@1(dr_u12, min=[-1.0, -0.05, -4.0], max=[1.0, 3.3, 3.0], edge_length=0.05)
+dr_skin = solid.material@1(dr_solid, color=[0.55, 0.08, 0.06], roughness=0.5)
+dr_wings_s = poly.script@1(code="const m = new Mesh(); ${jall} for(const sx of [-1,1]){ const P=[sx*0.45,1.75,0.3],E=[sx*1.5,2.55,0.0],Wr=[sx*2.4,2.95,-0.3],F1=[sx*3.9,2.3,-1.0],F2=[sx*3.6,1.1,-1.7],F3=[sx*2.7,0.55,-1.9],B=[sx*0.4,1.1,-0.7]; tube(P[0],P[1],P[2],E[0],E[1],E[2],0.07,0.055,7); tube(E[0],E[1],E[2],Wr[0],Wr[1],Wr[2],0.055,0.045,7); for(const F of [F1,F2,F3]){ tube(Wr[0],Wr[1],Wr[2],F[0],F[1],F[2],0.04,0.012,6); } const tri=function(a,b,c){ const A=m.vertex(a[0],a[1],a[2]),B2=m.vertex(b[0],b[1],b[2]),C=m.vertex(c[0],c[1],c[2]); m.face(A,B2,C); m.face(A,C,B2); }; tri(Wr,F1,F2); tri(Wr,F2,F3); tri(P,Wr,F3); tri(P,F3,B); } m", budget=400)
+dr_wings = solid.material@1(dr_wings_s, color=[0.3, 0.04, 0.07], roughness=0.7)
+dr_bone_s = poly.script@1(code="const m = new Mesh(); ${jall} for(let k=0;k<13;k++){ const z=0.9-k*0.36,y=z>-1.0?1.25+0.5*Math.sqrt(Math.max(0.01,1-(z/1.0)*(z/1.0))):1.15-(-1.0-z)*0.28; const h=0.28-k*0.012; tube(0,y-0.02,z,0,y+h,z-0.07,0.05,0.004,5); } for(const sx of [-1,1]){ tube(sx*0.25,2.35,2.1,sx*0.27,2.38,2.38,0.012,0.004,4); } m", budget=200)
+dr_bone = solid.material@1(dr_bone_s, color=[0.88, 0.82, 0.66], roughness=0.5)
+dr_eyes_s = poly.script@1(code="const m = new Mesh(); ${jall} blob(0.13,2.47,2.05,0.035); blob(-0.13,2.47,2.05,0.035); m", budget=100)
+dr_eyes = solid.material@1(dr_eyes_s, color=[1, 0.8, 0.1], roughness=0.3, emissive=[6, 4, 0.5])
+dr_a = xform.scale@1(dr_skin, by=[1.15, 1.15, 1.15])
+dr_a_p = xform.move@1(dr_a, by=[13.5, 0, -1])
+output dragon_body = dr_a_p
+dr_b = xform.scale@1(dr_wings, by=[1.15, 1.15, 1.15])
+dr_b_p = xform.move@1(dr_b, by=[13.5, 0, -1])
+output dragon_wings = dr_b_p
+dr_c = xform.scale@1(dr_bone, by=[1.15, 1.15, 1.15])
+dr_c_p = xform.move@1(dr_c, by=[13.5, 0, -1])
+output dragon_bone = dr_c_p
+dr_d = xform.scale@1(dr_eyes, by=[1.15, 1.15, 1.15])
+dr_d_p = xform.move@1(dr_d, by=[13.5, 0, -1])
+output dragon_eyes = dr_d_p

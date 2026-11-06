@@ -1,0 +1,327 @@
+# TRACTOR: a green farm tractor, 4.9 m long, in the default studio. Everything is built in our own language with the whole toolbox:
+#   silhouette x plan intersections (hood), solid.round (soft edges), revolve (tyres, rims, fenders), instanced chevron lugs and bolts (inst.radial),
+#   field modelling with smooth unions (axles, transmission, engine, hitch), sweeps along Bezier paths (exhaust and intake pipes), solid.difference (grille recess),
+#   shape-aware texture programs (edge wear, grime in crevices, dust on top; no UVs), clear-coat paint, relief on rubber, emissive lamps with real spot lights,
+#   animation (wheels roll, engine shakes, steering wheel turns, beacon flashes) and a particle emitter (exhaust smoke).
+# Metres, +x is forward, y up, z across. Rear wheels radius 0.85, front 0.55, wheelbase 2.65.
+
+let paint_program = "ao = surface_ao(strength=0.45); base = colorize(ao, gradient=[0:#0a3a14, 1:#1f7d30]); cav = surface_cavity(gain=6); edge = surface_convex(gain=9); up = surface_up(power=2); dirt = colorize(ao, gradient=[0:#241b12, 1:#4a3a28]); dust = colorize(up, gradient=[0:#00000000, 1:#7a6a4e]); a1 = blend(dirt, base, cav, blend_type=normal, amount=0.85); a2 = blend(dust, a1, up, blend_type=normal, amount=0.18); h = surface_height(low=0.0, high=1.1); mudmask = colorize(h, gradient=[0:#ffffff, 1:#000000]); mud = colorize(ao, gradient=[0:#2a1f14, 1:#5a4630]); a3 = blend(mud, a2, mudmask, blend_type=normal, amount=0.6); wear = colorize(edge, gradient=[0:#7b8085, 1:#c3c8cc]); albedo = blend(wear, a3, edge, blend_type=normal, amount=0.6); roughness = colorize(edge, gradient=[0:#383838, 1:#b0b0b0]); height = ao"
+let paint_flat = "h = surface_height(low=0.0, high=1.1); up = surface_up(power=2); base = colorize(h, gradient=[0:#1a6a2c, 1:#238a38]); dust = colorize(up, gradient=[0:#00000000, 1:#7a6a4e]); a2 = blend(dust, base, up, blend_type=normal, amount=0.12); mudmask = colorize(h, gradient=[0:#ffffff, 1:#000000]); mud = colorize(h, gradient=[0:#3a2c1c, 1:#5a4630]); albedo = blend(mud, a2, mudmask, blend_type=normal, amount=0.5)"
+let iron_program ="h = surface_height(low=0.0, high=1.4); base = colorize(h, gradient=[0:#141416, 1:#2e2f33]); mudmask = colorize(h, gradient=[0:#ffffff, 1:#000000]); mud = colorize(h, gradient=[0:#3a2c1c, 1:#5a4630]); albedo = blend(mud, base, mudmask, blend_type=normal, amount=0.65)"
+let spin_rear = "0:0,0,0; 0.445:0,0,-90; 0.89:0,0,-180; 1.335:0,0,-270; 1.78:0,0,-360"
+let spin_front = "0:0,0,0; 0.29:0,0,-90; 0.58:0,0,-180; 0.87:0,0,-270; 1.16:0,0,-360"
+
+# ---- the hood: a side silhouette meets a plan silhouette, then every edge is softened ----
+hood_a = field.box@1(half=[0.55, 0.44, 0.46], rounding=0.1)
+hood_a_m = field.move@1(hood_a, by=[0.85, 1.24, 0])
+hood_b = field.box@1(half=[0.8, 0.37, 0.4], rounding=0.1)
+hood_b_m = field.move@1(hood_b, by=[1.8, 1.15, 0])
+hood_u = field.smooth_union@1(hood_a_m, hood_b_m, radius=0.3)
+hood_taper = field.taper@1(hood_u, axis="x", from=1.0, to=2.6, scale_start=1.0, scale_end=0.86)
+hood_round = field.to_solid@1(hood_taper, min=[0.2, 0.6, -0.7], max=[2.8, 1.85, 0.7], edge_length=0.02)
+grille_cut = solid.box@1(size=[0.16, 0.50, 0.58])
+grille_cut_at = xform.move@1(grille_cut, by=[2.56, 1.13, 0])
+hood_cut = solid.difference@1(hood_round, grille_cut_at)
+hood_m = solid.material@1(hood_cut, color=[0.1, 0.45, 0.17], metallic=0.25, roughness=0.34)
+hood_t = solid.texture@1(hood_m, program="${paint_flat}")
+hood_f = solid.finish@1(hood_t, clearcoat=0.7, clearcoat_roughness=0.08)
+output hood = hood_f
+
+# Grille: nine dark slats (one box repeated by inst.array) behind the recess, and a badge bar.
+slat = solid.box@1(size=[0.03, 0.028, 0.56])
+slat_at = xform.move@1(slat, by=[2.52, 0.93, 0])
+slats = inst.array@1(slat_at, count_y=9, spacing=[0, 0.046, 0])
+slats_m = solid.material@1(slats, color=[0.05, 0.05, 0.055], metallic=0.7, roughness=0.4)
+output grille = slats_m
+# Cooling louvers on each flank: one slat repeated in a grid by inst.array (five rows, both sides).
+louver = solid.box@1(size=[0.34, 0.025, 0.06])
+louver_at = xform.move@1(louver, by=[1.2, 1.1, 0.47])
+louvers = inst.array@1(louver_at, count_y=5, count_z=2, spacing=[0, 0.055, -0.94])
+louvers_m = solid.material@1(louvers, color=[0.04, 0.04, 0.045], metallic=0.7, roughness=0.45)
+output louvers = louvers_m
+badge = solid.box@1(size=[0.02, 0.05, 0.3])
+badge_at = xform.move@1(badge, by=[2.585, 1.43, 0])
+badge_m = solid.material@1(badge_at, color=[0.9, 0.76, 0.12], metallic=0.9, roughness=0.25)
+output badge = badge_m
+
+# ---- rear fenders: a thin curved plate, revolved over each rear wheel ----
+fen_prof = profile.polygon@1(points=[[0.93, 0], [0.99, 0], [0.99, 0.14], [0.99, 0.28], [0.99, 0.42], [0.99, 0.56], [0.99, 0.70], [0.93, 0.70], [0.93, 0.56], [0.93, 0.42], [0.93, 0.28], [0.93, 0.14]])
+fen_solid = solid.revolve@1(fen_prof, angle=205deg, segments=48)
+fen_round = solid.round@1(fen_solid, radius=0.012, segments=6)
+fen_rot = xform.rotate@1(fen_round, angles=[90, 0, 0])
+fen_rot2 = xform.rotate@1(fen_rot, angles=[0, 0, -12])
+fen_l = xform.move@1(fen_rot2, by=[-0.9, 0.855, 0.66])
+fen_r = xform.move@1(fen_rot2, by=[-0.9, 0.855, -1.36])
+fen_both = solid.union@1(fen_l, fen_r)
+fen_m = solid.material@1(fen_both, color=[0.1, 0.45, 0.17], metallic=0.25, roughness=0.34)
+fen_t = solid.texture@1(fen_m, program="${paint_flat}")
+fen_f = solid.finish@1(fen_t, clearcoat=0.7, clearcoat_roughness=0.08)
+output fenders = fen_f
+
+# ---- the cab: floor, pillars, a rounded roof, tinted glass ----
+floor = solid.box@1(size=[2.1, 0.09, 1.5])
+floor_at = xform.move@1(floor, by=[-0.55, 1.25, 0])
+cowl = solid.box@1(size=[0.34, 0.5, 1.4])
+cowl_at = xform.move@1(cowl, by=[0.4, 1.45, 0])
+pillar = solid.box@1(size=[0.075, 1.7, 0.075])
+pillar_at = inst.place@1(pillar, at=[[0.36, 2.1, 0.7], [0.36, 2.1, -0.7], [-1.46, 2.1, 0.7], [-1.46, 2.1, -0.7], [-0.55, 2.1, 0.7], [-0.55, 2.1, -0.7]])
+roof = solid.box@1(size=[2.15, 0.1, 1.66])
+roof_round = solid.round@1(roof, radius=0.035, segments=6)
+roof_at = xform.move@1(roof_round, by=[-0.52, 3.0, 0])
+cab_all = solid.union@1(floor_at, cowl_at, roof_at)
+cab_m = solid.material@1(cab_all, color=[0.1, 0.45, 0.17], metallic=0.25, roughness=0.36)
+cab_t = solid.texture@1(cab_m, program="${paint_flat}")
+cab_f = solid.finish@1(cab_t, clearcoat=0.6, clearcoat_roughness=0.1)
+output cab = cab_f
+pillars_m = solid.material@1(pillar_at, color=[0.07, 0.07, 0.075], metallic=0.5, roughness=0.5)
+output cab_pillars = pillars_m
+
+glass_front = solid.box@1(size=[0.02, 1.5, 1.34])
+glass_front_r = xform.rotate@1(glass_front, angles=[0, 0, -7])
+glass_front_at = xform.move@1(glass_front_r, by=[0.37, 2.12, 0])
+glass_rear = solid.box@1(size=[0.02, 1.5, 1.34])
+glass_rear_at = xform.move@1(glass_rear, by=[-1.47, 2.12, 0])
+glass_side = solid.box@1(size=[1.74, 1.46, 0.02])
+glass_side_at = inst.place@1(glass_side, at=[[-0.55, 2.12, 0.7], [-0.55, 2.12, -0.7]])
+glass_all = solid.union@1(glass_front_at, glass_rear_at)
+glass_m = solid.material@1(glass_all, color=[0.55, 0.72, 0.8], metallic=0.2, roughness=0.04, opacity=0.28)
+glass_f = solid.finish@1(glass_m, clearcoat=1.0, clearcoat_roughness=0.02)
+output glass = glass_f
+glass_side_m = solid.material@1(glass_side_at, color=[0.55, 0.72, 0.8], metallic=0.2, roughness=0.04, opacity=0.28)
+output glass_sides = glass_side_m
+
+# ---- inside: seat, steering column and wheel, dashboard ----
+seat_a = field.ellipsoid@1(radii=[0.26, 0.07, 0.25])
+seat_a_m = field.move@1(seat_a, by=[-0.85, 1.52, 0])
+seat_b = field.ellipsoid@1(radii=[0.06, 0.34, 0.25])
+seat_b_m = field.move@1(seat_b, by=[-1.08, 1.84, 0])
+seat_u = field.smooth_union@1(seat_a_m, seat_b_m, radius=0.08)
+seat_s = field.to_solid@1(seat_u, min=[-1.5, 1.3, -0.4], max=[-0.5, 2.3, 0.4], edge_length=0.015)
+seat_m = solid.material@1(seat_s, color=[0.05, 0.05, 0.06], roughness=0.85, recipe="leather", texture_scale=6)
+output seat = seat_m
+wheel_ring = solid.torus@1(major=0.17, minor=0.02, segments=40, tube_segments=12)
+wheel_tilt = xform.rotate@1(wheel_ring, angles=[0, 0, 62])
+wheel_at = xform.move@1(wheel_tilt, by=[0.02, 1.88, 0])
+column = solid.cylinder@1(radius=0.025, height=0.5, segments=12)
+column_tilt = xform.rotate@1(column, angles=[0, 0, 62])
+column_at = xform.move@1(column_tilt, by=[0.1, 1.64, 0])
+steer = solid.union@1(wheel_at, column_at)
+steer_m = solid.material@1(steer, color=[0.04, 0.04, 0.045], roughness=0.6)
+steer_a = anim.track@1(steer_m, property="rotation", keys="0:0,0,0; 2:6,0,0; 4:0,0,0; 6:-6,0,0; 8:0,0,0", interpolation="smooth", loop=true, pivot=[0.02, 1.88, 0])
+output steering = steer_a
+dash = solid.box@1(size=[0.3, 0.2, 1.25])
+dash_round = solid.round@1(dash, radius=0.03, segments=6)
+dash_at = xform.move@1(dash_round, by=[0.2, 1.52, 0])
+dash_m = solid.material@1(dash_at, color=[0.06, 0.06, 0.065], roughness=0.7)
+output dash = dash_m
+
+# ---- mirrors on arms ----
+arm = solid.box@1(size=[0.04, 0.04, 0.34])
+arm_at = inst.place@1(arm, at=[[0.3, 2.55, 0.86], [0.3, 2.55, -0.86]])
+arm_m = solid.material@1(arm_at, color=[0.07, 0.07, 0.075], metallic=0.5, roughness=0.5)
+output mirror_arms = arm_m
+mirror = solid.box@1(size=[0.03, 0.26, 0.17])
+mirror_at = inst.place@1(mirror, at=[[0.3, 2.45, 1.05], [0.3, 2.45, -1.05]])
+mirror_m = solid.material@1(mirror_at, color=[0.7, 0.75, 0.8], metallic=1.0, roughness=0.05)
+output mirrors = mirror_m
+
+# ---- chassis, axles, engine, transmission, hitch: one field with smooth unions ----
+ch_trans = field.ellipsoid@1(radii=[0.7, 0.46, 0.62])
+ch_trans_m = field.move@1(ch_trans, by=[-0.95, 0.85, 0])
+ch_axle_r = field.tube@1(points=[[-0.9, 0.855, -1.12], [-0.9, 0.855, 1.12]], radius=0.09)
+ch_drive_l = field.ellipsoid@1(radii=[0.2, 0.2, 0.17])
+ch_drive_lm = field.move@1(ch_drive_l, by=[-0.9, 0.855, 0.66])
+ch_drive_rm = field.move@1(ch_drive_l, by=[-0.9, 0.855, -0.66])
+ch_engine = field.ellipsoid@1(radii=[0.95, 0.28, 0.38])
+ch_engine_m = field.move@1(ch_engine, by=[1.55, 0.7, 0])
+ch_bell = field.ellipsoid@1(radii=[0.3, 0.38, 0.4])
+ch_bell_m = field.move@1(ch_bell, by=[0.35, 0.75, 0])
+ch_faxle = field.tube@1(points=[[1.75, 0.55, -0.74], [1.75, 0.55, 0.74]], radius=0.07)
+ch_fblock = field.ellipsoid@1(radii=[0.3, 0.2, 0.26])
+ch_fblock_m = field.move@1(ch_fblock, by=[1.75, 0.66, 0])
+ch_bumper = field.ellipsoid@1(radii=[0.13, 0.17, 0.46])
+ch_bumper_m = field.move@1(ch_bumper, by=[2.64, 0.78, 0])
+ch_draw = field.tube@1(points=[[-1.5, 0.55, 0], [-2.25, 0.5, 0]], radius=0.04)
+ch_pto = field.tube@1(points=[[-1.55, 0.88, 0], [-1.95, 0.88, 0]], radius=0.032)
+ch_lift_l = field.tube@1(points=[[-1.15, 1.0, 0.5], [-1.95, 0.78, 0.58]], radius=0.035)
+ch_lift_r = field.tube@1(points=[[-1.15, 1.0, -0.5], [-1.95, 0.78, -0.58]], radius=0.035)
+ch_low_l = field.tube@1(points=[[-1.0, 0.5, 0.45], [-1.95, 0.48, 0.8]], radius=0.032)
+ch_low_r = field.tube@1(points=[[-1.0, 0.5, -0.45], [-1.95, 0.48, -0.8]], radius=0.032)
+ch_top = field.tube@1(points=[[-1.45, 1.35, 0], [-1.95, 1.05, 0]], radius=0.03)
+ch_u1 = field.smooth_union@1(ch_trans_m, ch_axle_r, radius=0.08)
+ch_u2 = field.smooth_union@1(ch_u1, ch_drive_lm, radius=0.06)
+ch_u3 = field.smooth_union@1(ch_u2, ch_drive_rm, radius=0.06)
+ch_u4 = field.smooth_union@1(ch_u3, ch_bell_m, radius=0.1)
+ch_u5 = field.smooth_union@1(ch_u4, ch_engine_m, radius=0.1)
+ch_u6 = field.smooth_union@1(ch_u5, ch_fblock_m, radius=0.08)
+ch_u7 = field.smooth_union@1(ch_u6, ch_faxle, radius=0.05)
+ch_u8 = field.smooth_union@1(ch_u7, ch_bumper_m, radius=0.06)
+ch_u9 = field.smooth_union@1(ch_u8, ch_draw, radius=0.04)
+ch_u10 = field.smooth_union@1(ch_u9, ch_pto, radius=0.03)
+ch_u11 = field.smooth_union@1(ch_u10, ch_lift_l, radius=0.04)
+ch_u12 = field.smooth_union@1(ch_u11, ch_lift_r, radius=0.04)
+ch_u13 = field.smooth_union@1(ch_u12, ch_low_l, radius=0.04)
+ch_u14 = field.smooth_union@1(ch_u13, ch_low_r, radius=0.04)
+ch_u15 = field.smooth_union@1(ch_u14, ch_top, radius=0.04)
+ch_noise = field.noise@1(ch_u15, amplitude=0.004, scale=0.06, octaves=2, seed=3)
+ch_solid = field.to_solid@1(ch_noise, min=[-2.4, 0.3, -1.3], max=[2.8, 1.6, 1.3], edge_length=0.03)
+ch_m = solid.material@1(ch_solid, color=[0.12, 0.12, 0.13], metallic=0.6, roughness=0.55)
+ch_t = solid.texture@1(ch_m, program="${iron_program}")
+output chassis = ch_t
+
+# ---- exhaust and air intake: a circle swept along a Bezier path ----
+ex_path = curve.bezier@1(points=[[1.55, 1.58, 0.22], [1.55, 2.3, 0.22], [1.52, 2.55, 0.22], [1.42, 2.72, 0.22]], steps=24)
+ex_ring = profile.circle@1(radius=0.05, segments=20)
+ex_pipe = solid.sweep@1(ex_path, ex_ring, scale_end=1.0)
+ex_collar = solid.cylinder@1(radius=0.085, height=0.08, segments=20)
+ex_collar_at = xform.move@1(ex_collar, by=[1.55, 1.6, 0.22])
+ex_all = solid.union@1(ex_pipe, ex_collar_at)
+ex_m = solid.material@1(ex_all, color=[0.1, 0.1, 0.1], metallic=0.8, roughness=0.45)
+ex_f = solid.finish@1(ex_m, wetness=0.1)
+output exhaust = ex_f
+cap = solid.cylinder@1(radius=0.065, height=0.025, segments=16)
+cap_tilt = xform.rotate@1(cap, angles=[0, 0, 18])
+cap_at = xform.move@1(cap_tilt, by=[1.4, 2.75, 0.22])
+cap_m = solid.material@1(cap_at, color=[0.08, 0.08, 0.08], metallic=0.8, roughness=0.5)
+cap_smoke = fx.emitter@1(cap_m, name="smoke", rate=34, lifetime=[1.2, 2.4], speed=[0.7, 1.4], direction=[0.12, 1, 0], cone=0.22, size=[0.05, 0.38], colour=[0.22, 0.22, 0.24], colour_end=[0.45, 0.45, 0.47], alpha=[0.4, 0], blend="alpha", max_particles=160)
+cap_wind = fx.force@1(cap_smoke, emitter="smoke", kind="turbulence", strength=1.2, scale=1.2, speed=0.4)
+output exhaust_cap = cap_wind
+in_path = curve.bezier@1(points=[[1.25, 1.6, -0.22], [1.25, 2.1, -0.22], [1.18, 2.35, -0.22], [1.02, 2.46, -0.22]], steps=20)
+in_ring = profile.circle@1(radius=0.065, segments=20)
+in_pipe = solid.sweep@1(in_path, in_ring, scale_end=1.0)
+in_m = solid.material@1(in_pipe, color=[0.06, 0.06, 0.065], metallic=0.5, roughness=0.55)
+output intake = in_m
+
+# ---- steps and a hand rail ----
+step = solid.box@1(size=[0.3, 0.04, 0.42])
+step_at = inst.place@1(step, at=[[0.2, 0.42, 0.86], [0.2, 0.82, 0.86], [0.2, 1.2, 0.86]])
+step_m = solid.material@1(step_at, color=[0.1, 0.1, 0.11], metallic=0.6, roughness=0.6)
+output steps = step_m
+rail_path = curve.bezier@1(points=[[0.45, 1.25, 0.78], [0.45, 1.7, 0.78], [0.45, 2.1, 0.78], [0.35, 2.55, 0.74]], steps=16)
+rail_ring = profile.circle@1(radius=0.018, segments=10)
+rail = solid.sweep@1(rail_path, rail_ring, scale_end=1.0)
+rail_m = solid.material@1(rail, color=[0.85, 0.7, 0.1], metallic=0.8, roughness=0.3)
+output handrail = rail_m
+
+# ---- lamps: lenses glow, and each carries a real spot light ----
+head_lens = solid.box@1(size=[0.04, 0.15, 0.2])
+head_lens_at = inst.place@1(head_lens, at=[[2.575, 1.18, 0.3], [2.575, 1.18, -0.3]])
+head_lens_m = solid.material@1(head_lens_at, color=[1, 0.95, 0.8], roughness=0.1, emissive=[3.5, 3.2, 2.6])
+output headlights = head_lens_m
+hl_a = light.spot@1(position=[2.7, 1.18, 0.3], direction=[1, -0.13, 0.05], color=[1, 0.93, 0.78], intensity=900, range=22, inner_angle=0.4, outer_angle=0.8)
+output headlight_l = hl_a
+hl_b = light.spot@1(position=[2.7, 1.18, -0.3], direction=[1, -0.13, -0.05], color=[1, 0.93, 0.78], intensity=900, range=22, inner_angle=0.4, outer_angle=0.8)
+output headlight_r = hl_b
+work_lens = solid.box@1(size=[0.05, 0.09, 0.2])
+work_lens_at = inst.place@1(work_lens, at=[[0.5, 2.95, 0.5], [0.5, 2.95, -0.5]])
+work_lens_m = solid.material@1(work_lens_at, color=[1, 0.97, 0.88], roughness=0.1, emissive=[3, 3, 2.6])
+output worklights = work_lens_m
+beacon = solid.cylinder@1(radius=0.08, height=0.14, segments=20)
+beacon_at = xform.move@1(beacon, by=[-1.3, 3.1, 0.55])
+beacon_m = solid.material@1(beacon_at, color=[1, 0.55, 0.05], roughness=0.2, emissive=[3.5, 1.5, 0.1])
+beacon_f = anim.wave@1(beacon_m, property="glow", amplitude=[0.95, 0, 0], period=1.0, shape="triangle")
+output beacon = beacon_f
+tail = solid.box@1(size=[0.04, 0.08, 0.18])
+tail_at = inst.place@1(tail, at=[[-1.62, 2.93, 0.68], [-1.62, 2.93, -0.68]])
+tail_m = solid.material@1(tail_at, color=[0.9, 0.05, 0.03], roughness=0.2, emissive=[2.4, 0.05, 0.02])
+output taillights = tail_m
+
+# ---- details: front weights, fuel tank, door handles, mud flaps ----
+weight = solid.box@1(size=[0.22, 0.13, 0.5])
+weight_at = xform.move@1(weight, by=[2.82, 0.55, 0])
+weights = inst.array@1(weight_at, count_y=3, spacing=[0, 0.145, 0])
+weights_m = solid.material@1(weights, color=[0.16, 0.16, 0.17], metallic=0.7, roughness=0.5)
+output weights = weights_m
+tank = solid.cylinder@1(radius=0.17, height=0.7, segments=32)
+tank_rot = xform.rotate@1(tank, angles=[0, 0, 90])
+tank_round = solid.round@1(tank_rot, radius=0.03, segments=6)
+tank_at = xform.move@1(tank_round, by=[0.55, 0.62, -0.62])
+tank_m = solid.material@1(tank_at, color=[0.1, 0.45, 0.17], metallic=0.25, roughness=0.4)
+tank_t = solid.texture@1(tank_m, program="${paint_flat}")
+output fuel_tank = tank_t
+handle = solid.box@1(size=[0.15, 0.03, 0.03])
+handle_at = inst.place@1(handle, at=[[-0.2, 1.95, 0.725], [-0.2, 1.95, -0.725]])
+handle_m = solid.material@1(handle_at, color=[0.7, 0.72, 0.75], metallic=0.95, roughness=0.3)
+output door_handles = handle_m
+flap = solid.box@1(size=[0.5, 0.36, 0.025])
+flap_at = inst.place@1(flap, at=[[-1.75, 0.62, 1.0], [-1.75, 0.62, -1.0]])
+flap_m = solid.material@1(flap_at, color=[0.03, 0.03, 0.035], roughness=0.9)
+output mud_flaps = flap_m
+
+# ---- the engine shakes a little; the whole front body rides the same shake ----
+# (kept to the hood and exhaust so the wheels stay planted)
+
+# ---- wheels: built at the origin with the axle on Y, turned to Z, moved, then spun about their own centre ----
+def rear_wheel(tag, wx, wy, wz, flip)
+  w{tag}_tp = profile.polygon@1(points=[[0.50, -0.27], [0.70, -0.285], [0.82, -0.25], [0.85, -0.18], [0.855, 0], [0.85, 0.18], [0.82, 0.25], [0.70, 0.285], [0.50, 0.27], [0.48, 0]])
+  w{tag}_tps = profile.smooth@1(w{tag}_tp, iterations=2)
+  w{tag}_tire = solid.revolve@1(w{tag}_tps, angle=360deg, segments=80)
+  w{tag}_tm = solid.material@1(w{tag}_tire, color=[0.025, 0.025, 0.027], roughness=0.92)
+  w{tag}_tf = solid.finish@1(w{tag}_tm, relief=0.5, relief_scale=60, relief_style="ridged", sheen=0.2)
+  w{tag}_tr = xform.rotate@1(w{tag}_tf, angles=[90, {flip}, 0])
+  w{tag}_ta = xform.move@1(w{tag}_tr, by=[{wx}, {wy}, {wz}])
+  w{tag}_ts = anim.track@1(w{tag}_ta, property="rotation", keys="${spin_rear}", interpolation="linear", loop=true, pivot=[{wx}, {wy}, {wz}])
+  output w{tag}_tire = w{tag}_ts
+  w{tag}_lug = solid.box@1(size=[0.1, 0.2, 0.07])
+  w{tag}_lua = xform.rotate@1(w{tag}_lug, angles=[24, 0, 0])
+  w{tag}_lub = xform.move@1(w{tag}_lua, by=[0, 0.14, 0])
+  w{tag}_lc = xform.rotate@1(w{tag}_lug, angles=[-24, 0, 0])
+  w{tag}_ld = xform.move@1(w{tag}_lc, by=[0, -0.14, 0])
+  w{tag}_la = inst.radial@1(w{tag}_lub, count=26, radius=0.88)
+  w{tag}_lb = inst.radial@1(w{tag}_ld, count=26, radius=0.88)
+  w{tag}_lar = inst.realize@1(w{tag}_la)
+  w{tag}_lbr = inst.realize@1(w{tag}_lb)
+  w{tag}_ls = solid.union@1(w{tag}_lar, w{tag}_lbr)
+  w{tag}_lm = solid.material@1(w{tag}_ls, color=[0.025, 0.025, 0.027], roughness=0.92)
+  w{tag}_lr = xform.rotate@1(w{tag}_lm, angles=[90, {flip}, 0])
+  w{tag}_lt = xform.move@1(w{tag}_lr, by=[{wx}, {wy}, {wz}])
+  w{tag}_lsn = anim.track@1(w{tag}_lt, property="rotation", keys="${spin_rear}", interpolation="linear", loop=true, pivot=[{wx}, {wy}, {wz}])
+  output w{tag}_lugs = w{tag}_lsn
+  w{tag}_rp = profile.polygon@1(points=[[0.40, -0.21], [0.52, -0.21], [0.52, 0.21], [0.40, 0.21]])
+  w{tag}_rim = solid.revolve@1(w{tag}_rp, angle=360deg, segments=64)
+  w{tag}_disc = solid.cylinder@1(radius=0.46, height=0.05, segments=48)
+  w{tag}_disc_at = xform.move@1(w{tag}_disc, by=[0, 0.12, 0])
+  w{tag}_hub = solid.cylinder@1(radius=0.15, height=0.34, segments=32)
+  w{tag}_hub_at = xform.move@1(w{tag}_hub, by=[0, 0.1, 0])
+  w{tag}_ru = solid.union@1(w{tag}_rim, w{tag}_disc_at, w{tag}_hub_at)
+  w{tag}_rm = solid.material@1(w{tag}_ru, color=[0.92, 0.72, 0.08], metallic=0.5, roughness=0.4)
+  w{tag}_rt = solid.finish@1(w{tag}_rm, clearcoat=0.5, clearcoat_roughness=0.15)
+  w{tag}_rr = xform.rotate@1(w{tag}_rt, angles=[90, {flip}, 0])
+  w{tag}_ra = xform.move@1(w{tag}_rr, by=[{wx}, {wy}, {wz}])
+  w{tag}_rs = anim.track@1(w{tag}_ra, property="rotation", keys="${spin_rear}", interpolation="linear", loop=true, pivot=[{wx}, {wy}, {wz}])
+  output w{tag}_rim = w{tag}_rs
+  w{tag}_bolt = solid.cylinder@1(radius=0.02, height=0.07, segments=10)
+  w{tag}_bolt_at = xform.move@1(w{tag}_bolt, by=[0, 0.16, 0])
+  w{tag}_bolts = inst.radial@1(w{tag}_bolt_at, count=8, radius=0.1)
+  w{tag}_bm = solid.material@1(w{tag}_bolts, color=[0.5, 0.52, 0.55], metallic=0.95, roughness=0.3)
+  w{tag}_br = xform.rotate@1(w{tag}_bm, angles=[90, {flip}, 0])
+  w{tag}_bt = xform.move@1(w{tag}_br, by=[{wx}, {wy}, {wz}])
+  w{tag}_bs = anim.track@1(w{tag}_bt, property="rotation", keys="${spin_rear}", interpolation="linear", loop=true, pivot=[{wx}, {wy}, {wz}])
+  output w{tag}_bolts = w{tag}_bs
+end
+def front_wheel(tag, wx, wy, wz, flip)
+  w{tag}_tp = profile.polygon@1(points=[[0.32, -0.15], [0.46, -0.155], [0.52, -0.13], [0.56, -0.12], [0.56, -0.08], [0.535, -0.065], [0.56, -0.05], [0.56, -0.012], [0.535, 0.0], [0.56, 0.012], [0.56, 0.05], [0.535, 0.065], [0.56, 0.08], [0.56, 0.12], [0.52, 0.13], [0.46, 0.155], [0.32, 0.15]])
+  w{tag}_tire = solid.revolve@1(w{tag}_tp, angle=360deg, segments=72)
+  w{tag}_tm = solid.material@1(w{tag}_tire, color=[0.025, 0.025, 0.027], roughness=0.92)
+  w{tag}_tf = solid.finish@1(w{tag}_tm, relief=0.5, relief_scale=70, relief_style="ridged", sheen=0.2)
+  w{tag}_tr = xform.rotate@1(w{tag}_tf, angles=[90, {flip}, 0])
+  w{tag}_ta = xform.move@1(w{tag}_tr, by=[{wx}, {wy}, {wz}])
+  w{tag}_ts = anim.track@1(w{tag}_ta, property="rotation", keys="${spin_front}", interpolation="linear", loop=true, pivot=[{wx}, {wy}, {wz}])
+  output w{tag}_tire = w{tag}_ts
+  w{tag}_rp = profile.polygon@1(points=[[0.24, -0.12], [0.34, -0.12], [0.34, 0.12], [0.24, 0.12]])
+  w{tag}_rim = solid.revolve@1(w{tag}_rp, angle=360deg, segments=48)
+  w{tag}_disc = solid.cylinder@1(radius=0.3, height=0.04, segments=40)
+  w{tag}_disc_at = xform.move@1(w{tag}_disc, by=[0, 0.08, 0])
+  w{tag}_hub = solid.cylinder@1(radius=0.09, height=0.26, segments=24)
+  w{tag}_hub_at = xform.move@1(w{tag}_hub, by=[0, 0.07, 0])
+  w{tag}_ru = solid.union@1(w{tag}_rim, w{tag}_disc_at, w{tag}_hub_at)
+  w{tag}_rm = solid.material@1(w{tag}_ru, color=[0.92, 0.72, 0.08], metallic=0.5, roughness=0.4)
+  w{tag}_rr = xform.rotate@1(w{tag}_rm, angles=[90, {flip}, 0])
+  w{tag}_ra = xform.move@1(w{tag}_rr, by=[{wx}, {wy}, {wz}])
+  w{tag}_rs = anim.track@1(w{tag}_ra, property="rotation", keys="${spin_front}", interpolation="linear", loop=true, pivot=[{wx}, {wy}, {wz}])
+  output w{tag}_rim = w{tag}_rs
+end
+rear_wheel("rl", -0.9, 0.855, 1.0, 0)
+rear_wheel("rr", -0.9, 0.855, -1.0, 180)
+front_wheel("fl", 1.75, 0.56, 0.82, 0)
+front_wheel("fr", 1.75, 0.56, -0.82, 180)

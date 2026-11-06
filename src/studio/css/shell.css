@@ -1,0 +1,56 @@
+.studio { position: fixed; inset: 0; overflow: hidden; background: var(--bg); }
+.stage { position: absolute; inset: 0; }
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+/* View aids drawn over the canvas; they never take the pointer. */
+.overlay-canvas { position: fixed; z-index: 5; pointer-events: none; }
+/* The transform handles: invisible fat lines to grab, thin coloured lines to see. */
+.gizmo-svg { position: fixed; z-index: 6; pointer-events: none; overflow: visible; }
+.gizmo-svg .gizmo-hit { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: grab; }
+.gizmo-svg .gizmo-axis { stroke-width: 3.5; stroke-linecap: round; pointer-events: none; }
+.gizmo-svg .gizmo-ring { fill: none; stroke-width: 3; pointer-events: none; }
+.gizmo-svg .gizmo-cube { stroke: rgba(0, 0, 0, 0.5); stroke-width: 1; pointer-events: none; }
+.gizmo-svg .gizmo-preview { stroke: #65f0ff; stroke-width: 2; stroke-dasharray: 5 3; }
+.gizmo-svg .axis-0 { stroke: #ff5d68; fill: #ff5d68; }
+.gizmo-svg .axis-1 { stroke: #72dc8b; fill: #72dc8b; }
+.gizmo-svg .axis-2 { stroke: #62a8ff; fill: #62a8ff; }
+.gizmo-svg .gizmo-ring.axis-0, .gizmo-svg .gizmo-ring.axis-1, .gizmo-svg .gizmo-ring.axis-2 { fill: none; }
+.gizmobar { position: absolute; z-index: 16; right: calc(330px + var(--gap-3) * 3); top: calc(var(--topbar-height) + var(--gap-3) * 2); display: flex; align-items: center; gap: var(--gap-3); padding: 5px var(--gap-3); border-radius: var(--radius-pill); font-size: var(--text-xs); }
+.studio.dock-closed .gizmobar { right: var(--gap-3); }
+.gizmobar .snap { display: flex; align-items: center; gap: 4px; color: var(--text-2); }
+.gizmobar .num { width: 54px; height: 24px; }
+.gizmostatus { color: var(--accent); font-weight: 600; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1300px) { .gizmobar .snap { display: none; } }
+.studio.hide-chrome .gizmobar { display: none; }
+.statsline { position: absolute; z-index: 16; left: calc(var(--chat-width) + var(--gap-3) * 2); top: calc(var(--topbar-height) + var(--gap-3) * 2); padding: 4px var(--gap-3); border-radius: var(--radius-pill); font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-2); }
+.studio.chat-closed .statsline { left: var(--gap-3); }
+.lookhint { position: absolute; z-index: 14; left: 50%; top: calc(var(--topbar-height) + var(--gap-4) * 1.5); transform: translateX(-50%); padding: 5px var(--gap-4); border-radius: var(--radius-pill); font-size: var(--text-xs); color: var(--text-2); pointer-events: none; white-space: nowrap; }
+@media (max-width: 1200px) { .lookhint { display: none; } }
+.boot { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-2); pointer-events: none; }
+.boot.error { color: var(--bad); padding: var(--gap-5); text-align: center; }
+
+.topbar {
+  position: absolute; top: var(--gap-3); left: var(--gap-3); right: var(--gap-3); z-index: 20;
+  height: var(--topbar-height); display: flex; align-items: center; gap: var(--gap-3);
+  padding: 0 var(--gap-3) 0 var(--gap-4); border-radius: var(--radius-pill);
+}
+.brand { display: flex; align-items: center; gap: var(--gap-2); font-weight: 650; letter-spacing: -0.02em; }
+.brand svg { color: var(--accent); }
+.docname { color: var(--text-2); font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.docname b { color: var(--text); font-weight: 600; }
+.grow { flex: 1; min-width: 0; }
+.topbar .group { display: flex; align-items: center; gap: 2px; }
+
+/* The graph opens as a sheet beside the chat. */
+.sheet {
+  position: absolute; z-index: 10; top: calc(var(--topbar-height) + var(--gap-3) * 2); bottom: var(--gap-3);
+  left: calc(var(--chat-width) + var(--gap-3) * 2); right: calc(330px + var(--gap-3) * 2);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+.studio.chat-closed .sheet { left: var(--gap-3); }
+.studio.dock-closed .sheet { right: var(--gap-3); }
+.studio.hide-chrome .lookhint, .studio.hide-chrome .statsline, .studio.hide-chrome .topbar, .studio.hide-chrome .chat, .studio.hide-chrome .dock, .studio.hide-chrome .playback, .studio.hide-chrome .viewpanel { display: none; }
+
+@media (max-width: 900px) {
+  .sheet { left: var(--gap-3); top: 50%; }
+  .docname { display: none; }
+}

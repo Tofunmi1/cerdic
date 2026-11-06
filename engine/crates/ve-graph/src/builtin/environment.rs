@@ -36,6 +36,68 @@ fn intensity() -> ParamSpec {
     }
 }
 
+/// Distance haze and sun shafts shared by both scene-lighting operators.
+fn haze_params() -> Vec<ParamSpec> {
+    vec![
+        strength(
+            "haze",
+            0.0,
+            "How thick the distance haze is: 0 is clear air, 0.2 a light morning mist, 1 a thick fog.",
+        ),
+        colour(
+            "haze_color",
+            [0.72, 0.78, 0.86],
+            "Colour of the distance haze, in sRGB.",
+        ),
+        ParamSpec {
+            name: "haze_height",
+            ty: ParamType::Num {
+                unit: Unit::Length,
+                min: 0.0,
+                max: 10_000.0,
+            },
+            default: Some(Value::Num(0.0)),
+            doc: "Height in metres over which ground haze thins: 0 makes it uniform; above 0 it is thickest at the ground.",
+        },
+        strength(
+            "light_shafts",
+            0.0,
+            "How visible the sun's light shafts are through the air: above 0 the sun scatters through it (rays past trees and walls), drawn by volumetric fog. Needs a sun with shadows.",
+        ),
+        ParamSpec {
+            name: "focus_distance",
+            ty: ParamType::Num {
+                unit: Unit::Length,
+                min: 0.0,
+                max: 100_000.0,
+            },
+            default: Some(Value::Num(0.0)),
+            doc: "Depth of field: the distance in metres the camera focuses on; what is nearer or farther blurs. 0 turns it off.",
+        },
+        ParamSpec {
+            name: "aperture",
+            ty: ParamType::Num {
+                unit: Unit::None,
+                min: 0.5,
+                max: 22.0,
+            },
+            default: Some(Value::Num(2.8)),
+            doc: "Lens aperture in f-stops for depth of field: 1.4 is a very shallow focus, 2.8 portrait-like, 8 or more nearly everything sharp.",
+        },
+        strength(
+            "motion_blur",
+            0.0,
+            "Motion blur strength: 0 is off, 0.5 a film shutter, 1 a long smear. Things that move fast across the screen streak.",
+        ),
+        ParamSpec {
+            name: "contact_shadows",
+            ty: ParamType::Bool,
+            default: Some(Value::Bool(false)),
+            doc: "Short-range shadows traced in screen space: they close the gap under feet, props and pebbles that the sun's shadow map misses.",
+        },
+    ]
+}
+
 fn environment() -> Option<OperatorSpec> {
     spec(
         "scene.environment@1",
@@ -218,6 +280,7 @@ fn wind_params() -> Vec<ParamSpec> {
 }
 
 fn with_probe_params(mut spec: OperatorSpec) -> OperatorSpec {
+    spec.params.extend(haze_params());
     spec.params.extend(probe_params());
     spec.params.extend(wind_params());
     spec

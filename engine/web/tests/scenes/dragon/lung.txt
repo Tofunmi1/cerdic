@@ -1,0 +1,171 @@
+# LÓNG: a Chinese dragon, 15 m long, coiling through the clouds. Everything is built by scripts and fields in our own language, with no imported data.
+# Body: a smooth lofted core along an S-shaped centre line, wrapped in about ten thousand overlapping scale plates (each a five-face ridged shingle, sized by the body's
+# radius there, jade on the back, lighter on the flanks), cream belly plates, a flame mane down the spine. Head, antlers, whiskers, legs, claws and the pearl are separate scripts.
+
+let jbox = "function box(x0,y0,z0,x1,y1,z1){ const v=[m.vertex(x0,y0,z0),m.vertex(x1,y0,z0),m.vertex(x1,y1,z0),m.vertex(x0,y1,z0),m.vertex(x0,y0,z1),m.vertex(x1,y0,z1),m.vertex(x1,y1,z1),m.vertex(x0,y1,z1)]; m.face(v[0],v[3],v[2],v[1]); m.face(v[4],v[5],v[6],v[7]); m.face(v[0],v[1],v[5],v[4]); m.face(v[3],v[7],v[6],v[2]); m.face(v[1],v[2],v[6],v[5]); m.face(v[0],v[4],v[7],v[3]); }; "
+let jlathe = "function lathe(cx,cz,p,n){ const R=[]; for(let k=0;k<p.length;k++){ const row=[]; for(let i=0;i<n;i++){ const a=i*6.283185/n; row.push(m.vertex(cx+Math.cos(a)*p[k][1],p[k][0],cz+Math.sin(a)*p[k][1])); } R.push(row); } for(let k=0;k<p.length-1;k++){ for(let i=0;i<n;i++){ const j=(i+1)%n; m.face(R[k][i],R[k+1][i],R[k+1][j],R[k][j]); } } m.face(...R[p.length-1].slice().reverse()); m.face(...R[0]); }; "
+let jtube = "function tube(ax,ay,az,bx,by,bz,r0,r1,n){ let dx=bx-ax,dy=by-ay,dz=bz-az; const L=Math.sqrt(dx*dx+dy*dy+dz*dz)||1; dx/=L; dy/=L; dz/=L; let hx=0,hy=1,hz=0; if(Math.abs(dy)>0.9){ hx=1; hy=0; } let ux=dy*hz-dz*hy,uy=dz*hx-dx*hz,uz=dx*hy-dy*hx; const l=Math.sqrt(ux*ux+uy*uy+uz*uz)||1; ux/=l; uy/=l; uz/=l; const vx=uy*dz-uz*dy,vy=uz*dx-ux*dz,vz=ux*dy-uy*dx; const A=[],B=[]; for(let i=0;i<n;i++){ const t=i*6.283185/n,c=Math.cos(t),s=Math.sin(t); const ox=ux*c+vx*s,oy=uy*c+vy*s,oz=uz*c+vz*s; A.push(m.vertex(ax+ox*r0,ay+oy*r0,az+oz*r0)); B.push(m.vertex(bx+ox*r1,by+oy*r1,bz+oz*r1)); } for(let i=0;i<n;i++){ const j=(i+1)%n; m.face(A[i],B[i],B[j],A[j]); } m.face(...A.slice().reverse()); m.face(...B); }; "
+let jblob = "function blob(cx,cy,cz,r){ lathe(cx,cz,[[cy-r*0.95,r*0.3],[cy-r*0.75,r*0.62],[cy-r*0.4,r*0.9],[cy,r],[cy+r*0.4,r*0.92],[cy+r*0.75,r*0.64],[cy+r*0.95,r*0.3]],10); }; "
+# The dragon's centre line (head at s = 0, tail tip at s = 1), its frames (tangent, side, up) sampled 1200 times, and its radius.
+let jd1 = "const N=1200; const PT=[],TG=[],SD=[],UP=[],SP=[]; function Pc(s){ const x=(s-0.5)*13.0+0.8*Math.sin(s*6.283185*1.2),y=5.0+1.6*(1-s)+(0.8+0.9*s)*Math.sin(s*6.283185*1.7+0.4),z=2.3*Math.sin(s*6.283185*1.2+1.0)-1.0*s; return [x,y,z]; }; function nz(v){ const l=Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2])||1; return [v[0]/l,v[1]/l,v[2]/l]; }; function cr(a,b){ return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]; }; for(let i=0;i<=N;i++){ PT.push(Pc(i/N)); } for(let i=0;i<=N;i++){ const a=PT[Math.max(0,i-1)],b=PT[Math.min(N,i+1)]; const t=nz([b[0]-a[0],b[1]-a[1],b[2]-a[2]]); TG.push(t); SP.push(Math.sqrt((b[0]-a[0])*(b[0]-a[0])+(b[1]-a[1])*(b[1]-a[1])+(b[2]-a[2])*(b[2]-a[2]))/(Math.min(N,i+1)-Math.max(0,i-1))*N); const sd=nz(cr(t,[0,1,0])); SD.push(sd); UP.push(nz(cr(sd,t))); } function R(s){ if(s<0.08) return 0.3+(s/0.08)*0.12; if(s<0.22) return 0.42+((s-0.08)/0.14)*0.42; if(s<0.42) return 0.84-((s-0.22)/0.2)*0.1; const u=(s-0.42)/0.58; return 0.74*Math.pow(Math.max(0,1-u),1.2)+0.05; }; function ix(s){ return Math.min(N,Math.max(0,Math.round(s*N))); }; function ring(s,th,k){ const i=ix(s),r=R(s)*(k||1),c=Math.cos(th),sn=Math.sin(th),ey=sn<0?0.85:1.05; return [PT[i][0]+r*(c*SD[i][0]+sn*ey*UP[i][0]),PT[i][1]+r*(c*SD[i][1]+sn*ey*UP[i][1]),PT[i][2]+r*(c*SD[i][2]+sn*ey*UP[i][2])]; }; function nrm(s,th){ const i=ix(s),c=Math.cos(th),sn=Math.sin(th); return nz([c*SD[i][0]+sn*UP[i][0],c*SD[i][1]+sn*UP[i][1],c*SD[i][2]+sn*UP[i][2]]); }; function hh(a,b){ return Math.abs(Math.sin(a*127.1+b*311.7)*43758.5453)%1; }; "
+# One scale: a five-face ridged shingle at pos, lying on a surface with outward normal n, its tip toward the tail direction t, length l, width w.
+let jd2 = "function plate(pos,n,t,l,w,lift){ const q=nz(cr(n,t)); const P=function(a,b,c){ return m.vertex(pos[0]+q[0]*a+n[0]*b+t[0]*c,pos[1]+q[1]*a+n[1]*b+t[1]*c,pos[2]+q[2]*a+n[2]*b+t[2]*c); }; const bL=P(-w*0.45,0.02*l,-0.15*l),sL=P(-w*0.5,0.06*l,0.35*l),rg=P(0,0.3*l,0.35*l),tp=P(0,lift*l,l),sR=P(w*0.5,0.06*l,0.35*l),bR=P(w*0.45,0.02*l,-0.15*l); m.face(bL,sL,rg); m.face(sL,tp,rg); m.face(tp,sR,rg); m.face(sR,bR,rg); m.face(bR,bL,rg); }; function scales(sA,sB,cls,lf){ let s=sA,row=0; while(s<sB){ const r=R(s),l=lf*(0.13*Math.pow(r,0.75)+0.01),step=l*0.62,n=Math.max(8,Math.round(6.283185*r/(l*0.9))),i=ix(s); for(let j=0;j<n;j++){ const th=(j+(row%2)*0.5)*6.283185/n,sn=Math.sin(th); const c=sn>0.6?0:(sn>-0.5?1:2); const v=hh(row,j); if(c!==cls) continue; const sz=l*(0.9+0.25*v); plate(ring(s,th,1.0),nrm(s,th),TG[i],sz,sz*0.95,0.16+0.14*hh(j,row)); } s+=step/Math.max(SP[i],1); row++; } }; "
+# The cream belly: wide plates across the underside, one per row.
+let jd3 = "function belly(sA,sB){ let s=sA; while(s<sB){ const r=R(s),l=0.5*r+0.03,i=ix(s),ds=l/Math.max(SP[i],1); for(let j=0;j<5;j++){ const t0=3.6128+j*0.2513,t1=t0+0.2513; const a=ring(s,t0,1.012),b=ring(s,t1,1.012),c=ring(s+ds*0.92,t1,1.012),d=ring(s+ds*0.92,t0,1.012); const A=m.vertex(a[0],a[1],a[2]),B=m.vertex(b[0],b[1],b[2]),C=m.vertex(c[0],c[1],c[2]),D=m.vertex(d[0],d[1],d[2]); m.face(A,D,C,B); } s+=ds; } }; "
+# The flame mane: tufts of three curling tapered flames down the spine, alternate tufts in each of two colours (parity 0 or 1), longer toward the head.
+let jd4 = "function flames(par,s0,s1,gain){ let s=s0,k=0; while(s<s1){ const i=ix(s),r=R(s),L=(0.3+0.85*r)*gain,b=ring(s,1.5708,1.04),t=TG[i],u=UP[i],sd=SD[i]; if((k%2)===par){ for(let f=0;f<3;f++){ const o=f-1; const p0=b,p1=[b[0]+t[0]*0.5*L+u[0]*0.4*L+sd[0]*o*0.05,b[1]+t[1]*0.5*L+u[1]*0.4*L+sd[1]*o*0.05,b[2]+t[2]*0.5*L+u[2]*0.4*L+sd[2]*o*0.05]; const p2=[p1[0]+t[0]*0.5*L+u[0]*0.12*L+sd[0]*o*0.14,p1[1]+t[1]*0.5*L+u[1]*0.12*L+sd[1]*o*0.14,p1[2]+t[2]*0.5*L+u[2]*0.12*L+sd[2]*o*0.14]; const p3=[p2[0]+t[0]*0.45*L-u[0]*0.22*L+sd[0]*o*0.18,p2[1]+t[1]*0.45*L-u[1]*0.22*L+sd[1]*o*0.18,p2[2]+t[2]*0.45*L-u[2]*0.22*L+sd[2]*o*0.18]; tube(p0[0],p0[1],p0[2],p1[0],p1[1],p1[2],0.045,0.034,5); tube(p1[0],p1[1],p1[2],p2[0],p2[1],p2[2],0.034,0.02,5); tube(p2[0],p2[1],p2[2],p3[0],p3[1],p3[2],0.02,0.004,5); } } s+=0.2/Math.max(SP[i],1); k++; } }; "
+
+# THE SPINE: twenty bones along the centre line. Each turns about its own head and follows the one before it (so the turns add up down the body), and each swings a little
+# later than the one before, so one full wave runs from the head to the tail: the body swings sideways and rises and falls as the wave passes, the way a Chinese dragon flows.
+let bones = "bone0; bone1; bone2; bone3; bone4; bone5; bone6; bone7; bone8; bone9; bone10; bone11; bone12; bone13; bone14; bone15; bone16; bone17; bone18; bone19"
+def bone(k, hx, hy, hz, tx, ty, tz, par)
+  bo{k}_a = solid.box@1(size=[0.02, 0.02, 0.02])
+  bo{k}_b = xform.move@1(bo{k}_a, by=[{hx}, {hy}, {hz}])
+  bo{k}_c = rig.bone@1(bo{k}_b, head=[{hx}, {hy}, {hz}], tail=[{tx}, {ty}, {tz}])
+  bo{k}_d = anim.parent@1(bo{k}_c, parent="${par}")
+  bo{k}_e = anim.wave@1(bo{k}_d, property="rotation", amplitude=[0, 8, 4], period=4, phase={1 - k * 0.05}, pivot_at="head")
+  output bone{k} = bo{k}_e
+end
+b0_a = solid.box@1(size=[0.02, 0.02, 0.02])
+b0_b = xform.move@1(b0_a, by=[-6.5, 6.912, 1.935])
+b0_c = rig.bone@1(b0_b, head=[-6.5, 6.912, 1.935], tail=[-5.556, 7.199, 2.207])
+b0_e = anim.wave@1(b0_c, property="rotation", amplitude=[0, 8, 4], period=4, phase=0.99, pivot_at="head")
+output bone0 = b0_e
+bone(1, -5.556, 7.199, 2.207, -4.652, 7.325, 2.162, "bone0")
+bone(2, -4.652, 7.325, 2.162, -3.826, 7.209, 1.798, "bone1")
+bone(3, -3.826, 7.209, 1.798, -3.102, 6.838, 1.162, "bone2")
+bone(4, -3.102, 6.838, 1.162, -2.489, 6.273, 0.334, "bone3")
+bone(5, -2.489, 6.273, 0.334, -1.984, 5.642, -0.576, "bone4")
+bone(6, -1.984, 5.642, -0.576, -1.565, 5.104, -1.447, "bone5")
+bone(7, -1.565, 5.104, -1.447, -1.2, 4.801, -2.164, "bone6")
+bone(8, -1.2, 4.801, -2.164, -0.849, 4.819, -2.634, "bone7")
+bone(9, -0.849, 4.819, -2.634, -0.47, 5.155, -2.796, "bone8")
+bone(10, -0.47, 5.155, -2.796, -0.025, 5.709, -2.636, "bone9")
+bone(11, -0.025, 5.709, -2.636, 0.514, 6.312, -2.183, "bone10")
+bone(12, 0.514, 6.312, -2.183, 1.164, 6.768, -1.508, "bone11")
+bone(13, 1.164, 6.768, -1.508, 1.925, 6.91, -0.712, "bone12")
+bone(14, 1.925, 6.91, -0.712, 2.78, 6.652, 0.085, "bone13")
+bone(15, 2.78, 6.652, 0.085, 3.701, 6.021, 0.766, "bone14")
+bone(16, 3.701, 6.021, 0.766, 4.65, 5.155, 1.226, "bone15")
+bone(17, 4.65, 5.155, 1.226, 5.585, 4.266, 1.395, "bone16")
+bone(18, 5.585, 4.266, 1.395, 6.466, 3.588, 1.241, "bone17")
+bone(19, 6.466, 3.588, 1.241, 7.261, 3.306, 0.78, "bone18")
+
+# ---- the body: smooth core (dark, under the scales) ----
+lung_core_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jd1} const M=36; const rows=[]; for(let i=0;i<=N;i+=3){ const s=i/N,row=[]; for(let j=0;j<M;j++){ const p=ring(s,j*6.283185/M,0.985); row.push(m.vertex(p[0],p[1],p[2])); } rows.push(row); } for(let k=0;k<rows.length-1;k++){ for(let j=0;j<M;j++){ const j2=(j+1)%M; m.face(rows[k][j],rows[k+1][j],rows[k+1][j2],rows[k][j2]); } } const c0=ring(0,0,0),c1=ring(1,0,0),A0=m.vertex(PT[0][0],PT[0][1],PT[0][2]),A1=m.vertex(PT[N][0],PT[N][1],PT[N][2]); for(let j=0;j<M;j++){ const j2=(j+1)%M; m.face(A0,rows[0][j2],rows[0][j]); m.face(A1,rows[rows.length-1][j],rows[rows.length-1][j2]); } m", budget=6000)
+lung_core = solid.material@1(lung_core_s, color=[0.03, 0.14, 0.12], roughness=0.7)
+lung_core_f = solid.finish@1(lung_core, subsurface=0.5, clearcoat=0.3, clearcoat_roughness=0.25)
+lung_core_k = rig.skin@1(lung_core_f, bones="${bones}")
+output lung_core = lung_core_k
+
+# ---- scales, in three stretches of the body and two colour bands (back and flanks) ----
+def stretch(tag, cls, s0, s1, r, g, b, lf)
+  lg_{tag}_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jd1} ${jd2} scales(${s0},${s1},${cls},${lf}); m", budget=9000)
+  lg_{tag}_m = solid.material@1(lg_{tag}_s, color=[{r}, {g}, {b}], roughness=0.42, metallic=0.25)
+  lg_{tag}_f = solid.finish@1(lg_{tag}_m, subsurface=0.35, clearcoat=0.6, clearcoat_roughness=0.15, iridescence=0.25)
+  lg_{tag}_k = rig.skin@1(lg_{tag}_f, bones="${bones}")
+  output lg_{tag} = lg_{tag}_k
+end
+stretch("back_a", 0, 0.012, 0.4, 0.04, 0.34, 0.3, 1.0)
+stretch("back_b", 0, 0.4, 0.7, 0.05, 0.4, 0.32, 1.0)
+stretch("back_c", 0, 0.7, 1.0, 0.08, 0.45, 0.3, 1.0)
+stretch("flank_a", 1, 0.012, 0.4, 0.12, 0.52, 0.4, 1.0)
+stretch("flank_b", 1, 0.4, 0.7, 0.18, 0.58, 0.38, 1.0)
+stretch("flank_c", 1, 0.7, 1.0, 0.25, 0.6, 0.3, 1.0)
+
+lung_belly_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jd1} ${jd3} belly(0.07,0.99); m", budget=4000)
+lung_belly = solid.material@1(lung_belly_s, color=[0.9, 0.74, 0.4], roughness=0.5, metallic=0.1)
+lung_belly_f = solid.finish@1(lung_belly, subsurface=0.6, sheen=0.2, clearcoat=0.2)
+lung_belly_k = rig.skin@1(lung_belly_f, bones="${bones}")
+output lung_belly = lung_belly_k
+
+lung_mane_gold_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jd1} ${jd4} flames(0,0.06,0.995,1.0); m", budget=4000)
+lung_mane_gold = solid.material@1(lung_mane_gold_s, color=[0.95, 0.68, 0.18], roughness=0.45, metallic=0.4)
+lung_mane_gold_f = solid.finish@1(lung_mane_gold, translucency=0.6, subsurface=0.4, sheen=0.3)
+lung_mane_gold_k = rig.skin@1(lung_mane_gold_f, bones="${bones}")
+output lung_mane_gold = lung_mane_gold_k
+lung_mane_red_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jd1} ${jd4} flames(1,0.06,0.995,1.0); m", budget=4000)
+lung_mane_red = solid.material@1(lung_mane_red_s, color=[0.85, 0.16, 0.08], roughness=0.5)
+lung_mane_red_f = solid.finish@1(lung_mane_red, translucency=0.6, subsurface=0.4, sheen=0.3)
+lung_mane_red_k = rig.skin@1(lung_mane_red_f, bones="${bones}")
+output lung_mane_red = lung_mane_red_k
+
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+# THE HEAD, in its own frame: x forward along the snout (occiput at 0, snout tip at 1.5), y up, z across; placed at the end of the neck facing away from the body and tilted up.
+let jh1 = "const HS=1.9; const F0=nz([PT[0][0]-PT[40][0],PT[0][1]-PT[40][1],PT[0][2]-PT[40][2]]); const HF=nz([F0[0],F0[1]+0.18,F0[2]]); const HZ=nz(cr(HF,[0,1,0])); const HU=cr(HZ,HF); const HO=[PT[0][0]-HF[0]*0.25*HS,PT[0][1]-HF[1]*0.25*HS,PT[0][2]-HF[2]*0.25*HS]; function W(x,y,z){ return [HO[0]+HF[0]*x*HS+HU[0]*y*HS+HZ[0]*z*HS,HO[1]+HF[1]*x*HS+HU[1]*y*HS+HZ[1]*z*HS,HO[2]+HF[2]*x*HS+HU[2]*y*HS+HZ[2]*z*HS]; }; function WV(x,y,z){ return [HF[0]*x+HU[0]*y+HZ[0]*z,HF[1]*x+HU[1]*y+HZ[1]*z,HF[2]*x+HU[2]*y+HZ[2]*z]; }; function VV(x,y,z){ const p=W(x,y,z); return m.vertex(p[0],p[1],p[2]); }; function wt(a,b,r0,r1,n){ const p=W(a[0],a[1],a[2]),q=W(b[0],b[1],b[2]); tube(p[0],p[1],p[2],q[0],q[1],q[2],r0*HS,r1*HS,n); }; function wb(x,y,z,r){ const p=W(x,y,z); blob(p[0],p[1],p[2],r*HS); }; const LH=1.5,TS=[0,0.05,0.12,0.22,0.35,0.5,0.65,0.8,0.92,1.0],HW=[0.1,0.17,0.19,0.17,0.2,0.27,0.32,0.3,0.24,0.18],HH=[0.07,0.1,0.12,0.13,0.15,0.2,0.26,0.28,0.25,0.2],CY=[0.02,0.03,0.03,0.03,0.04,0.06,0.08,0.1,0.1,0.08]; function la(a,t){ const f=Math.min(0.9999,Math.max(0,t))*(TS.length-1),i=Math.floor(f),u=f-i; return a[i]*(1-u)+a[i+1]*u; }; function hl(a,b){ return la(a,b); }; "
+let jh2 = "function headLoft(){ const rows=[],M=28; for(let k=0;k<TS.length;k++){ const x=LH*(1-TS[k]),row=[]; for(let j=0;j<M;j++){ const a=j*6.283185/M,sn=Math.sin(a); row.push(VV(x,CY[k]+(sn>=0?HH[k]*sn:HH[k]*0.45*sn),HW[k]*Math.cos(a))); } rows.push(row); } for(let k=0;k<rows.length-1;k++){ for(let j=0;j<M;j++){ const j2=(j+1)%M; m.face(rows[k][j],rows[k][j2],rows[k+1][j2],rows[k+1][j]); } } const k0=0,k1=TS.length-1,a0=VV(LH*(1-TS[k0]),CY[k0],0),a1=VV(LH*(1-TS[k1]),CY[k1],0); for(let j=0;j<M;j++){ const j2=(j+1)%M; m.face(a0,rows[k0][j],rows[k0][j2]); m.face(a1,rows[k1][j2],rows[k1][j]); } }; function headScales(){ const l=0.075; for(let t=0.06;t<0.95;t+=0.04){ const x=LH*(1-t),cy=la(CY,t),hh=la(HH,t),hw=la(HW,t),n=Math.max(10,Math.round(6.283185*(hw+hh)*0.5/(l*0.9))); for(let j=0;j<n;j++){ const a=(j+Math.round(t*25)%2*0.5)*6.283185/n,sn=Math.sin(a),cs=Math.cos(a); if(sn<-0.15) continue; const y=cy+(sn>=0?hh*sn:hh*0.45*sn),z=hw*cs; const nl=nz([0,(sn>=0?sn/hh:sn/(hh*0.45)),cs/hw]); const pos=W(x,y,z),nw=nz(WV(nl[0],nl[1],nl[2])),tw=nz(WV(-1,0,0)); const sz=l*HS*(0.85+0.3*hh0(j,t)); plate(pos,nw,tw,sz,sz*0.95,0.18); } } }; function hh0(a,b){ return hh(a,b*37); }; "
+let jh3 = "function jr(x,y){ const dx=x-0.5,dy=y+0.06,ca=Math.cos(0.22),sa=Math.sin(0.22); return [0.5+dx*ca+dy*sa,-0.06+dy*ca-dx*sa]; }; const JX=[1.42,1.3,1.1,0.9,0.7,0.5],JW=[0.07,0.11,0.13,0.14,0.15,0.15],JH=[0.04,0.05,0.06,0.07,0.08,0.08],JC=[-0.05,-0.06,-0.065,-0.07,-0.075,-0.08]; function jaw(){ const rows=[],M=20; for(let k=0;k<JX.length;k++){ const row=[]; for(let j=0;j<M;j++){ const a=j*6.283185/M,sn=Math.sin(a); const yy=JC[k]+(sn>=0?JH[k]*0.55*sn:JH[k]*sn); const p=jr(JX[k],yy); row.push(VV(p[0],p[1],JW[k]*Math.cos(a))); } rows.push(row); } for(let k=0;k<rows.length-1;k++){ for(let j=0;j<M;j++){ const j2=(j+1)%M; m.face(rows[k][j],rows[k][j2],rows[k+1][j2],rows[k+1][j]); } } const q0=jr(JX[0],JC[0]),q1=jr(JX[JX.length-1],JC[JX.length-1]),b0=VV(q0[0],q0[1],0),b1=VV(q1[0],q1[1],0); for(let j=0;j<M;j++){ const j2=(j+1)%M; m.face(b0,rows[0][j],rows[0][j2]); m.face(b1,rows[rows.length-1][j2],rows[rows.length-1][j]); } }; function teethUp(){ for(let k=0;k<10;k++){ const t=0.04+k*0.07,x=LH*(1-t),hw=la(HW,t),cy=la(CY,t),hh=la(HH,t); for(const sg of [-1,1]){ const ln=(k===2?0.26:0.07+0.02*(k%3)); wt([x,cy-hh*0.4,sg*hw*0.9],[x,cy-hh*0.4-ln,sg*hw*0.9+sg*0.012],0.024,0.003,5); } } }; function teethDown(){ for(let k=0;k<7;k++){ const x=1.38-k*0.13; for(const sg of [-1,1]){ const w=la(JW.slice().reverse(),0)*0; const jw=JW[Math.min(5,Math.floor(k*0.85))]*0.85; const a=jr(x,JC[Math.min(5,Math.floor(k*0.85))]+0.03),b=jr(x,JC[Math.min(5,Math.floor(k*0.85))]+0.03+(k===1?0.2:0.07)); wt([a[0],a[1],sg*jw],[b[0],b[1],sg*jw],0.02,0.003,5); } } }; "
+let jh4 = "function antler(p,d,len,r,depth,sg){ let cur=p,dir=nz(d); for(let i=0;i<3;i++){ const nx=[cur[0]+dir[0]*len/3,cur[1]+dir[1]*len/3,cur[2]+dir[2]*len/3]; wt(cur,nx,r*(1-i*0.14),r*(1-(i+1)*0.14),6); if(depth>0&&i<2){ antler(nx,[dir[0]*0.5,dir[1]*0.4+0.7,dir[2]*0.5+sg*0.9],len*0.5,r*0.62,depth-1,sg); } cur=nx; dir=nz([dir[0]-0.16,dir[1]+0.04,dir[2]+sg*0.02]); } }; function horns(){ for(const sg of [-1,1]){ antler([0.14,la(CY,0.85)+la(HH,0.85)*0.8,sg*0.14],[-0.55,0.8,sg*0.4],1.5,0.075,2,sg); } }; function whisker(sg,sc,ph){ let prev=null; for(let i=0;i<=22;i++){ const u=i/22,p=[1.28-2.7*u*sc,la(CY,0.14)-0.03+0.45*Math.sin(u*3.4+ph)*(0.5+u)-0.75*u*u,sg*(0.17+1.15*u*sc+0.3*Math.sin(u*7+ph))]; if(prev) wt(prev,p,0.03*(1-u)+0.004,0.03*(1-(u+0.045))+0.004,5); prev=p; } }; function whiskers(){ for(const sg of [-1,1]){ whisker(sg,1.0,0.3); whisker(sg,0.62,1.9); } }; function fur(par){ let k=0; for(const sg of [-1,1]){ for(let i=0;i<6;i++){ if((k+i)%2!==par){ continue; } const t=[0.35-0.04*i,-0.02-0.012*i,sg*0.28],a=[t[0]-0.25,t[1]-0.2,sg*(0.4+0.05*i)],b=[a[0]-0.35,a[1]-0.25-0.03*i,sg*(0.5+0.1*i)],c=[b[0]-0.28,b[1]+0.05,sg*(0.46+0.14*i)]; wt(t,a,0.05,0.035,5); wt(a,b,0.035,0.02,5); wt(b,c,0.02,0.004,5); } k++; } for(let i=0;i<6;i++){ if(i%2!==par) continue; const o=(i-2.5)*0.05,t=[1.0-0.07*i,-0.13,o],a=[t[0]-0.1,t[1]-0.35,o*1.5],b=[a[0]-0.18,a[1]-0.3,o*2.5],c=[b[0]-0.2,b[1]-0.1-0.05*i,o*3]; wt(t,a,0.045,0.03,5); wt(a,b,0.03,0.018,5); wt(b,c,0.018,0.004,5); } }; function brows(){ for(const sg of [-1,1]){ wt([0.72,0.2,sg*0.2],[0.5,0.26,sg*0.31],0.055,0.045,7); wb(1.32,la(CY,0.12)-0.02,sg*0.15,0.07); wb(1.46,la(CY,0.02)+0.05,sg*0.06,0.05); } }; "
+lung_head_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jlathe} ${jtube} ${jblob} ${jd1} ${jd2} ${jh1} ${jh2} ${jh4} headLoft(); headScales(); brows(); m", budget=6000)
+lung_head = solid.material@1(lung_head_s, color=[0.1, 0.46, 0.36], roughness=0.42, metallic=0.2)
+lung_head_f = solid.finish@1(lung_head, subsurface=0.5, clearcoat=0.5, clearcoat_roughness=0.2, iridescence=0.2)
+lung_head_k = anim.parent@1(lung_head_f, parent="bone0")
+output lung_head = lung_head_k
+lung_jaw_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jd1} ${jh1} ${jh3} jaw(); m", budget=2000)
+lung_jaw = solid.material@1(lung_jaw_s, color=[0.16, 0.5, 0.36], roughness=0.5, metallic=0.1)
+lung_jaw_f = solid.finish@1(lung_jaw, subsurface=0.5, clearcoat=0.5, clearcoat_roughness=0.2)
+lung_jaw_k = anim.parent@1(lung_jaw_f, parent="bone0")
+output lung_jaw = lung_jaw_k
+lung_teeth_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jd1} ${jh1} ${jh3} teethUp(); teethDown(); m", budget=2000)
+lung_teeth = solid.material@1(lung_teeth_s, color=[0.95, 0.92, 0.8], roughness=0.35)
+lung_teeth_f = solid.finish@1(lung_teeth, subsurface=0.7, clearcoat=0.4, clearcoat_roughness=0.1)
+lung_teeth_k = anim.parent@1(lung_teeth_f, parent="bone0")
+output lung_teeth = lung_teeth_k
+lung_horns_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jd1} ${jh1} ${jh4} horns(); m", budget=3000)
+lung_horns = solid.material@1(lung_horns_s, color=[0.82, 0.68, 0.42], roughness=0.45, metallic=0.15)
+lung_horns_f = solid.finish@1(lung_horns, subsurface=0.6, clearcoat=0.3)
+lung_horns_k = anim.parent@1(lung_horns_f, parent="bone0")
+output lung_horns = lung_horns_k
+lung_whiskers_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jd1} ${jh1} ${jh4} whiskers(); m", budget=3000)
+lung_whiskers = solid.material@1(lung_whiskers_s, color=[0.95, 0.76, 0.3], roughness=0.4, metallic=0.5)
+lung_whiskers_f = solid.finish@1(lung_whiskers, translucency=0.4, subsurface=0.4, sheen=0.3)
+lung_whiskers_k = anim.parent@1(lung_whiskers_f, parent="bone0")
+output lung_whiskers = lung_whiskers_k
+lung_fur_gold_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jd1} ${jh1} ${jh4} fur(0); m", budget=3000)
+lung_fur_gold = solid.material@1(lung_fur_gold_s, color=[0.95, 0.68, 0.18], roughness=0.45, metallic=0.4)
+lung_fur_gold_f = solid.finish@1(lung_fur_gold, translucency=0.6, subsurface=0.4, sheen=0.3)
+lung_fur_gold_k = anim.parent@1(lung_fur_gold_f, parent="bone0")
+output lung_fur_gold = lung_fur_gold_k
+lung_fur_red_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jd1} ${jh1} ${jh4} fur(1); m", budget=3000)
+lung_fur_red = solid.material@1(lung_fur_red_s, color=[0.85, 0.16, 0.08], roughness=0.5)
+lung_fur_red_f = solid.finish@1(lung_fur_red, translucency=0.6, subsurface=0.4, sheen=0.3)
+lung_fur_red_k = anim.parent@1(lung_fur_red_f, parent="bone0")
+output lung_fur_red = lung_fur_red_k
+lung_eyes_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jd1} ${jh1} for(const sg of [-1,1]){ wb(0.57,la(CY,0.62)+0.07,sg*0.29,0.075); } m", budget=500)
+lung_eyes = solid.material@1(lung_eyes_s, color=[1, 0.78, 0.15], roughness=0.2, emissive=[7, 4.5, 0.6])
+lung_eyes_f = solid.finish@1(lung_eyes, clearcoat=1, clearcoat_roughness=0.02)
+lung_eyes_k = anim.parent@1(lung_eyes_f, parent="bone0")
+output lung_eyes = lung_eyes_k
+lung_pupils_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jd1} ${jh1} for(const sg of [-1,1]){ const y=la(CY,0.62)+0.07,z=sg*0.355; wt([0.57,y-0.055,z],[0.57,y+0.055,z],0.013,0.013,6); wb(1.46,la(CY,0.02)+0.065,sg*0.045,0.03); } m", budget=500)
+lung_pupils = solid.material@1(lung_pupils_s, color=[0.02, 0.02, 0.03], roughness=0.3)
+lung_pupils_k = anim.parent@1(lung_pupils, parent="bone0")
+output lung_pupils = lung_pupils_k
+
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+# FOUR LEGS placed with two-bone IK (a root on the body, a hand target, a pole to bend the elbow), claws that curl, fur at elbow and wrist, and the pearl in the front claw.
+let jl1 = "function ikE(Rt,T,pole,l1,l2){ let d=[T[0]-Rt[0],T[1]-Rt[1],T[2]-Rt[2]]; let L=Math.sqrt(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]); const mx=l1+l2-0.02; if(L>mx){ d=[d[0]/L*mx,d[1]/L*mx,d[2]/L*mx]; L=mx; } const u=[d[0]/L,d[1]/L,d[2]/L]; const a=(l1*l1-l2*l2+L*L)/(2*L),h=Math.sqrt(Math.max(l1*l1-a*a,0)); const dp=pole[0]*u[0]+pole[1]*u[1]+pole[2]*u[2]; const pp=nz([pole[0]-u[0]*dp,pole[1]-u[1]*dp,pole[2]-u[2]*dp]); return [[Rt[0]+u[0]*a+pp[0]*h,Rt[1]+u[1]*a+pp[1]*h,Rt[2]+u[2]*a+pp[2]*h],[Rt[0]+d[0],Rt[1]+d[1],Rt[2]+d[2]]]; }; const LG=[[0.2,1,1.55,0.95,0.15],[0.2,-1,0.5,1.0,-0.9],[0.56,1,-1.0,0.9,-0.75],[0.56,-1,-1.5,1.0,-0.3]]; function legFrame(g){ const s=g[0],i=ix(s),C=PT[i],T=TG[i],sd=SD[i],u=UP[i],r=R(s); const root=[C[0]+sd[0]*g[1]*0.55*r-u[0]*0.35*r,C[1]+sd[1]*g[1]*0.55*r-u[1]*0.35*r,C[2]+sd[2]*g[1]*0.55*r-u[2]*0.35*r]; const tg=[root[0]-T[0]*g[2]+sd[0]*g[1]*g[3]+u[0]*g[4],root[1]-T[1]*g[2]+sd[1]*g[1]*g[3]+u[1]*g[4],root[2]-T[2]*g[2]+sd[2]*g[1]*g[3]+u[2]*g[4]]; const pole=[u[0]+sd[0]*g[1]*0.6,u[1]+sd[1]*g[1]*0.6,u[2]+sd[2]*g[1]*0.6]; const ik=ikE(root,tg,pole,1.3,1.3); const el=ik[0],hand=ik[1]; const D=nz([hand[0]-el[0],hand[1]-el[1],hand[2]-el[2]]); const S=nz(cr(D,u)); const U=nz(cr(S,D)); return [root,el,hand,D,S,U,r]; }; "
+let jl2 = "function legs(mode){ for(const g of LG){ const f=legFrame(g),Rt=f[0],El=f[1],Ha=f[2],D=f[3],S=f[4],U=f[5],r=f[6]; if(mode===0){ blob(Rt[0],Rt[1],Rt[2],0.42); tube(Rt[0],Rt[1],Rt[2],El[0],El[1],El[2],0.33,0.22,14); blob(El[0],El[1],El[2],0.27); tube(El[0],El[1],El[2],Ha[0],Ha[1],Ha[2],0.22,0.13,14); blob(Ha[0],Ha[1],Ha[2],0.19); } for(let k=0;k<4;k++){ const off=(k-1.5)*0.1,p0=[Ha[0]+S[0]*off,Ha[1]+S[1]*off,Ha[2]+S[2]*off],p1=[p0[0]+D[0]*0.2,p0[1]+D[1]*0.2,p0[2]+D[2]*0.2],p2=[p1[0]+D[0]*0.14-U[0]*0.12,p1[1]+D[1]*0.14-U[1]*0.12,p1[2]+D[2]*0.14-U[2]*0.12],p3=[p2[0]+D[0]*0.1-U[0]*0.2,p2[1]+D[1]*0.1-U[1]*0.2,p2[2]+D[2]*0.1-U[2]*0.2]; if(mode===0){ tube(p0[0],p0[1],p0[2],p1[0],p1[1],p1[2],0.06,0.05,7); tube(p1[0],p1[1],p1[2],p2[0],p2[1],p2[2],0.05,0.042,7); } if(mode===1){ tube(p2[0],p2[1],p2[2],p3[0],p3[1],p3[2],0.043,0.004,6); } } if(mode===2){ for(const P of [El,Ha]){ for(let k=0;k<5;k++){ const a=(k-2)*0.28,b=[P[0]-D[0]*0.3+S[0]*Math.sin(a)*0.35-U[0]*0.1,P[1]-D[1]*0.3+S[1]*Math.sin(a)*0.35-U[1]*0.1,P[2]-D[2]*0.3+S[2]*Math.sin(a)*0.35-U[2]*0.1],c=[b[0]-D[0]*0.35-U[0]*0.2,b[1]-D[1]*0.35-U[1]*0.2,b[2]-D[2]*0.35-U[2]*0.2]; tube(P[0],P[1],P[2],b[0],b[1],b[2],0.05,0.03,5); tube(b[0],b[1],b[2],c[0],c[1],c[2],0.03,0.004,5); } } } } }; function pearl(){ const c=W(2.1,0.1,0); blob(c[0],c[1],c[2],0.42); }; function tailtuft(par){ const N0=PT[N],T=TG[N],sd=SD[N],u=UP[N]; for(let f=0;f<10;f++){ if(f%2!==par) continue; const a=f*0.6283,dv=nz([T[0]+(Math.cos(a)*sd[0]+Math.sin(a)*u[0])*0.8,T[1]+(Math.cos(a)*sd[1]+Math.sin(a)*u[1])*0.8,T[2]+(Math.cos(a)*sd[2]+Math.sin(a)*u[2])*0.8]),L=1.2; const p1=[N0[0]+dv[0]*0.5*L,N0[1]+dv[1]*0.5*L,N0[2]+dv[2]*0.5*L],p2=[p1[0]+dv[0]*0.5*L+u[0]*0.2*L,p1[1]+dv[1]*0.5*L+u[1]*0.2*L,p1[2]+dv[2]*0.5*L+u[2]*0.2*L],p3=[p2[0]+dv[0]*0.4*L-u[0]*0.3*L,p2[1]+dv[1]*0.4*L-u[1]*0.3*L,p2[2]+dv[2]*0.4*L-u[2]*0.3*L]; tube(N0[0],N0[1],N0[2],p1[0],p1[1],p1[2],0.05,0.04,5); tube(p1[0],p1[1],p1[2],p2[0],p2[1],p2[2],0.04,0.025,5); tube(p2[0],p2[1],p2[2],p3[0],p3[1],p3[2],0.025,0.004,5); } }; "
+lung_legs_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jd1} ${jl1} ${jl2} legs(0); m", budget=3000)
+lung_legs = solid.material@1(lung_legs_s, color=[0.1, 0.46, 0.36], roughness=0.45, metallic=0.2)
+lung_legs_f = solid.finish@1(lung_legs, subsurface=0.5, clearcoat=0.3, clearcoat_roughness=0.25)
+lung_legs_k = rig.skin@1(lung_legs_f, bones="${bones}")
+output lung_legs = lung_legs_k
+lung_claws_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jd1} ${jl1} ${jl2} legs(1); m", budget=2000)
+lung_claws = solid.material@1(lung_claws_s, color=[0.95, 0.92, 0.82], roughness=0.3)
+lung_claws_f = solid.finish@1(lung_claws, subsurface=0.5, clearcoat=0.5, clearcoat_roughness=0.1)
+lung_claws_k = rig.skin@1(lung_claws_f, bones="${bones}")
+output lung_claws = lung_claws_k
+lung_legfur_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jd1} ${jl1} ${jl2} legs(2); tailtuft(0); m", budget=4000)
+lung_legfur = solid.material@1(lung_legfur_s, color=[0.95, 0.68, 0.18], roughness=0.45, metallic=0.4)
+lung_legfur_f = solid.finish@1(lung_legfur, translucency=0.6, subsurface=0.4, sheen=0.3)
+lung_legfur_k = rig.skin@1(lung_legfur_f, bones="${bones}")
+output lung_legfur = lung_legfur_k
+lung_tailred_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jd1} ${jl1} ${jl2} tailtuft(1); m", budget=2000)
+lung_tailred = solid.material@1(lung_tailred_s, color=[0.85, 0.16, 0.08], roughness=0.5)
+lung_tailred_f = solid.finish@1(lung_tailred, translucency=0.6, subsurface=0.4, sheen=0.3)
+lung_tailred_k = anim.parent@1(lung_tailred_f, parent="bone19")
+output lung_tailred = lung_tailred_k
+
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+# CLOUD BANKS around the coils: clusters of soft blobs, thicker below.
+let jc = "function cloudBank(){ for(let c=0;c<34;c++){ const cx=-10+20*hh(c,1),cy=-1.5+3.6*hh(c,2)+(c%3)*0.4,cz=-6+11*hh(c,3),sz=0.9+1.1*hh(c,4); for(let k=0;k<9;k++){ blob(cx+(hh(c,k+10)-0.5)*3.4*sz,cy+(hh(c,k+20)-0.5)*0.9*sz,cz+(hh(c,k+30)-0.5)*2.6*sz,sz*(0.7+0.6*hh(c,k+40))); } } }; "

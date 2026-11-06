@@ -1,0 +1,284 @@
+# LEVIATHAN: a steampunk airship that is a whale. A 10 m skinned whale swims through the air on a six-bone spine; on its back rides a wooden gondola with brass funnels
+# that puff steam, spinning propeller pods, a turning gear, a mast with sails and a string of lanterns; an angler lure hangs from its forehead.
+# Built entirely in our own language: fields with smooth unions for the whale, a rig and skin, silhouette-by-plan hull, revolves and sweeps, instanced blades and bolts,
+# a scripted gear and sails, height-based texture programs, glowing parts with real lights, steam emitters and animation.
+# Metres. The whale faces +x, y is up, z across; the body centre line is 3.2 m above the floor.
+
+let bones = "b0; b1; b2; b3; b4; b5"
+let hide_spin = "0:0,0,0; 0.15:90,0,0; 0.3:180,0,0; 0.45:270,0,0; 0.6:360,0,0"
+
+# A joint bone, and a bone that swings (about Z, a nod of the spine) with its own phase.
+def bw(tag, hx, hy, hz, tx, ty, tz, par, az, per, ph)
+  bw{tag}_a = solid.box@1(size=[0.02, 0.02, 0.02])
+  bw{tag}_b = xform.move@1(bw{tag}_a, by=[{hx}, {hy}, {hz}])
+  bw{tag}_c = rig.bone@1(bw{tag}_b, head=[{hx}, {hy}, {hz}], tail=[{tx}, {ty}, {tz}])
+  bw{tag}_d = anim.parent@1(bw{tag}_c, parent="${par}")
+  bw{tag}_e = anim.wave@1(bw{tag}_d, property="rotation", amplitude=[0, 0, {az}], period={per}, phase={ph}, pivot_at="head")
+  output {tag} = bw{tag}_e
+end
+r0_a = solid.box@1(size=[0.02, 0.02, 0.02])
+r0_b = xform.move@1(r0_a, by=[3.4, 3.3, 0])
+r0_c = rig.bone@1(r0_b, head=[3.4, 3.3, 0], tail=[1.9, 3.25, 0])
+r0_d = anim.wave@1(r0_c, property="rotation", amplitude=[0, 0, 0.8], period=3.2, phase=0, pivot_at="head")
+output b0 = r0_d
+bw("b1", 1.9, 3.25, 0, 0.4, 3.2, 0, "b0", 1.6, 3.2, 0.06)
+bw("b2", 0.4, 3.2, 0, -1.0, 3.2, 0, "b1", 3.0, 3.2, 0.13)
+bw("b3", -1.0, 3.2, 0, -2.4, 3.2, 0, "b2", 5.0, 3.2, 0.21)
+bw("b4", -2.4, 3.2, 0, -3.6, 3.2, 0, "b3", 8.0, 3.2, 0.3)
+bw("b5", -3.6, 3.2, 0, -5.0, 3.2, 0, "b4", 12.0, 3.2, 0.4)
+
+# ---- the whale: tapering tubes and a bulging forehead, smooth-united; jaw line cut; flukes and dorsal fin ----
+wh_t1 = field.tube@1(points=[[4.3, 3.3, 0], [3.4, 3.3, 0]], radius=0.5, end_radius=1.05)
+wh_t2 = field.tube@1(points=[[3.4, 3.3, 0], [2.2, 3.25, 0]], radius=1.05, end_radius=1.5)
+wh_t3 = field.tube@1(points=[[2.2, 3.25, 0], [0.6, 3.2, 0]], radius=1.5, end_radius=1.75)
+wh_t4 = field.tube@1(points=[[0.6, 3.2, 0], [-1.0, 3.2, 0]], radius=1.75, end_radius=1.55)
+wh_t5 = field.tube@1(points=[[-1.0, 3.2, 0], [-2.4, 3.2, 0]], radius=1.55, end_radius=1.05)
+wh_t6 = field.tube@1(points=[[-2.4, 3.2, 0], [-3.6, 3.2, 0]], radius=1.05, end_radius=0.55)
+wh_t7 = field.tube@1(points=[[-3.6, 3.2, 0], [-4.9, 3.2, 0]], radius=0.55, end_radius=0.28)
+wh_brow = field.ellipsoid@1(radii=[1.15, 0.95, 1.0])
+wh_brow_m = field.move@1(wh_brow, by=[3.3, 3.65, 0])
+wh_jaw = field.ellipsoid@1(radii=[1.35, 0.5, 0.82])
+wh_jaw_m = field.move@1(wh_jaw, by=[3.35, 2.75, 0])
+wh_fluke_a = field.ellipsoid@1(radii=[0.55, 0.06, 0.55])
+wh_fluke_am = field.move@1(wh_fluke_a, by=[-5.1, 3.2, 0.6])
+wh_fluke_b = field.ellipsoid@1(radii=[0.55, 0.06, 0.55])
+wh_fluke_bm = field.move@1(wh_fluke_b, by=[-5.1, 3.2, -0.6])
+wh_fluke_c = field.ellipsoid@1(radii=[0.42, 0.05, 0.42])
+wh_fluke_cm = field.move@1(wh_fluke_c, by=[-5.4, 3.2, 1.05])
+wh_fluke_d = field.ellipsoid@1(radii=[0.42, 0.05, 0.42])
+wh_fluke_dm = field.move@1(wh_fluke_d, by=[-5.4, 3.2, -1.05])
+wh_dorsal = field.ellipsoid@1(radii=[0.45, 0.42, 0.09])
+wh_dorsal_m = field.move@1(wh_dorsal, by=[-2.1, 4.55, 0])
+wh_u1 = field.smooth_union@1(wh_t1, wh_t2, radius=0.3)
+wh_u2 = field.smooth_union@1(wh_u1, wh_t3, radius=0.4)
+wh_u3 = field.smooth_union@1(wh_u2, wh_t4, radius=0.4)
+wh_u4 = field.smooth_union@1(wh_u3, wh_t5, radius=0.4)
+wh_u5 = field.smooth_union@1(wh_u4, wh_t6, radius=0.35)
+wh_u6 = field.smooth_union@1(wh_u5, wh_t7, radius=0.3)
+wh_u7 = field.smooth_union@1(wh_u6, wh_brow_m, radius=0.35)
+wh_u8 = field.smooth_union@1(wh_u7, wh_jaw_m, radius=0.25)
+wh_u9 = field.smooth_union@1(wh_u8, wh_fluke_am, radius=0.2)
+wh_u10 = field.smooth_union@1(wh_u9, wh_fluke_bm, radius=0.2)
+wh_u11 = field.smooth_union@1(wh_u10, wh_fluke_cm, radius=0.15)
+wh_u12 = field.smooth_union@1(wh_u11, wh_fluke_dm, radius=0.15)
+wh_u13 = field.smooth_union@1(wh_u12, wh_dorsal_m, radius=0.2)
+wh_mouth = field.ellipsoid@1(radii=[1.5, 0.045, 1.2])
+wh_mouth_m = field.move@1(wh_mouth, by=[3.3, 3.12, 0])
+wh_eye_l = field.sphere@1(radius=0.17)
+wh_eye_lm = field.move@1(wh_eye_l, by=[3.55, 3.55, 0.93])
+wh_eye_rm = field.move@1(wh_eye_l, by=[3.55, 3.55, -0.93])
+wh_cut1 = field.subtract@1(wh_u13, wh_mouth_m)
+wh_cut2 = field.subtract@1(wh_cut1, wh_eye_lm)
+wh_cut3 = field.subtract@1(wh_cut2, wh_eye_rm)
+wh_noise = field.noise@1(wh_cut3, amplitude=0.035, scale=0.5, octaves=3, persistence=0.5, seed=11)
+wh_solid = field.to_solid@1(wh_noise, min=[-6.8, 1.2, -2.4], max=[5.2, 5.4, 2.4], edge_length=0.05)
+wh_m = solid.material@1(wh_solid, color=[0.2, 0.26, 0.38], roughness=0.6)
+wh_t = solid.texture@1(wh_m, program="h = surface_height(low=1.5, high=4.9); belly = colorize(h, gradient=[0:#eee6d4, 0.30:#d4cebf, 0.42:#8896ac, 0.62:#4a6088, 1:#2d406a]); albedo = belly")
+wh_f = solid.finish@1(wh_t, subsurface=0.35, clearcoat=0.25, clearcoat_roughness=0.35, relief=0.45, relief_scale=22, relief_style="ridged", wetness=0.15)
+wh_k = rig.skin@1(wh_f, bones="${bones}", falloff=3, influences=3)
+output whale = wh_k
+
+# ---- eyes with brass rims, and the angler lure that hangs from the forehead ----
+eye = solid.sphere@1(radius=0.15, segments=32)
+eye_at = inst.place@1(eye, at=[[3.58, 3.55, 0.9], [3.58, 3.55, -0.9]])
+eye_m = solid.material@1(eye_at, color=[0.02, 0.02, 0.025], roughness=0.05)
+eye_f = solid.finish@1(eye_m, clearcoat=1.0, clearcoat_roughness=0.02)
+eye_k = anim.parent@1(eye_f, parent="b0")
+output eyes = eye_k
+rim = solid.torus@1(major=0.175, minor=0.022, segments=32, tube_segments=10)
+rim_rot = xform.rotate@1(rim, angles=[90, 0, 0])
+rim_at = inst.place@1(rim_rot, at=[[3.58, 3.55, 0.93], [3.58, 3.55, -0.93]])
+rim_m = solid.material@1(rim_at, color=[0.85, 0.62, 0.2], metallic=1.0, roughness=0.28)
+rim_k = anim.parent@1(rim_m, parent="b0")
+output eye_rims = rim_k
+lure_path = curve.bezier@1(points=[[3.9, 4.35, 0], [4.5, 5.2, 0], [5.0, 5.9, 0], [5.5, 5.7, 0]], steps=24)
+lure_ring = profile.circle@1(radius=0.035, segments=12)
+lure_rod = solid.sweep@1(lure_path, lure_ring, scale_end=0.5)
+lure_rod_m = solid.material@1(lure_rod, color=[0.55, 0.38, 0.14], metallic=0.9, roughness=0.4)
+lure_rod_k = anim.parent@1(lure_rod_m, parent="b0")
+output lure_rod = lure_rod_k
+lure = solid.sphere@1(radius=0.22, segments=32)
+lure_at = xform.move@1(lure, by=[5.55, 5.6, 0])
+lure_m = solid.material@1(lure_at, color=[1, 0.7, 0.25], roughness=0.15, emissive=[4, 2.2, 0.6])
+lure_k = anim.parent@1(lure_m, parent="b0")
+lure_g = anim.wave@1(lure_k, property="glow", amplitude=[0.35, 0, 0], period=2.2, shape="sine")
+output lure = lure_g
+lure_light = light.point@1(position=[5.6, 5.6, 0], color=[1, 0.72, 0.3], intensity=220, range=10)
+output lure_light = lure_light
+
+# ---- flippers: flat paddles that flap on top of the spine's own motion (parented to a spine bone, with a track of their own) ----
+def flipper(tag, fz, keys)
+  fl{tag}_e = field.ellipsoid@1(radii=[0.95, 0.075, 0.4])
+  fl{tag}_em = field.move@1(fl{tag}_e, by=[0.9, 2.3, {fz}])
+  fl{tag}_s = field.to_solid@1(fl{tag}_em, min=[-0.3, 2.0, {fz - 0.7}], max=[2.1, 2.6, {fz + 0.7}], edge_length=0.03)
+  fl{tag}_m = solid.material@1(fl{tag}_s, color=[0.2, 0.27, 0.42], roughness=0.55)
+  fl{tag}_f = solid.finish@1(fl{tag}_m, subsurface=0.3, clearcoat=0.2, clearcoat_roughness=0.4, wetness=0.1)
+  fl{tag}_p = anim.parent@1(fl{tag}_f, parent="b2")
+  fl{tag}_t = anim.track@1(fl{tag}_p, property="rotation", keys="${keys}", interpolation="smooth", loop=true, pivot=[0.6, 2.3, {fz * 0.75}])
+  output flipper_{tag} = fl{tag}_t
+end
+flipper("l", 1.75, "0:0,0,0; 1.6:16,0,0; 3.2:0,0,0; 4.8:-9,0,0; 6.4:0,0,0")
+flipper("r", -1.75, "0:0,0,0; 1.6:-16,0,0; 3.2:0,0,0; 4.8:9,0,0; 6.4:0,0,0")
+
+# ---- the gondola: a hull from a side silhouette and a plan silhouette, wooden planks, a cabin, brass fittings. All of it rides the mid-spine bone. ----
+hull_side_pts = profile.polygon@1(points=[[-1.8, 0.55], [-1.65, 0.05], [1.3, 0.05], [1.85, 0.35], [2.05, 0.95], [-1.8, 0.95]])
+hull_side = profile.smooth@1(hull_side_pts, iterations=1)
+hull_side_s = solid.extrude@1(hull_side, height=1.6)
+hull_side_r = xform.rotate@1(hull_side_s, angles=[90, 0, 0])
+hull_side_at = xform.move@1(hull_side_r, by=[0, 0, -0.8])
+hull_plan_pts = profile.polygon@1(points=[[-1.8, 0.55], [-1.8, -0.55], [0.3, -0.72], [1.7, -0.4], [2.1, 0], [1.7, 0.4], [0.3, 0.72]])
+hull_plan = profile.smooth@1(hull_plan_pts, iterations=1)
+hull_plan_s = solid.extrude@1(hull_plan, height=2.0)
+hull_raw = solid.intersect@1(hull_side_at, hull_plan_s)
+hull_round = solid.round@1(hull_raw, radius=0.03, segments=6)
+hull_at = xform.move@1(hull_round, by=[0.2, 4.8, 0])
+hull_m = solid.material@1(hull_at, color=[0.5, 0.31, 0.15], roughness=0.7, recipe="planks", texture_scale=2)
+hull_f = solid.finish@1(hull_m, relief=0.3, relief_scale=40, relief_style="ridged")
+hull_k = anim.parent@1(hull_f, parent="b2")
+output gondola = hull_k
+
+cabin = solid.box@1(size=[1.3, 0.8, 0.95])
+cabin_round = solid.round@1(cabin, radius=0.025, segments=6)
+cabin_at = xform.move@1(cabin_round, by=[0.65, 5.75, 0])
+roof = solid.box@1(size=[1.55, 0.07, 1.2])
+roof_round = solid.round@1(roof, radius=0.02, segments=6)
+roof_at = xform.move@1(roof_round, by=[0.65, 6.2, 0])
+cab_u = solid.union@1(cabin_at, roof_at)
+cab_m = solid.material@1(cab_u, color=[0.62, 0.45, 0.25], roughness=0.65, recipe="planks", texture_scale=3)
+cab_k = anim.parent@1(cab_m, parent="b2")
+output cabin = cab_k
+win = solid.box@1(size=[0.34, 0.3, 0.02])
+win_at = inst.place@1(win, at=[[0.3, 5.8, 0.485], [0.9, 5.8, 0.485], [0.3, 5.8, -0.485], [0.9, 5.8, -0.485]])
+win_m = solid.material@1(win_at, color=[1, 0.85, 0.5], roughness=0.2, emissive=[2.2, 1.4, 0.5])
+win_k = anim.parent@1(win_m, parent="b2")
+output windows = win_k
+win_front = solid.box@1(size=[0.02, 0.3, 0.5])
+win_front_at = xform.move@1(win_front, by=[1.31, 5.8, 0])
+win_front_m = solid.material@1(win_front_at, color=[1, 0.85, 0.5], roughness=0.2, emissive=[2.2, 1.4, 0.5])
+win_front_k = anim.parent@1(win_front_m, parent="b2")
+output window_front = win_front_k
+
+# Brass: a boiler on the stern deck, two funnels with flanges, deck rails and a mast.
+boiler = solid.cylinder@1(radius=0.34, height=1.25, segments=40)
+boiler_rot = xform.rotate@1(boiler, angles=[0, 0, 90])
+boiler_round = solid.round@1(boiler_rot, radius=0.04, segments=6)
+boiler_at = xform.move@1(boiler_round, by=[-0.85, 5.45, 0])
+funnel = solid.cylinder@1(radius=0.12, height=0.95, segments=28)
+funnel_at = inst.place@1(funnel, at=[[-0.55, 6.25, 0], [-1.15, 6.25, 0]])
+flange = solid.cylinder@1(radius=0.17, height=0.05, segments=28)
+flange_at = inst.place@1(flange, at=[[-0.55, 6.72, 0], [-1.15, 6.72, 0], [-0.55, 5.85, 0], [-1.15, 5.85, 0]])
+mast = solid.cylinder@1(radius=0.05, height=2.8, segments=16)
+mast_at = xform.move@1(mast, by=[0.65, 7.5, 0])
+boom = solid.cylinder@1(radius=0.03, height=2.4, segments=12)
+boom_rot = xform.rotate@1(boom, angles=[0, 0, 90])
+boom_at = xform.move@1(boom_rot, by=[-0.55, 6.5, 0])
+brass_m1 = solid.material@1(boiler_at, color=[0.85, 0.6, 0.2], metallic=1.0, roughness=0.3)
+brass_m2 = solid.material@1(funnel_at, color=[0.85, 0.6, 0.2], metallic=1.0, roughness=0.3)
+brass_m3 = solid.material@1(flange_at, color=[0.7, 0.5, 0.15], metallic=1.0, roughness=0.35)
+brass_m4 = solid.material@1(mast_at, color=[0.45, 0.3, 0.14], roughness=0.6)
+brass_m5 = solid.material@1(boom_at, color=[0.45, 0.3, 0.14], roughness=0.6)
+brass_k1 = anim.parent@1(brass_m1, parent="b2")
+brass_k2 = anim.parent@1(brass_m2, parent="b2")
+brass_k3 = anim.parent@1(brass_m3, parent="b2")
+brass_k4 = anim.parent@1(brass_m4, parent="b2")
+brass_k5 = anim.parent@1(brass_m5, parent="b2")
+output boiler = brass_k1
+output funnels = brass_k2
+output flanges = brass_k3
+output mast = brass_k4
+output boom = brass_k5
+
+# Steam: a small cap on each funnel top carries an emitter.
+steam_cap = solid.cylinder@1(radius=0.1, height=0.02, segments=16)
+steam_cap_at = inst.place@1(steam_cap, at=[[-0.55, 6.74, 0], [-1.15, 6.74, 0]])
+steam_cap_m = solid.material@1(steam_cap_at, color=[0.3, 0.2, 0.08], metallic=1.0, roughness=0.4)
+steam_cap_k = anim.parent@1(steam_cap_m, parent="b2")
+steam_e = fx.emitter@1(steam_cap_k, name="steam", rate=45, lifetime=[1.6, 3.0], speed=[0.7, 1.5], direction=[-0.15, 1, 0], cone=0.28, size=[0.12, 0.9], colour=[0.9, 0.9, 0.93], colour_end=[0.8, 0.82, 0.86], alpha=[0.55, 0], blend="alpha", max_particles=260)
+steam_f = fx.force@1(steam_e, emitter="steam", kind="turbulence", strength=1.4, scale=0.9, speed=0.35)
+output steam = steam_f
+
+# ---- sails: a triangular grid of vertices with a billow, scripted, double-sided, canvas; they flutter about the mast ----
+def sail(tag, ax, ay, bx, by, cx, cy, bil, per, ph)
+  sl{tag}_s = poly.script@1(code="const m = new Mesh(); const N = 12; const A = [${ax}, ${ay}, 0], B = [${bx}, ${by}, 0], C = [${cx}, ${cy}, 0]; const V = []; for (let i = 0; i <= N; i++) { const row = []; for (let j = 0; j <= N - i; j++) { const u = i / N, v = j / N, w = 1 - u - v; const z = ${bil} * 27 * u * v * w; row.push(m.vertex(A[0] + u * (B[0] - A[0]) + v * (C[0] - A[0]), A[1] + u * (B[1] - A[1]) + v * (C[1] - A[1]), z)); } V.push(row); } for (let i = 0; i < N; i++) { for (let j = 0; j <= N - i - 1; j++) { m.face(V[i][j], V[i + 1][j], V[i][j + 1]); m.face(V[i][j], V[i][j + 1], V[i + 1][j]); if (j <= N - i - 2) { m.face(V[i + 1][j], V[i + 1][j + 1], V[i][j + 1]); m.face(V[i + 1][j], V[i][j + 1], V[i + 1][j + 1]); } } } m", budget=2000)
+  sl{tag}_m = solid.material@1(sl{tag}_s, color=[0.93, 0.88, 0.76], roughness=0.9, recipe="fabric", texture_scale=14)
+  sl{tag}_f = solid.finish@1(sl{tag}_m, translucency=0.35, sheen=0.4)
+  sl{tag}_p = anim.parent@1(sl{tag}_f, parent="b2")
+  sl{tag}_w = anim.wave@1(sl{tag}_p, property="rotation", amplitude=[0, 2.5, 0], period={per}, phase={ph}, pivot=[0.65, 7.5, 0])
+  output sail_{tag} = sl{tag}_w
+end
+sail("main", 0.65, 8.7, 0.65, 6.6, -1.7, 6.65, 0.4, 3.4, 0)
+sail("jib", 0.65, 8.8, 0.65, 6.75, 2.5, 6.0, -0.35, 2.9, 0.3)
+
+# ---- propeller pods: nacelle, pylon, and a four-bladed screw built on its own axis, turned onto X and spun about its hub ----
+blade = solid.box@1(size=[0.5, 0.02, 0.15])
+blade_t = xform.rotate@1(blade, angles=[26, 0, 0])
+blades = inst.radial@1(blade_t, count=4, radius=0.3)
+blades_r = inst.realize@1(blades)
+hub = solid.cylinder@1(radius=0.09, height=0.14, segments=24)
+screw = solid.union@1(blades_r, hub)
+screw_x = xform.rotate@1(screw, angles=[0, 0, 90])
+screw_m = solid.material@1(screw_x, color=[0.85, 0.6, 0.2], metallic=1.0, roughness=0.3)
+def pod(tag, pz)
+  pd{tag}_n = solid.cylinder@1(radius=0.17, height=0.8, segments=28)
+  pd{tag}_nr = xform.rotate@1(pd{tag}_n, angles=[0, 0, 90])
+  pd{tag}_nm = xform.move@1(pd{tag}_nr, by=[-0.4, 5.2, {pz}])
+  pd{tag}_y = solid.box@1(size=[0.12, 0.1, 0.5])
+  pd{tag}_ym = xform.move@1(pd{tag}_y, by=[-0.4, 5.2, {pz * 0.82}])
+  pd{tag}_u = solid.union@1(pd{tag}_nm, pd{tag}_ym)
+  pd{tag}_um = solid.material@1(pd{tag}_u, color=[0.7, 0.5, 0.17], metallic=1.0, roughness=0.35)
+  pd{tag}_uk = anim.parent@1(pd{tag}_um, parent="b2")
+  output pod_{tag} = pd{tag}_uk
+  pd{tag}_s = xform.move@1(screw_m, by=[-0.9, 5.2, {pz}])
+  pd{tag}_sk = anim.parent@1(pd{tag}_s, parent="b2")
+  pd{tag}_st = anim.track@1(pd{tag}_sk, property="rotation", keys="${hide_spin}", interpolation="linear", loop=true, pivot=[-0.9, 5.2, {pz}])
+  output screw_{tag} = pd{tag}_st
+end
+pod("l", 1.2)
+pod("r", -1.2)
+
+# ---- two meshing brass gears on the cabin wall: toothed discs made by a script, the big one turning slowly, the small one faster the other way ----
+def gear(tag, gr, gt, gx, keys)
+  gr{tag}_s = poly.script@1(code="const m = new Mesh(); const R = ${gr}, T = ${gt}, th = 0.06; const rin = R * 0.62, root = R * 0.86, p = 2 * Math.PI / T; const out = []; for (let i = 0; i < T; i++) { const a = i * p; out.push([root, a], [root, a + 0.2 * p], [R, a + 0.32 * p], [R, a + 0.6 * p], [root, a + 0.72 * p]); } const n = out.length; const fo = [], bo = [], fi = [], bi = []; for (let k = 0; k < n; k++) { const r = out[k][0], a = out[k][1]; fo.push(m.vertex(r * Math.cos(a), r * Math.sin(a), th / 2)); bo.push(m.vertex(r * Math.cos(a), r * Math.sin(a), -th / 2)); fi.push(m.vertex(rin * Math.cos(a), rin * Math.sin(a), th / 2)); bi.push(m.vertex(rin * Math.cos(a), rin * Math.sin(a), -th / 2)); } const fc = m.vertex(0, 0, th / 2), bc = m.vertex(0, 0, -th / 2); for (let k = 0; k < n; k++) { const j = (k + 1) % n; m.face(fi[k], fo[k], fo[j], fi[j]); m.face(bi[k], bi[j], bo[j], bo[k]); m.face(fo[k], bo[k], bo[j], fo[j]); m.face(fc, fi[k], fi[j]); m.face(bc, bi[j], bi[k]); } m", budget=2000)
+  gr{tag}_m = solid.material@1(gr{tag}_s, color=[0.8, 0.55, 0.18], metallic=1.0, roughness=0.32)
+  gr{tag}_f = solid.finish@1(gr{tag}_m, clearcoat=0.4, clearcoat_roughness=0.25, relief=0.3, relief_scale=30, relief_style="ridged")
+  gr{tag}_a = xform.move@1(gr{tag}_f, by=[{gx}, 5.7, -0.53])
+  gr{tag}_p = anim.parent@1(gr{tag}_a, parent="b2")
+  gr{tag}_t = anim.track@1(gr{tag}_p, property="rotation", keys="${keys}", interpolation="linear", loop=true, pivot=[{gx}, 5.7, -0.53])
+  output gear_{tag} = gr{tag}_t
+end
+gear("big", 0.5, 16, 0.3, "0:0,0,0; 2:0,0,90; 4:0,0,180; 6:0,0,270; 8:0,0,360")
+gear("small", 0.3, 10, 1.04, "0:0,0,0; 1.25:0,0,-90; 2.5:0,0,-180; 3.75:0,0,-270; 5:0,0,-360")
+
+# ---- rigging: a rope swept along a Bezier with a string of lantern bulbs hanging along it ----
+def rope(tag, x0, y0, z0, x1, y1, z1, d)
+  rp{tag}_c = curve.bezier@1(points=[[{x0}, {y0}, {z0}], [{x0 + (x1 - x0) / 3}, {y0 + (y1 - y0) / 3 - d}, {z0 + (z1 - z0) / 3}], [{x0 + (x1 - x0) * 2 / 3}, {y0 + (y1 - y0) * 2 / 3 - d}, {z0 + (z1 - z0) * 2 / 3}], [{x1}, {y1}, {z1}]], steps=20)
+  rp{tag}_r = profile.circle@1(radius=0.018, segments=8)
+  rp{tag}_s = solid.sweep@1(rp{tag}_c, rp{tag}_r, scale_end=1.0)
+  rp{tag}_m = solid.material@1(rp{tag}_s, color=[0.55, 0.42, 0.25], roughness=0.9)
+  rp{tag}_k = anim.parent@1(rp{tag}_m, parent="b2")
+  output rope_{tag} = rp{tag}_k
+  rp{tag}_b = solid.sphere@1(radius=0.075, segments=16)
+  rp{tag}_bp = inst.place@1(rp{tag}_b, at=[[{x0 + (x1 - x0) * 0.2}, {y0 + (y1 - y0) * 0.2 - 3 * d * 0.16 - 0.1}, {z0 + (z1 - z0) * 0.2}], [{x0 + (x1 - x0) * 0.35}, {y0 + (y1 - y0) * 0.35 - 3 * d * 0.2275 - 0.1}, {z0 + (z1 - z0) * 0.35}], [{x0 + (x1 - x0) * 0.5}, {y0 + (y1 - y0) * 0.5 - 3 * d * 0.25 - 0.1}, {z0 + (z1 - z0) * 0.5}], [{x0 + (x1 - x0) * 0.65}, {y0 + (y1 - y0) * 0.65 - 3 * d * 0.2275 - 0.1}, {z0 + (z1 - z0) * 0.65}], [{x0 + (x1 - x0) * 0.8}, {y0 + (y1 - y0) * 0.8 - 3 * d * 0.16 - 0.1}, {z0 + (z1 - z0) * 0.8}]])
+  rp{tag}_bm = solid.material@1(rp{tag}_bp, color=[1, 0.82, 0.45], roughness=0.15, emissive=[3.2, 2.0, 0.7])
+  rp{tag}_bk = anim.parent@1(rp{tag}_bm, parent="b2")
+  rp{tag}_bg = anim.wave@1(rp{tag}_bk, property="glow", amplitude=[0.25, 0, 0], period=1.7, phase=0, phase_step=0.23)
+  output bulbs_{tag} = rp{tag}_bg
+end
+rope("bow", 0.65, 8.85, 0, 2.2, 6.0, 0, 0.35)
+rope("stern", 0.65, 8.85, 0, -1.75, 5.9, 0, 0.35)
+bulb_light_a = light.point@1(position=[1.4, 7.0, 0.15], color=[1, 0.8, 0.45], intensity=40, range=4)
+bulb_light_b = light.point@1(position=[-0.7, 7.0, 0.15], color=[1, 0.8, 0.45], intensity=40, range=4)
+output lantern_light_a = bulb_light_a
+output lantern_light_b = bulb_light_b
+
+# ---- girth bands: brass hoops round the whale with rivets, tying the gondola on ----
+band = solid.torus@1(major=1.76, minor=0.07, segments=64, tube_segments=14)
+band_x = xform.rotate@1(band, angles=[0, 0, 90])
+band_a = xform.move@1(band_x, by=[0.9, 3.2, 0])
+band_b = xform.move@1(band_x, by=[-0.6, 3.2, 0])
+band_am = solid.material@1(band_a, color=[0.8, 0.55, 0.18], metallic=1.0, roughness=0.3)
+band_bm = solid.material@1(band_b, color=[0.8, 0.55, 0.18], metallic=1.0, roughness=0.3)
+band_ak = anim.parent@1(band_am, parent="b1")
+band_bk = anim.parent@1(band_bm, parent="b2")
+output band_front = band_ak
+output band_rear = band_bk

@@ -1,0 +1,30 @@
+/* The node graph: a Blender-style editor. Coloured headers by operator family, sockets on the sides, parameters inside the node. */
+.graph { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.graph-bar { display: flex; align-items: center; gap: var(--gap-3); padding: var(--gap-3) var(--gap-4); border-bottom: 1px solid var(--glass-edge-soft); }
+.graph-bar h2 { margin: 0; font-size: var(--text-md); font-weight: 650; }
+.graph-bar input { height: 30px; width: 200px; padding: 0 var(--gap-3); border-radius: var(--radius-pill); border: 1px solid var(--glass-edge-soft); background: var(--hover); outline: none; font-size: var(--text-sm); }
+.graph-bar input:focus { border-color: var(--accent); }
+.graph-canvas { flex: 1; position: relative; }
+.graph-msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-2); }
+
+.react-flow { --xy-background-color: transparent; --xy-edge-stroke: var(--text-3); --xy-edge-stroke-selected: var(--accent); --xy-edge-stroke-width: 1.5; --xy-handle-background-color: var(--text-2); --xy-handle-border-color: var(--glass-solid);
+  --xy-minimap-background-color: var(--glass-strong); --xy-controls-button-background-color: var(--glass-strong); --xy-controls-button-color: var(--text); --xy-controls-button-border-color: var(--glass-edge-soft);
+  --xy-controls-button-background-color-hover: var(--hover); --xy-attribution-background-color: transparent; background: transparent; }
+.react-flow__attribution { display: none; }
+.react-flow__minimap { border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--glass-edge-soft); }
+.react-flow__controls { border-radius: var(--radius-md); overflow: hidden; box-shadow: none; border: 1px solid var(--glass-edge-soft); }
+.react-flow__background pattern circle, .react-flow__background pattern path { stroke: var(--glass-edge-soft); fill: var(--glass-edge-soft); }
+
+.gnode { width: 220px; border-radius: var(--radius-md); background: var(--glass-strong); border: 1px solid var(--glass-edge-soft); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22); overflow: visible; font-size: var(--text-xs); }
+.gnode[data-selected='true'] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft), 0 4px 14px rgba(0, 0, 0, 0.22); }
+.gnode[data-output='true'] .gtitle::after { content: '●'; margin-left: auto; color: var(--ok); font-size: 8px; }
+.ghead { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: var(--radius-md) var(--radius-md) 0 0; background: var(--fam, var(--fam-other)); color: #0b0c10; font-weight: 650; }
+.gtitle { display: flex; align-items: center; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--text-sm); }
+.gop { padding: 4px 10px 2px; color: var(--text-3); font-family: var(--font-mono); }
+.grow-line { position: relative; display: flex; justify-content: space-between; gap: 8px; padding: 2px 10px; min-height: 20px; align-items: center; }
+.grow-line .k { color: var(--text-2); }
+.grow-line .v { color: var(--text); font-family: var(--font-mono); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gnode .react-flow__handle { width: 9px; height: 9px; background: var(--fam, var(--text-2)); border: 2px solid var(--glass-solid); }
+.gnode .react-flow__handle-left { left: -5px; }
+.gnode .react-flow__handle-right { right: -5px; }
+.gpad { height: 6px; }

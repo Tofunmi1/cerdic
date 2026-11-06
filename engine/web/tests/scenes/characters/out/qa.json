@@ -1,0 +1,362 @@
+{
+  "generated": "cast.txt",
+  "iou_limit": 0.72,
+  "characters": [
+    {
+      "name": "warrior",
+      "canon_height": 1.8,
+      "body_height": 1.746,
+      "overall_height": 2.182,
+      "width": 1.301,
+      "depth": 0.926,
+      "on_floor": true
+    },
+    {
+      "name": "wizard",
+      "canon_height": 1.75,
+      "body_height": 1.691,
+      "overall_height": 2.654,
+      "width": 1.47,
+      "depth": 1.448,
+      "on_floor": true
+    },
+    {
+      "name": "priest",
+      "canon_height": 1.78,
+      "body_height": 1.717,
+      "overall_height": 2.264,
+      "width": 1.231,
+      "depth": 0.911,
+      "on_floor": true
+    },
+    {
+      "name": "rogue",
+      "canon_height": 1.75,
+      "body_height": 1.69,
+      "overall_height": 1.943,
+      "width": 0.812,
+      "depth": 0.889,
+      "on_floor": true
+    },
+    {
+      "name": "ranger",
+      "canon_height": 1.95,
+      "body_height": 1.859,
+      "overall_height": 2.409,
+      "width": 1.151,
+      "depth": 0.745,
+      "on_floor": true
+    },
+    {
+      "name": "dwarf",
+      "canon_height": 1.35,
+      "body_height": 1.353,
+      "overall_height": 1.502,
+      "width": 1.248,
+      "depth": 0.79,
+      "on_floor": true
+    },
+    {
+      "name": "orc",
+      "canon_height": 2.1,
+      "body_height": 2.021,
+      "overall_height": 2.462,
+      "width": 1.684,
+      "depth": 1.014,
+      "on_floor": true
+    },
+    {
+      "name": "dragon",
+      "canon_height": 3.4,
+      "body_height": 3.448,
+      "overall_height": 3.45,
+      "width": 8.984,
+      "depth": 7.037,
+      "on_floor": true
+    }
+  ],
+  "pairs": [
+    {
+      "a": "warrior",
+      "b": "rogue",
+      "true_front": 0.5667605633802817,
+      "true_side": 0.659265584970111,
+      "norm_front": 0.6359227467811159,
+      "norm_side": 0.713323259035386,
+      "worst_shape_overlap": 0.713,
+      "reads_apart": true
+    },
+    {
+      "a": "rogue",
+      "b": "ranger",
+      "true_front": 0.7147182114578482,
+      "true_side": 0.6357894736842106,
+      "norm_front": 0.711978021978022,
+      "norm_side": 0.6110567514677103,
+      "worst_shape_overlap": 0.712,
+      "reads_apart": true
+    },
+    {
+      "a": "rogue",
+      "b": "dwarf",
+      "true_front": 0.5340350877192982,
+      "true_side": 0.5256854711629373,
+      "norm_front": 0.4794955749343534,
+      "norm_side": 0.6895722204790294,
+      "worst_shape_overlap": 0.69,
+      "reads_apart": true
+    },
+    {
+      "a": "wizard",
+      "b": "priest",
+      "true_front": 0.6394370753801358,
+      "true_side": 0.6518251103088648,
+      "norm_front": 0.5826506936881481,
+      "norm_side": 0.6486603018170619,
+      "worst_shape_overlap": 0.649,
+      "reads_apart": true
+    },
+    {
+      "a": "ranger",
+      "b": "orc",
+      "true_front": 0.49923408995961566,
+      "true_side": 0.6576787807737398,
+      "norm_front": 0.5017219655606888,
+      "norm_side": 0.6452133632790568,
+      "worst_shape_overlap": 0.645,
+      "reads_apart": true
+    },
+    {
+      "a": "dwarf",
+      "b": "orc",
+      "true_front": 0.3395642818719742,
+      "true_side": 0.4319839074679407,
+      "norm_front": 0.5243817326657564,
+      "norm_side": 0.6364294061995659,
+      "worst_shape_overlap": 0.636,
+      "reads_apart": true
+    },
+    {
+      "a": "priest",
+      "b": "orc",
+      "true_front": 0.49614429486341655,
+      "true_side": 0.6030434782608696,
+      "norm_front": 0.5280078671659291,
+      "norm_side": 0.6064195409353136,
+      "worst_shape_overlap": 0.606,
+      "reads_apart": true
+    },
+    {
+      "a": "warrior",
+      "b": "dwarf",
+      "true_front": 0.5898865602768698,
+      "true_side": 0.41361556064073224,
+      "norm_front": 0.6007251821121745,
+      "norm_side": 0.5384014579536579,
+      "worst_shape_overlap": 0.601,
+      "reads_apart": true
+    },
+    {
+      "a": "priest",
+      "b": "rogue",
+      "true_front": 0.6004775169120573,
+      "true_side": 0.5848322800194458,
+      "norm_front": 0.6011896775347735,
+      "norm_side": 0.5494218575158523,
+      "worst_shape_overlap": 0.601,
+      "reads_apart": true
+    },
+    {
+      "a": "warrior",
+      "b": "orc",
+      "true_front": 0.5390461215932913,
+      "true_side": 0.5303411953286009,
+      "norm_front": 0.5940812061501717,
+      "norm_side": 0.5163121452186389,
+      "worst_shape_overlap": 0.594,
+      "reads_apart": true
+    },
+    {
+      "a": "priest",
+      "b": "ranger",
+      "true_front": 0.5711727842435094,
+      "true_side": 0.5891156462585034,
+      "norm_front": 0.5634466019417476,
+      "norm_side": 0.5928893340010015,
+      "worst_shape_overlap": 0.593,
+      "reads_apart": true
+    },
+    {
+      "a": "warrior",
+      "b": "priest",
+      "true_front": 0.6100016504373659,
+      "true_side": 0.4736256398842644,
+      "norm_front": 0.5861817592742589,
+      "norm_side": 0.4771260174010665,
+      "worst_shape_overlap": 0.586,
+      "reads_apart": true
+    },
+    {
+      "a": "rogue",
+      "b": "orc",
+      "true_front": 0.45413708158237936,
+      "true_side": 0.5933188090050835,
+      "norm_front": 0.5783562632866712,
+      "norm_side": 0.5805114432508174,
+      "worst_shape_overlap": 0.581,
+      "reads_apart": true
+    },
+    {
+      "a": "wizard",
+      "b": "ranger",
+      "true_front": 0.586241610738255,
+      "true_side": 0.525971527510581,
+      "norm_front": 0.5800713697502059,
+      "norm_side": 0.5111614160850154,
+      "worst_shape_overlap": 0.58,
+      "reads_apart": true
+    },
+    {
+      "a": "wizard",
+      "b": "rogue",
+      "true_front": 0.5469054796949814,
+      "true_side": 0.4986913629957721,
+      "norm_front": 0.5766533554105386,
+      "norm_side": 0.47452025586353946,
+      "worst_shape_overlap": 0.577,
+      "reads_apart": true
+    },
+    {
+      "a": "ranger",
+      "b": "dwarf",
+      "true_front": 0.44737887212073074,
+      "true_side": 0.4172872340425532,
+      "norm_front": 0.3990882166982796,
+      "norm_side": 0.575194990662419,
+      "worst_shape_overlap": 0.575,
+      "reads_apart": true
+    },
+    {
+      "a": "warrior",
+      "b": "ranger",
+      "true_front": 0.5750737719145982,
+      "true_side": 0.5524698943229295,
+      "norm_front": 0.5354474292830457,
+      "norm_side": 0.5512795210841392,
+      "worst_shape_overlap": 0.551,
+      "reads_apart": true
+    },
+    {
+      "a": "priest",
+      "b": "dwarf",
+      "true_front": 0.5448730374103509,
+      "true_side": 0.5265582655826558,
+      "norm_front": 0.4543783682751316,
+      "norm_side": 0.5201316298877274,
+      "worst_shape_overlap": 0.52,
+      "reads_apart": true
+    },
+    {
+      "a": "wizard",
+      "b": "orc",
+      "true_front": 0.49796170475602225,
+      "true_side": 0.5062624795788709,
+      "norm_front": 0.45626058529284336,
+      "norm_side": 0.4979127593925827,
+      "worst_shape_overlap": 0.498,
+      "reads_apart": true
+    },
+    {
+      "a": "warrior",
+      "b": "wizard",
+      "true_front": 0.5828276699029126,
+      "true_side": 0.4520785219399538,
+      "norm_front": 0.4960234407701967,
+      "norm_side": 0.4354317998385795,
+      "worst_shape_overlap": 0.496,
+      "reads_apart": true
+    },
+    {
+      "a": "wizard",
+      "b": "dwarf",
+      "true_front": 0.5007808433107757,
+      "true_side": 0.43103448275862066,
+      "norm_front": 0.37861695347355,
+      "norm_side": 0.40760206475832944,
+      "worst_shape_overlap": 0.408,
+      "reads_apart": true
+    },
+    {
+      "a": "dwarf",
+      "b": "dragon",
+      "true_front": 0.03892600885002556,
+      "true_side": 0.0639799278657676,
+      "norm_front": 0.2099179716629381,
+      "norm_side": 0.35812996857090035,
+      "worst_shape_overlap": 0.358,
+      "reads_apart": true
+    },
+    {
+      "a": "rogue",
+      "b": "dragon",
+      "true_front": 0.04028561354019746,
+      "true_side": 0.09296884139921226,
+      "norm_front": 0.1191303545619484,
+      "norm_side": 0.28308021098581304,
+      "worst_shape_overlap": 0.283,
+      "reads_apart": true
+    },
+    {
+      "a": "orc",
+      "b": "dragon",
+      "true_front": 0.09368756790859066,
+      "true_side": 0.13677871368967962,
+      "norm_front": 0.1384872469655883,
+      "norm_side": 0.2744197119390549,
+      "worst_shape_overlap": 0.274,
+      "reads_apart": true
+    },
+    {
+      "a": "priest",
+      "b": "dragon",
+      "true_front": 0.05568757644591997,
+      "true_side": 0.11227325357005018,
+      "norm_front": 0.13592613203075085,
+      "norm_side": 0.24510155584450521,
+      "worst_shape_overlap": 0.245,
+      "reads_apart": true
+    },
+    {
+      "a": "warrior",
+      "b": "dragon",
+      "true_front": 0.06871787650496373,
+      "true_side": 0.09707866921486798,
+      "norm_front": 0.15730048227708823,
+      "norm_side": 0.2392232920043407,
+      "worst_shape_overlap": 0.239,
+      "reads_apart": true
+    },
+    {
+      "a": "ranger",
+      "b": "dragon",
+      "true_front": 0.054288739851747266,
+      "true_side": 0.11906911031749147,
+      "norm_front": 0.09980938095684509,
+      "norm_side": 0.23281115028132515,
+      "worst_shape_overlap": 0.233,
+      "reads_apart": true
+    },
+    {
+      "a": "wizard",
+      "b": "dragon",
+      "true_front": 0.06837337809953485,
+      "true_side": 0.11967324198162928,
+      "norm_front": 0.11843924098353789,
+      "norm_side": 0.18878492356352136,
+      "worst_shape_overlap": 0.189,
+      "reads_apart": true
+    }
+  ],
+  "failures": [],
+  "console_errors": []
+}

@@ -1,0 +1,207 @@
+# PARIS: one Haussmann street at golden hour. Four limestone apartment buildings face each other across a tree-lined boulevard: rusticated ground floors with shopfronts and
+# awnings, a carriage door, tall French windows with wrought-iron balconies (a continuous one on the first and top floors), string courses, a modillion cornice, a zinc
+# mansard roof with dormers and brick chimneys. Streetlamps, plane trees, road with markings, kerbs and pavements. Metres; the street runs along z, y is up.
+# Every building is built from eight material parts (walls, glass, frames, iron, zinc, brick, shopfronts, awnings) by one script that is run once per part.
+
+sky = scene.sky@1(sun_elevation=28, sun_azimuth=-60, sun_intensity=5, turbidity=3, clouds=true, cloud_cover=0.35, seed=7, focus_distance=60, aperture=9, contact_shadows=true, gi=true, ground_color=[0.4, 0.3, 0.26])
+output sky = sky
+
+# ---- the building script, shared. Local frame: front wall on the plane z = 0 facing +z, building goes back to z = -D, centred on x = 0, y up. PART picks what to emit. ----
+let jb1 = "const m = new Mesh(); function fb(p,x0,x1,y0,z0,z1,y1,a0,a1,b0,b1){ if(p!==PART)return; const v=[m.vertex(x0,y0,z0),m.vertex(x1,y0,z0),m.vertex(a1,y1,b0),m.vertex(a0,y1,b0),m.vertex(x0,y0,z1),m.vertex(x1,y0,z1),m.vertex(a1,y1,b1),m.vertex(a0,y1,b1)]; m.face(v[0],v[3],v[2],v[1]); m.face(v[4],v[5],v[6],v[7]); m.face(v[0],v[1],v[5],v[4]); m.face(v[3],v[7],v[6],v[2]); m.face(v[1],v[2],v[6],v[5]); m.face(v[0],v[4],v[7],v[3]); } function bx(p,x0,y0,z0,x1,y1,z1){ if(x1-x0<1e-4||y1-y0<1e-4||z1-z0<1e-4)return; fb(p,x0,x1,y0,z0,z1,y1,x0,x1,z0,z1); } function gab(p,x0,x1,zf,zb,y0,y1){ if(p!==PART)return; const xm=(x0+x1)/2; const a=m.vertex(x0,y0,zf),b=m.vertex(x1,y0,zf),c=m.vertex(xm,y1,zf),d=m.vertex(x1,y0,zb),e=m.vertex(x0,y0,zb),f=m.vertex(xm,y1,zb); m.face(a,b,c); m.face(d,e,f); m.face(b,d,f,c); m.face(e,a,c,f); m.face(e,d,b,a); } function awn(p,x0,x1,zt,yt,zb,yb){ if(p!==PART)return; const A=m.vertex(x0,yt,zt),B=m.vertex(x1,yt,zt),C=m.vertex(x1,yb,zb),D2=m.vertex(x0,yb,zb); m.face(A,D2,C,B); m.face(A,B,C,D2); } function frame(x0,x1,y1,y2,z){ bx('frame',x0,y1,z,x0+0.07,y2,z+0.1); bx('frame',x1-0.07,y1,z,x1,y2,z+0.1); bx('frame',x0,y1,z,x1,y1+0.07,z+0.1); bx('frame',x0,y2-0.07,z,x1,y2,z+0.1); bx('frame',(x0+x1)/2-0.025,y1,z,(x0+x1)/2+0.025,y2,z+0.08); bx('frame',x0,y1+(y2-y1)*0.72,z,x1,y1+(y2-y1)*0.72+0.05,z+0.08); } function rail(xa,xb,yb){ bx('iron',xa,yb+0.3,0.72,xb,yb+0.36,0.78); bx('iron',xa,yb+1.22,0.7,xb,yb+1.3,0.8); for(let x=xa+0.06;x<xb-0.03;x+=0.12) bx('iron',x-0.008,yb+0.36,0.735,x+0.008,yb+1.22,0.751); for(const s of [xa,xb-0.06]){ bx('iron',s,yb+1.22,0,s+0.06,yb+1.3,0.8); for(let z=0.12;z<0.72;z+=0.12) bx('iron',s+0.02,yb+0.36,z-0.008,s+0.04,yb+1.22,z+0.008); } for(let x=xa+0.3;x<xb-0.2;x+=0.36) bx('iron',x-0.05,yb+0.62,0.725,x+0.05,yb+0.7,0.76); } "
+let jb2 = "const T=0.5, nb=Math.max(3,Math.round(W/3.4)), bw=W/nb, X0=-W/2, ww=1.25, cb=Math.floor(nb/2); const FH=[4.6,4.2,3.6,3.4,3.2,3.2,3.2,3.2]; let H=0; const YB=[]; for(let f=0;f<NF;f++){ YB.push(H); H+=FH[Math.min(f,7)]; } bx('walls',X0,0,-D,-X0,H,-T); function wall(x0,x1,y0,y1,rust){ if(rust){ bx('walls',x0,y0,-T,x1,y1,-0.05); for(let y=y0;y<y1-0.01;y+=0.5) bx('walls',x0,y,-0.05,x1,Math.min(y+0.44,y1),0); } else bx('walls',x0,y0,-T,x1,y1,0); } const CX=[]; for(let i=0;i<nb;i++) CX.push(X0+bw*(i+0.5)); const F0=FH[0]; for(let i=0;i<=nb;i++){ const hw=(i-1===cb||i===cb)?1.3:1.35; const xl=i===0?X0:CX[i-1]+(i-1===cb?1.3:1.35), xr=i===nb?-X0:CX[i]-(i===cb?1.3:1.35); wall(xl,xr,0,F0,true); } for(let i=0;i<nb;i++){ const cx=CX[i], door=i===cb, ow=door?1.3:1.35, x0=cx-ow, x1=cx+ow, top=door?3.9:3.6; wall(x0,x1,top,F0,true); if(door){ bx('shop',x0,0,-T+0.1,x1,top,-T+0.22); bx('walls',x0-0.25,top,-T,x1+0.25,top+0.25,0.14); bx('walls',cx-0.2,top+0.25,-T,cx+0.2,top+0.55,0.18); for(let k=-1;k<=1;k+=2) bx('walls',cx+k*(ow+0.1)-0.12,0,-T,cx+k*(ow+0.1)+0.12,top,0.12); } else { wall(x0,x1,0,0.45,true); bx(Math.random()<0.8?'lit':'glass',x0,0.45,-T+0.15,x1,top,-T+0.17); bx('shop',x0,0.45,-T+0.1,x0+0.1,top,-T+0.22); bx('shop',x1-0.1,0.45,-T+0.1,x1,top,-T+0.22); bx('shop',cx-0.04,0.45,-T+0.1,cx+0.04,top,-T+0.2); bx('shop',x0,2.7,-T+0.1,x1,2.78,-T+0.2); bx('shop',x0-0.2,top,0,x1+0.2,top+0.6,0.12); awn('awn',x0-0.1,x1+0.1,0.12,top-0.05,1.6,top-0.75); bx('awn',x0-0.1,top-0.95,1.56,x1+0.1,top-0.75,1.6); } } bx('walls',X0-0.05,F0-0.15,-T,-X0+0.05,F0+0.25,0.22); "
+let jb3 = "for(let f=1;f<NF;f++){ const yb=YB[f], h=FH[Math.min(f,7)], fr=(f<=3||f===NF-1), sill=fr?0.3:0.95, y1=yb+sill, y2=yb+h-0.8; for(let i=0;i<=nb;i++){ const xl=i===0?X0:CX[i-1]+ww/2, xr=i===nb?-X0:CX[i]-ww/2; wall(xl,xr,yb,yb+h,false); } for(let i=0;i<nb;i++){ const cx=CX[i], x0=cx-ww/2, x1=cx+ww/2; wall(x0,x1,yb,y1,false); wall(x0,x1,y2,yb+h,false); const rr=Math.random(); bx(rr<0.42?(rr<0.2?'lit':'lit2'):'glass',x0,y1,-T+0.14,x1,y2,-T+0.16); if(rr<0.42) bx('curtain',x0+0.06,y1+0.05,-T+0.19,x0+0.06+ww*(0.25+rr),y2-0.05,-T+0.23); frame(x0,x1,y1,y2,-T+0.1); if(f===1){ bx('walls',x0-0.15,y2,-T,x1+0.15,y2+0.12,0.12); gab('walls',x0-0.2,x1+0.2,0.16,-0.05,y2+0.12,y2+0.55); } else if(f===2){ bx('walls',x0-0.15,y2,-T,x1+0.15,y2+0.14,0.2); } else bx('walls',x0-0.1,y2,-T,x1+0.1,y2+0.1,0.1); if(!fr){ bx('walls',x0-0.12,y1-0.08,-T,x1+0.12,y1,0.1); } if(f===2||f===3){ bx('walls',cx-ww/2-0.3,yb+0.15,0,cx+ww/2+0.3,yb+0.28,0.8); for(const s of [-1,1]) bx('walls',cx+s*0.6-0.08,yb-0.3,0,cx+s*0.6+0.08,yb+0.15,0.45); rail(cx-ww/2-0.3,cx+ww/2+0.3,yb); } } if(f===1||f===NF-1){ bx('walls',X0-0.05,yb+0.15,0,-X0+0.05,yb+0.28,0.8); for(let i=0;i<=nb;i++){ const px=X0+bw*i; bx('walls',px-0.12,yb-0.4,0,px+0.12,yb+0.15,0.5); } rail(X0-0.05,-X0+0.05,yb); } for(const sx of [-1,1]){ const xo=sx*W/2, xi=xo+sx*0.05, xf=xo+sx*0.1; const lo=Math.min(xo,xi), hi=Math.max(xo,xi), a=Math.min(xo,xf), b=Math.max(xo,xf); bx('walls',Math.min(xo,xo+sx*0.12),yb+h-0.12,-D,Math.max(xo,xo+sx*0.12),yb+h+0.12,0); for(let k=0;k<5;k++){ const zc=-1.2-3.4*k; bx(Math.random()<0.3?'lit':'glass',lo,y1,zc-0.62,hi,y2,zc+0.62); bx('frame',a,y1,zc-0.62,b,y2,zc-0.55); bx('frame',a,y1,zc+0.55,b,y2,zc+0.62); bx('frame',a,y1,zc-0.62,b,y1+0.07,zc+0.62); bx('frame',a,y2-0.07,zc-0.62,b,y2,zc+0.62); bx('frame',a,y1+(y2-y1)*0.7,zc-0.62,b,y1+(y2-y1)*0.7+0.05,zc+0.62); bx('walls',Math.min(xo,xo+sx*0.1),y2,zc-0.75,Math.max(xo,xo+sx*0.1),y2+0.12,zc+0.75); } } bx('walls',X0-0.03,yb+h-0.12,-T,-X0+0.03,yb+h+0.12,0.12); } "
+let jb4 = "bx('walls',X0-0.08,H,-T,-X0+0.08,H+0.14,0.55); bx('walls',X0-0.1,H+0.14,-T,-X0+0.1,H+0.3,0.72); for(let x=X0;x<-X0-0.2;x+=0.38) bx('walls',x,H-0.28,0,x+0.16,H,0.5); const yE=H+0.3, Hm=3.3, I=1.3; fb('roof',X0,-X0,yE,-D,0.4,yE+Hm,X0,-X0,-D+I,0.4-I); bx('roof',X0,yE+Hm,-D+I,-X0,yE+Hm+0.25,0.4-I); for(let i=0;i<nb;i++){ const cx=CX[i], y0=yE+0.55, hd=1.5, zf=0.28; bx('walls',cx-0.8,y0-0.1,zf-0.15,cx-0.5,y0+hd,zf); bx('walls',cx+0.5,y0-0.1,zf-0.15,cx+0.8,y0+hd,zf); bx('walls',cx-0.5,y0-0.1,zf-0.15,cx+0.5,y0+0.15,zf); bx('walls',cx-0.8,y0+hd-0.2,zf-0.15,cx+0.8,y0+hd+0.05,zf+0.05); bx('roof',cx-0.8,y0-0.2,-0.9,cx-0.66,y0+hd,zf-0.15); bx('roof',cx+0.66,y0-0.2,-0.9,cx+0.8,y0+hd,zf-0.15); bx(Math.random()<0.45?'lit':'glass',cx-0.5,y0+0.15,zf-0.12,cx+0.5,y0+hd-0.2,zf-0.1); frame(cx-0.5,cx+0.5,y0+0.15,y0+hd-0.2,zf-0.14); gab('roof',cx-0.9,cx+0.9,zf+0.12,-0.9,y0+hd+0.05,y0+hd+0.8); } const topY=yE+Hm+0.2; for(const u of [0.18,0.5,0.84]){ const cx=X0+W*u, z=-D*0.55; bx('brick',cx-0.5,topY,z-0.3,cx+0.5,topY+2.6,z+0.3); bx('walls',cx-0.6,topY+2.6,z-0.4,cx+0.6,topY+2.75,z+0.4); for(const s of [-0.28,0.28]) bx('brick',cx+s-0.1,topY+2.75,z-0.1,cx+s+0.1,topY+3.3,z+0.1); } m"
+
+# One building: eight parts, each the same script with a different PART, then turned to face the street and placed.
+# tint 0 is clean cream limestone, 1 a little greyer.
+def bld(tag, w, d, nf, rot, px, pz, tint)
+  p{tag}_wl = poly.script@1(code="const PART='walls'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_wl2 = xform.rotate@1(p{tag}_wl, angles=[0, {rot}, 0])
+  p{tag}_wl3 = xform.move@1(p{tag}_wl2, by=[{px}, 0, {pz}])
+  p{tag}_wl4 = solid.material@1(p{tag}_wl3, color=[{0.82 - 0.05 * tint}, {0.76 - 0.05 * tint}, {0.63 - 0.04 * tint}], roughness=0.85, recipe="painted_wall", texture_scale=2)
+  p{tag}_wl5 = solid.finish@1(p{tag}_wl4, subsurface=0.15, relief=0.4, relief_scale=30, relief_style="smooth")
+  output p{tag}_walls = p{tag}_wl5
+  p{tag}_gl = poly.script@1(code="const PART='glass'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_gl2 = xform.rotate@1(p{tag}_gl, angles=[0, {rot}, 0])
+  p{tag}_gl3 = xform.move@1(p{tag}_gl2, by=[{px}, 0, {pz}])
+  p{tag}_gl4 = solid.material@1(p{tag}_gl3, color=[0.05, 0.07, 0.09], roughness=0.06)
+  p{tag}_gl5 = solid.finish@1(p{tag}_gl4, clearcoat=1, clearcoat_roughness=0.03)
+  output p{tag}_glass = p{tag}_gl5
+  p{tag}_li = poly.script@1(code="const PART='lit'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_li2 = xform.rotate@1(p{tag}_li, angles=[0, {rot}, 0])
+  p{tag}_li3 = xform.move@1(p{tag}_li2, by=[{px}, 0, {pz}])
+  p{tag}_li4 = solid.material@1(p{tag}_li3, color=[1, 0.82, 0.55], roughness=0.3, emissive=[0.25, 0.14, 0.05])
+  p{tag}_li5 = anim.wave@1(p{tag}_li4, property="glow", amplitude=[0.06, 0, 0], period=5, phase={tint * 0.3})
+  output p{tag}_lit = p{tag}_li5
+  p{tag}_lb = poly.script@1(code="const PART='lit2'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_lb2 = xform.rotate@1(p{tag}_lb, angles=[0, {rot}, 0])
+  p{tag}_lb3 = xform.move@1(p{tag}_lb2, by=[{px}, 0, {pz}])
+  p{tag}_lb4 = solid.material@1(p{tag}_lb3, color=[0.8, 0.9, 1], roughness=0.3, emissive=[0.12, 0.15, 0.22])
+  p{tag}_lb5 = anim.wave@1(p{tag}_lb4, property="glow", amplitude=[0.35, 0, 0], period=0.9, phase={0.2 + tint * 0.3})
+  output p{tag}_lit2 = p{tag}_lb5
+  p{tag}_cu = poly.script@1(code="const PART='curtain'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_cu2 = xform.rotate@1(p{tag}_cu, angles=[0, {rot}, 0])
+  p{tag}_cu3 = xform.move@1(p{tag}_cu2, by=[{px}, 0, {pz}])
+  p{tag}_cu4 = solid.material@1(p{tag}_cu3, color=[0.9, 0.82, 0.68], roughness=0.9, recipe="fabric", texture_scale=8)
+  p{tag}_cu5 = solid.finish@1(p{tag}_cu4, translucency=0.5, sheen=0.4)
+  output p{tag}_curtains = p{tag}_cu5
+  p{tag}_fr = poly.script@1(code="const PART='frame'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_fr2 = xform.rotate@1(p{tag}_fr, angles=[0, {rot}, 0])
+  p{tag}_fr3 = xform.move@1(p{tag}_fr2, by=[{px}, 0, {pz}])
+  p{tag}_fr4 = solid.material@1(p{tag}_fr3, color=[0.9, 0.88, 0.8], roughness=0.5)
+  output p{tag}_frames = p{tag}_fr4
+  p{tag}_ir = poly.script@1(code="const PART='iron'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_ir2 = xform.rotate@1(p{tag}_ir, angles=[0, {rot}, 0])
+  p{tag}_ir3 = xform.move@1(p{tag}_ir2, by=[{px}, 0, {pz}])
+  p{tag}_ir4 = solid.material@1(p{tag}_ir3, color=[0.03, 0.03, 0.035], metallic=0.7, roughness=0.4)
+  output p{tag}_iron = p{tag}_ir4
+  p{tag}_rf = poly.script@1(code="const PART='roof'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_rf2 = xform.rotate@1(p{tag}_rf, angles=[0, {rot}, 0])
+  p{tag}_rf3 = xform.move@1(p{tag}_rf2, by=[{px}, 0, {pz}])
+  p{tag}_rf4 = solid.material@1(p{tag}_rf3, color=[0.34, 0.38, 0.44], metallic=0.5, roughness=0.45)
+  p{tag}_rf5 = solid.finish@1(p{tag}_rf4, relief=0.2, relief_scale=45, relief_style="ridged")
+  output p{tag}_zinc = p{tag}_rf5
+  p{tag}_bk = poly.script@1(code="const PART='brick'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_bk2 = xform.rotate@1(p{tag}_bk, angles=[0, {rot}, 0])
+  p{tag}_bk3 = xform.move@1(p{tag}_bk2, by=[{px}, 0, {pz}])
+  p{tag}_bk4 = solid.material@1(p{tag}_bk3, color=[0.5, 0.21, 0.13], roughness=0.9, recipe="brick", texture_scale=6)
+  output p{tag}_brick = p{tag}_bk4
+  p{tag}_sh = poly.script@1(code="const PART='shop'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_sh2 = xform.rotate@1(p{tag}_sh, angles=[0, {rot}, 0])
+  p{tag}_sh3 = xform.move@1(p{tag}_sh2, by=[{px}, 0, {pz}])
+  p{tag}_sh4 = solid.material@1(p{tag}_sh3, color=[0.05, 0.2, 0.14], roughness=0.35)
+  p{tag}_sh5 = solid.finish@1(p{tag}_sh4, clearcoat=0.5, clearcoat_roughness=0.2)
+  output p{tag}_shops = p{tag}_sh5
+  p{tag}_aw = poly.script@1(code="const PART='awn'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_aw2 = xform.rotate@1(p{tag}_aw, angles=[0, {rot}, 0])
+  p{tag}_aw3 = xform.move@1(p{tag}_aw2, by=[{px}, 0, {pz}])
+  p{tag}_aw4 = solid.material@1(p{tag}_aw3, color=[0.5, 0.08, 0.07], roughness=0.8)
+  p{tag}_aw5 = solid.finish@1(p{tag}_aw4, sheen=0.5, translucency=0.25)
+  output p{tag}_awnings = p{tag}_aw5
+end
+
+# West side faces east (+x), east side faces west.
+bld("a", 24, 16, 6, 90, -9.2, 4, 0)
+bld("b", 22, 16, 7, 90, -9.2, -18, 1)
+bld("c", 24, 16, 6, -90, 9.2, 6, 1)
+bld("d", 22, 16, 7, -90, 9.2, -16, 0)
+
+# ---- the street ----
+rd_a = street.road@1(at=[0, 0, 0], length=80, width=10, lanes=2, axis="z", part="asphalt")
+rd_am = solid.material@1(rd_a, color=[0.16, 0.16, 0.17], roughness=0.9)
+output road = rd_am
+rd_b = street.road@1(at=[0, 0, 0], length=80, width=10, lanes=2, axis="z", part="markings")
+rd_bm = solid.material@1(rd_b, color=[0.85, 0.83, 0.75], roughness=0.7)
+output road_paint = rd_bm
+rd_c = street.road@1(at=[0, 0, 0], length=80, width=10, lanes=2, axis="z", part="crosswalk")
+rd_cm = solid.material@1(rd_c, color=[0.85, 0.83, 0.75], roughness=0.7)
+output road_cross = rd_cm
+rd_d = street.road@1(at=[0, 0, 0], length=80, width=10, lanes=2, axis="z", part="kerb")
+rd_dm = solid.material@1(rd_d, color=[0.55, 0.53, 0.5], roughness=0.8)
+output road_kerb = rd_dm
+rd_e = street.road@1(at=[0, 0, 0], length=80, width=10, lanes=2, axis="z", part="pavement")
+rd_em = solid.material@1(rd_e, color=[0.5, 0.47, 0.42], roughness=0.85)
+rd_ef = solid.finish@1(rd_em, relief=0.4, relief_scale=14, relief_style="smooth")
+output road_pavement = rd_ef
+
+# Wide pavements in front of the buildings, and the ground under the whole district.
+pv_s = poly.script@1(code="const m = new Mesh(); function bx(x0,y0,z0,x1,y1,z1){ const v=[m.vertex(x0,y0,z0),m.vertex(x1,y0,z0),m.vertex(x1,y1,z0),m.vertex(x0,y1,z0),m.vertex(x0,y0,z1),m.vertex(x1,y0,z1),m.vertex(x1,y1,z1),m.vertex(x0,y1,z1)]; m.face(v[0],v[3],v[2],v[1]); m.face(v[4],v[5],v[6],v[7]); m.face(v[0],v[1],v[5],v[4]); m.face(v[3],v[7],v[6],v[2]); m.face(v[1],v[2],v[6],v[5]); m.face(v[0],v[4],v[7],v[3]); } for(let z=-40;z<40;z+=10){ bx(5.4,-0.4,z,9.3,0.17,z+10); bx(-9.3,-0.4,z,-5.4,0.17,z+10); } m", budget=2000)
+pv_m = solid.material@1(pv_s, color=[0.52, 0.49, 0.44], roughness=0.85)
+pv_f = solid.finish@1(pv_m, relief=0.5, relief_scale=16, relief_style="smooth")
+output pavement_wide = pv_f
+gd_s = poly.script@1(code="const m = new Mesh(); const a=m.vertex(-300,-0.02,-300),b=m.vertex(300,-0.02,-300),c=m.vertex(300,-0.02,300),d=m.vertex(-300,-0.02,300); m.face(a,d,c,b); m", budget=500)
+gd_m = solid.material@1(gd_s, color=[0.32, 0.3, 0.27], roughness=0.9)
+output ground = gd_m
+
+# ---- plane trees along the pavements: a trunk with three limbs, and a rounded crown of five blobs smooth-united and roughened into leaf mass ----
+def tree(tag, tx, tz)
+  t{tag}_k0 = field.tube@1(points=[[0, 0, 0], [0.08, 2.4, 0.05], [0, 4.0, 0]], radius=0.26, end_radius=0.16)
+  t{tag}_k1 = field.tube@1(points=[[0, 3.4, 0], [0.9, 4.6, 0.4]], radius=0.11, end_radius=0.05)
+  t{tag}_k2 = field.tube@1(points=[[0, 3.6, 0], [-0.9, 4.7, -0.5]], radius=0.11, end_radius=0.05)
+  t{tag}_k3 = field.tube@1(points=[[0, 3.8, 0], [0.2, 5.0, -1.0]], radius=0.1, end_radius=0.05)
+  t{tag}_ku1 = field.smooth_union@1(t{tag}_k0, t{tag}_k1, radius=0.15)
+  t{tag}_ku2 = field.smooth_union@1(t{tag}_ku1, t{tag}_k2, radius=0.15)
+  t{tag}_ku3 = field.smooth_union@1(t{tag}_ku2, t{tag}_k3, radius=0.15)
+  t{tag}_ks = field.to_solid@1(t{tag}_ku3, min=[-1.4, -0.4, -1.4], max=[1.4, 5.3, 1.4], edge_length=0.03)
+  t{tag}_kp = xform.move@1(t{tag}_ks, by=[{tx}, 0, {tz}])
+  t{tag}_km = solid.material@1(t{tag}_kp, color=[0.42, 0.37, 0.3], roughness=0.9)
+  t{tag}_kf = solid.finish@1(t{tag}_km, relief=0.8, relief_scale=10, relief_style="ridged")
+  output t{tag}_trunk = t{tag}_kf
+  t{tag}_c0 = field.ellipsoid@1(radii=[1.9, 1.4, 1.9])
+  t{tag}_c0m = field.move@1(t{tag}_c0, by=[0, 6.0, 0])
+  t{tag}_c1 = field.ellipsoid@1(radii=[1.4, 1.1, 1.4])
+  t{tag}_c1m = field.move@1(t{tag}_c1, by=[1.5, 5.4, 0.7])
+  t{tag}_c2 = field.ellipsoid@1(radii=[1.4, 1.1, 1.4])
+  t{tag}_c2m = field.move@1(t{tag}_c2, by=[-1.5, 5.5, -0.6])
+  t{tag}_c3 = field.ellipsoid@1(radii=[1.3, 1.0, 1.3])
+  t{tag}_c3m = field.move@1(t{tag}_c3, by=[0.3, 5.3, -1.6])
+  t{tag}_c4 = field.ellipsoid@1(radii=[1.2, 1.0, 1.2])
+  t{tag}_c4m = field.move@1(t{tag}_c4, by=[-0.2, 5.5, 1.6])
+  t{tag}_cu1 = field.smooth_union@1(t{tag}_c0m, t{tag}_c1m, radius=0.7)
+  t{tag}_cu2 = field.smooth_union@1(t{tag}_cu1, t{tag}_c2m, radius=0.7)
+  t{tag}_cu3 = field.smooth_union@1(t{tag}_cu2, t{tag}_c3m, radius=0.7)
+  t{tag}_cu4 = field.smooth_union@1(t{tag}_cu3, t{tag}_c4m, radius=0.7)
+  t{tag}_cn = field.noise@1(t{tag}_cu4, amplitude=0.35, scale=0.9, octaves=3, seed=5)
+  t{tag}_cs = field.to_solid@1(t{tag}_cn, min=[-4.0, 3.6, -4.0], max=[4.0, 8.4, 4.0], edge_length=0.1)
+  t{tag}_cp = xform.move@1(t{tag}_cs, by=[{tx}, 0, {tz}])
+  t{tag}_cm = solid.material@1(t{tag}_cp, color=[0.2, 0.34, 0.09], roughness=0.8)
+  t{tag}_cf = solid.finish@1(t{tag}_cm, translucency=0.35, subsurface=0.3, relief=0.7, relief_scale=22, relief_style="ridged")
+  output t{tag}_crown = t{tag}_cf
+end
+tree("a", 6.6, -22)
+tree("b", 6.6, -3)
+tree("c", 6.6, 14)
+tree("d", -6.6, -20)
+tree("e", -6.6, -1)
+tree("f", -6.6, 16)
+
+# ---- streetlamps ----
+def lamp(tag, lx, lz)
+  l{tag}_b = street.prop@1(at=[{lx}, 0.17, {lz}], height=5.2, axis="x", kind="streetlight", part="body")
+  l{tag}_bm = solid.material@1(l{tag}_b, color=[0.04, 0.06, 0.05], metallic=0.6, roughness=0.4)
+  output l{tag}_body = l{tag}_bm
+  l{tag}_l = street.prop@1(at=[{lx}, 0.17, {lz}], height=5.2, axis="x", kind="streetlight", part="lens")
+  l{tag}_lm = solid.material@1(l{tag}_l, color=[0.9, 0.85, 0.7], roughness=0.3)
+  output l{tag}_lens = l{tag}_lm
+end
+lamp("a", 5.8, -12)
+lamp("b", 5.8, 7)
+lamp("c", -5.8, -12)
+lamp("d", -5.8, 7)
+def lglow(tag, lx, lz)
+  l{tag}_lt = light.point@1(position=[{lx}, 4.9, {lz}], color=[1, 0.72, 0.4], intensity=180, range=16)
+  output l{tag}_light = l{tag}_lt
+end
+
+# ---- street furniture from the prop kit: benches, bins, bollards, a hydrant, a bus shelter ----
+def prop(tag, kind, px, pz, ax, hh)
+  q{tag}_b = street.prop@1(at=[{px}, 0.17, {pz}], height={hh}, axis="${ax}", kind="${kind}", part="body")
+  q{tag}_bm = solid.material@1(q{tag}_b, color=[0.1, 0.13, 0.11], metallic=0.5, roughness=0.45)
+  output q{tag}_body = q{tag}_bm
+  q{tag}_a = street.prop@1(at=[{px}, 0.17, {pz}], height={hh}, axis="${ax}", kind="${kind}", part="accent")
+  q{tag}_am = solid.material@1(q{tag}_a, color=[0.35, 0.22, 0.12], roughness=0.6, recipe="planks", texture_scale=3)
+  output q{tag}_accent = q{tag}_am
+end
+prop("a", "bench", 8.2, -11, "z", 1)
+prop("b", "bench", -8.2, 4, "z", 1)
+prop("c", "bin", 8.4, -6, "z", 1)
+prop("d", "bin", -8.4, -14, "z", 1)
+prop("e", "hydrant", 5.8, -1.5, "z", 1)
+prop("f", "bollard", 5.55, -7, "z", 1)
+prop("g", "bollard", 5.55, -5, "z", 1)
+prop("h", "bollard", 5.55, -3, "z", 1)
+prop("i", "bollard", -5.55, -8, "z", 1)
+prop("j", "bollard", -5.55, -6, "z", 1)
+prop("k", "bus_shelter", 7.6, 13, "z", 3)
+
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+# THE EIFFEL TOWER, 150 m, at the end of the avenue. Four legs, each a square lattice of four chords with X-bracing and rings, leaning in along the tower's curve;
+# arches between the legs; three platforms; a mast. Beams are oriented square bars. The same script is run for the iron and for the warm lights.
+let jtw = "function beam(p,a,b,r){ if(p!==PART)return; let dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2]; const L=Math.sqrt(dx*dx+dy*dy+dz*dz); if(L<1e-4)return; dx/=L; dy/=L; dz/=L; let ux=0,uy=1,uz=0; if(Math.abs(dy)>0.9){ux=1;uy=0;} let px=dy*uz-dz*uy,py=dz*ux-dx*uz,pz=dx*uy-dy*ux; const pl=Math.sqrt(px*px+py*py+pz*pz); px/=pl; py/=pl; pz/=pl; const qx=dy*pz-dz*py,qy=dz*px-dx*pz,qz=dx*py-dy*px; const cc=[[-1,-1],[1,-1],[1,1],[-1,1]],v0=[],v1=[]; for(const k of cc){ const ox=(px*k[0]+qx*k[1])*r,oy=(py*k[0]+qy*k[1])*r,oz=(pz*k[0]+qz*k[1])*r; v0.push(m.vertex(a[0]+ox,a[1]+oy,a[2]+oz)); v1.push(m.vertex(b[0]+ox,b[1]+oy,b[2]+oz)); } for(let i=0;i<4;i++){ const j=(i+1)%4; m.face(v0[i],v0[j],v1[j],v1[i]); } m.face(v0[3],v0[2],v0[1],v0[0]); m.face(v1[0],v1[1],v1[2],v1[3]); } const H=150,Z0=-270,NL=36,TM=0.84; const wt=function(t){return 2+26.5*Math.pow(Math.max(0,1-t),2.5);}; const dt=function(t){return 0.9+3.2*Math.pow(Math.max(0,1-t/0.5),2);}; const CC=[[-1,-1],[1,-1],[1,1],[-1,1]]; function pt(sx,sz,c,k){ const t=TM*k/NL,w=wt(t),d=dt(t); return [sx*(w-d)+CC[c][0]*d,t*H,Z0+sz*(w-d)+CC[c][1]*d]; } for(const sx of [-1,1]) for(const sz of [-1,1]) for(let k=0;k<NL;k++){ const t=TM*k/NL,r=0.2+0.6*Math.pow(1-t,2); for(let c=0;c<4;c++){ const c2=(c+1)%4; beam('iron',pt(sx,sz,c,k),pt(sx,sz,c,k+1),r); beam('iron',pt(sx,sz,c,k),pt(sx,sz,c2,k+1),r*0.55); beam('iron',pt(sx,sz,c2,k),pt(sx,sz,c,k+1),r*0.55); beam('iron',pt(sx,sz,c,k),pt(sx,sz,c2,k),r*0.5); } if(k%2===0){ const co=sx<0?(sz<0?0:3):(sz<0?1:2),q=pt(sx,sz,co,k); bx('glow',q[0]-0.4,q[1]-0.4,q[2]-0.4,q[0]+0.4,q[1]+0.4,q[2]+0.4); } } for(const tp of [0.17,0.35,0.82]){ const y=tp*H,w=wt(tp)+(tp<0.5?3:2); bx('iron',-w,y-1.2,Z0-w,w,y+0.5,Z0+w); bx('glow',-w,y+0.5,Z0-w,w,y+0.8,Z0-w+0.3); bx('glow',-w,y+0.5,Z0+w-0.3,w,y+0.8,Z0+w); bx('glow',-w,y+0.5,Z0-w,-w+0.3,y+0.8,Z0+w); bx('glow',w-0.3,y+0.5,Z0-w,w,y+0.8,Z0+w); } for(const s of [-1,1]){ for(let i=0;i<16;i++){ const a0=Math.PI*i/16,a1=Math.PI*(i+1)/16; beam('iron',[19*Math.cos(a0),19*Math.sin(a0),Z0+s*24.4],[19*Math.cos(a1),19*Math.sin(a1),Z0+s*24.4],0.7); beam('iron',[s*24.4,19*Math.sin(a0),Z0+19*Math.cos(a0)],[s*24.4,19*Math.sin(a1),Z0+19*Math.cos(a1)],0.7); } } beam('iron',[0,126,Z0],[0,140,Z0],0.5); beam('iron',[0,140,Z0],[0,152,Z0],0.18); bx('glow',-0.5,141,Z0-0.5,0.5,142.2,Z0+0.5); m"
+tw_i = poly.script@1(code="const PART='iron'; ${jb1} ${jtw}", budget=20000)
+tw_im = solid.material@1(tw_i, color=[0.3, 0.22, 0.15], metallic=0.5, roughness=0.6)
+output eiffel_iron = tw_im
+tw_g = poly.script@1(code="const PART='glow'; ${jb1} ${jtw}", budget=20000)
+tw_gm = solid.material@1(tw_g, color=[1, 0.8, 0.5], emissive=[0.5, 0.28, 0.1])
+tw_gw = anim.wave@1(tw_gm, property="glow", amplitude=[0.6, 0, 0], period=0.45, phase=0.1)
+output eiffel_lights = tw_gw

@@ -1,0 +1,253 @@
+# HORSE: a bay stallion, 2.9 m nose to tail, in the default studio, walking in place. Everything is built in our own language: the body is one field (barrel, chest, rump,
+# neck, head, shoulder, thigh and forearm muscles, upper legs) smooth-united and mirrored, the lower legs and hooves are separate parts, the mane and tail are
+# thousands of hair wisps, the skeleton is 20 bones, and the walk is the four-beat cycle of a real horse (left hind, left fore, right hind, right fore).
+
+let bones = "pelvis; spine; neck1; neck2; head; lf_up; lf_can; lf_pas; rf_up; rf_can; rf_pas; lh_up; lh_can; lh_pas; rh_up; rh_can; rh_pas; tail1; tail2; tail3"
+let legbones = "lf_up; lf_can; lf_pas; rf_up; rf_can; rf_pas; lh_up; lh_can; lh_pas; rh_up; rh_can; rh_pas"
+
+# A bone that is only a joint.
+def bn(tag, hx, hy, hz, tx, ty, tz, par)
+  bn{tag}_a = solid.box@1(size=[0.01, 0.01, 0.01])
+  bn{tag}_b = xform.move@1(bn{tag}_a, by=[{hx}, {hy}, {hz}])
+  bn{tag}_c = rig.bone@1(bn{tag}_b, head=[{hx}, {hy}, {hz}], tail=[{tx}, {ty}, {tz}])
+  bn{tag}_d = anim.parent@1(bn{tag}_c, parent="${par}")
+  output {tag} = bn{tag}_d
+end
+# A bone that swings about the side axis: amp degrees around base, period seconds, phase of the cycle.
+def bw(tag, hx, hy, hz, tx, ty, tz, par, amp, base, per, ph)
+  bw{tag}_a = solid.box@1(size=[0.01, 0.01, 0.01])
+  bw{tag}_b = xform.move@1(bw{tag}_a, by=[{hx}, {hy}, {hz}])
+  bw{tag}_c = rig.bone@1(bw{tag}_b, head=[{hx}, {hy}, {hz}], tail=[{tx}, {ty}, {tz}])
+  bw{tag}_d = anim.parent@1(bw{tag}_c, parent="${par}")
+  bw{tag}_e = anim.wave@1(bw{tag}_d, property="rotation", amplitude=[0, 0, {amp}], base=[0, 0, {base}], period={per}, phase={ph}, pivot_at="head")
+  output {tag} = bw{tag}_e
+end
+
+# ---- the skeleton: spine and neck ----
+pv_a = solid.box@1(size=[0.01, 0.01, 0.01])
+pv_b = xform.move@1(pv_a, by=[-0.7, 1.3, 0])
+pv_c = rig.bone@1(pv_b, head=[-0.7, 1.3, 0], tail=[-0.05, 1.3, 0])
+output pelvis = pv_c
+bw("spine", -0.05, 1.3, 0, 0.5, 1.38, 0, "pelvis", 0.8, 0, 1, 0)
+bw("neck1", 0.5, 1.4, 0, 0.92, 1.88, 0, "spine", 3, 0, 2, 0.3)
+bw("neck2", 0.92, 1.88, 0, 1.2, 2.2, 0, "neck1", 2, 0, 2, 0.4)
+bw("head", 1.2, 2.2, 0, 1.75, 1.74, 0, "neck2", 2.5, 0, 2, 0.5)
+
+# ---- legs: a four-beat walk, left hind 0, left fore 0.25, right hind 0.5, right fore 0.75. The hock and knee flex as the leg swings forward. ----
+bw("lh_up", -0.5, 1.38, 0.2, -0.65, 0.55, 0.2, "pelvis", 14, 0, 2, 0)
+bw("lh_can", -0.65, 0.55, 0.2, -0.62, 0.14, 0.2, "lh_up", 12, 12, 2, 0.25)
+bw("lh_pas", -0.62, 0.14, 0.2, -0.56, 0.04, 0.2, "lh_can", 6, 4, 2, 0.3)
+bw("lf_up", 0.5, 1.2, 0.17, 0.5, 0.52, 0.17, "spine", 14, 0, 2, 0.25)
+bw("lf_can", 0.5, 0.52, 0.17, 0.52, 0.14, 0.17, "lf_up", 12, -12, 2, 0)
+bw("lf_pas", 0.52, 0.14, 0.17, 0.58, 0.04, 0.17, "lf_can", 6, -4, 2, 0.05)
+bw("rh_up", -0.5, 1.38, -0.2, -0.65, 0.55, -0.2, "pelvis", 14, 0, 2, 0.5)
+bw("rh_can", -0.65, 0.55, -0.2, -0.62, 0.14, -0.2, "rh_up", 12, 12, 2, 0.75)
+bw("rh_pas", -0.62, 0.14, -0.2, -0.56, 0.04, -0.2, "rh_can", 6, 4, 2, 0.8)
+bw("rf_up", 0.5, 1.2, -0.17, 0.5, 0.52, -0.17, "spine", 14, 0, 2, 0.75)
+bw("rf_can", 0.5, 0.52, -0.17, 0.52, 0.14, -0.17, "rf_up", 12, -12, 2, 0.5)
+bw("rf_pas", 0.52, 0.14, -0.17, 0.58, 0.04, -0.17, "rf_can", 6, -4, 2, 0.55)
+
+# ---- tail: three bones that sway a little and then carry on swinging by themselves (a spring chain) ----
+tl1_a = solid.box@1(size=[0.01, 0.01, 0.01])
+tl1_b = xform.move@1(tl1_a, by=[-0.86, 1.5, 0])
+tl1_c = rig.bone@1(tl1_b, head=[-0.86, 1.5, 0], tail=[-1.22, 1.2, 0])
+tl1_d = anim.parent@1(tl1_c, parent="pelvis")
+tl1_e = anim.wave@1(tl1_d, property="rotation", amplitude=[0, 9, 2], period=3, phase=0, pivot_at="head")
+output tail1 = tl1_e
+bn("tail2", -1.22, 1.2, 0, -1.42, 0.9, 0, "tail1")
+tl3_a = solid.box@1(size=[0.01, 0.01, 0.01])
+tl3_b = xform.move@1(tl3_a, by=[-1.42, 0.9, 0])
+tl3_c = rig.bone@1(tl3_b, head=[-1.42, 0.9, 0], tail=[-1.52, 0.6, 0])
+tl3_d = anim.parent@1(tl3_c, parent="tail2")
+tl3_e = rig.secondary@1(tl3_d, bones="tail1; tail2; tail3", stiffness=0.25, damping=3, gravity=9.8)
+output tail3 = tl3_e
+
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+# THE BODY, one field. Round masses for barrel, chest, rump and withers; a tube for the neck with a crest; a skull, cheek, muzzle and nose; ears; and on one side the
+# shoulder blade, thigh, gluteal and forearm muscles with the leg tubes, which the mirror copies to the other side.
+bd_barrel = field.ellipsoid@1(radii=[0.7, 0.33, 0.28])
+bd_barrel_m = field.move@1(bd_barrel, by=[0.0, 1.3, 0])
+bd_chest = field.ellipsoid@1(radii=[0.34, 0.4, 0.26])
+bd_chest_m = field.move@1(bd_chest, by=[0.45, 1.25, 0])
+bd_rump = field.ellipsoid@1(radii=[0.4, 0.36, 0.31])
+bd_rump_m = field.move@1(bd_rump, by=[-0.5, 1.34, 0])
+bd_with = field.ellipsoid@1(radii=[0.3, 0.12, 0.14])
+bd_with_m = field.move@1(bd_with, by=[0.4, 1.52, 0])
+bd_neck = field.tube@1(points=[[0.4, 1.35, 0], [0.8, 1.72, 0], [1.2, 2.16, 0]], radius=0.31, end_radius=0.12)
+bd_crest = field.ellipsoid@1(radii=[0.05, 0.05, 0.05])
+bd_crest_m = field.move@1(bd_crest, by=[0.9, 1.9, 0])
+bd_skull = field.ellipsoid@1(radii=[0.2, 0.17, 0.15])
+bd_skull_m = field.move@1(bd_skull, by=[1.3, 2.2, 0])
+bd_jaw = field.ellipsoid@1(radii=[0.27, 0.2, 0.125])
+bd_jaw_m = field.move@1(bd_jaw, by=[1.37, 2.03, 0])
+bd_muzzle = field.tube@1(points=[[1.45, 2.0, 0], [1.72, 1.76, 0]], radius=0.115, end_radius=0.09)
+bd_nose = field.ellipsoid@1(radii=[0.1, 0.085, 0.09])
+bd_nose_m = field.move@1(bd_nose, by=[1.74, 1.74, 0])
+bd_cheek = field.ellipsoid@1(radii=[0.14, 0.12, 0.05])
+bd_cheek_m = field.move@1(bd_cheek, by=[1.38, 2.1, 0.1])
+bd_ear = field.tube@1(points=[[1.2, 2.34, 0.08], [1.13, 2.6, 0.1]], radius=0.07, end_radius=0.015)
+bd_brow = field.ellipsoid@1(radii=[0.09, 0.05, 0.05])
+bd_brow_m = field.move@1(bd_brow, by=[1.37, 2.29, 0.11])
+bd_nostril = field.ellipsoid@1(radii=[0.04, 0.032, 0.024])
+bd_nostril_m = field.move@1(bd_nostril, by=[1.83, 1.77, 0.05])
+bd_scap = field.ellipsoid@1(radii=[0.24, 0.26, 0.1])
+bd_scap_m = field.move@1(bd_scap, by=[0.5, 1.38, 0.21])
+bd_sh = field.ellipsoid@1(radii=[0.2, 0.28, 0.13])
+bd_sh_m = field.move@1(bd_sh, by=[0.5, 1.15, 0.19])
+bd_arm = field.tube@1(points=[[0.5, 1.2, 0.17], [0.5, 0.52, 0.17]], radius=0.16, end_radius=0.075)
+bd_knee = field.sphere@1(radius=0.08)
+bd_knee_m = field.move@1(bd_knee, by=[0.51, 0.52, 0.17])
+bd_hock = field.sphere@1(radius=0.085)
+bd_hock_m = field.move@1(bd_hock, by=[-0.66, 0.56, 0.2])
+bd_fmus = field.ellipsoid@1(radii=[0.1, 0.2, 0.085])
+bd_fmus_m = field.move@1(bd_fmus, by=[0.5, 0.95, 0.17])
+bd_thigh = field.tube@1(points=[[-0.5, 1.38, 0.2], [-0.38, 0.95, 0.2]], radius=0.22, end_radius=0.12)
+bd_glut = field.ellipsoid@1(radii=[0.2, 0.2, 0.14])
+bd_glut_m = field.move@1(bd_glut, by=[-0.6, 1.42, 0.2])
+bd_bulge = field.ellipsoid@1(radii=[0.17, 0.28, 0.11])
+bd_bulge_m = field.move@1(bd_bulge, by=[-0.48, 1.15, 0.23])
+bd_gask = field.tube@1(points=[[-0.38, 0.95, 0.2], [-0.65, 0.58, 0.2]], radius=0.14, end_radius=0.075)
+bd_tuck = field.ellipsoid@1(radii=[0.32, 0.16, 0.5])
+bd_tuck_m = field.move@1(bd_tuck, by=[-0.22, 0.8, 0])
+bd_u1 = field.smooth_union@1(bd_barrel_m, bd_chest_m, radius=0.2)
+bd_u2 = field.smooth_union@1(bd_u1, bd_rump_m, radius=0.2)
+bd_u2t = field.subtract@1(bd_u2, bd_tuck_m)
+bd_u3 = field.smooth_union@1(bd_u2t, bd_with_m, radius=0.12)
+bd_u4 = field.smooth_union@1(bd_u3, bd_neck, radius=0.18)
+bd_u5 = field.smooth_union@1(bd_u4, bd_crest_m, radius=0.08)
+bd_u11 = field.smooth_union@1(bd_u5, bd_crest_m, radius=0.05)
+bd_u12 = field.smooth_union@1(bd_u11, bd_scap_m, radius=0.1)
+bd_u13 = field.smooth_union@1(bd_u12, bd_sh_m, radius=0.12)
+bd_u14 = field.smooth_union@1(bd_u13, bd_arm, radius=0.1)
+bd_u15 = field.smooth_union@1(bd_u14, bd_fmus_m, radius=0.08)
+bd_u16 = field.smooth_union@1(bd_u15, bd_thigh, radius=0.18)
+bd_u17 = field.smooth_union@1(bd_u16, bd_glut_m, radius=0.12)
+bd_u18 = field.smooth_union@1(bd_u17, bd_bulge_m, radius=0.1)
+bd_u19 = field.smooth_union@1(bd_u18, bd_gask, radius=0.1)
+bd_u20 = field.smooth_union@1(bd_u19, bd_knee_m, radius=0.06)
+bd_u21 = field.smooth_union@1(bd_u20, bd_hock_m, radius=0.06)
+bd_all = field.mirror@1(bd_u21, axes=[0, 0, 1])
+bd_noise = field.noise@1(bd_all, amplitude=0.005, scale=0.07, octaves=3, seed=4)
+bd_solid = field.to_solid@1(bd_noise, min=[-1.05, 0.4, -0.5], max=[1.95, 2.7, 0.5], edge_length=0.02)
+bd_m = solid.material@1(bd_solid, color=[0.24, 0.1, 0.045], roughness=0.5)
+bd_f = solid.finish@1(bd_m, subsurface=0.4, sheen=0.4, clearcoat=0.15, clearcoat_roughness=0.3, relief=0.3, relief_scale=70, relief_style="smooth")
+bd_k = rig.skin@1(bd_f, bones="${bones}", falloff=3, influences=4)
+output horse_body = bd_k
+
+# LOWER LEGS: cannon bone, fetlock joint and pastern in dark stockings, a separate part that overlaps the knee and hock.
+ll_fc = field.tube@1(points=[[0.5, 0.58, 0.17], [0.52, 0.17, 0.17]], radius=0.055, end_radius=0.04)
+ll_ff = field.sphere@1(radius=0.052)
+ll_ff_m = field.move@1(ll_ff, by=[0.52, 0.14, 0.17])
+ll_fp = field.tube@1(points=[[0.52, 0.14, 0.17], [0.57, 0.06, 0.17]], radius=0.042, end_radius=0.05)
+ll_hc = field.tube@1(points=[[-0.65, 0.6, 0.2], [-0.62, 0.17, 0.2]], radius=0.06, end_radius=0.042)
+ll_hf = field.sphere@1(radius=0.052)
+ll_hf_m = field.move@1(ll_hf, by=[-0.62, 0.14, 0.2])
+ll_hp = field.tube@1(points=[[-0.62, 0.14, 0.2], [-0.57, 0.06, 0.2]], radius=0.042, end_radius=0.05)
+ll_u1 = field.smooth_union@1(ll_fc, ll_ff_m, radius=0.04)
+ll_u2 = field.smooth_union@1(ll_u1, ll_fp, radius=0.03)
+ll_u3 = field.smooth_union@1(ll_u2, ll_hc, radius=0.03)
+ll_u4 = field.smooth_union@1(ll_u3, ll_hf_m, radius=0.04)
+ll_u5 = field.smooth_union@1(ll_u4, ll_hp, radius=0.03)
+ll_all = field.mirror@1(ll_u5, axes=[0, 0, 1])
+ll_solid = field.to_solid@1(ll_all, min=[-0.85, 0.0, -0.4], max=[0.8, 0.7, 0.4], edge_length=0.01)
+ll_m = solid.material@1(ll_solid, color=[0.05, 0.035, 0.03], roughness=0.5)
+ll_f = solid.finish@1(ll_m, subsurface=0.2, sheen=0.3, clearcoat=0.2, clearcoat_roughness=0.3)
+ll_k = rig.skin@1(ll_f, bones="${legbones}", falloff=4, influences=2)
+output horse_lowerlegs = ll_k
+
+# HOOVES: dark horn with a glossy coat.
+hv_fa = field.ellipsoid@1(radii=[0.078, 0.056, 0.064])
+hv_fa_m = field.move@1(hv_fa, by=[0.6, 0.056, 0.17])
+hv_ha = field.ellipsoid@1(radii=[0.078, 0.056, 0.064])
+hv_ha_m = field.move@1(hv_ha, by=[-0.55, 0.056, 0.2])
+hv_u = field.union@1(hv_fa_m, hv_ha_m)
+hv_all = field.mirror@1(hv_u, axes=[0, 0, 1])
+hv_solid = field.to_solid@1(hv_all, min=[-0.8, 0.0, -0.3], max=[0.8, 0.14, 0.3], edge_length=0.008)
+hv_m = solid.material@1(hv_solid, color=[0.1, 0.085, 0.07], roughness=0.35)
+hv_f = solid.finish@1(hv_m, clearcoat=0.5, clearcoat_roughness=0.15, relief=0.5, relief_scale=70, relief_style="ridged")
+hv_k = rig.skin@1(hv_f, bones="${legbones}", falloff=6, influences=1)
+output horse_hooves = hv_k
+
+# THE HEAD, its own part at 6 mm resolution, modelled in its own frame (poll at the origin, face along +x, up +y) and then tipped 40 degrees nose-down and set on the neck:
+# cranium, the long flat nasal bridge, deep jowl and jaw line, muzzle with upper lip, chin and flared nostrils, brow bumps over recessed eye sockets with lids, a groove for the
+# mouth, and ears with hollows.
+hh_cran = field.ellipsoid@1(radii=[0.12, 0.1, 0.085])
+hh_cran_m = field.move@1(hh_cran, by=[0.06, 0, 0])
+hh_nasal = field.ellipsoid@1(radii=[0.27, 0.062, 0.056])
+hh_nasal_m = field.move@1(hh_nasal, by=[0.32, 0.0, 0])
+hh_jowl = field.ellipsoid@1(radii=[0.18, 0.14, 0.08])
+hh_jowl_m = field.move@1(hh_jowl, by=[0.15, -0.1, 0])
+hh_jaw = field.tube@1(points=[[0.1, -0.15, 0.02], [0.3, -0.12, 0.03], [0.52, -0.07, 0.03]], radius=0.045, end_radius=0.035)
+hh_muz = field.ellipsoid@1(radii=[0.1, 0.056, 0.054])
+hh_muz_m = field.move@1(hh_muz, by=[0.54, -0.015, 0])
+hh_lip = field.ellipsoid@1(radii=[0.045, 0.032, 0.05])
+hh_lip_m = field.move@1(hh_lip, by=[0.59, -0.045, 0])
+hh_chin = field.ellipsoid@1(radii=[0.05, 0.026, 0.038])
+hh_chin_m = field.move@1(hh_chin, by=[0.54, -0.075, 0])
+hh_flare = field.ellipsoid@1(radii=[0.04, 0.03, 0.025])
+hh_flare_m = field.move@1(hh_flare, by=[0.57, 0.015, 0.042])
+hh_brow = field.ellipsoid@1(radii=[0.055, 0.028, 0.034])
+hh_brow_m = field.move@1(hh_brow, by=[0.09, 0.062, 0.072])
+hh_lid = field.ellipsoid@1(radii=[0.04, 0.032, 0.02])
+hh_lid_m = field.move@1(hh_lid, by=[0.09, 0.04, 0.074])
+hh_throat = field.ellipsoid@1(radii=[0.1, 0.1, 0.07])
+hh_throat_m = field.move@1(hh_throat, by=[-0.02, -0.13, 0])
+hh_ear = field.tube@1(points=[[0.0, 0.09, 0.055], [-0.06, 0.29, 0.085]], radius=0.045, end_radius=0.012)
+hh_u1 = field.smooth_union@1(hh_cran_m, hh_nasal_m, radius=0.06)
+hh_u2 = field.smooth_union@1(hh_u1, hh_jowl_m, radius=0.06)
+hh_u3 = field.smooth_union@1(hh_u2, hh_jaw, radius=0.07)
+hh_u4 = field.smooth_union@1(hh_u3, hh_muz_m, radius=0.05)
+hh_u5 = field.smooth_union@1(hh_u4, hh_lip_m, radius=0.03)
+hh_u6 = field.smooth_union@1(hh_u5, hh_chin_m, radius=0.03)
+hh_u7 = field.smooth_union@1(hh_u6, hh_flare_m, radius=0.02)
+hh_u8 = field.smooth_union@1(hh_u7, hh_brow_m, radius=0.025)
+hh_u9 = field.smooth_union@1(hh_u8, hh_lid_m, radius=0.012)
+hh_u10 = field.smooth_union@1(hh_u9, hh_throat_m, radius=0.06)
+hh_u11 = field.smooth_union@1(hh_u10, hh_ear, radius=0.02)
+hh_sock = field.sphere@1(radius=0.029)
+hh_sock_m = field.move@1(hh_sock, by=[0.09, 0.04, 0.088])
+hh_nost = field.ellipsoid@1(radii=[0.03, 0.02, 0.016])
+hh_nost_m = field.move@1(hh_nost, by=[0.605, 0.0, 0.034])
+hh_mouth = field.tube@1(points=[[0.6, -0.065, 0.05], [0.46, -0.075, 0.066], [0.3, -0.1, 0.07]], radius=0.0045)
+hh_hollow = field.ellipsoid@1(radii=[0.018, 0.09, 0.022])
+hh_hollow_m = field.move@1(hh_hollow, by=[-0.03, 0.19, 0.1])
+hh_s1 = field.subtract@1(hh_u11, hh_sock_m)
+hh_s2 = field.subtract@1(hh_s1, hh_nost_m)
+hh_s3 = field.subtract@1(hh_s2, hh_mouth)
+hh_s4 = field.subtract@1(hh_s3, hh_hollow_m)
+hh_all = field.mirror@1(hh_s4, axes=[0, 0, 1])
+hh_solid = field.to_solid@1(hh_all, min=[-0.15, -0.28, -0.15], max=[0.72, 0.36, 0.15], edge_length=0.006)
+hh_r = xform.rotate@1(hh_solid, angles=[0, 0, -40])
+hh_p = xform.move@1(hh_r, by=[1.22, 2.26, 0])
+hh_m = solid.material@1(hh_p, color=[0.24, 0.1, 0.045], roughness=0.5)
+hh_f = solid.finish@1(hh_m, subsurface=0.4, sheen=0.4, clearcoat=0.15, clearcoat_roughness=0.3, relief=0.3, relief_scale=90, relief_style="smooth")
+hh_k = rig.skin@1(hh_f, bones="neck1; neck2; head", falloff=4, influences=2)
+output horse_head = hh_k
+
+# EYES: dark glossy balls sitting in the sockets.
+ey_a = field.sphere@1(radius=0.027)
+ey_b = field.move@1(ey_a, by=[0.09, 0.04, 0.066])
+ey_c = field.mirror@1(ey_b, axes=[0, 0, 1])
+ey_d0 = field.to_solid@1(ey_c, min=[0.0, -0.05, -0.15], max=[0.2, 0.15, 0.15], edge_length=0.003)
+ey_d1 = xform.rotate@1(ey_d0, angles=[0, 0, -40])
+ey_d = xform.move@1(ey_d1, by=[1.22, 2.26, 0])
+ey_m = solid.material@1(ey_d, color=[0.04, 0.022, 0.012], roughness=0.08)
+ey_f = solid.finish@1(ey_m, clearcoat=1.0, clearcoat_roughness=0.02)
+ey_k = anim.parent@1(ey_f, parent="head")
+output horse_eyes = ey_k
+
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+# HAIR: each wisp is a tapered ribbon that leaves the skin, arcs and falls, turned a random way about the vertical so the strands cross. Mane along the crest of the neck,
+# a forelock over the brow, a full tail from the dock.
+let jhair = "const m = new Mesh(); let sd = 7; function rnd(){ sd = (sd * 1664525 + 1013904223) % 4294967296; return sd / 4294967296; } function wisp(P, d, L, droop, w, rows){ const a0 = rnd() * 3.14159, sx = Math.cos(a0), sz = Math.sin(a0); let prev = null; for (let i = 0; i <= rows; i++){ const t = i / rows, x = P[0] + d[0] * L * t + 0.03 * L * Math.sin(t * 5 + a0), y = P[1] + d[1] * L * t - droop * L * t * t, z = P[2] + d[2] * L * t, ww = w * (1 - 0.8 * t); const a = m.vertex(x - sx * ww, y, z - sz * ww), b = m.vertex(x + sx * ww, y, z + sz * ww); if (prev){ m.face(prev[0], prev[1], b, a); m.face(prev[0], a, b, prev[1]); } prev = [a, b]; } }"
+mane_s = poly.script@1(code="${jhair} for (let k = 0; k < 1200; k++){ const u = rnd(), v = 1 - u; const P = [v * v * 0.6 + 2 * u * v * 0.9 + u * u * 1.2, v * v * 1.7 + 2 * u * v * 2.02 + u * u * 2.32 - 0.03, (rnd() - 0.5) * 0.05]; const side = rnd() < 0.85 ? 1 : -1; wisp(P, [0.12 + 0.15 * rnd(), 0.4 + 0.2 * rnd(), side * (0.7 + 0.4 * rnd())], 0.2 + 0.22 * rnd() + 0.12 * v, 1.0 + 0.3 * rnd(), 0.012, 6); } for (let k = 0; k < 140; k++){ const P = [1.24 + 0.02 * rnd(), 2.34, (rnd() - 0.5) * 0.12]; wisp(P, [0.55, -0.25 + 0.3 * rnd(), (rnd() - 0.5) * 0.4], 0.16 + 0.14 * rnd(), 0.5, 0.01, 5); } m", budget=20000)
+mane_m = solid.material@1(mane_s, color=[0.03, 0.022, 0.018], roughness=0.5)
+mane_f = solid.finish@1(mane_m, sheen=0.6, clearcoat=0.15, clearcoat_roughness=0.3)
+mane_k = rig.skin@1(mane_f, bones="neck1; neck2; head; spine", falloff=3, influences=2)
+output horse_mane = mane_k
+
+tail_s = poly.script@1(code="${jhair} for (let k = 0; k < 1400; k++){ const P = [-0.86 + 0.02 * rnd(), 1.5 + (rnd() - 0.5) * 0.08, (rnd() - 0.5) * 0.08]; wisp(P, [-0.5 - 0.25 * rnd(), 0.12, (rnd() - 0.5) * 0.45], 0.7 + 0.45 * rnd(), 0.9 + 0.25 * rnd(), 0.013, 7); } m", budget=20000)
+tail_m = solid.material@1(tail_s, color=[0.03, 0.022, 0.018], roughness=0.5)
+tail_f = solid.finish@1(tail_m, sheen=0.6, clearcoat=0.15, clearcoat_roughness=0.3)
+tail_k = rig.skin@1(tail_f, bones="pelvis; tail1; tail2; tail3", falloff=3, influences=2)
+output horse_tail = tail_k
