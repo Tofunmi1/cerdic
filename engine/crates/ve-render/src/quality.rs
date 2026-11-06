@@ -17,6 +17,8 @@ use crate::light::{MAX_POINT_LIGHTS, MAX_SPOT_LIGHTS};
 pub enum QualityTier {
     /// Cheapest: no shadows, no multisampling, few lights, a slightly lower render resolution.
     Low,
+    /// Settings for a standalone headset.
+    Quest,
     /// Balanced; the starting point for a standalone headset.
     Medium,
     /// Everything on; the default on desktop.
@@ -26,13 +28,14 @@ pub enum QualityTier {
 
 impl QualityTier {
     /// All tiers, cheapest first.
-    pub const ALL: [Self; 3] = [Self::Low, Self::Medium, Self::High];
+    pub const ALL: [Self; 4] = [Self::Low, Self::Quest, Self::Medium, Self::High];
 
     /// The tier's lowercase name, as accepted by [`FromStr`].
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
             Self::Low => "low",
+            Self::Quest => "quest",
             Self::Medium => "medium",
             Self::High => "high",
         }
@@ -56,6 +59,127 @@ impl FromStr for QualityTier {
     }
 }
 
+/// Which surface effects the renderer draws. Every surface keeps what its author gave it (a `solid.finish` node, a baked map); a switch here only
+/// stops the viewer drawing that layer, so a person can see what each one adds, or buy back speed, without touching the document.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "each flag is an independent switch the page turns on or off; grouping them would only hide that"
+)]
+pub struct Effects {
+    /// Light scattering under the skin (`subsurface`).
+    pub subsurface: bool,
+    /// The glossy clear layer (`clearcoat`).
+    pub clearcoat: bool,
+    /// Light through a thin body (`translucency` and `thickness`).
+    pub translucency: bool,
+    /// Colour that shifts with the view angle (`iridescence`).
+    pub iridescence: bool,
+    /// Grazing-angle softness (`sheen`).
+    pub sheen: bool,
+    /// Procedural relief drawn in the pixel shader (`relief`).
+    pub relief: bool,
+    /// The wet look (`wetness`).
+    pub wetness: bool,
+    /// Highlights stretched along the surface (`anisotropy`).
+    pub anisotropy: bool,
+    /// The baked and procedural texture maps (colour, normal, roughness, glow).
+    pub maps: bool,
+}
+
+impl Effects {
+    /// Everything drawn: the default.
+    pub const ALL: Self = Self {
+        subsurface: true,
+        clearcoat: true,
+        translucency: true,
+        iridescence: true,
+        sheen: true,
+        relief: true,
+        wetness: true,
+        anisotropy: true,
+        maps: true,
+    };
+
+    /// The names the page uses for each switch.
+    pub const NAMES: [&'static str; 9] = [
+        "subsurface", "clearcoat", "translucency", "iridescence", "sheen", "relief", "wetness", "anisotropy", "maps",
+    ];
+
+    /// Turns the effect called `name` on or off; false when there is no such effect.
+    pub fn set(&mut self, name: &str, on: bool) -> bool {
+        let slot = match name {
+            "subsurface" => &mut self.subsurface,
+            "clearcoat" => &mut self.clearcoat,
+            "translucency" => &mut self.translucency,
+            "iridescence" => &mut self.iridescence,
+            "sheen" => &mut self.sheen,
+            "relief" => &mut self.relief,
+            "wetness" => &mut self.wetness,
+            "anisotropy" => &mut self.anisotropy,
+            "maps" => &mut self.maps,
+            _ => return false,
+        };
+        *slot = on;
+        true
+    }
+
+    /// Whether the effect called `name` is drawn, or `None` for a name that is not an effect.
+    #[must_use]
+    pub fn get(&self, name: &str) -> Option<bool> {
+        Some(match name {
+            "subsurface" => self.subsurface,
+            "clearcoat" => self.clearcoat,
+            "translucency" => self.translucency,
+            "iridescence" => self.iridescence,
+            "sheen" => self.sheen,
+            "relief" => self.relief,
+            "wetness" => self.wetness,
+            "anisotropy" => self.anisotropy,
+            "maps" => self.maps,
+            _ => return None,
+        })
+    }
+
+    /// The finish a surface is drawn with: its own, with every switched-off effect set to none.
+    #[must_use]
+    pub fn filter(&self, finish: &crate::SurfaceFinish) -> crate::SurfaceFinish {
+        let mut out = *finish;
+        if !self.subsurface {
+            out.subsurface = 0.0;
+        }
+        if !self.clearcoat {
+            out.clearcoat = 0.0;
+        }
+        if !self.translucency {
+            out.translucency = 0.0;
+            out.thickness = 0.0;
+        }
+        if !self.iridescence {
+            out.iridescence = 0.0;
+        }
+        if !self.sheen {
+            out.sheen = 0.0;
+        }
+        if !self.relief {
+            out.relief = 0.0;
+        }
+        if !self.wetness {
+            out.wetness = 0.0;
+        }
+        if !self.anisotropy {
+            out.anisotropy = 0.0;
+        }
+        out
+    }
+}
+
+impl Default for Effects {
+    fn default() -> Self {
+        Self::ALL
+    }
+}
+
 /// Settings that trade image quality for speed.
 #[derive(Resource, Clone, Copy, Debug, PartialEq)]
 #[expect(
@@ -63,13 +187,13 @@ impl FromStr for QualityTier {
     reason = "each flag is an independent switch the page turns on or off; grouping them would only hide that"
 )]
 pub struct RenderQuality {
-    /// The tier these settings came from (informational; the fields below are what the renderer reads).
+    /// The tier these settings came from; Low also disables stochastic texture sampling.
     pub tier: QualityTier,
     /// Samples per pixel: 1, 2 or 4.
     pub msaa_samples: u32,
     /// Side of one cascade of the sun's shadow map in texels; zero turns shadows off.
     pub shadow_resolution: u32,
-    /// How many cascades the sun's shadow map has (1 to 3): more keep near shadows sharp and still reach far.
+    /// How many cascades the sun's shadow map has: more keep near shadows sharp and still reach far.
     pub shadow_cascades: u32,
     /// Shadow filter radius in taps: 0 is one hardware-filtered tap, 1 is a 3 by 3 grid.
     pub shadow_pcf_radius: u32,
@@ -87,6 +211,10 @@ pub struct RenderQuality {
     pub bloom_enabled: bool,
     /// Adapts the exposure to the brightness of the picture over about a second, like an eye or a camera.
     pub auto_exposure_enabled: bool,
+    /// Smooths jagged edges after the picture is drawn (SMAA). Where the backend multisamples instead, this does not apply.
+    pub smaa_enabled: bool,
+    /// Which surface effects are drawn.
+    pub effects: Effects,
 }
 
 impl RenderQuality {
@@ -107,6 +235,24 @@ impl RenderQuality {
                 ssao_enabled: false,
                 bloom_enabled: false,
                 auto_exposure_enabled: false,
+                smaa_enabled: true,
+                effects: Effects::ALL,
+            },
+            QualityTier::Quest => Self {
+                tier,
+                msaa_samples: 4,
+                shadow_resolution: 1024,
+                shadow_cascades: 1,
+                shadow_pcf_radius: 0,
+                max_point_lights: 2,
+                max_spot_lights: 2,
+                resolution_scale: 1.0,
+                specular_aa_enabled: false,
+                ssao_enabled: false,
+                bloom_enabled: false,
+                auto_exposure_enabled: false,
+                smaa_enabled: true,
+                effects: Effects::ALL,
             },
             QualityTier::Medium => Self {
                 tier,
@@ -121,6 +267,8 @@ impl RenderQuality {
                 ssao_enabled: false,
                 bloom_enabled: false,
                 auto_exposure_enabled: false,
+                smaa_enabled: true,
+                effects: Effects::ALL,
             },
             QualityTier::High => Self {
                 tier,
@@ -135,8 +283,16 @@ impl RenderQuality {
                 ssao_enabled: false,
                 bloom_enabled: false,
                 auto_exposure_enabled: false,
+                smaa_enabled: true,
+                effects: Effects::ALL,
             },
         }
+    }
+
+    /// Whether opted-in surfaces may blend three samples rather than one.
+    #[must_use]
+    pub const fn stochastic_sampling_enabled(&self) -> bool {
+        !matches!(self.tier, QualityTier::Low)
     }
 
     /// Whether the sun casts shadows at these settings.
@@ -177,16 +333,20 @@ mod tests {
 
     #[test]
     fn tiers_only_get_more_expensive() {
-        let [low, medium, high] = QualityTier::ALL.map(RenderQuality::for_tier);
+        let [low, quest, medium, high] = QualityTier::ALL.map(RenderQuality::for_tier);
         assert!(
             low.msaa_samples <= medium.msaa_samples && medium.msaa_samples <= high.msaa_samples
         );
+        assert!(low.msaa_samples <= quest.msaa_samples);
         assert!(low.shadow_resolution <= medium.shadow_resolution);
         assert!(medium.shadow_resolution <= high.shadow_resolution);
+        assert!(low.shadow_resolution <= quest.shadow_resolution);
         assert!(low.max_point_lights <= medium.max_point_lights);
         assert!(medium.max_point_lights <= high.max_point_lights);
+        assert_eq!(quest.max_point_lights, 2);
         assert!(low.max_spot_lights <= medium.max_spot_lights);
         assert!(medium.max_spot_lights <= high.max_spot_lights);
+        assert_eq!(quest.max_spot_lights, 2);
         assert_eq!(
             (
                 low.max_point_lights,
@@ -205,11 +365,13 @@ mod tests {
         );
         assert!(low.resolution_scale <= medium.resolution_scale);
         assert!(medium.resolution_scale <= high.resolution_scale);
+        assert!(low.resolution_scale <= quest.resolution_scale);
     }
 
     #[test]
     fn low_has_no_shadows_and_the_others_do() {
         assert!(!RenderQuality::for_tier(QualityTier::Low).shadows_enabled());
+        assert!(RenderQuality::for_tier(QualityTier::Quest).shadows_enabled());
         assert!(RenderQuality::for_tier(QualityTier::Medium).shadows_enabled());
         assert!(RenderQuality::for_tier(QualityTier::High).shadows_enabled());
     }
@@ -271,5 +433,28 @@ mod tests {
         app.insert_resource(RenderQuality::for_tier(QualityTier::High));
         app.update();
         assert_eq!(app.world().get::<Msaa>(camera), Some(&Msaa::Sample4));
+    }
+
+    #[test]
+    fn a_switched_off_effect_is_removed_from_the_finish_and_the_others_stay() {
+        let finish = crate::SurfaceFinish {
+            subsurface: 0.5,
+            clearcoat: 0.4,
+            translucency: 0.3,
+            thickness: 0.2,
+            relief: 0.8,
+            ..crate::SurfaceFinish::default()
+        };
+        let mut effects = Effects::ALL;
+        assert_eq!(effects.filter(&finish), finish);
+        assert!(effects.set("subsurface", false));
+        assert!(effects.set("translucency", false));
+        let shown = effects.filter(&finish);
+        assert_eq!((shown.subsurface, shown.translucency, shown.thickness), (0.0, 0.0, 0.0));
+        assert_eq!((shown.clearcoat, shown.relief), (0.4, 0.8));
+        assert_eq!(effects.get("subsurface"), Some(false));
+        assert_eq!(effects.get("sheen"), Some(true));
+        assert!(!effects.set("nonsense", true));
+        assert_eq!(effects.get("nonsense"), None);
     }
 }

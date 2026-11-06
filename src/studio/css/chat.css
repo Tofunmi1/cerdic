@@ -1,0 +1,67 @@
+.chat {
+  position: absolute; z-index: 15; left: var(--gap-3); bottom: var(--gap-3);
+  top: calc(var(--topbar-height) + var(--gap-3) * 2); width: var(--chat-width);
+  display: flex; flex-direction: column; border-radius: var(--radius-lg); overflow: hidden;
+  transition: transform var(--speed) var(--ease), opacity var(--speed) var(--ease);
+}
+.studio.chat-closed .chat { transform: translateX(calc(-100% - var(--gap-4))); opacity: 0; pointer-events: none; }
+@media (max-width: 900px) { .chat { width: calc(100% - var(--gap-3) * 2); bottom: auto; height: 46%; } }
+
+.chat-head { display: flex; align-items: center; gap: var(--gap-2); padding: var(--gap-3) var(--gap-4) var(--gap-2); }
+.chat-head h2 { margin: 0; font-size: var(--text-md); font-weight: 650; flex: 1; }
+
+.chat-scroll { flex: 1; overflow-y: auto; padding: var(--gap-2) var(--gap-4) var(--gap-4); display: flex; flex-direction: column; gap: var(--gap-4); }
+.chat-empty { margin: auto; text-align: center; color: var(--text-2); max-width: 280px; }
+.chat-empty h3 { margin: 0 0 var(--gap-2); color: var(--text); font-size: var(--text-lg); font-weight: 650; letter-spacing: -0.02em; }
+.chat-empty p { margin: 0; font-size: var(--text-sm); }
+
+/* A user message is a soft bubble on the right; an assistant message is plain text on the left, as in ChatGPT and Claude. */
+.msg { display: flex; flex-direction: column; gap: var(--gap-2); max-width: 100%; animation: rise var(--speed) var(--ease); }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.msg.user { align-items: flex-end; }
+.msg.user .body { background: var(--user-bubble); padding: 8px 14px; border-radius: var(--radius-lg) var(--radius-lg) 6px var(--radius-lg); max-width: 88%; }
+.msg .body { overflow-wrap: anywhere; }
+.msg .body p { margin: 0 0 0.6em; }
+.msg .body p:last-child { margin-bottom: 0; }
+.msg .body code { background: var(--code-bg); padding: 1px 5px; border-radius: 5px; }
+.msg .body pre { background: var(--code-bg); border-radius: var(--radius-md); padding: var(--gap-3); overflow: auto; margin: 0.5em 0; font-size: var(--text-xs); line-height: 1.55; }
+.msg .body pre code { background: none; padding: 0; }
+.msg .meta { font-size: var(--text-xs); color: var(--text-3); }
+
+/* A tool call: a quiet collapsible card with a status, like the tool blocks in Codex and AI Elements. */
+.tool { border-radius: var(--radius-md); background: var(--hover); overflow: hidden; border: 1px solid var(--glass-edge-soft); }
+.tool > button { width: 100%; display: flex; align-items: center; gap: var(--gap-2); padding: 8px var(--gap-3); text-align: left; }
+.tool > button:hover { background: var(--hover); }
+.tool .name { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 600; }
+.tool .summary { flex: 1; min-width: 0; color: var(--text-2); font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool .caret { color: var(--text-3); transition: transform var(--speed) var(--ease); }
+.tool[data-open='true'] .caret { transform: rotate(90deg); }
+.tool .detail { padding: 0 var(--gap-3) var(--gap-3); display: grid; gap: var(--gap-2); }
+.tool .detail h4 { margin: var(--gap-2) 0 0; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); font-weight: 600; }
+.tool .detail pre { margin: 0; max-height: 220px; overflow: auto; background: var(--code-bg); border-radius: var(--radius-sm); padding: var(--gap-2) var(--gap-3); font-size: var(--text-xs); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* The live build card: the stages of an evaluation, lighting up as the engine moves through them. */
+.build { border-radius: var(--radius-md); padding: var(--gap-3); background: var(--accent-soft); display: grid; gap: var(--gap-3); }
+.build header { display: flex; align-items: center; gap: var(--gap-2); font-weight: 600; font-size: var(--text-sm); }
+.build .steps { display: flex; gap: 4px; }
+.build .step { flex: 1; height: 4px; border-radius: 2px; background: var(--glass-edge-soft); overflow: hidden; position: relative; }
+.build .step[data-state='done'] { background: var(--accent); }
+.build .step[data-state='active']::after { content: ''; position: absolute; inset: 0; background: var(--accent); animation: sweep 1.1s var(--ease) infinite; transform-origin: left; }
+.build .step[data-state='measured']::after { content: ''; position: absolute; inset: 0; width: var(--fill, 0%); background: var(--accent); transition: width 0.12s linear; }
+@keyframes sweep { 0% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
+.build .labels { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-2); }
+.build .labels span[data-state='active'] { color: var(--accent); font-weight: 600; }
+
+.composer { padding: var(--gap-3); }
+.composer .box {
+  display: flex; align-items: flex-end; gap: var(--gap-2); padding: 6px 6px 6px var(--gap-4);
+  border-radius: var(--radius-xl); background: var(--glass-strong); border: 1px solid var(--glass-edge-soft);
+  box-shadow: inset 0 1px 0 var(--glass-shine);
+}
+.composer .box:focus-within { border-color: var(--accent); }
+.composer textarea { flex: 1; resize: none; border: 0; background: none; outline: none; padding: 6px 0; max-height: 160px; line-height: 1.45; }
+.composer textarea::placeholder { color: var(--text-3); }
+.composer .send { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--accent-text); display: grid; place-items: center; flex: none; transition: transform var(--speed) var(--ease), opacity var(--speed); }
+.composer .send:active:not(:disabled) { transform: scale(0.92); }
+.composer .send:disabled { background: var(--press); color: var(--text-3); opacity: 1; }
+.composer .note { margin: var(--gap-2) var(--gap-2) 0; font-size: var(--text-xs); color: var(--text-3); }

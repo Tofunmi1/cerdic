@@ -37,6 +37,36 @@ fn g2_01_primitive_boolean_matches_direct_kernel() {
 }
 
 #[test]
+fn a_draft_shows_the_output_growing_one_node_at_a_time() {
+    let doc = fixture().unwrap();
+    let mut evaluator = Evaluator::default();
+    evaluator.begin(&doc, Quality::Preview).unwrap();
+    // The fixture runs box, sphere, then the difference. After the first node the output already has a draft: the bare box.
+    assert!(evaluator.step().unwrap().is_none());
+    let first = evaluator.take_drafts();
+    assert_eq!(first.len(), 1);
+    assert_eq!(first[0].node, doc.outputs[0].from.node);
+    let box_volume = first[0].volume;
+    // Nothing changed since: nothing to take.
+    assert!(evaluator.take_drafts().is_empty());
+    // After the sphere and the difference the same output has a newer draft, with the sphere cut out of the box.
+    let mut done = None;
+    let mut latest = Vec::new();
+    while done.is_none() {
+        done = evaluator.step().unwrap();
+        let drafts = evaluator.take_drafts();
+        if !drafts.is_empty() {
+            latest = drafts;
+        }
+    }
+    assert_eq!(latest.len(), 1);
+    assert!(latest[0].volume < box_volume);
+    // The finished scene has the same part.
+    let finished = done.unwrap();
+    assert!((finished.parts[0].volume - latest[0].volume).abs() < 1e-6);
+}
+
+#[test]
 fn g2_09_cache_eviction_obeys_byte_cap() {
     let doc = fixture().unwrap();
     let mut evaluator = Evaluator::with_cache_limit(1024);
@@ -45,17 +75,18 @@ fn g2_09_cache_eviction_obeys_byte_cap() {
 }
 
 #[test]
-fn g2_10_over_budget_refused_before_kernel_work() {
+fn g2_10_a_heavy_primitive_is_no_longer_refused_by_a_triangle_limit() {
+    // The preview triangle limit (200,000) was removed on 2026-11-06: a half-million-triangle sphere is built, not refused. What still bounds
+    // a document is its memory (`budget.memory`) and the time the evaluation takes.
     let mut doc = fixture().unwrap();
     doc.nodes[1]
         .params
         .insert("segments".into(), ve_graph::Value::Int(512));
     let mut evaluator = Evaluator::default();
-    let error = evaluator.evaluate(&doc, Quality::Preview).unwrap_err();
-    assert!(error.code.starts_with("budget."));
-    assert_eq!(error.limit, Some(200_000.0));
-    assert_eq!(error.observed, Some(524_288.0));
-    assert_eq!(evaluator.evaluated_nodes(), 0);
+    let result = evaluator.evaluate(&doc, Quality::Preview).unwrap();
+    // The sphere alone is 524,288 triangles; the box cut by it keeps a good share of them.
+    assert!(result.parts[0].indices.len() / 3 > 50_000);
+    assert!(evaluator.evaluated_nodes() > 0);
 }
 
 #[test]

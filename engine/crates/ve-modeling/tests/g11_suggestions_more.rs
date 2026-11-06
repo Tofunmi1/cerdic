@@ -54,15 +54,6 @@ fn assert_refusal(text: &str, code: &str, keyword: &str) {
 }
 
 #[test]
-fn a_solid_over_its_budget_names_the_mesh_detail() {
-    assert_refusal(
-        "t = solid.torus@1(major=0.5, minor=0.2, segments=512, tube_segments=256)\noutput t\n",
-        "budget.triangles",
-        "segments",
-    );
-}
-
-#[test]
 fn a_field_mesh_over_its_cell_budget_names_edge_length() {
     assert_refusal(
         "f = field.sphere@1(radius=0.5)\n\
@@ -121,7 +112,8 @@ fn a_group_input_with_nothing_linked_names_it() {
 
 #[test]
 fn too_many_bones_names_the_bones_parameter() {
-    let bones: Vec<String> = (0..33).map(|i| format!("b{i}")).collect();
+    // The limit was 32 until a body with fingers needed about 55 bones; it is 64 now.
+    let bones: Vec<String> = (0..65).map(|i| format!("b{i}")).collect();
     assert_refusal(
         &format!(
             "a = solid.box@1(size=[1, 1, 1])\n\

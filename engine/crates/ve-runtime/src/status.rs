@@ -35,9 +35,14 @@ fn xr_view_info(cameras: &Query<&StereoViews, With<XrCamera>>) -> serde_json::Va
     let left = stereo.eyes[0].world_from_view.w_axis.truncate();
     let right = stereo.eyes[1].world_from_view.w_axis.truncate();
     let head = (left + right) * 0.5;
+    let forward = stereo.eyes[0]
+        .world_from_view
+        .transform_vector3(bevy_math::Vec3::NEG_Z);
     json!({
         "eye_separation_m": left.distance(right),
         "head_position": [head.x, head.y, head.z],
+        // Which way the head faces, as a turn about up in radians (0 looks down -z; forward is (-sin, -cos)).
+        "head_yaw": (-forward.x).atan2(-forward.z),
         "viewports": [stereo.eyes[0].viewport, stereo.eyes[1].viewport],
     })
 }
@@ -49,14 +54,25 @@ fn render_counts() -> serde_json::Value {
     let counts = ve_render::last_frame_counts();
     let pass = |c: ve_render::PassCounts| json!({ "draws": c.draws, "triangles": c.triangles });
     let sets = ve_render::last_set_stats();
-    json!({
+    let mut result = json!({
         "main": pass(counts.main), "shadow": pass(counts.shadow), "depth": pass(counts.depth),
         // Retained instance sets: how many, their copies and chunks, and what the camera's culling kept.
         "sets": {
             "sets": sets.sets, "copies": sets.copies, "chunks": sets.chunks,
             "chunks_visible": sets.chunks_visible, "copies_visible": sets.copies_visible,
         },
-    })
+    });
+    #[cfg(any(feature = "bevy-webgl", feature = "bevy-webgpu"))]
+    {
+        let stats = ve_bevy::latest();
+        result["bevy"] = json!({
+            "entities": stats.entities,
+            "triangles": stats.triangles,
+            "set_entities": stats.sets_entities,
+            "frame": stats.frame,
+        });
+    }
+    result
 }
 
 /// The controllers as the app sees them, with where each hand's wand ended up in the world.
@@ -96,7 +112,9 @@ pub(crate) fn publish(
     viewer: Res<ViewerRig>,
     labelled: Query<(Entity, &Label, &Transform), With<Interactable>>,
     authored: Query<(Entity, &crate::projection::Authored)>,
+    textures: Res<ve_render::MaterialTextures>,
 ) {
+    let texture_report = textures.report();
     *frames += 1;
     let errors = ERRORS.with(|errors| errors.borrow().clone());
     let mut value = json!({
@@ -112,6 +130,15 @@ pub(crate) fn publish(
             "triangles": s.triangles,
         })),
         "render": render_counts(),
+        // The baked maps: counts and GPU bytes at 1024, 512 and 256 texels, the share of the budget, and what ASTC 6x6 would take.
+        "textures": {
+            "maps": texture_report.maps,
+            "bytes": texture_report.bytes,
+            "total_bytes": texture_report.total_bytes,
+            "budget_bytes": texture_report.budget_bytes,
+            "used_fraction": texture_report.used_fraction,
+            "astc_6x6_estimate_bytes": texture_report.astc_6x6_estimate_bytes,
+        },
         "interact": interact::report(&interaction, &labelled),
         "viewer": viewer.report(),
         "quality": {
@@ -124,6 +151,8 @@ pub(crate) fn publish(
             "ssao": quality.ssao_enabled,
             "bloom": quality.bloom_enabled,
             "auto_exposure": quality.auto_exposure_enabled,
+            "smaa": quality.smaa_enabled,
+            "effects": ve_render::Effects::NAMES.iter().map(|name| ((*name).to_owned(), quality.effects.get(name).unwrap_or(false))).collect::<std::collections::BTreeMap<_, _>>(),
         },
         "xr": {
             "state": format!("{:?}", ve_xr_web::session_state()),

@@ -37,6 +37,22 @@ pub struct SkyBackground {
     pub cloud_cover: f32,
     /// Stable cloud hash seed.
     pub seed: u32,
+    /// Distance haze from the document (`haze`, 0 clear to 1 thick fog); added to the haze the turbidity already gives.
+    pub haze: f32,
+    /// sRGB colour of the distance haze (`haze_color`).
+    pub haze_color: [f32; 3],
+    /// Height in metres over which ground haze thins (`haze_height`); above zero a fog volume hugs the ground.
+    pub haze_height: f32,
+    /// Strength of the sunlight shafts through haze (`light_shafts`, 0 to 1), drawn by Bevy's volumetric fog.
+    pub shafts: f32,
+    /// Depth of field: the focus distance in metres (`focus_distance`); 0 is off.
+    pub focus_distance: f32,
+    /// Depth of field aperture in f-stops (`aperture`).
+    pub aperture: f32,
+    /// Motion blur strength (`motion_blur`, 0 off to 1).
+    pub motion_blur: f32,
+    /// Screen-space contact shadows (`contact_shadows`).
+    pub contact_shadows: bool,
 }
 
 impl Default for SkyBackground {
@@ -52,6 +68,14 @@ impl Default for SkyBackground {
             clouds: false,
             cloud_cover: 0.0,
             seed: 0,
+            haze: 0.0,
+            haze_color: [0.72, 0.78, 0.86],
+            haze_height: 0.0,
+            shafts: 0.0,
+            focus_distance: 0.0,
+            aperture: 2.8,
+            motion_blur: 0.0,
+            contact_shadows: false,
         }
     }
 }
