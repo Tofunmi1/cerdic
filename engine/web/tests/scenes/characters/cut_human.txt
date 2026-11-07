@@ -1,0 +1,51 @@
+# A HEROINE FROM THE REAL BODY, CUT INTO RIGID SEGMENTS (no skinning): the human pack's body is sliced by boxes at the joints, each segment is its own part on a joint hierarchy,
+# and a sphere at every joint hides the seam when it bends. Because nothing is skinned, the game can place and move her anywhere.
+sky = scene.sky@1(sun_elevation=28, sun_azimuth=30, sun_intensity=4, turbidity=3, clouds=false, contact_shadows=true)
+output sky = sky
+floor_g = solid.box@1(size=[8, 0.2, 8])
+floor_a = xform.move@1(floor_g, by=[0, -0.1, 0])
+floor_m = solid.material@1(floor_a, color=[0.35, 0.33, 0.32], roughness=0.8)
+output floor = floor_m
+
+hbody = body.human@1(gender=0.85, age=0.667, height=0.5, weight=0.42, muscle=0.62, caucasian=0.5, asian=0.2, african=0.3)
+body = poly.to_solid@1(hbody)
+
+# a segment: the body clipped by a box (min and max corners), toon skin, hung from its parent
+def seg(tag, par, x0, y0, z0, x1, y1, z1)
+  sg_{tag}_b = solid.box@1(size=[{x1 - x0}, {y1 - y0}, {z1 - z0}])
+  sg_{tag}_c = xform.move@1(sg_{tag}_b, by=[{(x0 + x1) / 2}, {(y0 + y1) / 2}, {(z0 + z1) / 2}])
+  sg_{tag}_i = solid.intersect@1(body, sg_{tag}_c)
+  sg_{tag}_m = solid.material@1(sg_{tag}_i, color=[0.86, 0.64, 0.52], roughness=0.5)
+  sg_{tag}_t = solid.toon@1(sg_{tag}_m, bands=3, feather=0.2, outline=1.0, shade_color=[0.93, 0.7, 0.66], rim=0.25, outline_color=[0.2, 0.08, 0.06])
+  sg_{tag}_p = anim.parent@1(sg_{tag}_t, parent={par})
+  output {tag} = sg_{tag}_p
+end
+# a joint cover: a skin sphere
+def joint(tag, par, x, y, z, r)
+  jt_{tag}_s = solid.sphere@1(radius={r}, segments=20)
+  jt_{tag}_a = xform.move@1(jt_{tag}_s, by=[{x}, {y}, {z}])
+  jt_{tag}_m = solid.material@1(jt_{tag}_a, color=[0.86, 0.64, 0.52], roughness=0.5)
+  jt_{tag}_t = solid.toon@1(jt_{tag}_m, bands=3, feather=0.2, outline=1.0, shade_color=[0.93, 0.7, 0.66], rim=0.25, outline_color=[0.2, 0.08, 0.06])
+  jt_{tag}_p = anim.parent@1(jt_{tag}_t, parent={par})
+  output j_{tag} = jt_{tag}_p
+end
+
+rt_s = solid.sphere@1(radius=0.01, segments=8)
+rt_a = xform.move@1(rt_s, by=[0, 0.95, 0])
+rt_m = solid.material@1(rt_a, color=[0.2, 0.2, 0.2], roughness=0.5)
+output root = rt_m
+seg("pelvis", "root", -0.3, 0.74, -0.3, 0.3, 1.02, 0.3)
+seg("chest", "pelvis", -0.145, 1.02, -0.3, 0.145, 1.56, 0.3)
+seg("head", "chest", -0.3, 1.56, -0.3, 0.3, 2.0, 0.3)
+seg("uarm_l", "chest", 0.145, 1.1, -0.3, 0.364, 1.6, 0.3)
+seg("farm_l", "uarm_l", 0.364, 0.95, -0.3, 0.488, 1.5, 0.3)
+seg("hand_l", "farm_l", 0.488, 0.8, -0.3, 0.9, 1.4, 0.4)
+seg("uarm_r", "chest", -0.364, 1.1, -0.3, -0.145, 1.6, 0.3)
+seg("farm_r", "uarm_r", -0.488, 0.95, -0.3, -0.364, 1.5, 0.3)
+seg("hand_r", "farm_r", -0.9, 0.8, -0.3, -0.488, 1.4, 0.4)
+seg("thigh_l", "pelvis", 0.0, 0.521, -0.3, 0.4, 0.74, 0.3)
+seg("shin_l", "thigh_l", 0.0, 0.1, -0.3, 0.4, 0.521, 0.3)
+seg("foot_l", "shin_l", 0.0, -0.05, -0.3, 0.4, 0.1, 0.4)
+seg("thigh_r", "pelvis", -0.4, 0.521, -0.3, 0.0, 0.74, 0.3)
+seg("shin_r", "thigh_r", -0.4, 0.1, -0.3, 0.0, 0.521, 0.3)
+seg("foot_r", "shin_r", -0.4, -0.05, -0.3, 0.0, 0.1, 0.4)

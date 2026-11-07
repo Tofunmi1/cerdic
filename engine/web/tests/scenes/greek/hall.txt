@@ -1,0 +1,267 @@
+# THE HALL OF ATHENA: an ancient Greek temple interior, built only with the language's own nodes (revolve, booleans, arrays, instances, lights, particles, GI).
+# Axis runs along +z: the door is at z=-22.6, the goddess stands at the far end (z=+19.6). Metres, y up. Sun comes in through the door and the roof opening.
+sky = scene.sky@1(sun_elevation=26, sun_azimuth=170, sun_intensity=6, turbidity=3, clouds=false, contact_shadows=true)
+output sky = sky
+
+# ---------- materials as texture programs (one marble, one limestone, one floor) ----------
+let marble = "albedo = expr(code=\"n = fbm(vec2(p.x * 7.0, p.y * 7.0)); v = abs(fbm(vec2(p.x * 3.0 + n * 1.6, p.y * 3.0 + n)) - 0.5); vein = 1.0 - smoothstep(0.0, 0.035, v); out = vec4(mix(vec3(0.93, 0.9, 0.84), vec3(0.5, 0.47, 0.45), vein * 0.45) * (0.93 + 0.1 * n), 1.0)\"); roughness = expr(code=\"out = vec4(vec3(0.38), 1.0)\")"
+let lime = "albedo = expr(code=\"n = fbm(vec2(p.x * 16.0, p.y * 16.0)); m = fbm(vec2(p.x * 60.0, p.y * 60.0)); out = vec4(mix(vec3(0.74, 0.68, 0.58), vec3(0.86, 0.8, 0.7), n) * (0.9 + 0.2 * m), 1.0)\"); roughness = expr(code=\"out = vec4(vec3(0.82), 1.0)\")"
+let slabs = "albedo = expr(code=\"u = p.x * 9.6; v = p.y * 22.6; h = hash(vec2(floor(u), floor(v))); e = min(min(fract(u), 1.0 - fract(u)), min(fract(v), 1.0 - fract(v))); j = smoothstep(0.0, 0.025, e); n = fbm(vec2(p.x * 20.0 + h * 9.0, p.y * 46.0)); vein = 1.0 - smoothstep(0.0, 0.04, abs(fbm(vec2(p.x * 8.0 + h * 5.0, p.y * 19.0 + n)) - 0.5)); c = mix(vec3(0.86, 0.82, 0.74), vec3(0.94, 0.9, 0.82), h) - vein * 0.1; inlay = step(abs(p.x - 0.5), 0.035); band = step(abs(abs(p.x - 0.5) - 0.42), 0.012); c = mix(c, vec3(0.45, 0.12, 0.08), inlay); c = mix(c, vec3(0.1, 0.16, 0.34), band); out = vec4(c * (0.55 + 0.45 * j), 1.0)\"); roughness = expr(code=\"n = fbm(vec2(p.x * 30.0, p.y * 70.0)); out = vec4(vec3(0.22 + 0.25 * n), 1.0)\")"
+
+# ---------- floor, outside court ----------
+flr_b = solid.box@1(size=[19.2, 0.4, 45.2])
+flr_m = solid.material@1(flr_b, color=[1, 1, 1], roughness=0.3)
+flr_t = solid.texture@1(flr_m, program="${slabs}", tile=0, size="1024")
+flr_p = xform.move@1(flr_t, by=[0, -0.2, 0])
+output floor = flr_p
+out_b = solid.box@1(size=[80, 0.4, 70])
+out_m = solid.material@1(out_b, color=[1, 1, 1], roughness=0.9)
+out_t = solid.texture@1(out_m, program="${lime}", tile=0, size="1024")
+out_p = xform.move@1(out_t, by=[0, -0.2, -58.2])
+output court = out_p
+
+# ---------- walls: side walls carved with recessed panels, door wall, back wall with the niche ----------
+wl_b = solid.box@1(size=[1.2, 10.6, 45.2])
+wl_c = xform.move@1(wl_b, by=[-10.2, 5.3, 0])
+pn_b = solid.box@1(size=[0.35, 4.8, 3.2])
+pn_c = xform.move@1(pn_b, by=[-9.6, 4.0, -15.75])
+pn_a = xform.array@1(pn_c, count_x=1, count_y=1, count_z=8, spacing=[0, 0, 4.5])
+wl_d = solid.difference@1(wl_c, pn_a)
+wl_m = solid.material@1(wl_d, color=[1, 1, 1], roughness=0.85)
+wl_t = solid.texture@1(wl_m, program="${lime}", tile=0, size="1024")
+output wall_left = wl_t
+wl_r = xform.mirror@1(wl_t, axis="x")
+output wall_right = wl_r
+
+dw_b = solid.box@1(size=[21.6, 10.6, 1.2])
+dw_c = xform.move@1(dw_b, by=[0, 5.3, -22.6])
+dw_o = solid.box@1(size=[5.0, 7.4, 3.0])
+dw_p = xform.move@1(dw_o, by=[0, 3.7, -22.6])
+dw_d = solid.difference@1(dw_c, dw_p)
+dw_m = solid.material@1(dw_d, color=[1, 1, 1], roughness=0.85)
+dw_t = solid.texture@1(dw_m, program="${lime}", tile=0, size="1024")
+output wall_door = dw_t
+
+bw_b = solid.box@1(size=[21.6, 10.6, 3.0])
+bw_c = xform.move@1(bw_b, by=[0, 5.3, 24.1])
+bn_b = solid.box@1(size=[9.0, 9.4, 2.6])
+bn_c = xform.move@1(bn_b, by=[0, 4.7, 23.5])
+bw_d = solid.difference@1(bw_c, bn_c)
+bw_m = solid.material@1(bw_d, color=[1, 1, 1], roughness=0.85)
+bw_t = solid.texture@1(bw_m, program="${lime}", tile=0, size="1024")
+output wall_back = bw_t
+
+# door frame: jambs, lintel, cornice in marble
+jb_b = solid.box@1(size=[0.7, 7.4, 1.5])
+jb_l = xform.move@1(jb_b, by=[-2.85, 3.7, -22.6])
+jb_r = xform.mirror@1(jb_l, axis="x")
+lt_b = solid.box@1(size=[6.8, 0.7, 1.5])
+lt_p = xform.move@1(lt_b, by=[0, 7.75, -22.6])
+lc_b = solid.box@1(size=[7.4, 0.25, 1.9])
+lc_p = xform.move@1(lc_b, by=[0, 8.22, -22.6])
+df_1 = solid.union@1(jb_l, jb_r)
+df_2 = solid.union@1(df_1, lt_p)
+df_3 = solid.union@1(df_2, lc_p)
+df_m = solid.material@1(df_3, color=[1, 1, 1], roughness=0.4)
+df_t = solid.texture@1(df_m, program="${marble}", tile=0, size="1024")
+output door_frame = df_t
+
+# ---------- ceiling: a slab with 189 coffers and a skylight opening ----------
+ce_b = solid.box@1(size=[21.6, 1.0, 47.6])
+ce_c = xform.move@1(ce_b, by=[0, 10.0, 0])
+cf_b = solid.box@1(size=[1.7, 0.5, 1.7])
+cf_c = xform.move@1(cf_b, by=[-8.4, 9.5, -21])
+cf_a = xform.array@1(cf_c, count_x=9, count_y=1, count_z=7, spacing=[2.1, 0, 2.1])
+cf_d = xform.move@1(cf_c, by=[0, 0, 14.7])
+cf_e = xform.array@1(cf_d, count_x=9, count_y=1, count_z=7, spacing=[2.1, 0, 2.1])
+cf_f = xform.move@1(cf_c, by=[0, 0, 29.4])
+cf_g = xform.array@1(cf_f, count_x=9, count_y=1, count_z=7, spacing=[2.1, 0, 2.1])
+op_b = solid.box@1(size=[5.0, 3.0, 8.0])
+op_c = xform.move@1(op_b, by=[0, 10.0, -2])
+ce_d1 = solid.difference@1(ce_c, cf_a, op_c)
+ce_d2 = solid.difference@1(ce_d1, cf_e)
+ce_d = solid.difference@1(ce_d2, cf_g)
+ce_m = solid.material@1(ce_d, color=[1, 1, 1], roughness=0.6)
+ce_t = solid.texture@1(ce_m, program="${lime}", tile=0, size="1024")
+output ceiling = ce_t
+
+# ---------- the Ionic column: fluted shaft with entasis, scotia base, volute capital ----------
+sh_p = profile.polygon@1(points=[[0.0, 0.35], [0.58, 0.35], [0.6, 0.9], [0.595, 2.5], [0.56, 4.5], [0.5, 6.5], [0.47, 7.0], [0.0, 7.0]])
+sh_s = solid.revolve@1(sh_p, angle=360deg, segments=48)
+fln_c = solid.cylinder@1(radius=0.055, height=6.3, segments=10)
+fln_r = xform.rotate@1(fln_c, angles=[0, 0, 1.1])
+fln_m = xform.move@1(fln_r, by=[0, 3.7, 0])
+fln_a = xform.radial@1(fln_m, count=20, radius=0.585)
+sh_d = solid.difference@1(sh_s, fln_a)
+bs_p = solid.box@1(size=[1.5, 0.14, 1.5])
+bs_a = xform.move@1(bs_p, by=[0, 0.07, 0])
+bt_1 = solid.torus@1(major=0.64, minor=0.09, segments=40, tube_segments=10)
+bt_2 = xform.move@1(bt_1, by=[0, 0.22, 0])
+bt_3 = solid.torus@1(major=0.59, minor=0.055, segments=40, tube_segments=8)
+bt_4 = xform.move@1(bt_3, by=[0, 0.33, 0])
+ec_p = profile.polygon@1(points=[[0.0, 7.0], [0.47, 7.0], [0.5, 7.1], [0.6, 7.28], [0.68, 7.38], [0.0, 7.38]])
+ec_s = solid.revolve@1(ec_p, angle=360deg, segments=40)
+bo_b = solid.box@1(size=[0.55, 0.2, 1.55])
+bo_p = xform.move@1(bo_b, by=[0, 7.5, 0])
+vo_t = solid.torus@1(major=0.2, minor=0.09, segments=32, tube_segments=12)
+vo_r = xform.rotate@1(vo_t, angles=[0, 0, 90])
+vo_a = xform.move@1(vo_r, by=[0, 7.5, 0.7])
+vo_b = xform.move@1(vo_r, by=[0, 7.5, -0.7])
+ab_b = solid.box@1(size=[1.3, 0.14, 1.3])
+ab_p = xform.move@1(ab_b, by=[0, 7.76, 0])
+cl_1 = solid.union@1(sh_d, bs_a)
+cl_2 = solid.union@1(cl_1, bt_2)
+cl_3 = solid.union@1(cl_2, bt_4)
+cl_4 = solid.union@1(cl_3, ec_s)
+cl_5 = solid.union@1(cl_4, bo_p)
+cl_6 = solid.union@1(cl_5, vo_a)
+cl_7 = solid.union@1(cl_6, vo_b)
+cl_8 = solid.union@1(cl_7, ab_p)
+col_m = solid.material@1(cl_8, color=[1, 1, 1], roughness=0.4)
+col_t = solid.texture@1(col_m, program="${marble}", tile=0, size="1024")
+let cpos = join(i in 0..9, "[-5.4, 0, {-18 + i * 4.5}], [5.4, 0, {-18 + i * 4.5}]")
+col_i = inst.place@1(col_t, at=[${cpos}])
+output columns = col_i
+
+# ---------- entablature: architrave, triglyph frieze, cornice, both sides ----------
+ar_b = solid.box@1(size=[1.0, 1.0, 38.0])
+ar_p = xform.move@1(ar_b, by=[-5.4, 8.32, 0])
+fr_b = solid.box@1(size=[0.7, 0.7, 38.0])
+fr_p = xform.move@1(fr_b, by=[-5.4, 9.17, 0])
+co_b = solid.box@1(size=[1.3, 0.18, 38.6])
+co_p = xform.move@1(co_b, by=[-5.4, 9.58, 0])
+en_1 = solid.union@1(ar_p, fr_p)
+en_2 = solid.union@1(en_1, co_p)
+en_m = solid.material@1(en_2, color=[1, 1, 1], roughness=0.4)
+en_t = solid.texture@1(en_m, program="${marble}", tile=0, size="1024")
+output entablature_l = en_t
+en_r = xform.mirror@1(en_t, axis="x")
+output entablature_r = en_r
+tg_b = solid.box@1(size=[0.12, 0.6, 0.4])
+tg_p = xform.move@1(tg_b, by=[-5.0, 9.17, -18])
+tg_a = xform.array@1(tg_p, count_x=1, count_y=1, count_z=17, spacing=[0, 0, 2.25])
+tg_m = solid.material@1(tg_a, color=[0.04, 0.1, 0.3], roughness=0.5)
+output triglyphs_l = tg_m
+tg_r = xform.mirror@1(tg_m, axis="x")
+output triglyphs_r = tg_r
+
+# ---------- the dais and pedestal in the apse ----------
+ds_1 = solid.box@1(size=[9.0, 0.3, 6.0])
+ds_a = xform.move@1(ds_1, by=[0, 0.15, 19.6])
+ds_2 = solid.box@1(size=[7.4, 0.3, 5.0])
+ds_b = xform.move@1(ds_2, by=[0, 0.45, 19.6])
+ds_3 = solid.box@1(size=[6.0, 0.3, 4.2])
+ds_c = xform.move@1(ds_3, by=[0, 0.75, 19.6])
+pd_b = solid.box@1(size=[3.4, 1.4, 3.0])
+pd_p = xform.move@1(pd_b, by=[0, 1.6, 19.6])
+pd_1 = solid.union@1(ds_a, ds_b)
+pd_2 = solid.union@1(pd_1, ds_c)
+pd_3 = solid.union@1(pd_2, pd_p)
+pd_m = solid.material@1(pd_3, color=[1, 1, 1], roughness=0.4)
+pd_t = solid.texture@1(pd_m, program="${marble}", tile=0, size="1024")
+output dais = pd_t
+
+# ---------- the statue of Athena: a real body.human in white marble, a fluted peplos, golden helmet, spear, shield; about 6 m tall ----------
+zbody = body.human@1(gender=0.92, age=0.6, height=0.5, weight=0.35, muscle=0.35, caucasian=0.7, asian=0.1, african=0.2)
+# the peplos: the real body sampled into a distance field, grown a hair, cut to the torso, blended into a flared skirt, turned back into a mesh
+rb_p = profile.polygon@1(points=[[0.0, 0.0], [0.3, 0.0], [0.32, 0.1], [0.3, 0.5], [0.25, 0.95], [0.21, 1.15], [0.0, 1.15]])
+rb_s0 = solid.revolve@1(rb_p, angle=360deg, segments=56)
+rb_q = xform.scale@1(rb_s0, by=[1.0, 1.0, 0.8])
+vb_a = volume.from_mesh@1(zbody, voxel_size=0.014, band=6)
+vb_o = volume.offset@1(vb_a, distance=0.014)
+bx_s = solid.box@1(size=[0.42, 1.45, 0.6])
+bx_m = xform.move@1(bx_s, by=[0, 0.725, 0])
+vb_x = volume.from_mesh@1(bx_m, voxel_size=0.014, band=6)
+vb_t = volume.combine@1(vb_o, vb_x, operation="intersect")
+vs_a = volume.from_mesh@1(rb_q, voxel_size=0.014, band=6)
+vg_u = volume.combine@1(vb_t, vs_a, operation="union", blend=0.04)
+vg_m = volume.to_mesh@1(vg_u)
+vg_s = poly.to_solid@1(vg_m)
+rf_c = solid.cylinder@1(radius=0.028, height=1.0, segments=8)
+rf_r = xform.rotate@1(rf_c, angles=[0, 0, 10])
+rf_m = xform.move@1(rf_r, by=[0, 0.5, 0])
+rf_a = xform.radial@1(rf_m, count=30, radius=0.305)
+rf_q = xform.scale@1(rf_a, by=[1.0, 1.0, 0.8])
+zrobe = solid.difference@1(vg_s, rf_q)
+zbelt_t = solid.torus@1(major=0.225, minor=0.022, segments=40, tube_segments=8)
+zbelt_q = xform.scale@1(zbelt_t, by=[1.0, 1.0, 0.85])
+zbelt = xform.move@1(zbelt_q, by=[0, 1.2, 0])
+hm_s = solid.sphere@1(radius=0.1, segments=28)
+hm_m = xform.move@1(hm_s, by=[0, 1.7, 0.035])
+hm_c = solid.box@1(size=[0.6, 0.5, 0.6])
+hm_k = xform.move@1(hm_c, by=[0, 1.45, 0.035])
+zhelmet = solid.difference@1(hm_m, hm_k)
+cr_a = curve.bezier@1(points=[[0, 1.78, 0.09], [0, 1.88, 0.05], [0, 1.9, -0.05], [0, 1.8, -0.13]], steps=20)
+cr_p = profile.rect@1(size=[0.02, 0.08])
+zcrest = solid.sweep@1(cr_a, cr_p, scale_end=0.5)
+sp_c = solid.cylinder@1(radius=0.014, height=2.7, segments=12)
+zspear = xform.move@1(sp_c, by=[-0.488, 1.5, 0.187])
+st_c = solid.cone@1(radius=0.03, top_radius=0.0, height=0.22, segments=12)
+zspearhead = xform.move@1(st_c, by=[-0.488, 2.96, 0.187])
+sd_s = solid.sphere@1(radius=0.42, segments=32)
+sd_q = xform.scale@1(sd_s, by=[0.1, 1.0, 1.0])
+zshield = xform.move@1(sd_q, by=[0.64, 0.5, 0.12])
+sb_s = solid.sphere@1(radius=0.07, segments=16)
+zboss = xform.move@1(sb_s, by=[0.7, 0.5, 0.12])
+def stat(tag)
+  zs_{tag}_r = xform.rotate@1(z{tag}, angles=[0, 180, 0])
+  zs_{tag}_s = xform.scale@1(zs_{tag}_r, by=[3.5, 3.5, 3.5])
+  zs_{tag}_m = xform.move@1(zs_{tag}_s, by=[0, 2.3, 19.6])
+end
+stat("body")
+stat("robe")
+stat("belt")
+stat("helmet")
+stat("crest")
+stat("spear")
+stat("spearhead")
+stat("shield")
+stat("boss")
+sk_m = solid.material@1(zs_body_m, color=[0.97, 0.94, 0.88], roughness=0.35)
+sk_f = solid.finish@1(sk_m, subsurface=0.5)
+output athena_body = sk_f
+rr_m = solid.material@1(zs_robe_m, color=[0.95, 0.92, 0.86], roughness=0.4)
+output athena_robe = rr_m
+let goldprog = "albedo = expr(code=\"out = vec4(1.0, 0.76, 0.3, 1.0)\")"
+gd_1 = solid.union@1(zs_belt_m, zs_helmet_m)
+gd_2 = solid.union@1(gd_1, zs_crest_m)
+gd_3 = solid.union@1(gd_2, zs_spearhead_m)
+gd_4 = solid.union@1(gd_3, zs_shield_m)
+gd_5 = solid.union@1(gd_4, zs_boss_m)
+gd_m = solid.material@1(gd_5, color=[1.0, 0.8, 0.38], metallic=0.75, roughness=0.32)
+output athena_gold = gd_m
+sw_m = solid.material@1(zs_spear_m, color=[0.35, 0.22, 0.1], roughness=0.6)
+output athena_spear = sw_m
+
+# ---------- braziers: bronze tripod bowls with real fire and a warm light each ----------
+bz_p = profile.polygon@1(points=[[0.0, 0.88], [0.1, 0.88], [0.28, 1.04], [0.36, 1.18], [0.32, 1.18], [0.27, 1.1], [0.0, 1.0]])
+bz_s = solid.revolve@1(bz_p, angle=360deg, segments=32)
+lg_c = solid.cylinder@1(radius=0.025, height=0.95, segments=8)
+lg_r = xform.rotate@1(lg_c, angles=[0, 0, 12])
+lg_m = xform.move@1(lg_r, by=[0, 0.45, 0])
+lg_a = xform.radial@1(lg_m, count=3, radius=0.2)
+bz_u = solid.union@1(bz_s, lg_a)
+bz_m = solid.material@1(bz_u, color=[0.5, 0.32, 0.14], metallic=0.9, roughness=0.4)
+fl_s = solid.cone@1(radius=0.2, top_radius=0.0, height=0.5, segments=16)
+fl_m = solid.material@1(fl_s, color=[1, 0.6, 0.2], roughness=0.5, emissive=[4.0, 1.6, 0.3])
+def brazier(tag, bx, bz)
+  bzm_{tag} = xform.move@1(bz_m, by=[{bx}, 0, {bz}])
+  output brazier_{tag} = bzm_{tag}
+  bfm_{tag} = xform.move@1(fl_m, by=[{bx}, 1.1, {bz}])
+  bfe_{tag} = fx.emitter@1(bfm_{tag}, name="fire_${tag}", rate=45, lifetime=[0.5, 1.1], speed=[0.8, 1.7], direction=[0, 1, 0], cone=14, shape="sphere", extent=[0.12, 0.12, 0.12], max_particles=200, size=[0.3, 0.05], colour=[1.0, 0.8, 0.3], colour_end=[1.0, 0.2, 0.02], alpha=[0.9, 0], glow=4, blend="additive")
+  output flame_{tag} = bfe_{tag}
+  blp_{tag} = light.point@1(position=[{bx}, 1.7, {bz}], color=[1.0, 0.55, 0.22], intensity=45, range=9)
+  output lamp_{tag} = blp_{tag}
+end
+brazier("a", -3.2, 16.8)
+brazier("b", 3.2, 16.8)
+brazier("e", -7.6, -8)
+brazier("f", 7.6, -8)
+
+# ---------- the goddess's own light, and drifting dust in the sun shaft ----------
+athena_spot = light.spot@1(position=[0, 9.2, 14.5], direction=[0, -0.73, 0.68], color=[1.0, 0.85, 0.65], intensity=250, range=20, inner_angle=0.5, outer_angle=0.9)
+output athena_light = athena_spot
+dm_b = solid.box@1(size=[0.02, 0.02, 0.02])
+dm_p = xform.move@1(dm_b, by=[0, 5, -2])
+dm_e = fx.emitter@1(dm_p, name="dust", rate=60, lifetime=[5, 9], speed=[0.02, 0.08], direction=[0, 1, 0], cone=80, shape="box", extent=[3.5, 4.5, 4.5], max_particles=500, size=[0.035, 0.03], colour=[1.0, 0.92, 0.75], colour_end=[1.0, 0.9, 0.7], alpha=[0.7, 0], glow=1.5, blend="additive")
+output dust = dm_e

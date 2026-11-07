@@ -1,4 +1,3 @@
-
 /// One fixed step of the walker, steered by the keys.
 fn walk_step(world: &mut World, walking: &mut Walking, rig: &ViewerRig) {
     let Some(input) = rig.walk_input() else {
@@ -66,6 +65,8 @@ fn build(
             restitution: spec.restitution,
             linear_damping: spec.linear_damping,
             angular_damping: spec.angular_damping,
+            layers: ve_physics::Layers::default(),
+            sensor: false,
         };
         // A body that cannot be built (a shape with no volume) is left out rather than failing the scene.
         let id = match world.add(&desc) {
@@ -92,11 +93,16 @@ fn build(
 
 /// Adds every body's joints now that all bodies exist: a joint names the other part by its output name.
 fn connect(world: &mut World, live: &[Live], refused: &mut Vec<String>) {
+    connect_from(world, live, 0, refused);
+}
+
+/// Adds the joints of the bodies from number `first` on (the ones just added to a running world); a joint may name any body.
+fn connect_from(world: &mut World, live: &[Live], first: usize, refused: &mut Vec<String>) {
     let by_name: BTreeMap<&str, BodyId> = live
         .iter()
         .map(|body| (body.spec.name.as_str(), body.id))
         .collect();
-    for body in live {
+    for body in &live[first..] {
         for joint in &body.spec.joints {
             let other = if joint.to.is_empty() {
                 Some(None)
@@ -149,6 +155,9 @@ fn joint_desc(a: BodyId, b: Option<BodyId>, joint: &PhysJoint) -> JointDesc {
         motor_speed: angle(joint.motor_speed),
         motor_force: f(joint.motor_force),
         rest_length: f(joint.rest_length),
+        // Graph ball joints are free sockets; limited ones come from `phys.ragdoll`.
+        swing: None,
+        twist: None,
     }
 }
 
@@ -191,7 +200,10 @@ pub(crate) fn run(
     mut physics: ResMut<Physics>,
     mut parts: Query<(Entity, &Body, &mut Transform)>,
     mut rig: ResMut<ViewerRig>,
+    rigs: Query<&RagdollRig>,
+    prototypes: Prototypes,
 ) {
-    advance(&mut behaviors, &mut physics, &mut parts, &mut rig);
+    physics.rigs = rigs.iter().count();
+    advance(&mut behaviors, &mut physics, &mut parts, &mut rig, &prototypes);
     PUBLISHED.with(|text| *text.borrow_mut() = state(&physics));
 }

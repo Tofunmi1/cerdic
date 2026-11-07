@@ -14,6 +14,15 @@ const MEASURES: &[&str] = &[
     "width", "height", "depth", "longest", "shortest", "volume", "area",
 ];
 
+/// The places `value.point` can read.
+const POINTS: &[&str] = &["head", "tail", "min", "center", "max"];
+
+/// What `value.motion` can measure.
+const MOTIONS: &[&str] = &["travel", "path", "duration", "speed", "lift"];
+
+/// The coordinates `value.point` can read.
+const AXES: &[&str] = &["x", "y", "z"];
+
 /// What `value.math` can do.
 const MATH_OPS: &[&str] = &["add", "sub", "mul", "div", "min", "max", "pow", "mod"];
 
@@ -62,6 +71,49 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
                     Some(0.0),
                     "The second number; link a value node here to compute from it.",
                 ),
+            ],
+        ),
+        spec(
+            "value.point@1",
+            "Reads a place on a part as a number: the head (the joint it turns about) or the tail of a bone (body.bone, rig.bone), or the min, center or max of any solid or polygon mesh's bounding box, along x, y or z. Link it into a number parameter, one component at a time (for example `by.y=hy` or `position.x=hx`), so one part is placed from where another is. A part that is not a bone has no head or tail.",
+            vec![single("in", &[PortType::Solid, PortType::Poly])],
+            out,
+            vec![
+                ParamSpec {
+                    name: "at",
+                    ty: ParamType::Choice { options: POINTS },
+                    default: Some(Value::Str("center".to_owned())),
+                    doc: "Which place: head or tail (a bone's joint and far end), or min, center, max (the corners and middle of the bounding box).",
+                },
+                ParamSpec {
+                    name: "axis",
+                    ty: ParamType::Choice { options: AXES },
+                    default: Some(Value::Str("y".to_owned())),
+                    doc: "Which coordinate to read: x, y or z (y is up).",
+                },
+            ],
+        ),
+        spec(
+            "value.motion@1",
+            "Measures how far a clip moves a part, from its position tracks (anim.track property=position): the straight horizontal `travel` from the first key to the last, the horizontal `path` length, the `duration` in seconds, the `speed` (travel over duration) and the vertical `lift` (highest minus lowest). Use it to read the real speed of a walk or a dash instead of guessing: link `speed` into a state machine's walk threshold or a game unit's speed, or `travel` into how far a part should be placed. `clip` names the clip (empty is the part's main clip). The part must be linked after the track.",
+            vec![single(
+                "in",
+                &[PortType::Solid, PortType::Poly, PortType::Inst],
+            )],
+            out,
+            vec![
+                ParamSpec {
+                    name: "measure",
+                    ty: ParamType::Choice { options: MOTIONS },
+                    default: Some(Value::Str("travel".to_owned())),
+                    doc: "What to read: travel (straight horizontal distance, metres), path (horizontal path length), duration (seconds), speed (travel over duration, metres per second) or lift (vertical range, metres).",
+                },
+                ParamSpec {
+                    name: "clip",
+                    ty: ParamType::Str { max_len: 24 },
+                    default: Some(Value::Str(String::new())),
+                    doc: "The clip to read; empty reads the part's main clip.",
+                },
             ],
         ),
         spec(

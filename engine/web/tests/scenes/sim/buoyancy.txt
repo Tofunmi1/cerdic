@@ -1,0 +1,33 @@
+# BUOYANCY, both ways between a simulation program and physics. Each crate is a dynamic physics body; a SimL program reads the crate's pose
+# (`input bone crate`: a physics-moved part reads like a bone), works out how deep it sits below the water level, and pushes the crate back
+# up (`output push crate push`: the sum of the array is a change of speed each step). Nothing in the engine knows about water or boats.
+# The model kind is spawned three times: each copy gets its own physics body (crate#id) and its own program instance reading and pushing
+# that body. Press play: the crates drop, bob, and settle half under the surface.
+sky = scene.sky@1(sun_elevation=40, sun_azimuth=-30, sun_intensity=2.2, turbidity=2.5, ground_color=[0.2, 0.2, 0.2], clouds=false, haze=0.0)
+output sky = sky
+env = scene.environment@1(sky_color=[0.55, 0.65, 0.85], ground_color=[0.18, 0.17, 0.15], intensity=0.9, reflection=0.4)
+output env = env
+
+pool_s = solid.box@1(size=[24, 0.4, 24])
+pool_a = xform.move@1(pool_s, by=[0, -3, 0])
+pool_m = solid.material@1(pool_a, color=[0.3, 0.28, 0.25], roughness=0.95)
+output pool_floor = pool_m
+water_s = solid.box@1(size=[24, 0.1, 24])
+water_a = xform.move@1(water_s, by=[0, -0.05, 0])
+water_m = solid.material@1(water_a, color=[0.1, 0.35, 0.6], roughness=0.1)
+output water = water_m
+
+crate_s = solid.box@1(size=[0.6, 0.6, 0.6])
+crate_a = xform.move@1(crate_s, by=[0, 2.0, 0])
+crate_m = solid.material@1(crate_a, color=[0.6, 0.4, 0.15], roughness=0.7)
+crate_p = phys.body@1(crate_m, kind="dynamic", density=1, linear_damping=1.2, angular_damping=0.8)
+output crate = crate_p
+
+feel = sim.program@1(size=0.08, rate=60, source="sim buoyancy\nparam level = 0.0\nparam lift = 20.0\nparam half = 0.3\ninput bone crate\nstate probe: vec3[1]\nstate push: vec3[1]\nkernel feel each i in probe {\n  let c = bone_point(crate, vec3(0.0, 2.0, 0.0))\n  let under = clamp((level - c.y) / (2.0 * half) + 0.5, 0.0, 1.0)\n  probe[i] = c\n  push[i] = vec3(0.0, lift * under * dt, 0.0)\n}\nschedule feel\noutput particles probe\noutput push crate push\n")
+marker = solid.material@1(feel, color=[1, 1, 0.2], roughness=0.5)
+output probe = marker
+
+kc = game.kind@1(name="crates", size=1, part="crate", tags=["crate"])
+sc = game.spawn@1(kind="crates", at=[-3, 0, 0], count=3, spread=3)
+allc = game.collect@1(kc, sc, name="crates")
+output rules = allc

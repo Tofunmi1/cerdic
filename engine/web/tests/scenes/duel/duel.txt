@@ -1,0 +1,34 @@
+# A scripted duel: two fighters fight with the combat library (attack timelines, combos, hitstop, dodge, block and parry, poise) and the game UI
+# (health, stamina and poise bars drawn from procedural fonts), all driven by game.script (JavaScript inside the fixed step).
+sky = scene.sky@1(sun_elevation=35, sun_azimuth=40, ground_color=[0.2, 0.22, 0.25])
+ambient = scene.environment@1(sky_color=[0.6, 0.72, 0.9], ground_color=[0.25, 0.27, 0.3], intensity=0.5)
+floor_box = solid.box@1(size=[14, 0.2, 8])
+floor_at = xform.move@1(floor_box, by=[0, -0.1, 0])
+floor = solid.material@1(floor_at, color=[0.32, 0.27, 0.22], roughness=0.9, recipe="planks")
+output floor = floor
+
+def fighter(tag, r, g, b, h, w)
+  f{tag}_body = solid.box@1(size=[{w}, {h}, {w * 0.6}])
+  f{tag}_up = xform.move@1(f{tag}_body, by=[0, {h * 0.5 + 0.35}, 0])
+  f{tag}_head = solid.sphere@1(radius={w * 0.32}, segments=24)
+  f{tag}_hup = xform.move@1(f{tag}_head, by=[0, {h + 0.35 + w * 0.3}, 0])
+  f{tag}_legs = solid.box@1(size=[{w * 0.8}, 0.35, {w * 0.5}])
+  f{tag}_lup = xform.move@1(f{tag}_legs, by=[0, 0.175, 0])
+  f{tag}_u1 = solid.union@1(f{tag}_up, f{tag}_hup)
+  f{tag}_u2 = solid.union@1(f{tag}_u1, f{tag}_lup)
+  f{tag}_m = solid.material@1(f{tag}_u2, color=[{r}, {g}, {b}], roughness=0.5, metallic=0.3)
+  output {tag} = f{tag}_m
+end
+fighter("knight", 0.25, 0.4, 0.85, 1.0, 0.7)
+fighter("brute", 0.8, 0.3, 0.2, 1.3, 1.0)
+
+k_knight = game.kind@1(name="knight", size=0.5, speed=2, part="knight")
+k_brute = game.kind@1(name="brute", size=0.7, speed=2, part="brute")
+s_knight = game.spawn@1(kind="knight", at=[-4, 0, 0], heading=90)
+s_brute = game.spawn@1(kind="brute", at=[4, 0, 0], heading=-90)
+rpg_lib = game.script@1(lib="rpg")
+combat_lib = game.script@1(lib="combat")
+moves = game.script@1(name="moves", source="combat.attack_def('slash', { startup: 0.2, active: 0.12, recovery: 0.35, cancel_from: 0.1, next: 'slash2', cost: { stamina: 12 }, shape: { range: 1.7, arc: 110 }, damage: { amount: 18, poise: 12 }, hitstop: 0.08, knockback: 0.45, lunge: 0.3 }); combat.attack_def('slash2', { startup: 0.15, active: 0.12, recovery: 0.4, cost: { stamina: 14 }, shape: { range: 1.8, arc: 120 }, damage: { amount: 26, poise: 16 }, hitstop: 0.1, knockback: 0.6, lunge: 0.4 }); combat.attack_def('smash', { startup: 0.5, active: 0.15, recovery: 0.6, cost: { stamina: 25 }, shape: { range: 2.1, arc: 140 }, damage: { amount: 40, poise: 35 }, hitstop: 0.14, knockback: 1.0, lunge: 0.2 }); combat.dodge_def('roll', { duration: 0.4, i_frames: [0.0, 0.28], distance: 2.2, cost: { stamina: 18 } });")
+fight = game.script@1(name="fight", source="on('start', () => { const [a] = find('kind:knight'); const [b] = find('kind:brute'); rpg.actor(a, { attributes: { health: 100, max_health: 100, stamina: 70, max_stamina: 70, stamina_regen: 16, armor: 20, poise: 30, max_poise: 30, stagger_time: 1.2, block: 0.7 }, tags: ['team.a'] }); rpg.actor(b, { attributes: { health: 160, max_health: 160, stamina: 70, max_stamina: 70, stamina_regen: 12, armor: 30, poise: 60, max_poise: 60, stagger_time: 1.0, block: 0.5 }, tags: ['team.b'] }); state.ids = [a.id, b.id]; state.unblock = {}; state.trail = [100, 160]; }); on('tick', (e) => { const [a, b] = state.ids.map(entity); [[a, b, 2.4, 'slash', 0.03], [b, a, 1.8, 'smash', 0.02]].forEach(([u, t, speed, heavy, rate]) => { if (rpg.is_dead(u) || rpg.is_dead(t)) return; if (state.unblock[u.id] && e.tick >= state.unblock[u.id]) { combat.input(u, 'block_off'); state.unblock[u.id] = 0; } if (combat.frozen(u) || rpg.has_tag(u, 'state.staggered')) return; const dx = t.pos[0] - u.pos[0], dz = t.pos[2] - u.pos[2], dist = Math.hypot(dx, dz); if (!combat.busy(u)) u.heading = Math.atan2(dx, dz); if (combat.busy(u)) return; if (dist > 1.6) { u.pos = [u.pos[0] + dx / dist * speed / 60, 0, u.pos[2] + dz / dist * speed / 60]; return; } const r = Math.random(); if (combat.busy(t) && !state.unblock[u.id] && r < 0.05) { combat.input(u, 'block_on'); state.unblock[u.id] = e.tick + 30; } else if (r < rate) combat.input(u, heavy); else if (r < rate * 2.2) combat.input(u, 'slash'); else if (r < rate * 2.5) combat.input(u, 'roll'); }); const th = (id, v, i) => { state.trail[i] = Math.max(v, state.trail[i] - 0.4); return state.trail[i]; }; [[a, 'tl', 'KNIGHT', 0], [b, 'tr', 'BRUTE', 1]].forEach(([u, anchor, name, i]) => { const hp = rpg.get(u, 'health'); ui.text('n' + i, name, { anchor, size: 0.03, font: 'techno' }); ui.bar('h' + i, hp, rpg.get(u, 'max_health'), { anchor, at: [0, 0.045], size: [0.34, 0.03], trail: th(u.id, hp, i), color: 'rgb(217,74,74)' }); ui.bar('s' + i, rpg.get(u, 'stamina'), rpg.get(u, 'max_stamina'), { anchor, at: [0, 0.082], size: [0.34, 0.014], color: 'rgb(90,200,120)' }); ui.bar('p' + i, rpg.get(u, 'poise'), rpg.get(u, 'max_poise'), { anchor, at: [0, 0.1], size: [0.34, 0.01], color: 'rgb(110,160,230)' }); }); if (rpg.is_dead(a) || rpg.is_dead(b)) ui.text('banner', rpg.is_dead(b) ? 'KNIGHT WINS' : 'BRUTE WINS', { anchor: 'c', size: 0.09, font: 'bold', color: 'rgb(255,215,106)', plate: true }); });")
+all = game.collect@1(k_knight, k_brute, s_knight, s_brute, rpg_lib, combat_lib, moves, fight, name="duel")
+output rules = all

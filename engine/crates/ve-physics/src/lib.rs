@@ -4,7 +4,9 @@
 //! 1/60 s step and reads poses and contacts back. Every list that crosses the boundary is ordered by body id, so the
 //! result of a step is the same wherever it runs.
 mod joint;
+pub mod ragdoll;
 mod shape;
+pub mod vehicle;
 mod walker;
 mod world;
 
@@ -12,11 +14,12 @@ pub use joint::{JointDesc, JointKind, MAX_JOINTS};
 pub use shape::Shape;
 pub use walker::{WalkerDesc, WalkerState};
 pub use world::{Pose, World};
+pub use world::{RayHit, ShapeHit, SurfaceHit};
 
 /// Seconds per step: physics runs at the same fixed rate as behaviours.
 pub const STEP: f32 = 1.0 / 60.0;
 /// Most bodies in one world.
-pub const MAX_BODIES: usize = 256;
+pub const MAX_BODIES: usize = 4096;
 /// Most points in a convex or mesh shape.
 pub const MAX_SHAPE_POINTS: usize = 65_536;
 
@@ -29,6 +32,24 @@ pub enum Kind {
     Dynamic,
     /// Moved by the caller each step (a hand, an animated platform); pushes dynamic bodies but nothing pushes it.
     Kinematic,
+}
+
+/// Collision groups a body belongs to and accepts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Layers {
+    /// Bits identifying this body's groups.
+    pub member: u32,
+    /// Groups this body accepts.
+    pub mask: u32,
+}
+
+impl Default for Layers {
+    fn default() -> Self {
+        Self {
+            member: 1,
+            mask: u32::MAX,
+        }
+    }
 }
 
 /// A body to add to the world.
@@ -52,6 +73,10 @@ pub struct BodyDesc {
     pub linear_damping: f32,
     /// Fraction of spin lost per second.
     pub angular_damping: f32,
+    /// Collision group membership and interaction mask.
+    pub layers: Layers,
+    /// Whether this collider reports intersections without blocking bodies.
+    pub sensor: bool,
 }
 
 impl Default for BodyDesc {
@@ -66,6 +91,8 @@ impl Default for BodyDesc {
             restitution: 0.0,
             linear_damping: 0.0,
             angular_damping: 0.05,
+            layers: Layers::default(),
+            sensor: false,
         }
     }
 }

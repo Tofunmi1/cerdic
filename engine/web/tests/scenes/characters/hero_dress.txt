@@ -1,0 +1,73 @@
+# THE HEROINE'S CLOTHES, PLATES AND HAIR AS CONFORMING SHELLS OF HER OWN BODY (assemble after hero_cut.txt).
+# The real body is sampled into a distance field once (volume.from_mesh); a shell is the field grown by t1 minus the field grown by t0, meshed back to a solid (volume.to_mesh, poly.to_solid),
+# so a garment or a plate follows every curve of the body by construction. Each piece is the shell clipped by a box and hung on the segment it belongs to.
+hv = volume.from_mesh@1(hbody, voxel_size=0.008, band=8)
+def shellv(tag, t0, t1)
+  sv_{tag}_a = volume.offset@1(hv, distance={t1})
+  sv_{tag}_b = volume.offset@1(hv, distance={t0})
+  sv_{tag}_c = volume.combine@1(sv_{tag}_a, sv_{tag}_b, operation="subtract")
+  sv_{tag}_m = volume.to_mesh@1(sv_{tag}_c)
+  sh{tag} = poly.to_solid@1(sv_{tag}_m)
+end
+shellv("s", 0.002, 0.009)
+shellv("a", 0.008, 0.026)
+shellv("h", 0.004, 0.032)
+
+# tailored clothing: the suit shell clipped to a segment's box, in dark leather
+def suitp(tag, par, x0, y0, z0, x1, y1, z1)
+  su_{tag}_b = solid.box@1(size=[{x1 - x0}, {y1 - y0}, {z1 - z0}])
+  su_{tag}_c = xform.move@1(su_{tag}_b, by=[{(x0 + x1) / 2}, {(y0 + y1) / 2}, {(z0 + z1) / 2}])
+  su_{tag}_i = solid.intersect@1(shs, su_{tag}_c)
+  su_{tag}_m = solid.material@1(su_{tag}_i, color=[0.16, 0.11, 0.1], roughness=0.75, recipe="leather", texture_scale=12)
+  su_{tag}_t = solid.toon@1(su_{tag}_m, bands=3, feather=0.2, outline=1.1, shade_color=[0.5, 0.45, 0.62], rim=0.2, outline_color=[0.03, 0.02, 0.02])
+  su_{tag}_p = anim.parent@1(su_{tag}_t, parent={par})
+  output suit_{tag} = su_{tag}_p
+end
+# form-fitting steel plates: the armour shell clipped to a box
+def platep(tag, par, x0, y0, z0, x1, y1, z1)
+  pl_{tag}_b = solid.box@1(size=[{x1 - x0}, {y1 - y0}, {z1 - z0}])
+  pl_{tag}_c = xform.move@1(pl_{tag}_b, by=[{(x0 + x1) / 2}, {(y0 + y1) / 2}, {(z0 + z1) / 2}])
+  pl_{tag}_i = solid.intersect@1(sha, pl_{tag}_c)
+  pl_{tag}_m = solid.material@1(pl_{tag}_i, color=[0.6, 0.64, 0.72], metallic=0.85, roughness=0.3)
+  pl_{tag}_t = solid.toon@1(pl_{tag}_m, bands=3, feather=0.1, outline=1.3, shade_color=[0.34, 0.4, 0.56], rim=0.3, spec=0.5, outline_color=[0.05, 0.06, 0.1])
+  pl_{tag}_p = anim.parent@1(pl_{tag}_t, parent={par})
+  output plate_{tag} = pl_{tag}_p
+end
+suitp("chest", "chest", -0.145, 1.15, -0.3, 0.145, 1.56, 0.3)
+suitp("pelvis", "pelvis", -0.3, 0.88, -0.3, 0.3, 1.15, 0.3)
+suitp("uarm_l", "uarm_l", 0.145, 1.15, -0.3, 0.364, 1.6, 0.3)
+suitp("uarm_r", "uarm_r", -0.364, 1.15, -0.3, -0.145, 1.6, 0.3)
+suitp("thigh_l", "thigh_l", 0.0, 0.521, -0.3, 0.4, 0.88, 0.3)
+suitp("thigh_r", "thigh_r", -0.4, 0.521, -0.3, 0.0, 0.88, 0.3)
+suitp("shin_l", "shin_l", 0.0, 0.1, -0.3, 0.4, 0.521, 0.3)
+suitp("shin_r", "shin_r", -0.4, 0.1, -0.3, 0.0, 0.521, 0.3)
+platep("cuirass", "chest", -0.16, 1.2, -0.3, 0.16, 1.5, 0.3)
+platep("faulds", "pelvis", -0.3, 0.97, -0.3, 0.3, 1.14, 0.3)
+platep("vambrace_l", "farm_l", 0.385, 1.0, -0.3, 0.485, 1.5, 0.3)
+platep("vambrace_r", "farm_r", -0.485, 1.0, -0.3, -0.385, 1.5, 0.3)
+platep("cuisse_l", "thigh_l", 0.0, 0.6, -0.3, 0.4, 0.86, 0.3)
+platep("cuisse_r", "thigh_r", -0.4, 0.6, -0.3, 0.0, 0.86, 0.3)
+platep("greave_l", "shin_l", 0.0, 0.14, -0.3, 0.4, 0.5, 0.3)
+platep("greave_r", "shin_r", -0.4, 0.14, -0.3, 0.0, 0.5, 0.3)
+
+# hair: the head shell clipped to a cap over the crown and a curtain down the back, with swept locks
+hx_top = solid.box@1(size=[0.6, 0.4, 0.37])
+hx_topc = xform.move@1(hx_top, by=[0, 1.94, -0.115])
+hx_front = solid.box@1(size=[0.6, 0.36, 0.2])
+hx_frontc = xform.move@1(hx_front, by=[0, 1.95, 0.07])
+hx_a = solid.intersect@1(shh, hx_topc)
+hx_f = solid.intersect@1(shh, hx_frontc)
+hx_u = solid.union@1(hx_a, hx_f)
+hx_m = solid.material@1(hx_u, color=[0.36, 0.11, 0.05], roughness=0.35)
+hx_t = solid.toon@1(hx_m, bands=3, feather=0.14, outline=1.3, shade_color=[0.6, 0.3, 0.3], rim=0.3, spec=0.3, outline_color=[0.08, 0.03, 0.02])
+hx_p = anim.parent@1(hx_t, parent="head")
+output hair2 = hx_p
+# the hair that moves: 66 narrow strips rooted on a ring at the hairline (y = 1.74), meshed by a script, held by their root row to the head bone and simulated as live cloth,
+# so it falls, swings with her motion and rests on her shoulders and back (capsules of the head, chest and upper arms)
+let hairjs = "const m = new Mesh(); const N = 10; const rings = [[0.085, 0.097], [0.097, 0.109], [0.109, 0.121]]; let k = 0; for (const [ax, bz] of rings) { const count = 22; for (let s = 0; s < count; s++) { const th = (s + 0.5 * k) / count * 6.2832; const sx = Math.cos(th), sz = Math.sin(th); if (sz > 0.55 && Math.abs(sx) < 0.8) continue; const back = Math.max(0, -sz); const L = 0.12 + 0.2 * back + 0.05 * Math.abs(sx); const w = 0.034; const R = [ax * sx, 1.74, 0.015 + bz * sz]; const tx = -sz, tz = sx; const rowA = [], rowB = []; for (let i = 0; i <= N; i++) { const u = i / N; const ww = w * (1 - 0.45 * u) * 0.5; const out = 0.008 + 0.05 * u * u; const px = R[0] + sx * out, py = R[1] - L * u, pz = R[2] + sz * out; rowA.push(m.vertex(px + tx * ww, py, pz + tz * ww)); rowB.push(m.vertex(px - tx * ww, py, pz - tz * ww)); } for (let i = 0; i < N; i++) m.face(rowA[i], rowA[i + 1], rowB[i + 1], rowB[i]); } k++; } m"
+hs_s = poly.script@1(code="${hairjs}", budget=4000)
+hs_top = poly.select@1(hs_s, element="vertex", by="box", box_min=[-1, 1.735, -1], box_max=[1, 1.745, 1])
+hs_c = cloth.sim@1(hs_s, hs_top, pin_bone="head", collide_bones="head; chest; uarm_l; uarm_r", collider_radius=0.085, bend=0.012, density=0.12, damping=0.7, drag=0.5, thickness=0.006)
+hs_m = solid.material@1(hs_c, color=[0.36, 0.11, 0.05], roughness=0.35)
+hs_t = solid.toon@1(hs_m, bands=3, feather=0.14, outline=0.8, shade_color=[0.6, 0.3, 0.3], rim=0.3, spec=0.3, outline_color=[0.08, 0.03, 0.02])
+output hair_strands = hs_t

@@ -6,6 +6,10 @@ use super::{
 use bevy_math::Mat4;
 use ve_render::VeInstanceTransform;
 
+/// Most placements one scene may upload across all its sets (each set is still limited to 16,384 copies). A forest planted in three
+/// camera-distance bands draws the same trees three times over, so this is well above one set's limit.
+const MAX_SCENE_PLACEMENTS: usize = 131_072;
+
 /// Original logical instance index, shared by all chunks of the prototype.
 #[derive(Component, Clone, Copy)]
 pub(crate) struct InstanceIndex(pub(crate) u32);
@@ -15,6 +19,8 @@ pub(super) struct Placements {
     pub(super) node: String,
     pub(super) matrices: Vec<Mat4>,
     pub(super) indices: Vec<u32>,
+    pub(super) visible_range: Option<(f32, f32)>,
+    pub(super) visible_fade: f32,
 }
 
 pub(crate) fn append(
@@ -23,6 +29,8 @@ pub(crate) fn append(
     node: &str,
     matrices: &[f32],
     indices: &[u32],
+    visible_range: Option<(f32, f32)>,
+    visible_fade: f32,
 ) -> bool {
     if group == 0
         || indices.is_empty()
@@ -56,7 +64,7 @@ pub(crate) fn append(
         if serde_json::to_string(&candidate.token).ok().as_deref() != Some(text)
             || !staging::current(&candidate.token)
             || candidate.finished
-            || candidate.placement_count + indices.len() > 16_384
+            || candidate.placement_count + indices.len() > MAX_SCENE_PLACEMENTS
         {
             return false;
         }
@@ -64,6 +72,13 @@ pub(crate) fn append(
         if !entry.node.is_empty() && entry.node != node {
             return false;
         }
+        if !entry.indices.is_empty()
+            && (entry.visible_range != visible_range || entry.visible_fade != visible_fade)
+        {
+            return false;
+        }
+        entry.visible_range = visible_range;
+        entry.visible_fade = visible_fade;
         if entry.indices.last().is_some_and(|last| *last >= indices[0])
             || indices.windows(2).any(|pair| pair[0] >= pair[1])
         {
@@ -114,10 +129,22 @@ fn reactive(
 pub(super) struct Motion<'a> {
     pub(super) tracks: Option<&'a Vec<ve_modeling::anim::Track>>,
     pub(super) behavior: Option<&'a ve_modeling::anim::Behavior>,
+    /// The animation state machine on this part (`anim.machine`).
+    pub(super) machine: Option<&'a std::sync::Arc<ve_animstate::StateMachine>>,
     pub(super) parent: Option<&'a String>,
     pub(super) skin: Option<&'a std::sync::Arc<crate::skinning::SkinData>>,
     /// The chain of bones this part is the target of.
     pub(super) ik: Option<&'a std::sync::Arc<ve_modeling::rig::IkChain>>,
+    /// The particle effect this part emits.
+    pub(super) fx: Option<&'a std::sync::Arc<ve_modeling::fx::PartFx>>,
+    /// The ragdoll this part triggers.
+    pub(super) ragdoll: Option<&'a std::sync::Arc<ve_modeling::ragdoll::RagdollSpec>>,
+    /// The live cloth this part is.
+    pub(super) cloth: Option<&'a std::sync::Arc<crate::cloth_live::Shared>>,
+    /// The live liquid this part is.
+    pub(super) fluid: Option<&'a std::sync::Arc<crate::fluid_live::Shared>>,
+    /// The simulation program this part is drawn by.
+    pub(super) sim: Option<&'a std::sync::Arc<crate::sim_live::Shared>>,
     /// Whether this part is a bone in some chain (it must be posed even with no tracks or parent).
     pub(super) ik_bone: bool,
     /// Its physics body, if it is one.
@@ -146,6 +173,20 @@ fn attach_motion(
             centre,
         });
     }
+    if let Some(graph) = motion.machine {
+        entity.insert(crate::animation::MachineDrive::new(std::sync::Arc::clone(graph)));
+    }
+    if let Some(rig) = motion.ragdoll {
+        entity.insert(crate::physics::RagdollRig(std::sync::Arc::clone(rig)));
+    }
+    if let Some(effect) = motion.fx {
+        // Particles come from the middle of the part, wherever it has been moved to.
+        #[expect(clippy::cast_possible_truncation, reason = "bounds are metres, well inside f32")]
+        let centre = (bevy_math::Vec3::from(item.bounds.min.map(|v| v as f32))
+            + bevy_math::Vec3::from(item.bounds.max.map(|v| v as f32)))
+            * 0.5;
+        entity.insert(crate::effects::EffectEmitter::new(std::sync::Arc::clone(effect), centre));
+    }
     if animation.is_none() && behavior.is_none() && parent.is_none() && !motion.ik_bone {
         return;
     }
@@ -165,6 +206,7 @@ fn attach_motion(
             name: item.name.clone(),
             node: item.node.clone(),
             parent: parent.cloned(),
+            instance: None,
         });
     }
 }
@@ -207,10 +249,19 @@ pub(super) fn spawn(
     if let Some(set) = placements
         && super::bulk::eligible(set.matrices.len(), &surface, shared.is_some())
     {
-        super::bulk::spawn(commands, item, token, surface, &set.matrices, &set.indices);
+        super::bulk::spawn(
+            commands,
+            item,
+            token,
+            surface,
+            &set.matrices,
+            &set.indices,
+            set.visible_range,
+            set.visible_fade,
+        );
         return;
     }
-    let spawn_one =|commands: &mut Commands, matrix: Mat4, index: Option<u32>| {
+    let spawn_one = |commands: &mut Commands, matrix: Mat4, index: Option<u32>| {
         let mut entity = commands.spawn((
             Mesh3d(item.handle.clone()),
             surface,
@@ -219,9 +270,14 @@ pub(super) fn spawn(
             Label(item.name.clone()),
             Authored {
                 node: item.node.clone(),
+                name: item.name.clone(),
                 revision: token.revision,
             },
         ));
+        if let Some((from, to)) = placements.and_then(|set| set.visible_range) {
+            let fade = placements.map_or(0.0, |set| set.visible_fade);
+            entity.insert(visibility_range(from, to, fade));
+        }
         if let Some(index) = index {
             entity.insert((InstanceIndex(index), VeInstanceTransform(matrix, index)));
             if let Some(tracks) = &shared {
@@ -231,7 +287,30 @@ pub(super) fn spawn(
                     index,
                 });
             }
+        } else if let Some(shared) = motion.fluid.filter(|_| !item.rest.is_empty()) {
+            // The surface is rebuilt from the particles every frame, wherever it was when uploaded.
+            entity.insert(bevy_camera::visibility::NoFrustumCulling);
+            entity.insert(crate::fluid_live::FluidLive { shared: std::sync::Arc::clone(shared), corner_offset: item.corner_offset });
+        } else if let Some(shared) = motion.sim.filter(|_| !item.rest.is_empty()) {
+            // The tetrahedra move every frame, away from the box Bevy computed at upload.
+            entity.insert(bevy_camera::visibility::NoFrustumCulling);
+            entity.insert(crate::sim_live::SimLive { shared: std::sync::Arc::clone(shared), corner_offset: item.corner_offset });
+        } else if let Some(shared) = motion.cloth.filter(|_| !item.rest.is_empty()) {
+            // Its points move every frame, away from the box Bevy computed at upload.
+            entity.insert(bevy_camera::visibility::NoFrustumCulling);
+            entity.insert(crate::cloth_live::ClothLive {
+                shared: std::sync::Arc::clone(shared),
+                corner_offset: item.corner_offset,
+            });
         } else if let Some(skin) = motion.skin.filter(|_| !item.rest.is_empty()) {
+            // A GPU skinned chunk stays hidden until `attach_gpu_skins` gives it its skin, so Bevy never draws it unskinned.
+            #[cfg(any(feature = "bevy-webgl", feature = "bevy-webgpu"))]
+            if skin.blend == ve_modeling::rig::Blend::Linear {
+                entity.insert(bevy_camera::visibility::Visibility::Hidden);
+            }
+            // A deformed mesh leaves the bounding box Bevy computed when it first appeared (culling against that stale box hid the body while
+            // its outline hull stayed: a black ghost), so a skinned part is always drawn; static parts keep frustum culling.
+            entity.insert(bevy_camera::visibility::NoFrustumCulling);
             entity.insert(crate::skinning::Skinned::new(
                 std::sync::Arc::clone(skin),
                 item.rest.clone(),
@@ -250,5 +329,25 @@ pub(super) fn spawn(
         }
     } else {
         spawn_one(commands, Mat4::IDENTITY, None);
+    }
+}
+
+fn visibility_range(from: f32, to: f32, fade: f32) -> bevy_camera::visibility::VisibilityRange {
+    use bevy_camera::visibility::VisibilityRange;
+    if fade <= 0.0 {
+        return VisibilityRange::abrupt(from, to);
+    }
+    VisibilityRange {
+        start_margin: if from == 0.0 {
+            0.0..0.0
+        } else {
+            (from - fade * 0.5)..(from + fade * 0.5)
+        },
+        end_margin: if to.is_infinite() {
+            0.0..0.0
+        } else {
+            (to - fade * 0.5)..(to + fade * 0.5)
+        },
+        use_aabb: false,
     }
 }

@@ -49,15 +49,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../src/engine/generated.ts");
+    // The typed call declarations for every ready operator (G3), made from the same registry the evaluator validates against.
+    let operators = ve_graph::operators_d_ts(&ve_graph::builtin_registry());
+    let operators_path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../src/engine/operators.d.ts");
     if std::env::args().any(|a| a == "--check") {
         if std::fs::read_to_string(path).unwrap_or_default() != text {
             return Err("Rust/TypeScript schema drift: run bun run schema:generate".into());
+        }
+        if std::fs::read_to_string(operators_path).unwrap_or_default() != operators {
+            return Err(
+                "operator declarations drift from the registry: run bun run schema:generate".into(),
+            );
         }
     } else if std::env::args().any(|a| a == "--write") {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
         std::fs::write(path, text)?;
+        std::fs::write(operators_path, operators)?;
     } else {
         std::io::stdout().write_all(text.as_bytes())?;
     }

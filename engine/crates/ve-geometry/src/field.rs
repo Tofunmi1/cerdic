@@ -1,8 +1,12 @@
 //! Bounded spatial scalar fields and their deterministic kernel tape.
 mod expr;
+mod expr_bytes;
+mod expr_validate;
 mod model;
+mod noise;
 mod repeat;
 mod tape;
+mod warp;
 
 pub use model::{DistanceGuarantee, Field};
 /// Maximum number of control points in a tube polyline.

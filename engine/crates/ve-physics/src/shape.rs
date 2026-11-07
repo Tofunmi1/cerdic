@@ -1,4 +1,5 @@
 //! Collision shapes.
+use rapier3d::na::{DMatrix, Vector3};
 use rapier3d::prelude::{ColliderBuilder, Point};
 
 use crate::{Error, MAX_SHAPE_POINTS};
@@ -43,16 +44,88 @@ pub enum Shape {
         /// Triangles as vertex index triples.
         triangles: Vec<[u32; 3]>,
     },
+    /// A sampled terrain surface with rows along Z and columns along X.
+    Heightfield {
+        /// Number of samples along Z.
+        rows: usize,
+        /// Number of samples along X.
+        cols: usize,
+        /// Heights in row-major order.
+        heights: Vec<f32>,
+        /// Width along X and depth along Z in metres.
+        size: [f32; 2],
+    },
 }
 
 fn finite(values: &[f32]) -> bool {
     values.iter().all(|v| v.is_finite())
 }
 
+fn convex_collider(points: &[[f32; 3]]) -> Result<ColliderBuilder, Error> {
+    if points.len() < 4
+        || points.len() > MAX_SHAPE_POINTS
+        || !points.iter().all(|point| finite(point))
+    {
+        return Err(Error::BadShape(
+            "a convex shape needs 4 to 65536 finite points",
+        ));
+    }
+    let cloud = points
+        .iter()
+        .map(|point| Point::new(point[0], point[1], point[2]))
+        .collect::<Vec<_>>();
+    ColliderBuilder::convex_hull(&cloud).ok_or(Error::BadShape("the points have no volume"))
+}
+
+fn mesh_collider(points: &[[f32; 3]], triangles: &[[u32; 3]]) -> Result<ColliderBuilder, Error> {
+    let valid = points.len() >= 3
+        && points.len() <= MAX_SHAPE_POINTS
+        && !triangles.is_empty()
+        && points.iter().all(|point| finite(point))
+        && triangles
+            .iter()
+            .flatten()
+            .all(|index| (*index as usize) < points.len());
+    if !valid {
+        return Err(Error::BadShape(
+            "a mesh needs 3 to 65536 finite points and triangles that name them",
+        ));
+    }
+    let cloud = points
+        .iter()
+        .map(|point| Point::new(point[0], point[1], point[2]))
+        .collect::<Vec<_>>();
+    Ok(ColliderBuilder::trimesh(cloud, triangles.to_vec()))
+}
+
+fn heightfield_collider(
+    rows: usize,
+    cols: usize,
+    heights: &[f32],
+    size: [f32; 2],
+) -> Result<ColliderBuilder, Error> {
+    let count = rows.checked_mul(cols);
+    if rows < 2
+        || cols < 2
+        || count != Some(heights.len())
+        || count.is_none_or(|value| value > MAX_SHAPE_POINTS)
+        || !finite(heights)
+        || !finite(&size)
+        || size.iter().any(|value| *value <= 0.0)
+    {
+        return Err(Error::BadShape("invalid heightfield dimensions or samples"));
+    }
+    let matrix = DMatrix::from_row_slice(rows, cols, heights);
+    Ok(ColliderBuilder::heightfield(
+        matrix,
+        Vector3::new(size[0], 1.0, size[1]),
+    ))
+}
+
 impl Shape {
     /// Whether a moving body may use this shape.
     pub(crate) fn can_move(&self) -> bool {
-        !matches!(self, Self::Mesh { .. })
+        !matches!(self, Self::Mesh { .. } | Self::Heightfield { .. })
     }
 
     pub(crate) fn collider(&self) -> Result<ColliderBuilder, Error> {
@@ -91,42 +164,14 @@ impl Shape {
                 }
                 Ok(ColliderBuilder::cylinder(*half_height, *radius))
             }
-            Self::Convex { points } => {
-                if points.len() < 4
-                    || points.len() > MAX_SHAPE_POINTS
-                    || !points.iter().all(|p| finite(p))
-                {
-                    return Err(Error::BadShape(
-                        "a convex shape needs 4 to 65536 finite points",
-                    ));
-                }
-                let cloud: Vec<Point<f32>> = points
-                    .iter()
-                    .map(|p| Point::new(p[0], p[1], p[2]))
-                    .collect();
-                ColliderBuilder::convex_hull(&cloud)
-                    .ok_or(Error::BadShape("the points have no volume"))
-            }
-            Self::Mesh { points, triangles } => {
-                let valid = points.len() >= 3
-                    && points.len() <= MAX_SHAPE_POINTS
-                    && !triangles.is_empty()
-                    && points.iter().all(|p| finite(p))
-                    && triangles
-                        .iter()
-                        .flatten()
-                        .all(|index| (*index as usize) < points.len());
-                if !valid {
-                    return Err(Error::BadShape(
-                        "a mesh needs 3 to 65536 finite points and triangles that name them",
-                    ));
-                }
-                let cloud: Vec<Point<f32>> = points
-                    .iter()
-                    .map(|p| Point::new(p[0], p[1], p[2]))
-                    .collect();
-                Ok(ColliderBuilder::trimesh(cloud, triangles.clone()))
-            }
+            Self::Convex { points } => convex_collider(points),
+            Self::Mesh { points, triangles } => mesh_collider(points, triangles),
+            Self::Heightfield {
+                rows,
+                cols,
+                heights,
+                size,
+            } => heightfield_collider(*rows, *cols, heights, *size),
         }
     }
 }

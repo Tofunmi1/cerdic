@@ -36,6 +36,51 @@ fn run(world: &mut World, tenths: u16) {
 }
 
 #[test]
+fn a_push_changes_the_speed_without_touching_the_spin() {
+    let mut world = World::new([0.0; 3]);
+    let ball = cube(&mut world, [0.0, 5.0, 0.0]);
+    world.set_velocity(ball, [1.0, 0.0, 0.0], [0.0, 2.0, 0.0]).unwrap();
+    world.push(ball, [0.0, 3.0, 0.0]).unwrap();
+    assert_eq!(world.velocity(ball).unwrap(), [1.0, 3.0, 0.0]);
+    assert!(world.push(ball, [f32::NAN, 0.0, 0.0]).is_err());
+    assert!(world.push(BodyId(99), [0.0; 3]).is_err());
+    run(&mut world, 5);
+    assert!(world.pose(ball).unwrap().position[1] > 6.0, "the push lifted it");
+}
+
+#[test]
+fn a_removed_body_leaves_with_its_joints_and_the_other_ids_stay() {
+    use crate::{JointDesc, JointKind};
+    let mut world = World::new(GRAVITY);
+    let floor = ground(&mut world);
+    let doomed = cube(&mut world, [0.0, 3.0, 0.0]);
+    let kept = cube(&mut world, [5.0, 3.0, 0.0]);
+    world
+        .add_joint(&JointDesc {
+            a: doomed,
+            b: None,
+            kind: JointKind::Hinge,
+            anchor: [0.0, 4.0, 0.0],
+            axis: [0.0, 0.0, 1.0],
+            ..JointDesc::default()
+        })
+        .unwrap();
+    assert_eq!((world.len(), world.joint_count()), (3, 1));
+    world.remove(doomed).unwrap();
+    assert_eq!((world.len(), world.joint_count()), (2, 0));
+    assert!(world.pose(doomed).is_err());
+    assert!(world.remove(doomed).is_err());
+    // The other bodies keep their ids and the world still runs: the kept cube falls to the floor and rests there.
+    run(&mut world, 30);
+    let at = world.pose(kept).unwrap().position;
+    assert!((at[1] - 0.5).abs() < 0.05, "kept cube rests on the floor: {at:?}");
+    assert!(world.pose(floor).is_ok());
+    // A new body after a removal gets a fresh id.
+    let fresh = cube(&mut world, [9.0, 3.0, 0.0]);
+    assert!(fresh != doomed && fresh != kept && fresh != floor);
+}
+
+#[test]
 fn a_dropped_box_comes_to_rest_on_the_ground_and_touches_it() {
     let mut world = World::new(GRAVITY);
     let floor = ground(&mut world);

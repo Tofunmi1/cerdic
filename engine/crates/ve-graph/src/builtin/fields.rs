@@ -13,8 +13,166 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
     operators.extend(combiners());
     operators.extend(transforms());
     operators.extend(repeats());
+    operators.push(noise());
+    operators.extend(warps());
     operators.push(to_solid());
     operators
+}
+
+fn warps() -> Vec<Option<OperatorSpec>> {
+    ["taper", "twist", "bend"]
+        .into_iter()
+        .map(|name| {
+            let mut params = vec![
+                ParamSpec {
+                    name: "axis",
+                    ty: ParamType::Choice {
+                        options: &["x", "y", "z"],
+                    },
+                    default: Some(Value::Str("y".into())),
+                    doc: "Axis the warp follows.",
+                },
+                ParamSpec {
+                    name: "from",
+                    ty: ParamType::Num { unit: Unit::Length, min: -EXTENT, max: EXTENT },
+                    default: Some(Value::Num(0.0)),
+                    doc: "Where along the axis the warp starts, in metres; before it the warp is held at its starting value. A bend keeps this point fixed.",
+                },
+                ParamSpec {
+                    name: "to",
+                    ty: ParamType::Num { unit: Unit::Length, min: -EXTENT, max: EXTENT },
+                    default: Some(Value::Num(1.0)),
+                    doc: "Where along the axis the warp ends, in metres; it must differ from `from` (less than `from` works the other way round); after it the warp is held at its end value.",
+                },
+            ];
+            if name == "taper" {
+                params.extend([
+                    ParamSpec {
+                        name: "scale_start",
+                        ty: ParamType::Num {
+                            unit: Unit::None,
+                            min: 0.01,
+                            max: 100.0,
+                        },
+                        default: Some(Value::Num(1.0)),
+                        doc: "Cross-section scale at from.",
+                    },
+                    ParamSpec {
+                        name: "scale_end",
+                        ty: ParamType::Num {
+                            unit: Unit::None,
+                            min: 0.01,
+                            max: 100.0,
+                        },
+                        default: Some(Value::Num(1.0)),
+                        doc: "Cross-section scale at to.",
+                    },
+                ]);
+            } else {
+                params.push(ParamSpec {
+                    name: "angle",
+                    ty: ParamType::Num {
+                        unit: Unit::None,
+                        min: if name == "bend" { -360.0 } else { -3600.0 },
+                        max: if name == "bend" { 360.0 } else { 3600.0 },
+                    },
+                    default: Some(Value::Num(0.0)),
+                    doc: "Total rotation in degrees.",
+                });
+            }
+            if name == "bend" {
+                params.push(ParamSpec {
+                    name: "toward",
+                    ty: ParamType::Choice {
+                        options: &["auto", "x", "y", "z"],
+                    },
+                    default: Some(Value::Str("auto".into())),
+                    doc: "The axis the bar curves toward (x, y or z, not the bend axis itself); auto picks the next one cyclically: x to y, y to z, z to x. A positive angle curves toward its positive side.",
+                });
+            }
+            let family = match name {
+                "taper" => "field.taper@1",
+                "twist" => "field.twist@1",
+                _ => "field.bend@1",
+            };
+            let help = match name {
+                "taper" => "Tapers a field along an axis: the cross-section is scaled linearly from `scale_start` at `from` to `scale_end` at `to` (held beyond): a nose, a horn, a column that narrows. Example: field.taper@1(f, axis=\"y\", from=-0.5, to=0.5, scale_start=1, scale_end=0.5). Not an exact distance field.",
+                "twist" => "Twists a field about an axis: the cross-section turns by 0 degrees at `from` up to `angle` degrees at `to` (held beyond), keeping the volume: a tusk, a shell, a rope. Example: field.twist@1(f, axis=\"y\", from=-0.5, to=0.5, angle=90). Not an exact distance field.",
+                _ => "Bends a field: the axis curves into a circular arc toward `toward` through `angle` degrees between `from` and `to` (the point at `from` stays put; beyond `to` the axis continues straight along the end tangent): a tail, a horn, an arm. Example: field.bend@1(f, axis=\"y\", toward=\"x\", from=-0.5, to=0.5, angle=90). A negative angle curves the other way. Not an exact distance field.",
+            };
+            spec(
+                family,
+                help,
+                vec![single("field", FIELD)],
+                OutputSpec::Fixed(PortType::Field),
+                params,
+            )
+        })
+        .collect()
+}
+
+fn noise() -> Option<OperatorSpec> {
+    spec(
+        "field.noise@1",
+        "Displaces a field surface by bounded deterministic smooth or ridged noise.",
+        vec![single("field", FIELD)],
+        OutputSpec::Fixed(PortType::Field),
+        vec![
+            ParamSpec {
+                name: "amplitude",
+                ty: ParamType::Num {
+                    unit: Unit::Length,
+                    min: 0.0,
+                    max: EXTENT,
+                },
+                default: Some(Value::Num(0.02)),
+                doc: "Maximum displacement in metres.",
+            },
+            ParamSpec {
+                name: "scale",
+                ty: ParamType::Num {
+                    unit: Unit::Length,
+                    min: 0.001,
+                    max: EXTENT,
+                },
+                default: Some(Value::Num(0.25)),
+                doc: "First octave wavelength in metres.",
+            },
+            ParamSpec {
+                name: "octaves",
+                ty: ParamType::Int { min: 1, max: 6 },
+                default: Some(Value::Int(1)),
+                doc: "Number of noise octaves.",
+            },
+            ParamSpec {
+                name: "persistence",
+                ty: ParamType::Num {
+                    unit: Unit::None,
+                    min: 0.0,
+                    max: 1.0,
+                },
+                default: Some(Value::Num(0.5)),
+                doc: "Weight ratio between octaves.",
+            },
+            ParamSpec {
+                name: "seed",
+                ty: ParamType::Int {
+                    min: 0,
+                    max: i64::from(u32::MAX),
+                },
+                default: Some(Value::Int(0)),
+                doc: "Deterministic integer noise seed.",
+            },
+            ParamSpec {
+                name: "mode",
+                ty: ParamType::Choice {
+                    options: &["smooth", "ridged"],
+                },
+                default: Some(Value::Str("smooth".to_owned())),
+                doc: "Smooth noise or creased ridged noise.",
+            },
+        ],
+    )
 }
 
 fn primitives() -> Vec<Option<OperatorSpec>> {
@@ -40,7 +198,12 @@ fn primitives() -> Vec<Option<OperatorSpec>> {
                     EXTENT,
                     "Half extents in metres.",
                 ),
-                super::length("rounding", "Corner radius in metres."),
+                ParamSpec {
+                    name: "rounding",
+                    ty: ParamType::Num { unit: Unit::Length, min: 0.0, max: EXTENT },
+                    default: Some(Value::Num(0.0)),
+                    doc: "Corner radius in metres; 0 gives sharp corners.",
+                },
             ],
         ),
         spec(

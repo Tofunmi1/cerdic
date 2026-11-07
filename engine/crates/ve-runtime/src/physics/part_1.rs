@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use bevy_ecs::{
@@ -7,7 +7,7 @@ use bevy_ecs::{
     resource::Resource,
     system::{Query, ResMut},
 };
-use bevy_math::{Quat, Vec3};
+use bevy_math::{Mat4, Quat, Vec3};
 use bevy_transform::components::Transform;
 use ve_modeling::physics::{
     BodyKind, BodyShape, JointKind as GraphJoint, PhysBody, PhysJoint, WorldSettings,
@@ -195,6 +195,12 @@ pub(crate) struct Physics {
     refused: Vec<String>,
     /// Positions of every body at steps 60, 120, ... (the first [`MAX_MARKS`]), in body order.
     marks: Vec<(u64, Vec<[f32; 3]>)>,
+    /// Ragdolls that have gone limp, by name (plan W5; see `part_4.rs`).
+    ragdolls: HashMap<String, ActiveRagdoll>,
+    /// How many parts carry a `phys.ragdoll` (a scene with one has something to play even with no prop that can fall).
+    rigs: usize,
+    /// The pose of every bone of a limp ragdoll, by the bone part's output name, for the animation pass to use instead of its tracks.
+    ragdoll_poses: HashMap<String, Mat4>,
     /// Pairs of bodies touching after the last step, to tell when a touch begins.
     touching: Vec<(BodyId, BodyId)>,
     /// The walking viewer, when the scene has one and play mode is on.

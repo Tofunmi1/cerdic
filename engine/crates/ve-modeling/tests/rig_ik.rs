@@ -97,6 +97,95 @@ fn chains_that_cannot_work_are_dropped_with_a_reason() {
 }
 
 #[test]
+fn the_two_bone_solver_carries_its_pole_soften_and_twist_and_needs_exactly_two_bones() {
+    let program = |extra: &str, bones: &str| {
+        arm("[1, 0, 0]", true, bones).replace(
+            "iterations=48",
+            &format!("iterations=48, solver=\"two_bone\"{extra}"),
+        )
+    };
+    // Angles are written in degrees in the language and kept in radians.
+    let evaluation = evaluate(&program(
+        ", pole=[0, 1, 0], soften=0.3, twist=30",
+        "upper_arm; forearm",
+    ))
+    .unwrap();
+    let target = evaluation
+        .parts
+        .iter()
+        .find(|p| p.name == "target")
+        .unwrap();
+    let settings = target.ik.as_ref().unwrap().two_bone.as_ref().unwrap();
+    assert_eq!(settings.pole, [0.0, 1.0, 0.0]);
+    assert!(
+        (settings.soften - 0.3).abs() < 1e-6
+            && (settings.twist - 30.0_f32.to_radians()).abs() < 1e-5,
+        "{settings:?}"
+    );
+    // The default solver is the general one and carries no two-bone settings.
+    let plain = evaluate(&arm("[1, 0, 0]", true, "upper_arm; forearm")).unwrap();
+    let plain = plain.parts.iter().find(|p| p.name == "target").unwrap();
+    assert!(plain.ik.as_ref().unwrap().two_bone.is_none());
+    // Not two bones: refused with the fix named.
+    let message = evaluate(&program("", "upper_arm")).unwrap_err();
+    assert!(
+        message.contains("two_bone") || message.contains("two bones"),
+        "{message}"
+    );
+}
+
+#[test]
+fn rig_aim_makes_a_target_that_one_bone_looks_at() {
+    let program = |extra: &str| {
+        format!(
+            "h = solid.box@1(size=[0.1, 0.1, 0.1])\nhead_bone = rig.bone@1(h, head=[0, 1.7, 0], tail=[0, 1.7, 0.2])\noutput head = head_bone\n\
+             ball = solid.sphere@1(radius=0.1)\ngoal = rig.aim@1(ball, bone=\"head\"{extra})\noutput target = goal\n"
+        )
+    };
+    let evaluation = evaluate(&program(", pole=[0, 1, 0], twist=10, weight=0.8")).unwrap();
+    let target = evaluation
+        .parts
+        .iter()
+        .find(|p| p.name == "target")
+        .unwrap();
+    let chain = target.ik.as_ref().unwrap();
+    assert_eq!(chain.bones, ["head"]);
+    assert_eq!(
+        chain.segments.len(),
+        1,
+        "the bone is resolved against its part"
+    );
+    let aim = chain.aim.as_ref().unwrap();
+    assert_eq!(aim.pole, [0.0, 1.0, 0.0]);
+    assert!(
+        (aim.twist - 10.0_f32.to_radians()).abs() < 1e-5 && (aim.weight - 0.8).abs() < 1e-6,
+        "{aim:?}"
+    );
+    // A target that is already an ik target, or a bone that does not exist, is refused or dropped with a reason.
+    let twice = format!(
+        "{}r2 = rig.aim@1(goal, bone=\"head\")\noutput t2 = r2\n",
+        program("")
+    );
+    assert!(evaluate(&twice).is_err(), "one chain per target");
+    let ghost = evaluate(&program("").replace("bone=\"head\"", "bone=\"ghost\"")).unwrap();
+    assert!(
+        ghost
+            .parts
+            .iter()
+            .find(|p| p.name == "target")
+            .unwrap()
+            .ik
+            .is_none()
+            && ghost
+                .warnings
+                .iter()
+                .any(|w| w.code == "rig.ik_bone_missing"),
+        "{:?}",
+        ghost.warnings
+    );
+}
+
+#[test]
 fn the_node_checks_its_bones() {
     for bad in [
         "b = solid.box@1(size=[1, 1, 1])\nr = rig.ik@1(b, bones=\"\")\noutput o = r\n",

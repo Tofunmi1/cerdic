@@ -1,0 +1,8 @@
+# kind: world
+# EMBERFALL, sky and a plain stage (the cathedral replaces the stage).
+sky = scene.sky@1(sun_elevation=20, sun_azimuth=25, sun_intensity=4, turbidity=4, clouds=false, contact_shadows=true)
+output sky = sky
+stage_s = solid.cylinder@1(radius=14, height=0.5, segments=96)
+stage_a = xform.move@1(stage_s, by=[0, -0.25, 0])
+stage_m = solid.material@1(stage_a, color=[0.42, 0.38, 0.34], roughness=0.7)
+output stage = stage_m

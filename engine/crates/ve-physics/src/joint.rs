@@ -1,13 +1,80 @@
 //! Joints between bodies (ADR 0036): hinges, sliders, ball sockets, fixed welds and springs.
 use rapier3d::na::{Isometry3, Point3, Translation3, UnitQuaternion, Vector3};
-use rapier3d::prelude::{
-    GenericJointBuilder, ImpulseJointHandle, JointAxesMask, JointAxis, RigidBodyHandle,
-};
+use rapier3d::prelude::{GenericJointBuilder, JointAxesMask, JointAxis, RigidBodyHandle};
 
 use crate::{BodyId, Error, World};
 
 /// Most joints in one world.
 pub const MAX_JOINTS: usize = 512;
+
+fn validate_joint(desc: &JointDesc) -> Result<(), Error> {
+    let numbers = [
+        desc.stiffness,
+        desc.damping,
+        desc.motor_speed,
+        desc.motor_force,
+        desc.rest_length,
+    ];
+    let mut all: Vec<f32> = numbers.to_vec();
+    all.extend(desc.anchor);
+    all.extend(desc.anchor_b);
+    all.extend(desc.axis);
+    if let Some(limits) = desc.limits {
+        all.extend(limits);
+        if limits[0] > limits[1] {
+            return Err(Error::BadValue("joint limits must run from low to high"));
+        }
+    }
+    if let Some(swing) = desc.swing {
+        all.push(swing);
+        if swing < 0.0 {
+            return Err(Error::BadValue("a swing limit cannot be negative"));
+        }
+    }
+    if let Some(twist) = desc.twist {
+        all.extend(twist);
+        if twist[0] > twist[1] {
+            return Err(Error::BadValue("twist limits must run from low to high"));
+        }
+    }
+    if !all.iter().all(|value| value.is_finite())
+        || desc
+            .anchor
+            .iter()
+            .chain(&desc.anchor_b)
+            .any(|value| value.abs() > 1000.0)
+    {
+        return Err(Error::BadValue(
+            "joint numbers must be finite and anchors within 1000 m",
+        ));
+    }
+    if desc.stiffness < 0.0 || desc.damping < 0.0 || desc.motor_force < 0.0 {
+        return Err(Error::BadValue(
+            "stiffness, damping and motor force cannot be negative",
+        ));
+    }
+    Ok(())
+}
+
+fn configure_joint_axis(
+    mut builder: GenericJointBuilder,
+    axis: JointAxis,
+    desc: &JointDesc,
+) -> GenericJointBuilder {
+    if let Some(limits) = desc.limits {
+        builder = builder.limits(axis, limits);
+    }
+    if desc.motor_force > 0.0 {
+        builder = builder
+            .motor_velocity(axis, desc.motor_speed, desc.damping.max(1.0))
+            .motor_max_force(axis, desc.motor_force);
+    } else if desc.damping > 0.0 {
+        builder = builder
+            .motor_velocity(axis, 0.0, desc.damping)
+            .motor_max_force(axis, desc.damping * 5.0);
+    }
+    builder
+}
 
 /// How a joint lets its bodies move.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -51,6 +118,11 @@ pub struct JointDesc {
     pub motor_force: f32,
     /// Distance a spring rests at; a negative value means the distance between its anchors at the start.
     pub rest_length: f32,
+    /// Ball joints only: the most the joint may swing away from straight along `axis`, in radians, in each of the two sideways directions
+    /// (a cone of about this half-angle); `None` for no limit. Shoulders and hips are 1 to 1.5, a neck 0.5.
+    pub swing: Option<f32>,
+    /// Ball joints only: the lowest and highest twist about `axis`, in radians; `None` for free twist.
+    pub twist: Option<[f32; 2]>,
 }
 
 impl Default for JointDesc {
@@ -68,6 +140,8 @@ impl Default for JointDesc {
             motor_speed: 0.0,
             motor_force: 0.0,
             rest_length: -1.0,
+            swing: None,
+            twist: None,
         }
     }
 }
@@ -89,6 +163,68 @@ impl World {
         Ok((self.world_anchor(), Isometry3::identity()))
     }
 
+    fn insert_joint(
+        &mut self,
+        desc: &JointDesc,
+        first: RigidBodyHandle,
+        second: RigidBodyHandle,
+        frame_a: Isometry3<f32>,
+        frame_b: Isometry3<f32>,
+    ) {
+        if desc.kind == JointKind::Spring {
+            let rest = if desc.rest_length >= 0.0 {
+                desc.rest_length
+            } else {
+                (point(desc.anchor) - point(desc.anchor_b)).norm()
+            };
+            self.springs.push(Spring {
+                first,
+                second,
+                local_first: frame_a.translation.vector.into(),
+                local_second: frame_b.translation.vector.into(),
+                rest,
+                stiffness: desc.stiffness,
+                damping: desc.damping,
+            });
+            return;
+        }
+        let (mask, free) = match desc.kind {
+            JointKind::Fixed => (JointAxesMask::LOCKED_FIXED_AXES, None),
+            JointKind::Hinge => (JointAxesMask::LOCKED_REVOLUTE_AXES, Some(JointAxis::AngX)),
+            JointKind::Slider => (JointAxesMask::LOCKED_PRISMATIC_AXES, Some(JointAxis::LinX)),
+            JointKind::Ball | JointKind::Spring => (JointAxesMask::LOCKED_SPHERICAL_AXES, None),
+        };
+        let mut builder = GenericJointBuilder::new(mask)
+            .contacts_enabled(false)
+            .local_frame1(frame_a)
+            .local_frame2(frame_b);
+        if let Some(axis) = free {
+            builder = configure_joint_axis(builder, axis, desc);
+        }
+        if desc.kind == JointKind::Ball {
+            // The joint frame has local X along `axis`: twist is about X, swing about Y and Z (a cone, approximated by two limits).
+            if let Some(swing) = desc.swing {
+                builder = builder
+                    .limits(JointAxis::AngY, [-swing, swing])
+                    .limits(JointAxis::AngZ, [-swing, swing]);
+            }
+            if let Some(twist) = desc.twist {
+                builder = builder.limits(JointAxis::AngX, twist);
+            }
+            if desc.damping > 0.0 {
+                for axis in [JointAxis::AngX, JointAxis::AngY, JointAxis::AngZ] {
+                    builder = builder
+                        .motor_velocity(axis, 0.0, desc.damping)
+                        .motor_max_force(axis, desc.damping * 5.0);
+                }
+            }
+        }
+        let handle = self
+            .impulse_joints
+            .insert(first, second, builder.build(), true);
+        self.joints.push(handle);
+    }
+
     /// Joins two bodies (or one body and the world).
     ///
     /// # Errors
@@ -98,39 +234,7 @@ impl World {
         if self.joint_count() >= MAX_JOINTS {
             return Err(Error::BadValue("a world holds at most 512 joints"));
         }
-        let numbers = [
-            desc.stiffness,
-            desc.damping,
-            desc.motor_speed,
-            desc.motor_force,
-            desc.rest_length,
-        ];
-        let mut all: Vec<f32> = numbers.to_vec();
-        all.extend(desc.anchor);
-        all.extend(desc.anchor_b);
-        all.extend(desc.axis);
-        if let Some(limits) = desc.limits {
-            all.extend(limits);
-            if limits[0] > limits[1] {
-                return Err(Error::BadValue("joint limits must run from low to high"));
-            }
-        }
-        if !all.iter().all(|v| v.is_finite())
-            || desc
-                .anchor
-                .iter()
-                .chain(&desc.anchor_b)
-                .any(|v| v.abs() > 1000.0)
-        {
-            return Err(Error::BadValue(
-                "joint numbers must be finite and anchors within 1000 m",
-            ));
-        }
-        if desc.stiffness < 0.0 || desc.damping < 0.0 || desc.motor_force < 0.0 {
-            return Err(Error::BadValue(
-                "stiffness, damping and motor force cannot be negative",
-            ));
-        }
+        validate_joint(desc)?;
         let (first, pose_a) = self.joint_end(Some(desc.a))?;
         let (second, pose_b) = self.joint_end(desc.b)?;
         let world_axis = Vector3::new(desc.axis[0], desc.axis[1], desc.axis[2]);
@@ -159,62 +263,7 @@ impl World {
                 },
             ),
         );
-        let handle: ImpulseJointHandle = match desc.kind {
-            JointKind::Spring => {
-                let rest = if desc.rest_length >= 0.0 {
-                    desc.rest_length
-                } else {
-                    (point(desc.anchor) - point(desc.anchor_b)).norm()
-                };
-                // Springs are forces we apply ourselves each step (see `apply_springs`): Rapier's spring joint ignores its
-                // rest length in this setup, and ours is mass-independent, so a feather and a boulder swing alike.
-                self.springs.push(Spring {
-                    first,
-                    second,
-                    local_first: frame_a.translation.vector.into(),
-                    local_second: frame_b.translation.vector.into(),
-                    rest,
-                    stiffness: desc.stiffness,
-                    damping: desc.damping,
-                });
-                return Ok(());
-            }
-            kind => {
-                let (mask, free) = match kind {
-                    JointKind::Fixed => (JointAxesMask::LOCKED_FIXED_AXES, None),
-                    JointKind::Hinge => {
-                        (JointAxesMask::LOCKED_REVOLUTE_AXES, Some(JointAxis::AngX))
-                    }
-                    JointKind::Slider => {
-                        (JointAxesMask::LOCKED_PRISMATIC_AXES, Some(JointAxis::LinX))
-                    }
-                    _ => (JointAxesMask::LOCKED_SPHERICAL_AXES, None),
-                };
-                // Two bodies joined together do not collide with each other (a door and its post overlap at the hinge).
-                let mut builder = GenericJointBuilder::new(mask)
-                    .contacts_enabled(false)
-                    .local_frame1(frame_a)
-                    .local_frame2(frame_b);
-                if let Some(axis) = free {
-                    if let Some(limits) = desc.limits {
-                        builder = builder.limits(axis, limits);
-                    }
-                    if desc.motor_force > 0.0 {
-                        builder = builder
-                            .motor_velocity(axis, desc.motor_speed, desc.damping.max(1.0))
-                            .motor_max_force(axis, desc.motor_force);
-                    } else if desc.damping > 0.0 {
-                        // Friction in the joint: a motor aiming for a standstill with a force cap of the damping.
-                        builder = builder
-                            .motor_velocity(axis, 0.0, desc.damping)
-                            .motor_max_force(axis, desc.damping * 5.0);
-                    }
-                }
-                self.impulse_joints
-                    .insert(first, second, builder.build(), true)
-            }
-        };
-        self.joints.push(handle);
+        self.insert_joint(desc, first, second, frame_a, frame_b);
         Ok(())
     }
 
@@ -274,8 +323,8 @@ impl World {
 /// A spring between two points on two bodies.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Spring {
-    first: RigidBodyHandle,
-    second: RigidBodyHandle,
+    pub(crate) first: RigidBodyHandle,
+    pub(crate) second: RigidBodyHandle,
     local_first: Point3<f32>,
     local_second: Point3<f32>,
     rest: f32,

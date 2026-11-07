@@ -1,0 +1,138 @@
+# THE FALLEN TITAN. A dying stone giant in a volcanic canyon at dusk: ridged ground sorted into ash forest, scorched meadow and cliff rock by terrain.biomes,
+# a lava sea whose surface is a live animated texture, and the titan itself built from smooth fields, coming apart.
+sky = scene.sky@1(sun_elevation=3, sun_azimuth=70, sun_intensity=8, turbidity=6, clouds=false, seed=7, haze=0.07, haze_color=[1.0, 0.4, 0.16], haze_height=60, ground_color=[0.12, 0.06, 0.04])
+output sky = sky
+
+land = terrain.tile@1(size=[600, 600], cell=3, seed=21, height=90, scale=420, octaves=5, roughness=0.42, style="hills", basis="simplex")
+b = terrain.biomes@1(land, rules="forest: height 14..90, slope 0..26, wet 0.4..1; ash: height 10..120, slope 0..26, wet 0..0.6; cliff: slope 27..", blend=0.5, wet_scale=120, seed=5)
+ground = solid.material@1(b, color=[0.16, 0.13, 0.12], roughness=0.97)
+output ground = ground
+
+# Charred forest, cinder meadow and cliff boulders, each planted by its own biome layer.
+trunk = solid.cone@1(radius=1.1, height=15, top_radius=0.3, segments=7)
+crown = solid.cone@1(radius=4.2, height=9, segments=8)
+crown_up = xform.move@1(crown, by=[0, 9, 0])
+snag = solid.union@1(trunk, crown_up)
+snag_m = solid.material@1(snag, color=[0.035, 0.03, 0.028], roughness=0.95)
+snags = scatter.place@1(snag_m, b, layer="biome_forest", radius=7, seed=1, max_slope=28, scale=[0.7, 1.7])
+output snags = snags
+cinder = solid.sphere@1(radius=0.8, segments=8)
+cinder_m = solid.material@1(cinder, color=[0.08, 0.05, 0.04], roughness=0.9, emissive=[0.5, 0.1, 0.0])
+cinders = scatter.place@1(cinder_m, b, layer="biome_ash", radius=3.2, seed=2, density=0.5, max_slope=30, scale=[0.5, 1.6])
+output cinders = cinders
+boulder = solid.sphere@1(radius=3, segments=9)
+boulder_m = solid.material@1(boulder, color=[0.09, 0.085, 0.085], roughness=0.92)
+boulders = scatter.place@1(boulder_m, b, layer="biome_cliff", radius=9, seed=3, sink=0.3, scale=[0.6, 2.2])
+output boulders = boulders
+
+lava = solid.box@1(size=[620, 2, 620])
+lava_m = solid.material@1(lava, color=[1, 1, 1], roughness=0.35, emissive=[1, 1, 1])
+# A texture goes on AFTER the material (a material applied later would replace it).
+lava_t = solid.texture@1(lava_m, program="d = expr(code=\"w = fbm(vec2(p.x * 9.0 + t * 0.05, p.y * 9.0)); n = fbm(vec2(p.x * 22.0 + w * 4.0 - t * 0.04, p.y * 22.0 + w * 4.0 + t * 0.03)); k = smoothstep(0.40, 0.58, n); out = vec3(0.025 + 0.06 * k, 0.014 + 0.02 * k, 0.012)\")\nh = expr(code=\"w = fbm(vec2(p.x * 9.0 + t * 0.05, p.y * 9.0)); n = fbm(vec2(p.x * 22.0 + w * 4.0 - t * 0.04, p.y * 22.0 + w * 4.0 + t * 0.03)); m = 1.0 - smoothstep(0.40, 0.58, n); out = vec3(3.0 * m, 0.5 * m * m, 0.02 * m * m * m)\")\nalbedo = d\nemissive = h", size="512")
+lava_p = xform.move@1(lava_t, by=[300, 52, 300])
+output lava = lava_p
+
+# The dais: a broad stepped drum of dark stone rising out of the lava.
+dais_a = solid.cylinder@1(radius=62, height=110, segments=48)
+dais_b = solid.cylinder@1(radius=46, height=10, segments=48)
+dais_b_up = xform.move@1(dais_b, by=[0, 60, 0])
+dais = solid.union@1(dais_a, dais_b_up)
+dais_m = solid.material@1(dais, color=[0.11, 0.1, 0.1], roughness=0.95)
+dais_p = xform.move@1(dais_m, by=[300, 45, 300])
+output dais = dais_p
+
+# The titan, facing -z toward the valley mouth, standing on y=0, a little over 100 m tall. Seven closed parts built from smooth fields:
+# they stand together as one giant, then come apart one after another.
+hip = field.ellipsoid@1(radii=[15, 9, 10])
+hip_m = field.move@1(hip, by=[0, 42, 0])
+chest = field.ellipsoid@1(radii=[19, 23, 12])
+chest_m = field.move@1(chest, by=[0, 63, 0])
+neck = field.tube@1(points=[[0, 78, 0], [0, 88, -2]], radius=6, end_radius=5)
+shoulder_l = field.sphere@1(radius=9)
+shoulder_l_m = field.move@1(shoulder_l, by=[-22, 78, 0])
+shoulder_r = field.sphere@1(radius=9)
+shoulder_r_m = field.move@1(shoulder_r, by=[22, 78, 0])
+torso_a = field.smooth_union@1(hip_m, chest_m, radius=6)
+torso_b = field.smooth_union@1(torso_a, neck, radius=3)
+torso_c = field.smooth_union@1(torso_b, shoulder_l_m, radius=4)
+torso_f = field.smooth_union@1(torso_c, shoulder_r_m, radius=4)
+
+head = field.ellipsoid@1(radii=[7.5, 9, 8])
+head_m = field.move@1(head, by=[0, 94, -2])
+jaw = field.ellipsoid@1(radii=[5, 4, 6])
+jaw_m = field.move@1(jaw, by=[0, 87, -6])
+crown_a = field.tube@1(points=[[-5, 100, -2], [-9, 112, -3]], radius=2.6, end_radius=1.1)
+crown_b = field.tube@1(points=[[0, 102, -2], [0, 116, -4]], radius=2.8, end_radius=1.1)
+crown_c = field.tube@1(points=[[5, 100, -2], [9, 112, -3]], radius=2.6, end_radius=1.1)
+head_a = field.smooth_union@1(head_m, jaw_m, radius=2)
+head_f = field.union@1(head_a, crown_a, crown_b, crown_c)
+
+arm_l = field.tube@1(points=[[-22, 78, 0], [-29, 58, -6], [-24, 40, -18]], radius=6.5, end_radius=5)
+fist_l = field.sphere@1(radius=6.5)
+fist_l_m = field.move@1(fist_l, by=[-24, 38, -20])
+arm_l_f = field.smooth_union@1(arm_l, fist_l_m, radius=2)
+arm_r_f = field.tube@1(points=[[22, 78, 0], [30, 60, -3], [30, 44, 4]], radius=6.5, end_radius=4.5)
+
+leg_l = field.tube@1(points=[[-9, 42, 0], [-11, 22, -4], [-10, 2, 0]], radius=9, end_radius=7)
+foot_l = field.ellipsoid@1(radii=[8, 3, 12])
+foot_l_m = field.move@1(foot_l, by=[-10, 3, -4])
+leg_l_f = field.smooth_union@1(leg_l, foot_l_m, radius=2)
+leg_r = field.tube@1(points=[[9, 42, 0], [11, 22, -4], [10, 2, 0]], radius=9, end_radius=7)
+foot_r = field.ellipsoid@1(radii=[8, 3, 12])
+foot_r_m = field.move@1(foot_r, by=[10, 3, -4])
+leg_r_f = field.smooth_union@1(leg_r, foot_r_m, radius=2)
+
+sword_f = field.tube@1(points=[[-24, 38, -20], [-24, 0, -20]], radius=2.2, end_radius=1.2)
+
+# One part: rocky noise (the same everywhere, so seams match), sampled to a solid, stone material, released at `start` seconds with a sideways
+# velocity and a turning rate, falling to the dais (local floor -3), then placed on the dais.
+def build(name, src, x0, y0, z0, x1, y1, z1)
+  p_{name}_n = field.noise@1(${src}, amplitude=1.1, scale=7, octaves=3, persistence=0.5, seed=4)
+  p_{name}_s = field.to_solid@1(p_{name}_n, min=[{x0}, {y0}, {z0}], max=[{x1}, {y1}, {z1}], edge_length=1.0)
+  p_{name}_k = solid.material@1(p_{name}_s, color=[1, 1, 1], roughness=0.9, emissive=[1, 1, 1])
+  p_{name}_m = solid.texture@1(p_{name}_k, program="a = expr(code=\"n = fbm(vec2(p.x * 11.0, p.y * 11.0)); out = vec3(0.07 + 0.1 * n, 0.065 + 0.08 * n, 0.06 + 0.07 * n)\")\nc = expr(code=\"n = fbm(vec2(p.x * 5.0, p.y * 5.0)); v = 1.0 - smoothstep(0.0, 0.035, abs(n - 0.52)); out = vec3(2.6 * v, 0.55 * v, 0.03 * v)\")\nalbedo = a\nemissive = c", size="512")
+end
+# The hero, on the dais edge looking up at what is left of the titan, with a cape on the cloth solver pinned along the shoulders.
+hero = body.human@1(gender=0.15, muscle=0.8, weight=0.55, stature=1.9, at=[300, 114, 255], turn=0)
+hero_m = solid.material@1(hero, color=[0.06, 0.055, 0.06], metallic=0.6, roughness=0.45)
+output hero = hero_m
+cape_grid = poly.grid@1(width=1.5, height=1.9, columns=12, rows=16)
+cape_at = xform.move@1(cape_grid, by=[300, 114.55, 254.7])
+cape_top = poly.select@1(cape_at, element="vertex", by="height", axis="y", height=115.5, tolerance=0.02)
+cape_sim = cloth.sim@1(cape_at, cape_top, bend=0.2, density=0.15, damping=1.0, wind=[0, 0, 5], drag=1.0)
+cape_m = solid.material@1(cape_sim, color=[0.45, 0.02, 0.03], roughness=0.8)
+output cape = cape_m
+
+# Embers rising off the lava sea, and a column of smoke from the neck stump.
+ember_src = solid.sphere@1(radius=0.1, segments=6)
+embers = fx.emitter@1(ember_src, name="embers", rate=900, lifetime=[4, 9], speed=[5, 14], direction=[0.15, 1, 0.05], cone=0.5, shape="disc", extent=[260, 0.1, 260], max_particles=9000, size=[0.9, 0.1], colour=[4, 1.4, 0.25], colour_end=[1.5, 0.15, 0.02], alpha=[1, 0], glow=6, blend="additive")
+embers_p = xform.move@1(embers, by=[300, 56, 300])
+output embers = embers_p
+smoke_src = solid.sphere@1(radius=0.1, segments=6)
+smoke = fx.emitter@1(smoke_src, name="smoke", rate=60, lifetime=[8, 14], speed=[4, 9], direction=[0.3, 1, -0.1], cone=0.35, shape="sphere", extent=[5, 5, 5], max_particles=1200, size=[6, 34], colour=[0.1, 0.085, 0.08], colour_end=[0.2, 0.17, 0.16], alpha=[0.7, 0], blend="alpha")
+smoke_p = xform.move@1(smoke, by=[300, 200, 296])
+output smoke = smoke_p
+
+# A frozen moment of the collapse: the part's own centre is moved to the origin (n is the centre negated), turned by rx ry rz radians, set down at (tx ty tz)
+# and placed on the dais.
+def pose(name, nx, ny, nz, rx, ry, rz, tx, ty, tz)
+  p_{name}_a = xform.move@1(p_{name}_m, by=[{nx}, {ny}, {nz}])
+  p_{name}_r = xform.rotate@1(p_{name}_a, angles=[{rx}, {ry}, {rz}])
+  p_{name}_b = xform.move@1(p_{name}_r, by=[{tx}, {ty}, {tz}])
+  p_{name}_p = xform.move@1(p_{name}_b, by=[300, 114, 300])
+  output {name} = p_{name}_p
+end
+build("torso", "torso_f", -36, 30, -18, 36, 96, 18)
+build("head", "head_f", -14, 80, -16, 14, 120, 14)
+build("arm_l", "arm_l_f", -40, 28, -32, -14, 88, 10)
+build("arm_r", "arm_r_f", 12, 34, -12, 42, 88, 12)
+build("leg_l", "leg_l_f", -24, -10, -22, 4, 54, 12)
+build("leg_r", "leg_r_f", -4, -10, -22, 24, 54, 12)
+build("sword", "sword_f", -30, -6, -26, -18, 44, -14)
+pose("torso", 0, -50, 0, -0.22, 0, 0.08, 0, 50, -4)
+pose("head", 0, -98, 2, 0.2, 0.4, 1.25, -22, 5, -36)
+pose("arm_l", 24, -60, 8, 0, 0.5, 1.45, -34, 2, -26)
+pose("arm_r", -28, -60, 0, 0, 0, -0.35, 30, 58, 2)
+pose("leg_l", 10, -24, 2, -0.12, 0, 0.05, -10, 24, -2)
+pose("leg_r", -10, -24, 2, 0, 0, 0, 10, 24, -2)
+pose("sword", 24, -20, 20, -1.5, 0, 0, 6, -2, -30)

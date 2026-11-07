@@ -1,0 +1,157 @@
+# THE HEROINE ON THE REAL BODY, CUT INTO RIGID SEGMENTS (no skinning, so the game places and moves her anywhere without distortion).
+# The human pack's body is sliced by boxes at the joints; every segment is a part on a joint hierarchy with its own clips (rotation about the joint),
+# spheres cover the joints, and armour, sword, cape and eyes are rigid parts on the segments. Dark suit and boots are colour regions of the segments.
+let still = "0:0,0,0; 1:0,0,0"
+let skin = "0.86, 0.64, 0.52"
+hbody = body.human@1(gender=0.85, age=0.667, height=0.5, weight=0.42, muscle=0.62, caucasian=0.5, asian=0.2, african=0.3)
+srcb = poly.to_solid@1(hbody)
+
+# one segment: the body clipped by a box, toon-coloured; its node is p0<tag>
+def seg(tag, x0, y0, z0, x1, y1, z1, cr, cg, cb)
+  sg_{tag}_b = solid.box@1(size=[{x1 - x0}, {y1 - y0}, {z1 - z0}])
+  sg_{tag}_c = xform.move@1(sg_{tag}_b, by=[{(x0 + x1) / 2}, {(y0 + y1) / 2}, {(z0 + z1) / 2}])
+  sg_{tag}_i = solid.intersect@1(srcb, sg_{tag}_c)
+  sg_{tag}_m = solid.material@1(sg_{tag}_i, color=[{cr}, {cg}, {cb}], roughness=0.55)
+  p0{tag} = solid.toon@1(sg_{tag}_m, bands=3, feather=0.2, outline=1.0, shade_color=[0.7, 0.62, 0.7], rim=0.25, outline_color=[0.12, 0.05, 0.05])
+end
+# the first five clips of a segment, as rotation about the joint (px, py, pz); the result is pa<tag>
+def bone(tag, hx, hy, hz, tx, ty, tz)
+  pq{tag} = rig.bone@1(p0{tag}, head=[{hx}, {hy}, {hz}], tail=[{tx}, {ty}, {tz}])
+end
+def trkA(tag, px, py, pz, idle, run, slash, slash2, heavy)
+  ta_{tag}_0 = anim.track@1(pq{tag}, property="rotation", keys={idle}, interpolation="smooth", clip="idle", pivot=[{px}, {py}, {pz}])
+  ta_{tag}_1 = anim.track@1(ta_{tag}_0, property="rotation", keys={run}, interpolation="smooth", clip="run", pivot=[{px}, {py}, {pz}])
+  ta_{tag}_2 = anim.track@1(ta_{tag}_1, property="rotation", keys={slash}, interpolation="smooth", loop=false, clip="slash", pivot=[{px}, {py}, {pz}])
+  ta_{tag}_3 = anim.track@1(ta_{tag}_2, property="rotation", keys={slash2}, interpolation="smooth", loop=false, clip="slash2", pivot=[{px}, {py}, {pz}])
+  pa{tag} = anim.track@1(ta_{tag}_3, property="rotation", keys={heavy}, interpolation="smooth", loop=false, clip="heavy", pivot=[{px}, {py}, {pz}])
+end
+# the other five clips; the result is pb<tag>
+def trkB(tag, px, py, pz, roll, hit, block, cast, death)
+  tb_{tag}_0 = anim.track@1(pa{tag}, property="rotation", keys={roll}, interpolation="smooth", loop=false, clip="roll", pivot=[{px}, {py}, {pz}])
+  tb_{tag}_1 = anim.track@1(tb_{tag}_0, property="rotation", keys={hit}, interpolation="smooth", loop=false, clip="hit", pivot=[{px}, {py}, {pz}])
+  tb_{tag}_2 = anim.track@1(tb_{tag}_1, property="rotation", keys={block}, interpolation="smooth", loop=false, clip="block", pivot=[{px}, {py}, {pz}])
+  tb_{tag}_3 = anim.track@1(tb_{tag}_2, property="rotation", keys={cast}, interpolation="smooth", loop=false, clip="cast", pivot=[{px}, {py}, {pz}])
+  pb{tag} = anim.track@1(tb_{tag}_3, property="rotation", keys={death}, interpolation="smooth", loop=false, clip="death", pivot=[{px}, {py}, {pz}])
+end
+# hang a segment with clips from its parent, and name it; hang0 for a segment without clips
+def hang(tag, par)
+  hg_{tag} = anim.parent@1(pb{tag}, parent={par})
+  output {tag} = hg_{tag}
+end
+def hang0(tag, par)
+  hz_{tag} = anim.parent@1(p0{tag}, parent={par})
+  output {tag} = hz_{tag}
+end
+# a skin sphere over a joint, riding a segment
+def joint(tag, par, x, y, z, r, cr, cg, cb)
+  jt_{tag}_s = solid.sphere@1(radius={r}, segments=20)
+  jt_{tag}_a = xform.move@1(jt_{tag}_s, by=[{x}, {y}, {z}])
+  jt_{tag}_m = solid.material@1(jt_{tag}_a, color=[{cr}, {cg}, {cb}], roughness=0.55)
+  jt_{tag}_t = solid.toon@1(jt_{tag}_m, bands=3, feather=0.2, outline=1.0, shade_color=[0.7, 0.62, 0.7], rim=0.25, outline_color=[0.12, 0.05, 0.05])
+  jt_{tag}_p = anim.parent@1(jt_{tag}_t, parent={par})
+  output j_{tag} = jt_{tag}_p
+end
+
+# ---- the root: bob, crouches, a roll, a fall; and the state machine that picks the clip ----
+rt_s = solid.sphere@1(radius=0.01, segments=8)
+rt_a = xform.move@1(rt_s, by=[0, 0.95, 0])
+rt_m = solid.material@1(rt_a, color=[0.2, 0.2, 0.2], roughness=0.5)
+hr_0 = anim.track@1(rt_m, property="position", keys="0:0,0,0; 1.5:0,0.006,0; 3:0,0,0", interpolation="smooth", clip="idle")
+hr_1 = anim.track@1(hr_0, property="position", keys="0:0,0,0; 0.125:0,0.045,0; 0.25:0,0,0; 0.375:0,0.045,0; 0.5:0,0,0", interpolation="smooth", clip="run")
+hr_2 = anim.track@1(hr_1, property="position", keys="0:0,0,0; 0.25:0,-0.06,0.05; 0.67:0,0,0", interpolation="smooth", loop=false, clip="slash")
+hr_3 = anim.track@1(hr_2, property="position", keys="0:0,0,0; 0.22:0,-0.06,0.05; 0.67:0,0,0", interpolation="smooth", loop=false, clip="slash2")
+hr_4 = anim.track@1(hr_3, property="position", keys="0:0,0,0; 0.4:0,0.03,-0.04; 0.55:0,-0.12,0.1; 1.1:0,0,0", interpolation="smooth", loop=false, clip="heavy")
+hr_5 = anim.track@1(hr_4, property="rotation", keys="0:0,0,0; 0.1:80,0,0; 0.2:170,0,0; 0.3:260,0,0; 0.4:350,0,0; 0.45:360,0,0", interpolation="linear", loop=false, clip="roll", pivot=[0, 0.9, 0.02])
+hr_6 = anim.track@1(hr_5, property="position", keys="0:0,0,0; 0.2:0,-0.3,0; 0.45:0,0,0", interpolation="smooth", loop=false, clip="roll")
+hr_7 = anim.track@1(hr_6, property="position", keys="0:0,0,0; 0.1:0,0,-0.1; 0.45:0,0,0", interpolation="smooth", loop=false, clip="hit")
+hr_8 = anim.track@1(hr_7, property="position", keys="0:0,0,0; 0.3:0,-0.05,0; 0.5:0,-0.05,0", interpolation="smooth", loop=false, clip="block")
+hr_9 = anim.track@1(hr_8, property="rotation", keys="0:0,0,0; 0.5:-35,0,0; 1.4:-88,0,0", interpolation="ease_out", loop=false, clip="death", pivot=[0, 0.08, -0.1])
+hmachine = anim.machine@1(hr_9, program="entry move;state move blend=speed idle@0 run@3.4;state slash clip=slash once;state slash2 clip=slash2 once;state heavy clip=heavy once;state roll clip=roll once;state hit clip=hit once;state block clip=block once;state cast clip=cast once;state death clip=death once;transition any -> slash when trigger:slash fade=0.05;transition any -> slash2 when trigger:slash2 fade=0.05;transition any -> heavy when trigger:heavy fade=0.06;transition any -> roll when trigger:roll fade=0.04;transition any -> hit when trigger:hit_react fade=0.04;transition any -> block when trigger:block fade=0.06;transition any -> cast when trigger:cast fade=0.08;transition any -> death when trigger:death fade=0.1;transition slash -> move exit=0.95;transition slash2 -> move exit=0.95;transition heavy -> move exit=0.95;transition roll -> move exit=0.95;transition hit -> move exit=0.95;transition block -> move exit=0.95;transition cast -> move exit=0.95")
+output root = hmachine
+
+# ---- the segments ----
+seg("pelvis", -0.3, 0.88, -0.3, 0.3, 1.15, 0.3, 0.13, 0.1, 0.11)
+hang0("pelvis", "root")
+seg("chest", -0.145, 1.15, -0.3, 0.145, 1.56, 0.3, 0.13, 0.1, 0.11)
+bone("chest", 0, 1.15, 0, 0, 1.5, 0)
+trkA("chest",0, 1.15, 0, still, "0:-6,0,0; 0.5:-6,0,0", "0:0,0,0; 0.2:0,14,0; 0.32:-2,-20,0; 0.67:0,0,0", "0:0,0,0; 0.16:0,-16,0; 0.3:-2,22,0; 0.67:0,0,0", "0:0,0,0; 0.4:-10,0,0; 0.55:16,0,0; 1.1:0,0,0")
+trkB("chest", 0, 1.15, 0, "0:0,0,0; 0.2:25,0,0; 0.45:0,0,0", "0:0,0,0; 0.08:-20,0,3; 0.45:0,0,0", "0:0,0,0; 0.1:6,0,0; 0.5:6,0,0", "0:0,0,0; 0.3:-10,0,0; 1.0:-10,0,0; 1.3:0,0,0", "0:0,0,0; 0.5:15,0,0; 1.4:25,0,0")
+hang("chest", "pelvis")
+seg("head", -0.3, 1.56, -0.3, 0.3, 2.0, 0.3, 0.86, 0.64, 0.52)
+bone("head", 0, 1.56, 0.02, 0, 1.78, 0.02)
+trkA("head",0, 1.56, 0.02, "0:0,0,0; 1.5:-2,3,0; 3:0,0,0", still, "0:0,0,0; 0.2:0,-14,0; 0.32:0,24,0; 0.67:0,0,0", "0:0,0,0; 0.16:0,20,0; 0.3:0,-26,0; 0.67:0,0,0", "0:0,0,0; 0.4:10,0,0; 0.55:-12,0,0; 1.1:0,0,0")
+trkB("head", 0, 1.56, 0.02, "0:0,0,0; 0.2:30,0,0; 0.45:0,0,0", "0:0,0,0; 0.08:-22,0,0; 0.45:0,0,0", still, "0:0,0,0; 0.3:-20,0,0; 1.0:-20,0,0; 1.3:0,0,0", "0:0,0,0; 0.6:-25,0,0; 1.4:-30,0,0")
+hang("head", "chest")
+joint("neck", "chest", 0, 1.56, 0.02, 0.05, 0.86, 0.64, 0.52)
+# left arm
+seg("uarm_l", 0.145, 1.15, -0.3, 0.364, 1.6, 0.3, 0.13, 0.1, 0.11)
+bone("uarm_l", 0.175, 1.44, 0.02, 0.364, 1.229, 0.031)
+trkA("uarm_l",0.175, 1.44, 0.02, "0:0,0,-12; 1.5:1,0,-13; 3:0,0,-12", "0:24,0,-12; 0.25:-24,0,-12; 0.5:24,0,-12", "0:0,0,-12; 0.2:-30,0,-30; 0.32:12,0,-12; 0.67:0,0,-12", "0:0,0,-12; 0.16:10,0,-12; 0.3:-30,0,-30; 0.67:0,0,-12", "0:0,0,-12; 0.4:-150,-10,-20; 0.55:-30,0,-10; 1.1:0,0,-12")
+trkB("uarm_l", 0.175, 1.44, 0.02, "0:0,0,-12; 0.2:-60,0,-20; 0.45:0,0,-12", "0:0,0,-12; 0.1:20,0,-8; 0.45:0,0,-12", "0:0,0,-12; 0.1:-60,-30,-40; 0.5:-60,-30,-40", "0:0,0,-12; 0.3:-150,0,-30; 1.0:-150,0,-30; 1.3:0,0,-12", "0:0,0,-12; 0.5:-20,0,-30; 1.4:10,0,-20")
+hang("uarm_l", "chest")
+seg("farm_l", 0.364, 0.95, -0.3, 0.488, 1.5, 0.3, 0.86, 0.64, 0.52)
+bone("farm_l", 0.364, 1.229, 0.031, 0.488, 1.098, 0.187)
+trkA("farm_l",0.364, 1.229, 0.031, "0:-10,0,0; 1.5:-12,0,0; 3:-10,0,0", "0:-40,0,0; 0.25:-12,0,0; 0.5:-40,0,0", still, still, "0:-10,0,0; 0.4:-40,0,0; 0.55:-10,0,0; 1.1:-10,0,0")
+trkB("farm_l", 0.364, 1.229, 0.031, still, still, "0:-10,0,0; 0.1:-70,0,0; 0.5:-70,0,0", "0:-10,0,0; 0.3:-30,0,0; 1.0:-30,0,0; 1.3:-10,0,0", "0:-10,0,0; 0.5:-30,0,0; 1.4:-20,0,0")
+hang("farm_l", "uarm_l")
+seg("hand_l", 0.488, 0.8, -0.3, 0.9, 1.4, 0.4, 0.86, 0.64, 0.52)
+hang0("hand_l", "farm_l")
+joint("shoulder_l", "chest", 0.175, 1.44, 0.02, 0.052, 0.13, 0.1, 0.11)
+joint("elbow_l", "uarm_l", 0.364, 1.229, 0.031, 0.04, 0.86, 0.64, 0.52)
+# right arm: the sword arm, held out and ready
+seg("uarm_r", -0.364, 1.15, -0.3, -0.145, 1.6, 0.3, 0.13, 0.1, 0.11)
+bone("uarm_r", -0.175, 1.44, 0.02, -0.364, 1.229, 0.031)
+trkA("uarm_r",-0.175, 1.44, 0.02, "0:-34,0,16; 1.5:-36,0,17; 3:-34,0,16", "0:-24,0,12; 0.25:-34,0,12; 0.5:-24,0,12", "0:-14,0,12; 0.2:-95,30,40; 0.32:-70,-70,-10; 0.67:-14,0,12", "0:-14,0,12; 0.16:-70,-60,-10; 0.3:-95,40,40; 0.67:-14,0,12", "0:-14,0,12; 0.4:-160,10,20; 0.55:-30,0,10; 1.1:-14,0,12")
+trkB("uarm_r", -0.175, 1.44, 0.02, "0:-14,0,12; 0.2:-60,0,20; 0.45:-14,0,12", "0:-14,0,12; 0.1:10,0,10; 0.45:-14,0,12", "0:-14,0,12; 0.1:-70,40,50; 0.5:-70,40,50", "0:-14,0,12; 0.3:-150,0,30; 1.0:-150,0,30; 1.3:-14,0,12", "0:-14,0,12; 0.5:-20,0,30; 1.4:10,0,20")
+hang("uarm_r", "chest")
+seg("farm_r", -0.488, 0.95, -0.3, -0.364, 1.5, 0.3, 0.86, 0.64, 0.52)
+bone("farm_r", -0.364, 1.229, 0.031, -0.488, 1.098, 0.187)
+trkA("farm_r",-0.364, 1.229, 0.031, "0:-25,0,0; 1.5:-27,0,0; 3:-25,0,0", "0:-60,0,0; 0.5:-60,0,0", "0:-45,0,0; 0.2:-70,0,0; 0.32:-20,0,0; 0.67:-45,0,0", "0:-45,0,0; 0.16:-20,0,0; 0.3:-70,0,0; 0.67:-45,0,0", "0:-45,0,0; 0.4:-30,0,0; 0.55:-10,0,0; 1.1:-45,0,0")
+trkB("farm_r", -0.364, 1.229, 0.031, still, still, "0:-45,0,0; 0.1:-100,0,0; 0.5:-100,0,0", "0:-45,0,0; 0.3:-30,0,0; 1.0:-30,0,0; 1.3:-45,0,0", "0:-45,0,0; 0.5:-20,0,0; 1.4:-10,0,0")
+hang("farm_r", "uarm_r")
+seg("hand_r", -0.9, 0.8, -0.3, -0.488, 1.4, 0.4, 0.86, 0.64, 0.52)
+hang0("hand_r", "farm_r")
+joint("shoulder_r", "chest", -0.175, 1.44, 0.02, 0.052, 0.13, 0.1, 0.11)
+joint("elbow_r", "uarm_r", -0.364, 1.229, 0.031, 0.04, 0.86, 0.64, 0.52)
+# legs
+seg("thigh_l", 0.0, 0.521, -0.3, 0.4, 0.88, 0.3, 0.13, 0.1, 0.11)
+bone("thigh_l", 0.109, 0.951, 0.013, 0.147, 0.521, 0.046)
+trkA("thigh_l",0.109, 0.951, 0.013, still, "0:-34,0,0; 0.25:34,0,0; 0.5:-34,0,0", "0:0,0,0; 0.25:-18,0,0; 0.67:0,0,0", "0:0,0,0; 0.22:-18,0,0; 0.67:0,0,0", "0:0,0,0; 0.55:-16,0,0; 1.1:0,0,0")
+trkB("thigh_l", 0.109, 0.951, 0.013, "0:0,0,0; 0.1:-70,0,0; 0.35:-70,0,0; 0.45:0,0,0", still, still, still, "0:0,0,0; 0.5:-40,0,0; 1.2:-20,0,0")
+hang("thigh_l", "pelvis")
+seg("shin_l", 0.0, 0.1, -0.3, 0.4, 0.521, 0.3, 0.13, 0.1, 0.11)
+bone("shin_l", 0.147, 0.521, 0.046, 0.183, 0.081, 0.011)
+trkA("shin_l",0.147, 0.521, 0.046, still, "0:8,0,0; 0.125:4,0,0; 0.25:60,0,0; 0.5:8,0,0", still, still, still)
+trkB("shin_l", 0.147, 0.521, 0.046, "0:0,0,0; 0.1:100,0,0; 0.35:100,0,0; 0.45:0,0,0", still, still, still, "0:0,0,0; 0.5:80,0,0; 1.2:30,0,0")
+hang("shin_l", "thigh_l")
+seg("foot_l", 0.0, -0.05, -0.3, 0.4, 0.1, 0.4, 0.1, 0.07, 0.05)
+hang0("foot_l", "shin_l")
+joint("knee_l", "thigh_l", 0.147, 0.521, 0.046, 0.056, 0.13, 0.1, 0.11)
+joint("hip_l", "pelvis", 0.109, 0.92, 0.013, 0.095, 0.13, 0.1, 0.11)
+seg("thigh_r", -0.4, 0.521, -0.3, 0.0, 0.88, 0.3, 0.13, 0.1, 0.11)
+bone("thigh_r", -0.109, 0.951, 0.013, -0.147, 0.521, 0.046)
+trkA("thigh_r",-0.109, 0.951, 0.013, still, "0:34,0,0; 0.25:-34,0,0; 0.5:34,0,0", "0:0,0,0; 0.25:22,0,0; 0.67:0,0,0", "0:0,0,0; 0.22:22,0,0; 0.67:0,0,0", "0:0,0,0; 0.55:20,0,0; 1.1:0,0,0")
+trkB("thigh_r", -0.109, 0.951, 0.013, "0:0,0,0; 0.1:-70,0,0; 0.35:-70,0,0; 0.45:0,0,0", still, still, still, "0:0,0,0; 0.5:-30,0,0; 1.2:-10,0,0")
+hang("thigh_r", "pelvis")
+seg("shin_r", -0.4, 0.1, -0.3, 0.0, 0.521, 0.3, 0.13, 0.1, 0.11)
+bone("shin_r", -0.147, 0.521, 0.046, -0.183, 0.081, 0.011)
+trkA("shin_r",-0.147, 0.521, 0.046, still, "0:60,0,0; 0.25:8,0,0; 0.375:4,0,0; 0.5:60,0,0", still, still, still)
+trkB("shin_r", -0.147, 0.521, 0.046, "0:0,0,0; 0.1:100,0,0; 0.35:100,0,0; 0.45:0,0,0", still, still, still, "0:0,0,0; 0.5:70,0,0; 1.2:20,0,0")
+hang("shin_r", "thigh_r")
+seg("foot_r", -0.4, -0.05, -0.3, 0.0, 0.1, 0.4, 0.1, 0.07, 0.05)
+hang0("foot_r", "shin_r")
+joint("knee_r", "thigh_r", -0.147, 0.521, 0.046, 0.056, 0.13, 0.1, 0.11)
+joint("hip_r", "pelvis", -0.109, 0.92, 0.013, 0.095, 0.13, 0.1, 0.11)
+
+# ---- eyes ride the head ----
+def eyepart(tag, r, z, cr, cg, cb, shine)
+  he_{tag}_s = solid.sphere@1(radius={r}, segments=20)
+  he_{tag}_a = xform.move@1(he_{tag}_s, by=[0.0315, 1.687, {z}])
+  he_{tag}_b = xform.mirror@1(he_{tag}_a, axis="x")
+  he_{tag}_m = solid.material@1(he_{tag}_b, color=[{cr}, {cg}, {cb}], roughness={shine})
+  he_{tag}_p = anim.parent@1(he_{tag}_m, parent="head")
+  output eye_{tag} = he_{tag}_p
+end
+eyepart("white", 0.0168, 0.124, 0.95, 0.93, 0.9, 0.35)
+eyepart("iris", 0.0105, 0.1325, 0.2, 0.55, 0.38, 0.15)
+eyepart("pupil", 0.0058, 0.1405, 0.02, 0.02, 0.03, 0.1)

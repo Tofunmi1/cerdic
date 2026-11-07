@@ -81,6 +81,46 @@ pub(crate) fn execute(
         }
         "field.offset" => first_field(inputs)?.offset(number(node, "amount")?),
         "field.shell" => first_field(inputs)?.shell(number(node, "half_width")?),
+        "field.noise" => {
+            let octaves = u8::try_from(integer(node, "octaves")?)
+                .map_err(|_| fail("field.invalid_parameter", "invalid octaves"))?;
+            let seed = integer(node, "seed")?;
+            let ridged =
+                matches!(node.params.get("mode"), Some(Param::Str(mode)) if mode == "ridged");
+            first_field(inputs)?.noise(
+                number(node, "amplitude")?,
+                number(node, "scale")?,
+                octaves,
+                number(node, "persistence")?,
+                seed,
+                ridged,
+            )
+        }
+        "field.taper" | "field.twist" | "field.bend" => {
+            let kind = if family == "field.taper" {
+                0
+            } else if family == "field.twist" {
+                1
+            } else {
+                2
+            };
+            let axis = axis_param(node, "axis", 1)?;
+            let toward = axis_param(node, "toward", (axis + 1) % 3)?;
+            let (start, end) = if kind == 0 {
+                (number(node, "scale_start")?, number(node, "scale_end")?)
+            } else {
+                (0.0, number(node, "angle")?)
+            };
+            first_field(inputs)?.warp(
+                kind,
+                axis,
+                toward,
+                number(node, "from")?,
+                number(node, "to")?,
+                start,
+                end,
+            )
+        }
         "field.repeat" => {
             first_field(inputs)?.repeated(vector(node, "period")?, repeat_counts(node)?)
         }
@@ -93,6 +133,20 @@ pub(crate) fn execute(
     Ok(value)
 }
 
+fn axis_param(node: &Node, name: &str, fallback: u8) -> Result<u8, Fail> {
+    match node.params.get(name) {
+        None => Ok(fallback),
+        Some(Param::Str(axis)) if axis == "auto" => Ok(fallback),
+        Some(Param::Str(axis)) => match axis.as_str() {
+            "x" => Ok(0),
+            "y" => Ok(1),
+            "z" => Ok(2),
+            _ => Err(fail("field.invalid_parameter", format!("invalid {name}"))),
+        },
+        _ => Err(fail("field.invalid_parameter", format!("missing {name}"))),
+    }
+}
+
 fn warn_inexact_distance(family: &str, node: &Node, inputs: &[Rc<Value>], value: &mut Value) {
     if matches!(family, "field.offset" | "field.shell")
         && inputs
@@ -103,6 +157,7 @@ fn warn_inexact_distance(family: &str, node: &Node, inputs: &[Rc<Value>], value:
         value.warnings.push(crate::EvaluationWarning {
             code: "field.distance_inexact".to_owned(),
             node: node.id.to_string(),
+            related: Vec::new(),
             message: format!(
                 "{} is applied to a field without an exact Euclidean distance guarantee",
                 node.op.family()
@@ -164,6 +219,14 @@ fn number(node: &Node, name: &str) -> Result<f64, Fail> {
         .get(name)
         .and_then(Param::as_f64)
         .ok_or_else(|| fail("field.invalid_parameter", format!("missing {name}")))
+}
+
+fn integer(node: &Node, name: &str) -> Result<u32, Fail> {
+    match node.params.get(name) {
+        Some(Param::Int(value)) => u32::try_from(*value)
+            .map_err(|_| fail("field.invalid_parameter", format!("invalid {name}"))),
+        _ => Err(fail("field.invalid_parameter", format!("missing {name}"))),
+    }
 }
 
 fn vector(node: &Node, name: &str) -> Result<[f64; 3], Fail> {

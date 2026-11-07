@@ -32,15 +32,24 @@ async function start() {
   try {
     const runtime = await window.__loadSpatialRuntime();
     const params = new URLSearchParams(location.search);
-    runtime.start('ve', params.get('scene') ?? 'gallery');
+    runtime.start('ve', params.get('scene') ?? 'stage');
     host.boots++; host.runtime = runtime;
     runtime.viewer_configure(true, 40, false, 3);
-    host.evaluation = new EvaluationHost(runtime, notify, host.resources);
+    // The first model that appears is framed so it is in view; later edits leave the camera where the person put it.
+    let framed = false;
+    host.evaluation = new EvaluationHost(runtime, notify, host.resources, {
+      onProjected: bounds => {
+        if (!framed) framed = runtime.viewer_frame(...bounds.min as [number, number, number], ...bounds.max as [number, number, number]);
+      },
+    });
     const mcp = params.get('mcp');
     if (mcp) window.addEventListener('pagehide', connectMcpBridge(host, Number(mcp) > 1 ? Number(mcp) : 8765), { once: true });
-    host.doc = documentBridge(runtime, notify, () => host.evaluation?.request());
-    runtime.doc_open(params.get('docname') ?? 'spatial-lab', 1);
-    host.evaluation.request();
+    host.doc = documentBridge(runtime, notify, () => host.evaluation?.request(), host.evaluation.text);
+    // The engine keeps the last document in the browser and opening restores it. A page that names a world to load starts empty instead, so the
+    // document that was saved last (another world) is neither shown while the world loads nor mixed into it.
+    const docName = params.get('docname') ?? 'spatial-lab';
+    if (params.has('world')) runtime.doc_reset(docName, 1);
+    else { runtime.doc_open(docName, 1); host.evaluation.request(); }
     const disposeInput = bindInput(canvas, runtime);
     host.resources.inputBindings = 8;
     const cleanup = () => {

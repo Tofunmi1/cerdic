@@ -51,6 +51,13 @@ bool valid_instruction(const ve_field_instruction& instruction, size_t index) {
              (instruction.input_b >> 24U) == 0U &&
              std::all_of(counts.begin(), counts.end(), [](uint32_t count) { return count <= 16U; });
     }
+    case VE_FIELD_NOISE:
+      return valid_reference(instruction.input_a, index) && instruction.x >= 0.0 &&
+             instruction.y > 0.0 && instruction.z >= 0.0 && instruction.z <= 1.0 &&
+             instruction.w >= 1.0 && instruction.w <= 14.0 &&
+             std::floor(instruction.w) == instruction.w;
+    case VE_FIELD_WARP:
+      return valid_reference(instruction.input_a, index) && instruction.input_b < 196608U && instruction.y != instruction.x;
     case VE_FIELD_UNION:
     case VE_FIELD_INTERSECTION:
     case VE_FIELD_DIFFERENCE:
@@ -130,8 +137,9 @@ double tube_segment_value(const ve_field_instruction& instruction,
       denominator;
   const double t = std::clamp(projection, 0.0, 1.0);
   const manifold::vec3 delta = relative - direction * t;
-  // x is the radius at the segment's start and y at its end; the radius changes linearly between them.
-  return instruction.x + (instruction.y - instruction.x) * t -
+  // x is the radius at the segment's start and y at its end; the radius changes linearly between
+  // them.
+  return instruction.x + ((instruction.y - instruction.x) * t) -
          std::sqrt((delta.x * delta.x) + (delta.y * delta.y) + (delta.z * delta.z));
 }
 
@@ -211,6 +219,106 @@ double combine_value(const ve_field_instruction& instruction, double left, doubl
   }
 }
 
+uint64_t noise_hash(int64_t x, int64_t y, int64_t z, uint32_t seed) {
+  uint64_t h = static_cast<uint64_t>(seed) * 0x9E3779B97F4A7C15ULL;
+  for (const int64_t coordinate : {x, y, z}) {
+    h ^= static_cast<uint64_t>(coordinate);
+    h *= 0xBF58476D1CE4E5B9ULL;
+    h ^= h >> 31U;
+  }
+  h *= 0x94D049BB133111EBULL;
+  h ^= h >> 29U;
+  return h;
+}
+
+double noise_corner(int64_t x, int64_t y, int64_t z, uint32_t seed) {
+  const double unit = static_cast<double>(noise_hash(x, y, z, seed) >> 40U) / 16777216.0;
+  return (unit * 2.0) - 1.0;
+}
+
+double smooth_noise(manifold::vec3 point, uint32_t seed) {
+  const std::array<double, 3> at = {point.x, point.y, point.z};
+  const std::array<double, 3> base = {std::floor(point.x), std::floor(point.y),
+                                      std::floor(point.z)};
+  const std::array<int64_t, 3> cell = {static_cast<int64_t>(base.at(0)),
+                                       static_cast<int64_t>(base.at(1)),
+                                       static_cast<int64_t>(base.at(2))};
+  const std::array<double, 3> fade = {
+      (at.at(0) - base.at(0)) * (at.at(0) - base.at(0)) * (3.0 - (2.0 * (at.at(0) - base.at(0)))),
+      (at.at(1) - base.at(1)) * (at.at(1) - base.at(1)) * (3.0 - (2.0 * (at.at(1) - base.at(1)))),
+      (at.at(2) - base.at(2)) * (at.at(2) - base.at(2)) * (3.0 - (2.0 * (at.at(2) - base.at(2))))};
+  double sum = 0.0;
+  for (int dx = 0; dx < 2; ++dx) {
+    for (int dy = 0; dy < 2; ++dy) {
+      for (int dz = 0; dz < 2; ++dz) {
+        const double weight = (dx != 0 ? fade.at(0) : 1.0 - fade.at(0)) *
+                              (dy != 0 ? fade.at(1) : 1.0 - fade.at(1)) *
+                              (dz != 0 ? fade.at(2) : 1.0 - fade.at(2));
+        sum += weight * noise_corner(cell.at(0) + dx, cell.at(1) + dy, cell.at(2) + dz, seed);
+      }
+    }
+  }
+  return sum;
+}
+
+// The point of the straight input a point of the bent field comes from; the same formulas as
+// `bend_inverse` in `ve-geometry/src/field/warp.rs` (the axis curves toward `toward` through
+// `angle_degrees` between `from` and `to`; unchanged before `from`; a rigid motion past `to`).
+manifold::vec3 bend_inverse(manifold::vec3 point, uint32_t axis, uint32_t toward, double from,
+                            double to, double angle_degrees) {
+  const double theta = angle_degrees * 0.017453292519943295;
+  if (theta == 0.0) {
+    return point;
+  }
+  const double radius = (to - from) / theta;
+  const double sign = radius < 0.0 ? -1.0 : 1.0;
+  const double ds = point[axis] - from;
+  const double w = radius - point[toward];
+  const double phi = std::atan2(ds * sign, w * sign);
+  const double turned = phi * (theta < 0.0 ? -1.0 : 1.0);
+  if (turned < 0.0) {
+    return point;
+  }
+  manifold::vec3 out = point;
+  if (turned > std::abs(theta)) {
+    const double sine = std::sin(theta);
+    const double cosine = std::cos(theta);
+    const double end_axis = from + (radius * sine);
+    const double end_toward = radius * (1.0 - cosine);
+    const double x = point[axis] - end_axis;
+    const double y = point[toward] - end_toward;
+    out[axis] = to + (x * cosine) + (y * sine);
+    out[toward] = (-x * sine) + (y * cosine);
+    return out;
+  }
+  out[axis] = from + (radius * phi);
+  out[toward] = radius - (sign * std::hypot(ds, w));
+  return out;
+}
+
+double noise_value(const ve_field_instruction& instruction, manifold::vec3 point, double child) {
+  if (instruction.x == 0.0) {
+    return child;
+  }
+  const auto packed = static_cast<uint32_t>(instruction.w);
+  const uint32_t octaves = packed & 7U;
+  const bool ridged = (packed & 8U) != 0U;
+  double sum = 0.0;
+  double total = 0.0;
+  double weight = 1.0;
+  for (uint32_t octave = 0; octave < octaves; ++octave) {
+    const auto frequency = static_cast<double>(1U << octave);
+    const double value =
+        smooth_noise({point.x / instruction.y * frequency, point.y / instruction.y * frequency,
+                      point.z / instruction.y * frequency},
+                     instruction.input_b + octave);
+    sum += weight * (ridged ? 1.0 - (2.0 * std::abs(value)) : value);
+    total += weight;
+    weight *= instruction.z;
+  }
+  return child - (instruction.x * (sum / total));
+}
+
 }  // namespace
 
 bool valid_tape(const ve_field_instruction* instructions, size_t count) {
@@ -267,12 +375,36 @@ double TapeEvaluator::Evaluate(const ve_field_instruction* instructions, size_t 
       frames_.push_back({instruction.input_a, frame.point});
       continue;
     }
+    if (instruction.opcode == VE_FIELD_NOISE && frame.state == 0) {
+      frame.state = 1;
+      frames_.push_back({instruction.input_a, frame.point});
+      continue;
+    }
+    if (instruction.opcode == VE_FIELD_WARP && frame.state == 0) {
+      frame.state = 1;
+      auto point = frame.point;
+      const auto kind = instruction.input_b & 0xffU;
+      const auto axis = (instruction.input_b >> 8U) & 0xffU;
+      const auto a = (axis + 1U) % 3U;
+      const auto b = (axis + 2U) % 3U;
+      const double t = std::clamp((point[axis] - instruction.x) / (instruction.y - instruction.x), 0.0, 1.0);
+      const double value = instruction.z + (instruction.w - instruction.z) * t;
+      if (kind == 0U) { point[a] /= value; point[b] /= value; }
+      else if (kind == 1U) { const double angle = value * 0.017453292519943295; const double c = std::cos(angle), s = std::sin(angle); const double old_a = point[a], old_b = point[b]; point[a] = c * old_a + s * old_b; point[b] = -s * old_a + c * old_b; }
+      else { point = bend_inverse(point, axis, (instruction.input_b >> 16U) & 0xffU, instruction.x, instruction.y, instruction.w); }
+      frames_.push_back({instruction.input_a, point});
+      continue;
+    }
     if (frame.state == 0) {
       returned = primitive_value(instruction, instructions, frame.point);
       frames_.pop_back();
       continue;
     }
-    returned = combine_value(instruction, frame.left, returned);
+    returned = instruction.opcode == VE_FIELD_WARP && (instruction.input_b & 0xffU) == 0U
+                   ? returned * (instruction.z + (instruction.w - instruction.z) * std::clamp((frame.point[(instruction.input_b >> 8U) & 0xffU] - instruction.x) / (instruction.y - instruction.x), 0.0, 1.0))
+                   : instruction.opcode == VE_FIELD_NOISE
+                   ? noise_value(instruction, frame.point, returned)
+                   : combine_value(instruction, frame.left, returned);
     frames_.pop_back();
   }
   return returned;

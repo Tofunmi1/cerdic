@@ -86,7 +86,7 @@ fn sources() -> Vec<Option<OperatorSpec>> {
     vec![
         spec(
             "poly.grid@1",
-            "A flat grid of quads in the z = 0 plane with normalized u/v corner UVs, width wide centred on x = 0 and height tall from y = 0, facing +z.",
+            "A flat grid of quads in the z = 0 plane with normalized u/v corner UVs, width wide centred on x = 0 and height tall centred on y = 0 (so it spans -height/2 to height/2: move it up to stand it on the floor), facing +z.",
             vec![],
             poly,
             vec![
@@ -94,6 +94,46 @@ fn sources() -> Vec<Option<OperatorSpec>> {
                 length("height", None, "Total height in metres."),
                 count("columns", 512, 4, "Quads across."),
                 count("rows", 512, 4, "Quads up."),
+            ],
+        ),
+        spec(
+            "poly.import@1",
+            "Brings your own mesh file into the document as an editable polygon mesh: the file's text goes in `data` and `format` says how to read it (obj, ascii ply or ascii stl). Nothing is fetched and nothing is bundled with the engine; the document carries the text, so the result is the same everywhere. OBJ keeps its polygons (triangles, quads and larger) and its texture coordinates as the mesh's u and v; PLY keeps its faces; STL is triangles welded by exact position. Normals, materials, groups and colours in the file are ignored (give the part a look with appearance nodes). `scale` multiplies every coordinate (use 0.001 for a file in millimetres, 0.01 for centimetres) and `up` says which axis the file calls up: a file made in Z-up software (`z`) is turned to this engine's Y up. Binary PLY and binary STL are refused with the way out (save them as ASCII); up to 200,000 vertices and faces and 1,000,000 characters of text. The result is a normal poly mesh: it can be selected, extruded, smoothed, unwrapped, decimated, put into sets or turned into a solid, and it is checked like any other (an open or non-manifold file imports fine as a poly; poly.to_solid asks for a closed one).",
+            vec![],
+            poly,
+            vec![
+                ParamSpec {
+                    name: "data",
+                    ty: ParamType::Str { max_len: 1_000_000 },
+                    default: None,
+                    doc: "The file's text.",
+                },
+                ParamSpec {
+                    name: "format",
+                    ty: ParamType::Choice {
+                        options: &["obj", "ply", "stl"],
+                    },
+                    default: Some(Value::Str("obj".to_owned())),
+                    doc: "How to read `data`: Wavefront obj, ascii ply or ascii stl.",
+                },
+                ParamSpec {
+                    name: "scale",
+                    ty: ParamType::Num {
+                        unit: Unit::Ratio,
+                        min: 1.0e-6,
+                        max: 1.0e6,
+                    },
+                    default: Some(Value::Num(1.0)),
+                    doc: "Multiplies every coordinate; the file's unit times this is metres.",
+                },
+                ParamSpec {
+                    name: "up",
+                    ty: ParamType::Choice {
+                        options: &["y", "z"],
+                    },
+                    default: Some(Value::Str("y".to_owned())),
+                    doc: "Which axis the file calls up; z is turned to Y up.",
+                },
             ],
         ),
         spec(
@@ -171,18 +211,28 @@ fn edits() -> Vec<Option<OperatorSpec>> {
         ),
         edit(
             "poly.merge_coplanar@1",
-            "Merges connected coplanar faces into single faces, such as a solid's triangles into its flat faces. Refuses a patch that cannot become one simple face (a hole or pinch).",
+            "Merges connected coplanar faces into single faces, such as a solid's triangles into its flat faces. A patch that cannot become one simple face (the wall face around a window, a pinch) stays as it is by default, so a cut wall can then be rounded with poly.round_edges.",
             false,
-            vec![ParamSpec {
-                name: "angle",
-                ty: ParamType::Num {
-                    unit: Unit::Angle,
-                    min: 0.0,
-                    max: 0.5,
+            vec![
+                ParamSpec {
+                    name: "angle",
+                    ty: ParamType::Num {
+                        unit: Unit::Angle,
+                        min: 0.0,
+                        max: 0.5,
+                    },
+                    default: Some(Value::Num(0.01)),
+                    doc: "How far a face's normal may differ from the patch's first face and still count as coplanar, in radians.",
                 },
-                default: Some(Value::Num(0.01)),
-                doc: "How far a face's normal may differ from the patch's first face and still count as coplanar, in radians.",
-            }],
+                ParamSpec {
+                    name: "holes",
+                    ty: ParamType::Choice {
+                        options: &["keep", "refuse"],
+                    },
+                    default: Some(Value::Str("keep".into())),
+                    doc: "keep leaves a patch that cannot become one simple face (a hole or pinch) unmerged; refuse fails with the reason instead.",
+                },
+            ],
         ),
         edit(
             "poly.dissolve_faces@1",

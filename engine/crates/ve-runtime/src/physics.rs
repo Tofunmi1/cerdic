@@ -11,3 +11,5 @@
 include!("physics/part_1.rs");
 include!("physics/part_2.rs");
 include!("physics/part_3.rs");
+include!("physics/part_4.rs");
+include!("physics/part_5.rs");

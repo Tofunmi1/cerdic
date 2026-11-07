@@ -55,9 +55,15 @@ impl Candidate {
         Motion {
             tracks: self.animations.get(node),
             behavior: self.behaviors.get(node),
+            machine: self.machines.get(node),
             parent: self.parents.get(node),
             skin: self.skins.get(node),
             ik: self.iks.get(node),
+            fx: self.fxs.get(node),
+            ragdoll: self.ragdolls.get(node),
+            cloth: self.cloths.get(node),
+            fluid: self.fluids.get(node),
+            sim: self.sims.get(node),
             ik_bone: self.ik_bones.contains(name),
             body: None,
         }
@@ -128,6 +134,34 @@ pub(crate) fn behavior(text: &str, node: &str, json: &str) -> bool {
             return false;
         }
         candidate.behaviors.insert(node.to_owned(), behavior);
+        true
+    })
+}
+
+/// Stages the animation state machine (the JSON of a `ve_animstate::StateMachine`) of the part made by `node`. A malformed or invalid
+/// machine refuses the call.
+pub(crate) fn machine(text: &str, node: &str, json: &str) -> bool {
+    let Ok(machine) = serde_json::from_str::<ve_animstate::StateMachine>(json) else {
+        return false;
+    };
+    if ve_graph::NodeId::parse(node).is_err() || machine.validate().is_err() {
+        return false;
+    }
+    STATE.with(|cell| {
+        let mut state = cell.borrow_mut();
+        let Some(candidate) = state.candidate.as_mut() else {
+            return false;
+        };
+        if serde_json::to_string(&candidate.token).ok().as_deref() != Some(text)
+            || !staging::current(&candidate.token)
+            || candidate.finished
+            || candidate.machines.len() >= 256
+        {
+            return false;
+        }
+        candidate
+            .machines
+            .insert(node.to_owned(), std::sync::Arc::new(machine));
         true
     })
 }
@@ -219,6 +253,185 @@ pub(crate) fn ik(text: &str, node: &str, json: &str) -> bool {
         candidate
             .iks
             .insert(node.to_owned(), std::sync::Arc::new(chain));
+        true
+    })
+}
+
+/// Stages the particle effect (a JSON `PartFx`) that the part made by `node` emits (`fx.emitter`). A malformed or invalid effect, or
+/// one too many in the scene, refuses the call.
+pub(crate) fn fx(text: &str, node: &str, json: &str) -> bool {
+    /// Most parts that may emit in one scene.
+    const MAX_EFFECTS: usize = 64;
+    let Ok(effect) = serde_json::from_str::<ve_modeling::fx::PartFx>(json) else {
+        return false;
+    };
+    if ve_graph::NodeId::parse(node).is_err()
+        || effect.effect.validate().is_err()
+        || effect.names.len() != effect.effect.emitters.len()
+        || effect.ground.is_some_and(|g| !g.is_finite())
+    {
+        return false;
+    }
+    STATE.with(|cell| {
+        let mut state = cell.borrow_mut();
+        let Some(candidate) = state.candidate.as_mut() else {
+            return false;
+        };
+        if serde_json::to_string(&candidate.token).ok().as_deref() != Some(text)
+            || !staging::current(&candidate.token)
+            || candidate.finished
+            || candidate.fxs.len() >= MAX_EFFECTS
+        {
+            return false;
+        }
+        candidate
+            .fxs
+            .insert(node.to_owned(), std::sync::Arc::new(effect));
+        true
+    })
+}
+
+/// Stages the ragdoll definition (a JSON `RagdollSpec`, resolved against its bones) carried by the part made by `node` (`phys.ragdoll`). A
+/// malformed or inconsistent one refuses the call.
+pub(crate) fn ragdoll(text: &str, node: &str, json: &str) -> bool {
+    use ve_modeling::ragdoll::MAX_RAGDOLL_BONES;
+    let Ok(spec) = serde_json::from_str::<ve_modeling::ragdoll::RagdollSpec>(json) else {
+        return false;
+    };
+    let count = spec.bones.len();
+    let numbers = [spec.swing, spec.twist, spec.hinge_limits[0], spec.hinge_limits[1], spec.density, spec.damping, spec.radius];
+    if ve_graph::NodeId::parse(node).is_err()
+        || count == 0
+        || count > MAX_RAGDOLL_BONES
+        || spec.segments.len() != count
+        || spec.parents.len() != count
+        || spec.hinges.len() != count
+        || spec.parents.iter().enumerate().any(|(i, p)| p.is_some_and(|p| p >= i))
+        || !numbers.iter().chain(&spec.hinge_axis).all(|v| v.is_finite())
+        || spec.density <= 0.0
+        || !spec.segments.iter().all(|s| s.head.iter().chain(&s.tail).all(|v| v.is_finite()))
+    {
+        return false;
+    }
+    STATE.with(|cell| {
+        let mut state = cell.borrow_mut();
+        let Some(candidate) = state.candidate.as_mut() else {
+            return false;
+        };
+        if serde_json::to_string(&candidate.token).ok().as_deref() != Some(text)
+            || !staging::current(&candidate.token)
+            || candidate.finished
+            || candidate.ragdolls.len() >= 16
+        {
+            return false;
+        }
+        // Every bone must be posable by the animation pass even with no track or parent of its own (the pelvis): it is a bone like an IK bone.
+        candidate.ik_bones.extend(spec.bones.iter().cloned());
+        candidate.ragdolls.insert(node.to_owned(), std::sync::Arc::new(spec));
+        true
+    })
+}
+
+/// Stages the live liquid (a JSON `FluidSpec`, collider segments filled in) of the part made by `node` (`fluid.sim`). A malformed or impossible
+/// liquid refuses the call.
+pub(crate) fn fluid(text: &str, node: &str, json: &str) -> bool {
+    let Ok(spec) = serde_json::from_str::<ve_modeling::fluid_sim::FluidSpec>(json) else {
+        return false;
+    };
+    if ve_graph::NodeId::parse(node).is_err() {
+        return false;
+    }
+    let bones = spec.collide_bones.clone();
+    let Some(shared) = crate::fluid_live::Shared::new(spec) else {
+        return false;
+    };
+    STATE.with(|cell| {
+        let mut state = cell.borrow_mut();
+        let Some(candidate) = state.candidate.as_mut() else {
+            return false;
+        };
+        if serde_json::to_string(&candidate.token).ok().as_deref() != Some(text)
+            || !staging::current(&candidate.token)
+            || candidate.finished
+            || candidate.fluids.len() >= 8
+        {
+            return false;
+        }
+        candidate.ik_bones.extend(bones);
+        candidate.fluids.insert(node.to_owned(), shared);
+        true
+    })
+}
+
+/// Stages the simulation program (a JSON `SimSpec`) of the part made by `node` (`sim.program`). A program that does not compile or a
+/// description with impossible numbers refuses the call.
+pub(crate) fn sim(text: &str, node: &str, json: &str, points: &[f32], corners: &[u32]) -> bool {
+    let Ok(spec) = serde_json::from_str::<ve_modeling::sim_program::SimSpec>(json) else {
+        return false;
+    };
+    if ve_graph::NodeId::parse(node).is_err() || !points.len().is_multiple_of(3) {
+        return false;
+    }
+    let mesh = (spec.mode == "mesh").then(|| (points.chunks_exact(3).map(|p| [p[0], p[1], p[2]]).collect(), corners.to_vec()));
+    let Some(shared) = crate::sim_live::Shared::new(spec, mesh) else {
+        return false;
+    };
+    STATE.with(|cell| {
+        let mut state = cell.borrow_mut();
+        let Some(candidate) = state.candidate.as_mut() else {
+            return false;
+        };
+        if serde_json::to_string(&candidate.token).ok().as_deref() != Some(text)
+            || !staging::current(&candidate.token)
+            || candidate.finished
+            || candidate.sims.len() >= 16
+        {
+            return false;
+        }
+        // The bones it reads must be posed by the animation pass even with no track or parent of their own.
+        candidate.ik_bones.extend(shared.bone_parts().map(str::to_owned));
+        candidate.sims.insert(node.to_owned(), shared);
+        true
+    })
+}
+
+/// Stages the live cloth (a JSON `ClothSpec`, collider segments filled in) of the part made by `node` (`cloth.sim`), with the part's vertices
+/// (flat xyz) and the vertex each triangle corner comes from. A malformed or inconsistent cloth refuses the call.
+pub(crate) fn cloth(text: &str, node: &str, json: &str, points: &[f32], corners: &[u32]) -> bool {
+    let Ok(spec) = serde_json::from_str::<ve_modeling::cloth_sim::ClothSpec>(json) else {
+        return false;
+    };
+    if !points.len().is_multiple_of(3) {
+        return false;
+    }
+    let data = crate::cloth_live::ClothData {
+        spec,
+        rest: points.chunks_exact(3).map(|p| [p[0], p[1], p[2]]).collect(),
+        corners: corners.to_vec(),
+    };
+    if ve_graph::NodeId::parse(node).is_err() || !data.valid() {
+        return false;
+    }
+    STATE.with(|cell| {
+        let mut state = cell.borrow_mut();
+        let Some(candidate) = state.candidate.as_mut() else {
+            return false;
+        };
+        if serde_json::to_string(&candidate.token).ok().as_deref() != Some(text)
+            || !staging::current(&candidate.token)
+            || candidate.finished
+            || candidate.cloths.len() >= 16
+        {
+            return false;
+        }
+        // The pin bone and the collider bones must be posed by the animation pass even with no track or parent of their own.
+        candidate.ik_bones.extend(data.spec.collide_bones.iter().cloned());
+        if !data.spec.pin_bone.is_empty() {
+            candidate.ik_bones.insert(data.spec.pin_bone.clone());
+        }
+        candidate
+            .cloths
+            .insert(node.to_owned(), crate::cloth_live::Shared::new(std::sync::Arc::new(data)));
         true
     })
 }

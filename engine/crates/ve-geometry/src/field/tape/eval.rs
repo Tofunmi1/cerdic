@@ -59,6 +59,60 @@ fn evaluate_expr(expr: &FieldExpr, point: [f64; 3]) -> f64 {
         } => evaluate_expr(child, repeated_point(point, *period, *count)),
         FieldExpr::Offset { child, amount } => evaluate_expr(child, point) + amount,
         FieldExpr::Shell { child, half_width } => half_width - evaluate_expr(child, point).abs(),
+        FieldExpr::Noise {
+            child,
+            amplitude,
+            scale,
+            octaves,
+            persistence,
+            seed,
+            ridged,
+        } => {
+            if *amplitude == 0.0 {
+                evaluate_expr(child, point)
+            } else {
+                evaluate_expr(child, point)
+                    - amplitude
+                        * super::super::noise::fractal(
+                            point.map(|v| v / scale),
+                            *seed,
+                            *octaves,
+                            *persistence,
+                            *ridged,
+                        )
+            }
+        }
+        FieldExpr::Warp {
+            child,
+            kind,
+            axis,
+            toward,
+            from,
+            to,
+            start,
+            end,
+        } => {
+            let axis = *axis as usize;
+            let mut q = point;
+            let a = (axis + 1) % 3;
+            let b = (axis + 2) % 3;
+            match kind {
+                0 => {
+                    let scale = super::super::warp::value_at(point, axis, *from, *to, *start, *end);
+                    q[a] /= scale;
+                    q[b] /= scale;
+                    evaluate_expr(child, q) * scale
+                }
+                1 => {
+                    let angle = super::super::warp::value_at(point, axis, *from, *to, *start, *end).to_radians();
+                    let (s, c) = angle.sin_cos();
+                    q[a] = c * point[a] + s * point[b];
+                    q[b] = -s * point[a] + c * point[b];
+                    evaluate_expr(child, q)
+                }
+                _ => evaluate_expr(child, super::super::warp::bend_inverse(point, axis, *toward as usize, *from, *to, *end)),
+            }
+        }
     }
 }
 

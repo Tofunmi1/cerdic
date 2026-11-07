@@ -1,0 +1,109 @@
+# A HEROINE BUILT ONLY FROM THE LANGUAGE, WITH NO SKINNING: rigid parts on a joint hierarchy, so the game can place and move her anywhere.
+# Limbs are convex hulls between two spheres (a tapered segment between any two joints, the spheres hide the joint seams); torso, pelvis and head are smooth unions of ellipsoids meshed from fields.
+# Metres, 1.7 m tall, facing +z, y up. Joint positions follow the human pack's proportions.
+sky = scene.sky@1(sun_elevation=28, sun_azimuth=30, sun_intensity=4, turbidity=3, clouds=false, contact_shadows=true)
+output sky = sky
+floor_g = solid.box@1(size=[8, 0.2, 8])
+floor_a = xform.move@1(floor_g, by=[0, -0.1, 0])
+floor_m = solid.material@1(floor_a, color=[0.35, 0.33, 0.32], roughness=0.8)
+output floor = floor_m
+
+# skin look shared by every part (a macro so a part is three lines)
+def dress(tag, par)
+  sk_{tag}_m = solid.material@1(b{tag}, color=[0.86, 0.64, 0.52], roughness=0.5)
+  sk_{tag}_t = solid.toon@1(sk_{tag}_m, bands=3, feather=0.2, outline=1.0, shade_color=[0.93, 0.7, 0.66], rim=0.25, outline_color=[0.2, 0.08, 0.06])
+  sk_{tag}_p = anim.parent@1(sk_{tag}_t, parent={par})
+  output {tag} = sk_{tag}_p
+end
+# a limb segment: hull of a sphere at joint A and a sphere at joint B (radii ra, rb), plus a muscle bulge sphere at a fraction along it
+def limb(tag, par, ax, ay, az, bx, by, bz, ra, rb, rm)
+  ls_{tag}_a = solid.sphere@1(radius={ra}, segments=20)
+  ls_{tag}_am = xform.move@1(ls_{tag}_a, by=[{ax}, {ay}, {az}])
+  ls_{tag}_b = solid.sphere@1(radius={rb}, segments=20)
+  ls_{tag}_bm = xform.move@1(ls_{tag}_b, by=[{bx}, {by}, {bz}])
+  ls_{tag}_c = solid.sphere@1(radius={rm}, segments=20)
+  ls_{tag}_cm = xform.move@1(ls_{tag}_c, by=[{(ax + bx) / 2}, {(ay + by) / 2}, {(az + bz) / 2}])
+  ls_{tag}_w = curve.polyline@1(points=[[{ax}, {ay}, {az}], [{bx}, {by}, {bz}]])
+  ls_{tag}_q = profile.circle@1(radius={ra}, segments=20)
+  ls_{tag}_t = solid.sweep@1(ls_{tag}_w, ls_{tag}_q, scale_end={rb / ra})
+  ls_{tag}_u0 = solid.union@1(ls_{tag}_t, ls_{tag}_am)
+  ls_{tag}_u1 = solid.union@1(ls_{tag}_u0, ls_{tag}_bm)
+  b{tag} = solid.union@1(ls_{tag}_u1, ls_{tag}_cm)
+  sk_{tag}_m = solid.material@1(b{tag}, color=[0.86, 0.64, 0.52], roughness=0.5)
+  sk_{tag}_t = solid.toon@1(sk_{tag}_m, bands=3, feather=0.2, outline=1.0, shade_color=[0.93, 0.7, 0.66], rim=0.25, outline_color=[0.2, 0.08, 0.06])
+  sk_{tag}_p = anim.parent@1(sk_{tag}_t, parent={par})
+  output {tag} = sk_{tag}_p
+end
+
+# pelvis and chest, from fields
+pv_a = field.ellipsoid@1(radii=[0.17, 0.115, 0.115])
+pv_b = field.move@1(pv_a, by=[0, 0.93, 0.0])
+pv_c = field.ellipsoid@1(radii=[0.135, 0.12, 0.095])
+pv_d = field.move@1(pv_c, by=[0, 1.03, 0.0])
+pv_u = field.smooth_union@1(pv_b, pv_d, radius=0.08)
+bpelvis = field.to_solid@1(pv_u, min=[-0.3, 0.75, -0.2], max=[0.3, 1.18, 0.2], edge_length=0.012)
+dress("pelvis", "root")
+ch_a = field.ellipsoid@1(radii=[0.155, 0.17, 0.105])
+ch_b = field.move@1(ch_a, by=[0, 1.3, 0.0])
+ch_c = field.ellipsoid@1(radii=[0.125, 0.14, 0.09])
+ch_d = field.move@1(ch_c, by=[0, 1.17, 0.0])
+ch_e = field.ellipsoid@1(radii=[0.05, 0.045, 0.05])
+ch_f = field.move@1(ch_e, by=[0.058, 1.33, 0.085])
+ch_g = field.move@1(ch_e, by=[-0.058, 1.33, 0.085])
+ch_u = field.smooth_union@1(ch_b, ch_d, radius=0.07)
+ch_v = field.smooth_union@1(ch_u, ch_f, radius=0.04)
+ch_w = field.smooth_union@1(ch_v, ch_g, radius=0.04)
+bchest = field.to_solid@1(ch_w, min=[-0.25, 1.0, -0.2], max=[0.25, 1.5, 0.2], edge_length=0.01)
+dress("chest", "pelvis")
+# neck and head
+nk_a = field.capsule@1(radius=0.047, half_length=0.05)
+nk_b = field.move@1(nk_a, by=[0, 1.52, 0.01])
+bneck = field.to_solid@1(nk_b, min=[-0.1, 1.42, -0.1], max=[0.1, 1.62, 0.1], edge_length=0.008)
+dress("neck", "chest")
+hd_a = field.ellipsoid@1(radii=[0.078, 0.105, 0.095])
+hd_b = field.move@1(hd_a, by=[0, 1.69, 0.015])
+hd_c = field.ellipsoid@1(radii=[0.06, 0.06, 0.07])
+hd_d = field.move@1(hd_c, by=[0, 1.62, 0.04])
+hd_e = field.ellipsoid@1(radii=[0.015, 0.025, 0.02])
+hd_f = field.move@1(hd_e, by=[0, 1.665, 0.11])
+hd_g = field.ellipsoid@1(radii=[0.07, 0.02, 0.03])
+hd_h = field.move@1(hd_g, by=[0, 1.735, 0.07])
+hd_u = field.smooth_union@1(hd_b, hd_d, radius=0.04)
+hd_v = field.smooth_union@1(hd_u, hd_f, radius=0.02)
+hd_w = field.smooth_union@1(hd_v, hd_h, radius=0.03)
+bhead = field.to_solid@1(hd_w, min=[-0.15, 1.5, -0.14], max=[0.15, 1.83, 0.17], edge_length=0.006)
+dress("head", "neck")
+# eyes
+def eye(tag, x)
+  ey_{tag}_w = solid.sphere@1(radius=0.0145, segments=16)
+  ey_{tag}_a = xform.move@1(ey_{tag}_w, by=[{x}, 1.688, 0.098])
+  ey_{tag}_m = solid.material@1(ey_{tag}_a, color=[0.95, 0.93, 0.9], roughness=0.3)
+  ey_{tag}_p = anim.parent@1(ey_{tag}_m, parent="head")
+  output eye_{tag}_white = ey_{tag}_p
+  ey_{tag}_i = solid.sphere@1(radius=0.0085, segments=16)
+  ey_{tag}_j = xform.move@1(ey_{tag}_i, by=[{x}, 1.688, 0.1075])
+  ey_{tag}_k = solid.material@1(ey_{tag}_j, color=[0.2, 0.5, 0.35], roughness=0.2)
+  ey_{tag}_q = anim.parent@1(ey_{tag}_k, parent="head")
+  output eye_{tag}_iris = ey_{tag}_q
+end
+eye("l", 0.032)
+eye("r", -0.032)
+# arms (left x>0, right x<0): shoulder to elbow, elbow to wrist, hand
+limb("uarm_l", "chest", 0.175, 1.435, 0.02, 0.364, 1.229, 0.031, 0.05, 0.04, 0.052)
+limb("farm_l", "uarm_l", 0.364, 1.229, 0.031, 0.488, 1.098, 0.187, 0.04, 0.028, 0.042)
+limb("hand_l", "farm_l", 0.488, 1.098, 0.187, 0.52, 1.045, 0.24, 0.032, 0.02, 0.03)
+limb("uarm_r", "chest", -0.175, 1.435, 0.02, -0.364, 1.229, 0.031, 0.05, 0.04, 0.052)
+limb("farm_r", "uarm_r", -0.364, 1.229, 0.031, -0.488, 1.098, 0.187, 0.04, 0.028, 0.042)
+limb("hand_r", "farm_r", -0.488, 1.098, 0.187, -0.52, 1.045, 0.24, 0.032, 0.02, 0.03)
+# legs
+limb("thigh_l", "pelvis", 0.109, 0.951, 0.013, 0.147, 0.521, 0.046, 0.088, 0.058, 0.09)
+limb("shin_l", "thigh_l", 0.147, 0.521, 0.046, 0.183, 0.081, 0.011, 0.056, 0.036, 0.058)
+limb("foot_l", "shin_l", 0.183, 0.081, 0.011, 0.19, 0.035, 0.13, 0.04, 0.03, 0.036)
+limb("thigh_r", "pelvis", -0.109, 0.951, 0.013, -0.147, 0.521, 0.046, 0.088, 0.058, 0.09)
+limb("shin_r", "thigh_r", -0.147, 0.521, 0.046, -0.183, 0.081, 0.011, 0.056, 0.036, 0.058)
+limb("foot_r", "shin_r", -0.183, 0.081, 0.011, -0.19, 0.035, 0.13, 0.04, 0.03, 0.036)
+# the root: the part everything hangs from
+rt_s = solid.sphere@1(radius=0.01, segments=8)
+rt_a = xform.move@1(rt_s, by=[0, 0.95, 0])
+rt_m = solid.material@1(rt_a, color=[0.2, 0.2, 0.2], roughness=0.5)
+output root = rt_m

@@ -133,7 +133,7 @@ fn field_graph_reports_clipping_and_type_checks_field_sockets() {
 #[test]
 fn field_grid_caps_are_refused_during_plan_preflight() {
     let source = "field = field.sphere@1(radius=0.5)\n\
-        result = field.to_solid@1(field, min=[-1, -1, -1], max=[1, 1, 1], edge_length=0.016)\n\
+        result = field.to_solid@1(field, min=[-1, -1, -1], max=[1, 1, 1], edge_length=0.008)\n\
         output result";
     let commands = parse_text(&builtin_registry(), source).unwrap().commands;
     let mut session = Session::with_builtin(15);

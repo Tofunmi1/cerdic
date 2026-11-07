@@ -173,7 +173,7 @@ fn g6_09_dissolving_a_triangulated_boxs_diagonal_merges_two_triangles() {
 #[test]
 fn g6_21_dissolving_an_interior_grid_vertex_merges_its_four_cells() {
     let result = ok("wall = poly.grid@1(width=2, height=2, columns=2, rows=2)\n\
-         centre = poly.select@1(wall, element=\"vertex\", by=\"box\", box_min=[-0.05, 0.95, -0.05], box_max=[0.05, 1.05, 0.05], expect=\"one\")\n\
+         centre = poly.select@1(wall, element=\"vertex\", by=\"box\", box_min=[-0.05, -0.05, -0.05], box_max=[0.05, 0.05, 0.05], expect=\"one\")\n\
          merged = poly.dissolve_vertex@1(wall, centre)\n\
          output merged");
     // One eight-sided face is six triangles.

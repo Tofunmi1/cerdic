@@ -44,24 +44,25 @@ fn g9_a1_eight_chained_sphere_cuts_fit_preview() {
 }
 
 #[test]
-fn g9_a1_large_array_is_still_refused_by_preflight() {
+fn g9_a1_large_array_is_no_longer_refused_for_triangles_only_memory_bounds_it() {
+    // Owner decision 2026-11-06: the triangle limit is gone; what still stops this array is the memory budget.
     let result = evaluate(
         "sphere = solid.sphere@1(radius=0.5, segments=100)\n\
          copies = xform.array@1(sphere, count_x=32, count_y=32, count_z=1, spacing=[2, 2, 0])\n\
          output copies\n",
     );
-    let failure = result.expect_err("array output exceeds the Preview triangle budget");
-    assert_eq!(failure.code, "budget.triangles");
+    let failure =
+        result.expect_err("a 20 million triangle array needs more memory than the budget");
+    assert_eq!(failure.code, "budget.memory");
 }
 
 #[test]
-fn g9_a1_deep_subdivision_of_a_dense_cage_is_refused_by_preflight() {
+fn g9_a1_deep_subdivision_of_a_dense_cage_is_accepted_there_is_no_triangle_limit() {
     let result = evaluate(
         "sphere = solid.sphere@1(radius=0.5, segments=100)\n\
          cage = poly.from_solid@1(sphere)\n\
          refined = poly.subdivide@1(cage, levels=3)\n\
          output refined\n",
     );
-    let failure = result.expect_err("deep refinement exceeds the Preview triangle budget");
-    assert_eq!(failure.code, "budget.triangles");
+    assert!(result.is_ok(), "{:?}", result.err().map(|e| e.code));
 }
