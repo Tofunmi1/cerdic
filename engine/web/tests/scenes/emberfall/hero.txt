@@ -1,0 +1,233 @@
+# EMBERFALL, the heroine, rebuilt on the repo's autorig wiring: the full skeleton with the real parents, the full skin list, rigid plates parented to bones.
+# kind: world
+let still = "0:0,0,0; 1:0,0,0"
+let hbones = "h_root; h_spine05; h_spine04; h_spine03; h_spine02; h_spine01; h_neck01; h_neck02; h_neck03; h_head; h_clavicle_l; h_shoulder01_l; h_upperarm01_l; h_upperarm02_l; h_lowerarm01_l; h_lowerarm02_l; h_wrist_l; h_clavicle_r; h_shoulder01_r; h_upperarm01_r; h_upperarm02_r; h_lowerarm01_r; h_lowerarm02_r; h_wrist_r; h_upperleg01_l; h_upperleg02_l; h_lowerleg01_l; h_lowerleg02_l; h_foot_l; h_upperleg01_r; h_upperleg02_r; h_lowerleg01_r; h_lowerleg02_r; h_foot_r"
+let hskinlist = "root; spine05; spine04; spine03; spine02; spine01; neck01; neck02; neck03; head; clavicle_l; shoulder01_l; upperarm01_l; upperarm02_l; lowerarm01_l; lowerarm02_l; wrist_l; clavicle_r; shoulder01_r; upperarm01_r; upperarm02_r; lowerarm01_r; lowerarm02_r; wrist_r; upperleg01_l; upperleg02_l; lowerleg01_l; lowerleg02_l; foot_l; upperleg01_r; upperleg02_r; lowerleg01_r; lowerleg02_r; foot_r"
+
+hbody = body.human@1(gender=0.85, age=0.667, height=0.5, weight=0.42, muscle=0.62, caucasian=0.5, asian=0.2, african=0.3)
+
+# a bone that is not animated: the part and its link to its parent
+def sb(n, par)
+  bs_{n} = body.bone@1(hbody, bone={n})
+  bq_{n} = anim.parent@1(bs_{n}, parent={par})
+  output h_{n} = bq_{n}
+end
+# an animated bone, with a clip for every move (a clip the bone does not use is `still`)
+def limb(name, parent, idle, run, slash, slash2, heavy, roll, hit, block, cast, death)
+  hb_{name} = body.bone@1(hbody, bone={name})
+  hp_{name} = anim.parent@1(hb_{name}, parent={parent})
+  hc_{name}_0 = anim.track@1(hp_{name}, property="rotation", keys={idle}, interpolation="smooth", clip="idle", pivot_at="head")
+  hc_{name}_1 = anim.track@1(hc_{name}_0, property="rotation", keys={run}, interpolation="smooth", clip="run", pivot_at="head")
+  hc_{name}_2 = anim.track@1(hc_{name}_1, property="rotation", keys={slash}, interpolation="smooth", loop=false, clip="slash", pivot_at="head")
+  hc_{name}_3 = anim.track@1(hc_{name}_2, property="rotation", keys={slash2}, interpolation="smooth", loop=false, clip="slash2", pivot_at="head")
+  hc_{name}_4 = anim.track@1(hc_{name}_3, property="rotation", keys={heavy}, interpolation="smooth", loop=false, clip="heavy", pivot_at="head")
+  hc_{name}_5 = anim.track@1(hc_{name}_4, property="rotation", keys={roll}, interpolation="smooth", loop=false, clip="roll", pivot_at="head")
+  hc_{name}_6 = anim.track@1(hc_{name}_5, property="rotation", keys={hit}, interpolation="smooth", loop=false, clip="hit", pivot_at="head")
+  hc_{name}_7 = anim.track@1(hc_{name}_6, property="rotation", keys={block}, interpolation="smooth", loop=false, clip="block", pivot_at="head")
+  hc_{name}_8 = anim.track@1(hc_{name}_7, property="rotation", keys={cast}, interpolation="smooth", loop=false, clip="cast", pivot_at="head")
+  hc_{name}_9 = anim.track@1(hc_{name}_8, property="rotation", keys={death}, interpolation="smooth", loop=false, clip="death", pivot_at="head")
+  output h_{name} = hc_{name}_9
+end
+
+# the root: bob, crouches, a roll, a fall; and the state machine that picks the clip
+hb_root = body.bone@1(hbody, bone="root")
+hr_0 = anim.track@1(hb_root, property="position", keys="0:0,0,0; 1.5:0,0.006,0; 3:0,0,0", interpolation="smooth", clip="idle")
+hr_1 = anim.track@1(hr_0, property="position", keys="0:0,0,0; 0.125:0,0.045,0; 0.25:0,0,0; 0.375:0,0.045,0; 0.5:0,0,0", interpolation="smooth", clip="run")
+hr_2 = anim.track@1(hr_1, property="position", keys="0:0,0,0; 0.25:0,-0.06,0.05; 0.67:0,0,0", interpolation="smooth", loop=false, clip="slash")
+hr_3 = anim.track@1(hr_2, property="position", keys="0:0,0,0; 0.22:0,-0.06,0.05; 0.67:0,0,0", interpolation="smooth", loop=false, clip="slash2")
+hr_4 = anim.track@1(hr_3, property="position", keys="0:0,0,0; 0.4:0,0.03,-0.04; 0.55:0,-0.12,0.1; 1.1:0,0,0", interpolation="smooth", loop=false, clip="heavy")
+hr_5 = anim.track@1(hr_4, property="rotation", keys="0:0,0,0; 0.1:80,0,0; 0.2:170,0,0; 0.3:260,0,0; 0.4:350,0,0; 0.45:360,0,0", interpolation="linear", loop=false, clip="roll", pivot=[0, 0.9, 0.02])
+hr_6 = anim.track@1(hr_5, property="position", keys="0:0,0,0; 0.2:0,-0.3,0; 0.45:0,0,0", interpolation="smooth", loop=false, clip="roll")
+hr_7 = anim.track@1(hr_6, property="position", keys="0:0,0,0; 0.1:0,0,-0.1; 0.45:0,0,0", interpolation="smooth", loop=false, clip="hit")
+hr_8 = anim.track@1(hr_7, property="position", keys="0:0,0,0; 0.3:0,-0.05,0; 0.5:0,-0.05,0", interpolation="smooth", loop=false, clip="block")
+hr_9 = anim.track@1(hr_8, property="rotation", keys="0:0,0,0; 0.5:-35,0,0; 1.4:-88,0,0", interpolation="ease_out", loop=false, clip="death", pivot=[0, 0.08, -0.1])
+hmachine = anim.machine@1(hr_9, program="entry move;state move blend=speed idle@0 run@3.4;state slash clip=slash once;state slash2 clip=slash2 once;state heavy clip=heavy once;state roll clip=roll once;state hit clip=hit once;state block clip=block once;state cast clip=cast once;state death clip=death once;transition any -> slash when trigger:slash fade=0.05;transition any -> slash2 when trigger:slash2 fade=0.05;transition any -> heavy when trigger:heavy fade=0.06;transition any -> roll when trigger:roll fade=0.04;transition any -> hit when trigger:hit_react fade=0.04;transition any -> block when trigger:block fade=0.06;transition any -> cast when trigger:cast fade=0.08;transition any -> death when trigger:death fade=0.1;transition slash -> move exit=0.95;transition slash2 -> move exit=0.95;transition heavy -> move exit=0.95;transition roll -> move exit=0.95;transition hit -> move exit=0.95;transition block -> move exit=0.95;transition cast -> move exit=0.95")
+output h_root = hmachine
+
+# the spine, neck and head
+sb("spine05", "h_root")
+sb("spine04", "h_spine05")
+limb("spine03", "h_spine04", still, "0:0,4,0; 0.25:0,-4,0; 0.5:0,4,0", "0:0,0,0; 0.2:2,20,0; 0.32:-3,-30,0; 0.67:0,0,0", "0:0,0,0; 0.16:0,-24,0; 0.3:-3,32,0; 0.67:0,0,0", "0:0,0,0; 0.4:-12,0,0; 0.55:18,0,0; 1.1:0,0,0", "0:0,0,0; 0.2:30,0,0; 0.45:0,0,0", still, "0:0,0,0; 0.1:4,0,0; 0.5:4,0,0", "0:0,0,0; 0.3:-8,0,0; 1.0:-8,0,0; 1.3:0,0,0", "0:0,0,0; 0.5:20,0,0; 1.4:30,0,0")
+sb("spine02", "h_spine03")
+limb("spine01", "h_spine02", "0:0,0,0; 1.5:2,0,0; 3:0,0,0", "0:-6,0,0; 0.5:-6,0,0", "0:0,0,0; 0.2:0,14,0; 0.32:-2,-20,0; 0.67:0,0,0", "0:0,0,0; 0.16:0,-16,0; 0.3:-2,22,0; 0.67:0,0,0", "0:0,0,0; 0.4:-10,0,0; 0.55:16,0,0; 1.1:0,0,0", "0:0,0,0; 0.2:25,0,0; 0.45:0,0,0", "0:0,0,0; 0.08:-20,0,3; 0.45:0,0,0", "0:0,0,0; 0.1:6,0,0; 0.5:6,0,0", "0:0,0,0; 0.3:-10,0,0; 1.0:-10,0,0; 1.3:0,0,0", "0:0,0,0; 0.5:15,0,0; 1.4:25,0,0")
+sb("neck01", "h_spine01")
+sb("neck02", "h_neck01")
+sb("neck03", "h_neck02")
+limb("head", "h_neck03", "0:0,0,0; 1.5:-2,3,0; 3:0,0,0", still, "0:0,0,0; 0.2:0,-14,0; 0.32:0,24,0; 0.67:0,0,0", "0:0,0,0; 0.16:0,20,0; 0.3:0,-26,0; 0.67:0,0,0", "0:0,0,0; 0.4:10,0,0; 0.55:-12,0,0; 1.1:0,0,0", "0:0,0,0; 0.2:30,0,0; 0.45:0,0,0", "0:0,0,0; 0.08:-22,0,0; 0.45:0,0,0", still, "0:0,0,0; 0.3:-20,0,0; 1.0:-20,0,0; 1.3:0,0,0", "0:0,0,0; 0.6:-25,0,0; 1.4:-30,0,0")
+
+# arms
+sb("clavicle_l", "h_spine01")
+sb("shoulder01_l", "h_clavicle_l")
+limb("upperarm01_l", "h_shoulder01_l", "0:0,0,-12; 1.5:1,0,-13; 3:0,0,-12", "0:24,0,-12; 0.25:-24,0,-12; 0.5:24,0,-12", "0:0,0,-12; 0.2:-30,0,-30; 0.32:12,0,-12; 0.67:0,0,-12", "0:0,0,-12; 0.16:10,0,-12; 0.3:-30,0,-30; 0.67:0,0,-12", "0:0,0,-12; 0.4:-150,-10,-20; 0.55:-30,0,-10; 1.1:0,0,-12", "0:0,0,-12; 0.2:-60,0,-20; 0.45:0,0,-12", "0:0,0,-12; 0.1:20,0,-8; 0.45:0,0,-12", "0:0,0,-12; 0.1:-60,-30,-40; 0.5:-60,-30,-40", "0:0,0,-12; 0.3:-150,0,-30; 1.0:-150,0,-30; 1.3:0,0,-12", "0:0,0,-12; 0.5:-20,0,-30; 1.4:10,0,-20")
+sb("upperarm02_l", "h_upperarm01_l")
+limb("lowerarm01_l", "h_upperarm02_l", "0:-10,0,0; 1.5:-12,0,0; 3:-10,0,0", "0:-40,0,0; 0.25:-12,0,0; 0.5:-40,0,0", still, still, "0:-10,0,0; 0.4:-40,0,0; 0.55:-10,0,0; 1.1:-10,0,0", still, still, "0:-10,0,0; 0.1:-70,0,0; 0.5:-70,0,0", "0:-10,0,0; 0.3:-30,0,0; 1.0:-30,0,0; 1.3:-10,0,0", "0:-10,0,0; 0.5:-30,0,0; 1.4:-20,0,0")
+sb("lowerarm02_l", "h_lowerarm01_l")
+sb("wrist_l", "h_lowerarm02_l")
+sb("clavicle_r", "h_spine01")
+sb("shoulder01_r", "h_clavicle_r")
+limb("upperarm01_r", "h_shoulder01_r", "0:-34,0,16; 1.5:-36,0,17; 3:-34,0,16", "0:-24,0,12; 0.25:-34,0,12; 0.5:-24,0,12", "0:-14,0,12; 0.2:-95,30,40; 0.32:-70,-70,-10; 0.67:-14,0,12", "0:-14,0,12; 0.16:-70,-60,-10; 0.3:-95,40,40; 0.67:-14,0,12", "0:-14,0,12; 0.4:-160,10,20; 0.55:-30,0,10; 1.1:-14,0,12", "0:-14,0,12; 0.2:-60,0,20; 0.45:-14,0,12", "0:-14,0,12; 0.1:10,0,10; 0.45:-14,0,12", "0:-14,0,12; 0.1:-70,40,50; 0.5:-70,40,50", "0:-14,0,12; 0.3:-150,0,30; 1.0:-150,0,30; 1.3:-14,0,12", "0:-14,0,12; 0.5:-20,0,30; 1.4:10,0,20")
+sb("upperarm02_r", "h_upperarm01_r")
+limb("lowerarm01_r", "h_upperarm02_r", "0:-25,0,0; 1.5:-27,0,0; 3:-25,0,0", "0:-60,0,0; 0.5:-60,0,0", "0:-45,0,0; 0.2:-70,0,0; 0.32:-20,0,0; 0.67:-45,0,0", "0:-45,0,0; 0.16:-20,0,0; 0.3:-70,0,0; 0.67:-45,0,0", "0:-45,0,0; 0.4:-30,0,0; 0.55:-10,0,0; 1.1:-45,0,0", still, still, "0:-45,0,0; 0.1:-100,0,0; 0.5:-100,0,0", "0:-45,0,0; 0.3:-30,0,0; 1.0:-30,0,0; 1.3:-45,0,0", "0:-45,0,0; 0.5:-20,0,0; 1.4:-10,0,0")
+sb("lowerarm02_r", "h_lowerarm01_r")
+sb("wrist_r", "h_lowerarm02_r")
+
+# legs
+sb("pelvis_l", "h_root")
+limb("upperleg01_l", "h_pelvis_l", still, "0:-34,0,0; 0.25:34,0,0; 0.5:-34,0,0", "0:0,0,0; 0.25:-18,0,0; 0.67:0,0,0", "0:0,0,0; 0.22:-18,0,0; 0.67:0,0,0", "0:0,0,0; 0.55:-16,0,0; 1.1:0,0,0", "0:0,0,0; 0.1:-70,0,0; 0.35:-70,0,0; 0.45:0,0,0", still, still, still, "0:0,0,0; 0.5:-40,0,0; 1.2:-20,0,0")
+sb("upperleg02_l", "h_upperleg01_l")
+limb("lowerleg01_l", "h_upperleg02_l", still, "0:8,0,0; 0.125:4,0,0; 0.25:60,0,0; 0.5:8,0,0", still, still, still, "0:0,0,0; 0.1:100,0,0; 0.35:100,0,0; 0.45:0,0,0", still, still, still, "0:0,0,0; 0.5:80,0,0; 1.2:30,0,0")
+sb("lowerleg02_l", "h_lowerleg01_l")
+sb("foot_l", "h_lowerleg02_l")
+sb("pelvis_r", "h_root")
+limb("upperleg01_r", "h_pelvis_r", still, "0:34,0,0; 0.25:-34,0,0; 0.5:34,0,0", "0:0,0,0; 0.25:22,0,0; 0.67:0,0,0", "0:0,0,0; 0.22:22,0,0; 0.67:0,0,0", "0:0,0,0; 0.55:20,0,0; 1.1:0,0,0", "0:0,0,0; 0.1:-70,0,0; 0.35:-70,0,0; 0.45:0,0,0", still, still, still, "0:0,0,0; 0.5:-30,0,0; 1.2:-10,0,0")
+sb("upperleg02_r", "h_upperleg01_r")
+limb("lowerleg01_r", "h_upperleg02_r", still, "0:60,0,0; 0.25:8,0,0; 0.375:4,0,0; 0.5:60,0,0", still, still, still, "0:0,0,0; 0.1:100,0,0; 0.35:100,0,0; 0.45:0,0,0", still, still, still, "0:0,0,0; 0.5:70,0,0; 1.2:20,0,0")
+sb("lowerleg02_r", "h_lowerleg01_r")
+sb("foot_r", "h_lowerleg02_r")
+
+# ---- the person: skin, outfit, hair, boots, all skinned with the body's own weights ----
+hskin = body.skin@1(hbody, bones="${hskinlist}", prefix="h_", blend="linear")
+hskin_m = solid.material@1(hskin, color=[0.8, 0.58, 0.46], roughness=0.52)
+hskin_t = solid.toon@1(hskin_m, bands=3, feather=0.22, outline=1.1, shade_color=[0.93, 0.7, 0.66], rim=0.25, outline_color=[0.2, 0.08, 0.06])
+output h_person = hskin_t
+hhair = body.outfit@1(hbody, asset="bob02", standoff=0.016, bones="${hskinlist}", prefix="h_", blend="linear")
+hhair_m = solid.material@1(hhair, color=[0.32, 0.1, 0.05], roughness=0.38)
+hhair_t = solid.toon@1(hhair_m, bands=3, feather=0.14, outline=1.4, shade_color=[0.55, 0.3, 0.3], rim=0.25, outline_color=[0.08, 0.03, 0.02])
+output h_hair = hhair_t
+hsuit = body.outfit@1(hbody, asset="female_casualsuit01", standoff=0.014, bones="${hskinlist}", prefix="h_", blend="linear")
+hsuit_m = solid.material@1(hsuit, color=[0.12, 0.09, 0.09], roughness=0.8, recipe="leather", texture_scale=10)
+hsuit_t = solid.toon@1(hsuit_m, bands=3, feather=0.2, outline=1.2, shade_color=[0.55, 0.5, 0.7], rim=0.15, outline_color=[0.04, 0.03, 0.03])
+output h_suit = hsuit_t
+hshoes = body.outfit@1(hbody, asset="shoes02", standoff=0.012, bones="${hskinlist}", prefix="h_", blend="linear")
+hshoes_m = solid.material@1(hshoes, color=[0.1, 0.07, 0.05], roughness=0.5, recipe="leather", texture_scale=14)
+hshoes_t = solid.toon@1(hshoes_m, bands=3, feather=0.2, outline=1.2, shade_color=[0.5, 0.45, 0.6], rim=0.1, outline_color=[0.03, 0.02, 0.02])
+output h_shoes = hshoes_t
+
+# eyes ride the head bone (rigid)
+def eyepart(tag, r, z, cr, cg, cb, shine)
+  he_{tag}_s = solid.sphere@1(radius={r}, segments=20)
+  he_{tag}_a = xform.move@1(he_{tag}_s, by=[0.0315, 1.687, {z}])
+  he_{tag}_b = xform.mirror@1(he_{tag}_a, axis="x")
+  he_{tag}_m = solid.material@1(he_{tag}_b, color=[{cr}, {cg}, {cb}], roughness={shine})
+  he_{tag}_p = anim.parent@1(he_{tag}_m, parent="h_head")
+  output h_eye_{tag} = he_{tag}_p
+end
+eyepart("white", 0.0168, 0.124, 0.95, 0.93, 0.9, 0.35)
+eyepart("iris", 0.0105, 0.1325, 0.2, 0.55, 0.38, 0.15)
+eyepart("pupil", 0.0058, 0.1405, 0.02, 0.02, 0.03, 0.1)
+
+# ---- plate armour: lathes and sweeps, every plate a rigid part on its bone; the shape to dress is the node named x<tag> ----
+# xform.mirror keeps the original AND adds the mirror image, so a right-hand plate is the mirror cut to x < 0 (else the left half rides the right bone)
+rh_b = solid.box@1(size=[2, 4, 4])
+rhalf = xform.move@1(rh_b, by=[-1, 1, 0])
+def mir(tag)
+  mr_{tag} = xform.mirror@1(x{tag}_l, axis="x")
+  x{tag}_r = solid.intersect@1(mr_{tag}, rhalf)
+end
+def steel(tag, parent)
+  as_{tag}_m = solid.material@1(x{tag}, color=[0.6, 0.64, 0.72], metallic=0.85, roughness=0.32)
+  as_{tag}_t = solid.toon@1(as_{tag}_m, bands=3, feather=0.1, outline=1.4, shade_color=[0.34, 0.4, 0.56], rim=0.3, spec=0.5, outline_color=[0.05, 0.06, 0.1])
+  as_{tag}_p = anim.parent@1(as_{tag}_t, parent={parent})
+  output a_{tag} = as_{tag}_p
+end
+def gold(tag, parent)
+  ag_{tag}_m = solid.material@1(x{tag}, color=[1.0, 0.78, 0.3], metallic=0.9, roughness=0.28)
+  ag_{tag}_t = solid.toon@1(ag_{tag}_m, bands=3, feather=0.1, outline=1.0, shade_color=[0.62, 0.42, 0.28], rim=0.3, spec=0.6, outline_color=[0.25, 0.14, 0.04])
+  ag_{tag}_p = anim.parent@1(ag_{tag}_t, parent={parent})
+  output g_{tag} = ag_{tag}_p
+end
+cu_prof = profile.polygon@1(points=[[0.0, 1.16], [0.15, 1.16], [0.158, 1.2], [0.168, 1.26], [0.19, 1.32], [0.205, 1.38], [0.198, 1.43], [0.17, 1.47], [0.125, 1.495], [0.0, 1.5]])
+cu_s = solid.revolve@1(cu_prof, angle=360deg, segments=64)
+cu_q = xform.scale@1(cu_s, by=[1.0, 1.0, 0.78])
+xcuirass = xform.move@1(cu_q, by=[0, 0, 0.02])
+steel("cuirass", "h_spine01")
+tr_a = solid.torus@1(major=0.15, minor=0.011, segments=64, tube_segments=10)
+tr_b = xform.scale@1(tr_a, by=[1.0, 1.0, 0.78])
+xwaist_trim = xform.move@1(tr_b, by=[0, 1.165, 0.02])
+gold("waist_trim", "h_spine01")
+tn_a = solid.torus@1(major=0.123, minor=0.01, segments=64, tube_segments=10)
+tn_b = xform.scale@1(tn_a, by=[1.0, 1.0, 0.8])
+xneck_trim = xform.move@1(tn_b, by=[0, 1.497, 0.015])
+gold("neck_trim", "h_spine01")
+pa_prof = profile.polygon@1(points=[[0.0, 0.075], [0.045, 0.072], [0.085, 0.055], [0.115, 0.025], [0.126, 0.0], [0.12, -0.012], [0.0, -0.012]])
+pa_s = solid.revolve@1(pa_prof, angle=360deg, segments=40)
+pa_q = xform.scale@1(pa_s, by=[1.2, 1.0, 1.1])
+pa_r = xform.rotate@1(pa_q, angles=[0, 0, -32])
+xpauldron_l = xform.move@1(pa_r, by=[0.2, 1.465, 0.02])
+steel("pauldron_l", "h_upperarm01_l")
+mir("pauldron")
+steel("pauldron_r", "h_upperarm01_r")
+vc_a = curve.polyline@1(points=[[0.389, 1.203, 0.062], [0.476, 1.111, 0.171]])
+vc_p = profile.circle@1(radius=0.056, segments=28)
+xvambrace_l = solid.sweep@1(vc_a, vc_p, scale_end=0.8)
+steel("vambrace_l", "h_lowerarm01_l")
+mir("vambrace")
+steel("vambrace_r", "h_lowerarm01_r")
+vf_a = curve.polyline@1(points=[[0.372, 1.22, 0.04], [0.395, 1.195, 0.07]])
+vf_p = profile.circle@1(radius=0.068, segments=28)
+xcuff_l = solid.sweep@1(vf_a, vf_p)
+gold("cuff_l", "h_lowerarm01_l")
+mir("cuff")
+gold("cuff_r", "h_lowerarm01_r")
+gv_a = curve.polyline@1(points=[[0.151, 0.468, 0.042], [0.178, 0.146, 0.016]])
+gv_p = profile.circle@1(radius=0.085, segments=28)
+xgreave_l = solid.sweep@1(gv_a, gv_p, scale_end=0.7)
+steel("greave_l", "h_lowerleg01_l")
+mir("greave")
+steel("greave_r", "h_lowerleg01_r")
+kn_a = solid.sphere@1(radius=0.072, segments=24)
+kn_b = xform.scale@1(kn_a, by=[1.0, 1.0, 0.85])
+xknee_l = xform.move@1(kn_b, by=[0.148, 0.525, 0.092])
+gold("knee_l", "h_lowerleg01_l")
+mir("knee")
+gold("knee_r", "h_lowerleg01_r")
+cs_a = curve.polyline@1(points=[[0.1226, 0.8554, 0.0228], [0.1394, 0.6243, 0.0372]])
+cs_p = profile.circle@1(radius=0.1, segments=28)
+xcuisse_l = solid.sweep@1(cs_a, cs_p, scale_end=0.82)
+steel("cuisse_l", "h_upperleg01_l")
+mir("cuisse")
+steel("cuisse_r", "h_upperleg01_r")
+bt_a = solid.torus@1(major=0.145, minor=0.022, segments=64, tube_segments=10)
+bt_b = xform.scale@1(bt_a, by=[1.0, 1.0, 0.8])
+xbelt = xform.move@1(bt_b, by=[0, 1.0, 0.02])
+gold("belt", "h_root")
+ci_a = solid.torus@1(major=0.1, minor=0.006, segments=40, tube_segments=8)
+xcirclet = xform.move@1(ci_a, by=[0, 1.775, 0.035])
+gold("circlet", "h_head")
+
+# the cape: a cloth strip skinned with the body's weights
+cp_path = curve.bezier@1(points=[[0, 1.5, -0.1], [0, 1.2, -0.27], [0, 0.75, -0.32], [0, 0.32, -0.26]], steps=26)
+cp_prof = profile.rect@1(size=[0.4, 0.014])
+cp_s = solid.sweep@1(cp_path, cp_prof, scale_end=1.5)
+cp_k = body.skin_to@1(cp_s, hbody, bones="${hskinlist}", prefix="h_", blend="linear")
+cp_m = solid.material@1(cp_k, color=[0.62, 0.07, 0.1], roughness=0.7, recipe="fabric", texture_scale=14)
+cp_t = solid.toon@1(cp_m, bands=3, feather=0.2, outline=1.2, shade_color=[0.45, 0.2, 0.38], rim=0.3, outline_color=[0.08, 0.01, 0.02])
+output h_cape = cp_t
+
+# the greatsword in the right hand, all rigid on the wrist bone
+sw_g = solid.box@1(size=[0.034, 0.034, 0.24])
+xsword_grip = xform.move@1(sw_g, by=[-0.488, 1.098, 0.187])
+sw_c = solid.box@1(size=[0.28, 0.034, 0.03])
+xsword_guard = xform.move@1(sw_c, by=[-0.488, 1.098, 0.315])
+gold("sword_guard", "h_wrist_r")
+sw_p = solid.sphere@1(radius=0.032, segments=16)
+xsword_pommel = xform.move@1(sw_p, by=[-0.488, 1.098, 0.058])
+gold("sword_pommel", "h_wrist_r")
+sw_b = solid.box@1(size=[0.012, 0.085, 1.0])
+sw_bc = solid.chamfer@1(sw_b, width=0.005)
+xsword_blade = xform.move@1(sw_bc, by=[-0.488, 1.098, 0.85])
+steel("sword_blade", "h_wrist_r")
+sg_m = solid.material@1(xsword_grip, color=[0.12, 0.05, 0.05], roughness=0.8, recipe="leather", texture_scale=30)
+sg_t = solid.toon@1(sg_m, bands=2, feather=0.15, outline=1.0, outline_color=[0.02, 0.01, 0.01])
+sg_p = anim.parent@1(sg_t, parent="h_wrist_r")
+output h_sword_grip = sg_p
+sw_f = solid.box@1(size=[0.016, 0.022, 0.86])
+xfuller = xform.move@1(sw_f, by=[-0.488, 1.098, 0.86])
+sf_m = solid.material@1(xfuller, color=[1.0, 0.7, 0.2], roughness=0.3, emissive=[3.5, 1.5, 0.25])
+sf_p = anim.parent@1(sf_m, parent="h_wrist_r")
+output h_glow = sf_p
+sm_a = solid.sphere@1(radius=0.022, segments=16)
+xgem = xform.move@1(sm_a, by=[0, 1.38, 0.175])
+gm_m = solid.material@1(xgem, color=[1.0, 0.5, 0.1], roughness=0.2, emissive=[3.0, 1.0, 0.2])
+gm_p = anim.parent@1(gm_m, parent="h_spine01")
+output h_gem = gm_p

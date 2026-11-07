@@ -3,11 +3,11 @@ use crate::{Fail, Quality, budget};
 use std::collections::BTreeMap;
 use ve_graph::{Node, NodeId, Value};
 
-const MAX_CELLS: usize = 2_000_000;
+const MAX_CELLS: usize = 6_000_000;
 const MAX_TAPE: usize = 4_096;
-const MAX_WORK: usize = 64_000_000;
-const MAX_PADDED: usize = 2_097_152;
-const MAX_CELLS_F64: f64 = 2_000_000.0;
+const MAX_WORK: usize = 1_500_000_000;
+const MAX_PADDED: usize = 16_777_216;
+const MAX_CELLS_F64: f64 = 6_000_000.0;
 const TRIANGLES_PER_PRIMITIVE_CELL: usize = 10;
 
 #[derive(Clone, Copy, Default)]
@@ -144,6 +144,17 @@ pub(super) fn complexity(
             value.primitives = value.primitives.saturating_add(input.primitives);
             inputs_area += input.area;
         }
+    }
+    // A warp looks the input up at a moved point: about one and a half evaluations of it per sample.
+    if matches!(family, "field.taper" | "field.twist" | "field.bend") {
+        value.instructions = value.instructions.saturating_add(value.instructions / 2 + 1);
+    }
+    if family == "field.noise" {
+        let extra = match node.params.get("octaves") {
+            Some(Value::Int(value)) => usize::try_from(*value).unwrap_or(6).saturating_sub(1),
+            _ => 5,
+        };
+        value.instructions = value.instructions.saturating_add(extra);
     }
     // Combiners and transforms: the surface of a union or blend is at most the sum of its inputs' (a blend's small
     // extra is inside the margin of the final estimate); a scale grows it by the factor squared, a mirror doubles it

@@ -103,6 +103,10 @@ fn bad_bodies_are_refused_or_dropped_with_a_reason() {
         "{:?}",
         animated.warnings
     );
+    // a kinematic body is meant to be moved by animation, so its tracks are kept and it stays a body
+    let kinematic = evaluate("b = solid.box@1(size=[1, 1, 1])\nm = anim.track@1(b, property=\"position\", keys=\"0:0,0,0; 1:1,0,0\")\np = phys.body@1(m, kind=\"kinematic\")\noutput p = p\n").unwrap();
+    assert!(kinematic.parts[0].body.is_some(), "{:?}", kinematic.warnings);
+    assert_eq!(kinematic.parts[0].animation.len(), 1);
     let set = evaluate(
         "b = solid.box@1(size=[0.1, 0.1, 0.1])\ns = inst.repeat@1(b, count=3, step=[1, 0, 0])\np = phys.body@1(s)\noutput p = p\n",
     );

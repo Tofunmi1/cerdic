@@ -23,6 +23,13 @@ fn print_poses(label: &str, world: &World) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    run_tower()?;
+    run_yard()?;
+    run_rig()?;
+    Ok(())
+}
+
+fn run_tower() -> Result<(), Box<dyn std::error::Error>> {
     // A tower of boxes settling on a floor.
     let mut tower = World::new([0.0, -9.81, 0.0]);
     tower.add(&BodyDesc {
@@ -49,7 +56,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         tower.step();
     }
     print_poses("tower", &tower);
+    Ok(())
+}
 
+fn run_yard() -> Result<(), Box<dyn std::error::Error>> {
     // Balls, a capsule and a convex rock falling on a triangle-mesh hill, with a kinematic pusher.
     let mut yard = World::new([0.0, -9.81, 0.0]);
     let hill = Shape::Mesh {
@@ -117,7 +127,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         yard.step();
     }
     print_poses("yard", &yard);
+    Ok(())
+}
 
+fn run_rig() -> Result<(), Box<dyn std::error::Error>> {
     // Joints: a three-link ball chain hung from the world, a limited door with a motor, a slider, a spring and a weld.
     let mut rig = World::new([0.0, -9.81, 0.0]);
     let link = |at: [f32; 3]| BodyDesc {
@@ -170,6 +183,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         motor_force: 20.0,
         ..JointDesc::default()
     })?;
+    add_slider_and_spring(&mut rig)?;
+    for _ in 0..240 {
+        rig.step();
+    }
+    print_poses("rig", &rig);
+    Ok(())
+}
+
+fn add_slider_and_spring(rig: &mut World) -> Result<(), Box<dyn std::error::Error>> {
     let drawer = rig.add(&BodyDesc {
         shape: Shape::Box {
             half: [0.3, 0.1, 0.2],
@@ -188,7 +210,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..JointDesc::default()
     })?;
     rig.set_velocity(drawer, [2.0, 0.0, 0.0], [0.0; 3])?;
-    let bob = rig.add(&link([5.0, 1.0, 0.0]))?;
+    let bob = rig.add(&BodyDesc {
+        shape: Shape::Sphere { radius: 0.1 },
+        position: [5.0, 1.0, 0.0],
+        angular_damping: 0.0,
+        ..BodyDesc::default()
+    })?;
     rig.add_joint(&JointDesc {
         a: bob,
         b: None,
@@ -200,9 +227,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         damping: 3.0,
         ..JointDesc::default()
     })?;
-    for _ in 0..240 {
-        rig.step();
-    }
-    print_poses("rig", &rig);
     Ok(())
 }

@@ -131,6 +131,31 @@ fn a_behaviour_rides_with_the_part_and_needs_a_track() {
     );
 }
 
+#[test]
+fn a_behaviour_can_make_a_character_go_limp() {
+    use ve_modeling::anim::{Action, Trigger};
+    let program = "b = solid.box@1(size=[1, 1, 1])\n\
+        r = behavior.on@1(b, trigger=\"select\", action=\"ragdoll\", target=\"hero\")\noutput o = r\n";
+    let part = &evaluate(program).unwrap().parts[0];
+    let behavior = part.behavior.clone().unwrap();
+    assert_eq!(
+        (behavior.trigger, behavior.action),
+        (Trigger::Select, Action::Ragdoll)
+    );
+    assert_eq!(
+        behavior.target.as_deref(),
+        Some("hero"),
+        "the target names the phys.ragdoll"
+    );
+    let no_name =
+        "b = solid.box@1(size=[1, 1, 1])\nr = behavior.on@1(b, action=\"ragdoll\")\noutput o = r\n";
+    let error = evaluate(no_name).err().unwrap();
+    assert!(
+        error.1.contains("ragdoll"),
+        "a limp behaviour must say who goes limp: {error:?}"
+    );
+}
+
 const SWITCH_AND_DOOR: &str = "door = solid.box@1(size=[0.9, 2, 0.05])\n\
     swing = anim.track@1(door, property=\"rotation\", keys=\"0:0,0,0; 1:0,90,0\", pivot=[-0.45, 0, 0], loop=false)\n\
     listen = behavior.on@1(swing, trigger=\"signal\")\n\

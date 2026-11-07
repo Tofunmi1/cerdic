@@ -11,8 +11,20 @@ pub fn eval_projection_instances(
     node: &str,
     matrices: &[f32],
     indices: &[u32],
+    has_range: bool,
+    show_from: f32,
+    show_to: f32,
+    show_fade: f32,
 ) -> bool {
-    projection::instances(token, group, node, matrices, indices)
+    projection::instances(
+        token,
+        group,
+        node,
+        matrices,
+        indices,
+        has_range.then_some((show_from, show_to)),
+        show_fade,
+    )
 }
 
 /// Sets the surface of one material region of the part made by `node`; a fused solid of several
@@ -54,6 +66,13 @@ pub fn eval_projection_maps(
 #[must_use]
 pub fn eval_projection_animation(token: &str, node: &str, tracks: &str) -> bool {
     projection::animation(token, node, tracks)
+}
+
+/// Stages the animation state machine (JSON) of the part made by `node` (`anim.machine`); the viewer drives it each frame.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_projection_machine(token: &str, node: &str, machine: &str) -> bool {
+    projection::machine(token, node, machine)
 }
 
 /// Stages a skinned part's bones (a JSON array of names), the vertex of each triangle corner, and four joint
@@ -99,6 +118,78 @@ pub fn viewer_physics() -> String {
 #[must_use]
 pub fn eval_projection_ik(token: &str, node: &str, chain: &str) -> bool {
     projection::ik(token, node, chain)
+}
+
+/// Stages the particle effect (a JSON `PartFx`) that the part made by `node` emits (`fx.emitter`).
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_projection_fx(token: &str, node: &str, effect: &str) -> bool {
+    projection::fx(token, node, effect)
+}
+
+/// Stages the ragdoll definition (a JSON `RagdollSpec`) carried by the part made by `node` (`phys.ragdoll`).
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_projection_ragdoll(token: &str, node: &str, ragdoll: &str) -> bool {
+    projection::ragdoll(token, node, ragdoll)
+}
+
+/// `{ cloths: [{ points, steps, min, max, pin_matrix }] }`: the live cloths (`cloth.sim`) as of the last frame.
+#[wasm_bindgen]
+#[must_use]
+pub fn viewer_cloth() -> String {
+    crate::cloth_live::published()
+}
+
+/// Gives map `slot` (0 albedo, 1 normal, 2 metallic-roughness, 3 emissive) of the part made by `node`, in `region`, a new picture: square RGBA8 of the size the map already
+/// has. This is how a texture that moves (a shader drawn every frame by the page) reaches the renderer. `false` when the scene has no such map or the size is wrong.
+#[wasm_bindgen]
+#[must_use]
+pub fn viewer_texture_update(node: &str, region: u32, slot: u32, pixels: &[u8]) -> bool {
+    projection::live_update(node, region, slot, pixels)
+}
+
+/// `{ fluids: [{ particles, steps, min, max, triangles, fastest }] }`: the live liquids (`fluid.sim`) as of the last frame.
+#[wasm_bindgen]
+#[must_use]
+pub fn viewer_fluid() -> String {
+    crate::fluid_live::published()
+}
+
+/// Stages the live liquid (a JSON `FluidSpec`, collider segments filled in) of the part made by `node` (`fluid.sim`).
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_projection_fluid(token: &str, node: &str, spec: &str) -> bool {
+    projection::fluid(token, node, spec)
+}
+
+/// `{ sims: [{ particles, steps, min, max, error }] }`: the live simulation programs (`sim.program`) as of the last frame.
+#[wasm_bindgen]
+#[must_use]
+pub fn viewer_sim() -> String {
+    crate::sim_live::published()
+}
+
+/// Stages the simulation program (a JSON `SimSpec`) of the part made by `node` (`sim.program`), with the part's vertices (flat xyz) and the
+/// vertex each triangle corner comes from (used by a program that drives the mesh).
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_projection_sim(token: &str, node: &str, spec: &str, points: &[f32], corners: &[u32]) -> bool {
+    projection::sim(token, node, spec, points, corners)
+}
+
+/// Stages the live cloth (a JSON `ClothSpec`) of the part made by `node` (`cloth.sim`), with the part's vertices (flat xyz) and its triangle
+/// corners (flat vertex indices).
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_projection_cloth(
+    token: &str,
+    node: &str,
+    spec: &str,
+    points: &[f32],
+    corners: &[u32],
+) -> bool {
+    projection::cloth(token, node, spec, points, corners)
 }
 
 /// Stages the output name of the part that the part made by `node` follows (`anim.parent`).
@@ -152,6 +243,25 @@ pub fn viewer_animation(playing: bool, seconds: f32) {
     crate::animation::control(playing, seconds);
 }
 
+/// Sets a number parameter of the animation state machine on the part named `part` (empty: every machine), for example `speed` or
+/// `vy`; a parameter set this way is no longer computed from the part's movement.
+#[wasm_bindgen]
+pub fn animation_set_float(part: &str, name: &str, value: f32) {
+    crate::animation::request_float(part, name, value);
+}
+
+/// Sets a true or false parameter (for example `grounded`) of the animation state machine on the part named `part` (empty: every machine).
+#[wasm_bindgen]
+pub fn animation_set_bool(part: &str, name: &str, value: bool) {
+    crate::animation::request_bool(part, name, value);
+}
+
+/// Raises a trigger (for example `jump`) on the animation state machine on the part named `part` (empty: every machine).
+#[wasm_bindgen]
+pub fn animation_trigger(part: &str, name: &str) {
+    crate::animation::request_trigger(part, name);
+}
+
 /// Stages the scene's complete bounded light list alongside its mesh projection.
 #[wasm_bindgen]
 #[must_use]
@@ -167,8 +277,8 @@ pub fn eval_projection_environment(token: &str, environment: &str) -> bool {
 }
 
 /// Adds one mesh chunk of a part: `group` names its placement set (0 for none) and `region` its
-/// material region. `textured` vertices are nine floats (position, normal, occlusion, texture
-/// coordinates), otherwise seven.
+/// material region. A vertex is seven floats (position, normal, occlusion); `layout` bit 0 adds two
+/// (texture coordinates) and bit 1 adds four (a vertex colour: water carries flow, depth and foam in it).
 #[wasm_bindgen]
 #[must_use]
 pub fn eval_projection_chunk_part(
@@ -178,9 +288,9 @@ pub fn eval_projection_chunk_part(
     node: &str,
     name: &str,
     vertices: &[f32],
-    textured: bool,
+    layout: u32,
 ) -> bool {
-    projection::chunk_part(token, (group, region), node, name, vertices, textured)
+    projection::chunk_part(token, (group, region), node, name, vertices, layout)
 }
 
 /// Adds one prototype mesh chunk belonging to an instance batch.

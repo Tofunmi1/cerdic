@@ -1,0 +1,38 @@
+# CAPE ON A MOVING BONE, from a simulation program. A red post slides back and forth (a bone with a keyframed track); a 12 x 8 cape is
+# a polygon grid driven by the ready-made cloth program (sim.program, library="cloth"): the top row rides the bone `anchor`, every
+# point gathers its own spring corrections, and a capsule along the bone `body` pushes the cloth out. No cloth node is involved.
+sky = scene.sky@1(sun_elevation=35, sun_azimuth=-40, sun_intensity=2.2, turbidity=2.5, ground_color=[0.2, 0.2, 0.2], clouds=false, haze=0.0)
+output sky = sky
+env = scene.environment@1(sky_color=[0.55, 0.65, 0.85], ground_color=[0.18, 0.17, 0.15], intensity=0.9, reflection=0.4)
+output env = env
+
+ground_s = solid.box@1(size=[40, 0.5, 40])
+ground_m = solid.material@1(ground_s, color=[0.3, 0.32, 0.28], roughness=0.95)
+output ground = ground_m
+
+# the bone the cape hangs from (moves) and the bone that is its collider (stands still)
+post_s = solid.box@1(size=[1.2, 0.12, 0.12])
+post_a = xform.move@1(post_s, by=[0, 1.5, 0])
+post_m = solid.material@1(post_a, color=[0.7, 0.1, 0.1], roughness=0.5)
+post_b = rig.bone@1(post_m, head=[-0.6, 1.5, 0], tail=[0.6, 1.5, 0])
+post_t = anim.track@1(post_b, property="position", keys="0:0,0,0; 3:3,0,0; 6:-3,0,0; 9:0,0,0", interpolation="smooth")
+output anchor = post_t
+
+body_s = solid.cylinder@1(radius=0.18, height=0.4)
+body_a = xform.move@1(body_s, by=[0, 0.9, -0.08])
+body_m = solid.material@1(body_a, color=[0.25, 0.25, 0.3], roughness=0.6)
+body_b = rig.bone@1(body_m, head=[0, 1.1, -0.08], tail=[0, 0.7, -0.08])
+body_p = anim.parent@1(body_b, parent="anchor")
+output body = body_p
+
+cape_g = poly.grid@1(width=0.9, height=1.0, columns=12, rows=16)
+cape_h = xform.move@1(cape_g, by=[0, 1.0, 0])
+cape_c = sim.program@1(cape_h, library="cloth", rate=60, values="pin_height=1.45; collider_radius=0.2; collider_top=0,1.1,-0.08; collider_bottom=0,0.7,-0.08")
+cape_m = solid.material@1(cape_c, color=[0.1, 0.25, 0.7], roughness=0.8)
+output cape = cape_m
+
+# a model kind (the moving post, its collider child and the cape) spawned twice: each copy runs its own cloth program on its own bones
+kc = game.kind@1(name="caped", size=1, part="anchor", tags=["caped"])
+sc = game.spawn@1(kind="caped", at=[-3, 0, 0], count=2, spread=6)
+allc = game.collect@1(kc, sc, name="capes")
+output rules = allc

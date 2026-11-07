@@ -1,0 +1,24 @@
+# A tank of water, solved with method="apic": a column of water is let go and floods the tank, sloshing against the glass.
+sky = scene.sky@1(sun_elevation=35, sun_azimuth=30, ground_color=[0.5, 0.5, 0.5], clouds=false, haze=0.05)
+env = scene.environment@1(sky_color=[0.7, 0.8, 0.95], ground_color=[0.45, 0.4, 0.35], intensity=0.7, reflection=0.6)
+
+table_s = solid.box@1(size=[3.0, 0.1, 2.0])
+table_a = xform.move@1(table_s, by=[0.5, -0.05, 0.25])
+table_m = solid.material@1(table_a, color=[0.45, 0.3, 0.18], roughness=0.6, recipe="wood", texture_scale=3)
+output table = table_m
+
+def pane(tag, sx, sy, sz, x, y, z)
+  p{tag}_s = solid.box@1(size=[{sx}, {sy}, {sz}])
+  p{tag}_a = xform.move@1(p{tag}_s, by=[{x}, {y}, {z}])
+  p{tag}_m = solid.material@1(p{tag}_a, color=[0.85, 0.95, 1.0], roughness=0.05, opacity=0.18)
+  output glass_{tag} = p{tag}_m
+end
+pane("back", 1.04, 0.62, 0.02, 0.5, 0.31, -0.01)
+pane("front", 1.04, 0.62, 0.02, 0.5, 0.31, 0.51)
+pane("left", 0.02, 0.62, 0.5, -0.01, 0.31, 0.25)
+pane("right", 0.02, 0.62, 0.5, 1.01, 0.31, 0.25)
+
+water = fluid.sim@1(method="apic", min=[0.0, 0.0, 0.0], max=[0.35, 0.5, 0.5], spacing=0.02, bounds_min=[0, 0, 0], bounds_max=[1, 0.6, 0.5], viscosity=0.005, iterations=4, substeps=3, cell=0.026, level=0.5, max_triangles=12000)
+water_m = solid.material@1(water, color=[0.35, 0.7, 0.95], roughness=0.02, opacity=0.6, emissive=[0.02, 0.06, 0.1])
+water_f = solid.finish@1(water_m, clearcoat=0.5, clearcoat_roughness=0.05)
+output water = water_f

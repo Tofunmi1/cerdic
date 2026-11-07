@@ -1,13 +1,16 @@
 //! The physics world: bodies, the fixed step, poses, velocities and contacts.
 use rapier3d::na::{Isometry3, Quaternion, Translation3, UnitQuaternion, Vector3};
 use rapier3d::prelude::{
-    CCDSolver, CoefficientCombineRule, ColliderHandle, ColliderSet, DefaultBroadPhase,
-    ImpulseJointHandle, ImpulseJointSet, IntegrationParameters, IslandManager, MultibodyJointSet,
-    NarrowPhase, PhysicsPipeline, QueryPipeline, RigidBodyBuilder, RigidBodyHandle, RigidBodySet,
-    RigidBodyType,
+    CCDSolver, CoefficientCombineRule, ColliderHandle, ColliderSet, DefaultBroadPhase, Group,
+    ImpulseJointHandle, ImpulseJointSet, IntegrationParameters, InteractionGroups, IslandManager,
+    MultibodyJointSet, NarrowPhase, PhysicsPipeline, QueryPipeline, RigidBodyBuilder,
+    RigidBodyHandle, RigidBodySet, RigidBodyType,
 };
 
 use crate::{BodyDesc, BodyId, Error, Kind, MAX_BODIES, STEP};
+
+mod query;
+pub use query::{RayHit, ShapeHit, SurfaceHit};
 
 /// Where a body is.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -21,6 +24,8 @@ pub struct Pose {
 struct Entry {
     handle: RigidBodyHandle,
     collider: ColliderHandle,
+    /// False once the body was removed: its slot stays so every other body keeps its id.
+    live: bool,
 }
 
 /// A set of rigid bodies stepped at 1/60 s.
@@ -35,6 +40,7 @@ pub struct World {
     pub(crate) colliders: ColliderSet,
     /// Spatial queries for the walker, refreshed when it moves.
     pub(crate) query: QueryPipeline,
+    query_dirty: bool,
     /// The walking character, if the scene has one.
     pub(crate) walker: Option<crate::walker::Walker>,
     pub(crate) impulse_joints: ImpulseJointSet,
@@ -84,6 +90,7 @@ impl World {
             bodies: RigidBodySet::new(),
             colliders: ColliderSet::new(),
             query: QueryPipeline::new(),
+            query_dirty: true,
             walker: None,
             impulse_joints: ImpulseJointSet::new(),
             multibody_joints: MultibodyJointSet::new(),
@@ -101,7 +108,7 @@ impl World {
     /// [`Error::TooManyBodies`], [`Error::BadShape`] for a shape that cannot be built or a mesh on a moving body, and
     /// [`Error::BadValue`] for a number that is not finite or out of range.
     pub fn add(&mut self, desc: &BodyDesc) -> Result<BodyId, Error> {
-        if self.entries.len() >= MAX_BODIES {
+        if self.len() >= MAX_BODIES {
             return Err(Error::TooManyBodies);
         }
         let numbers = [
@@ -129,7 +136,7 @@ impl World {
         }
         if desc.kind != Kind::Static && !desc.shape.can_move() {
             return Err(Error::BadShape(
-                "a triangle mesh can only be static; use a convex shape for moving bodies",
+                "a mesh or heightfield can only be static; use a convex shape for moving bodies",
             ));
         }
         // A contact bounces as much as the bouncier of the two, so a rubber ball bounces on a floor that says nothing
@@ -140,7 +147,12 @@ impl World {
             .density(desc.density)
             .friction(desc.friction)
             .restitution(desc.restitution)
-            .restitution_combine_rule(CoefficientCombineRule::Max);
+            .restitution_combine_rule(CoefficientCombineRule::Max)
+            .collision_groups(InteractionGroups::new(
+                Group::from_bits_retain(desc.layers.member),
+                Group::from_bits_retain(desc.layers.mask),
+            ))
+            .sensor(desc.sensor);
         let builder = match desc.kind {
             Kind::Static => RigidBodyBuilder::fixed(),
             Kind::Dynamic => RigidBodyBuilder::dynamic(),
@@ -155,8 +167,38 @@ impl World {
         let collider = self
             .colliders
             .insert_with_parent(collider, handle, &mut self.bodies);
-        self.entries.push(Entry { handle, collider });
+        self.entries.push(Entry {
+            handle,
+            collider,
+            live: true,
+        });
+        self.query_dirty = true;
         Ok(BodyId(self.entries.len() - 1))
+    }
+
+    /// Removes a body with its collider and every joint and spring attached to it (a character that left the game takes its ropes
+    /// and hair chains with it). The ids of the other bodies do not change; this id is not reused and answers [`Error::NoSuchBody`].
+    ///
+    /// # Errors
+    /// [`Error::NoSuchBody`].
+    pub fn remove(&mut self, id: BodyId) -> Result<(), Error> {
+        let handle = self.entry(id)?.handle;
+        self.springs
+            .retain(|spring| spring.first != handle && spring.second != handle);
+        self.bodies.remove(
+            handle,
+            &mut self.islands,
+            &mut self.colliders,
+            &mut self.impulse_joints,
+            &mut self.multibody_joints,
+            true,
+        );
+        // Rapier dropped the joints attached to the body; forget their handles.
+        let joints = &self.impulse_joints;
+        self.joints.retain(|joint| joints.get(*joint).is_some());
+        self.entries[id.0].live = false;
+        self.query_dirty = true;
+        Ok(())
     }
 
     pub(crate) fn entry_handle(&self, id: BodyId) -> Result<RigidBodyHandle, Error> {
@@ -174,19 +216,22 @@ impl World {
     }
 
     fn entry(&self, id: BodyId) -> Result<&Entry, Error> {
-        self.entries.get(id.0).ok_or(Error::NoSuchBody)
+        self.entries
+            .get(id.0)
+            .filter(|entry| entry.live)
+            .ok_or(Error::NoSuchBody)
     }
 
     /// How many bodies the world holds.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.entries.len()
+        self.entries.iter().filter(|entry| entry.live).count()
     }
 
     /// Whether the world has no bodies.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        self.len() == 0
     }
 
     /// Advances the world by one fixed step.
@@ -207,6 +252,7 @@ impl World {
             &(),
             &(),
         );
+        self.query_dirty = true;
     }
 
     /// Where a body is now.
@@ -246,6 +292,7 @@ impl World {
             body.set_linvel(Vector3::zeros(), true);
             body.set_angvel(Vector3::zeros(), true);
         }
+        self.query_dirty = true;
         Ok(())
     }
 
@@ -255,12 +302,11 @@ impl World {
     /// [`Error::NoSuchBody`], or [`Error::BadShape`] when a triangle-mesh body would start to move.
     pub fn set_kind(&mut self, id: BodyId, kind: Kind) -> Result<(), Error> {
         let collider = self.entry(id)?.collider;
-        let is_mesh = self
-            .colliders
-            .get(collider)
-            .is_some_and(|c| c.shape().as_trimesh().is_some());
+        let is_mesh = self.colliders.get(collider).is_some_and(|c| {
+            c.shape().as_trimesh().is_some() || c.shape().as_heightfield().is_some()
+        });
         if is_mesh && kind != Kind::Static {
-            return Err(Error::BadShape("a triangle mesh can only be static"));
+            return Err(Error::BadShape("a mesh or heightfield can only be static"));
         }
         let handle = self.entry(id)?.handle;
         self.bodies[handle].set_body_type(body_type(kind), true);
@@ -287,12 +333,33 @@ impl World {
         Ok(())
     }
 
+    /// Changes a body's linear velocity by `change` metres per second, waking it, and leaves its spin alone (a gust of wind, a buoyant
+    /// lift, a magnet: whatever pushes from outside).
+    ///
+    /// # Errors
+    /// [`Error::NoSuchBody`], or [`Error::BadValue`] for a change that is not finite.
+    pub fn push(&mut self, id: BodyId, change: [f32; 3]) -> Result<(), Error> {
+        if !change.iter().all(|v| v.is_finite()) {
+            return Err(Error::BadValue("a push must be finite"));
+        }
+        let handle = self.entry(id)?.handle;
+        let body = &mut self.bodies[handle];
+        let now = *body.linvel();
+        body.set_linvel(now + Vector3::new(change[0], change[1], change[2]), true);
+        Ok(())
+    }
+
     /// A body's linear velocity in metres per second.
     ///
     /// # Errors
     /// [`Error::NoSuchBody`].
     pub fn velocity(&self, id: BodyId) -> Result<[f32; 3], Error> {
-        let v = self.bodies[self.entry(id)?.handle].linvel();
+        let body = &self.bodies[self.entry(id)?.handle];
+        // A sleeping body is at rest, whatever velocity it had when it fell asleep.
+        if body.is_sleeping() {
+            return Ok([0.0; 3]);
+        }
+        let v = body.linvel();
         Ok([v.x, v.y, v.z])
     }
 
@@ -302,7 +369,7 @@ impl World {
         let owner = |collider: ColliderHandle| {
             self.entries
                 .iter()
-                .position(|entry| entry.collider == collider)
+                .position(|entry| entry.live && entry.collider == collider)
                 .map(BodyId)
         };
         let mut pairs: Vec<(BodyId, BodyId)> = self

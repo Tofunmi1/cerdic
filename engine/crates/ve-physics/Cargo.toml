@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 # enhanced-determinism: the same inputs give the same bits on every platform, which the viewer and the tests rely on.
 rapier3d = { version = "=0.22.0", default-features = false, features = ["f32", "enhanced-determinism", "dim3"] }
+parry3d = { version = "=0.17.6", default-features = false, features = ["f32", "enhanced-determinism", "dim3"] }
 thiserror.workspace = true
 
 [lints]

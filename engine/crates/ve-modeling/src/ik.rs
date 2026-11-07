@@ -9,6 +9,7 @@
 //! Only `+ - * /` and `sqrt` are used (in `f64`), so the result is the same on every target.
 use glam::{DMat3, DMat4, DQuat, DVec3};
 
+use crate::ik_limb::{Aim, AimGoal, TwoBone, TwoBoneGoal, aim, two_bone};
 use crate::rig::Segment;
 
 /// Most bones in one chain.
@@ -63,6 +64,30 @@ fn rotation_of(m: DMat4) -> DQuat {
 /// `root_parent` is the world pose of the part the first bone hangs from (the identity if it hangs from nothing).
 #[must_use]
 pub fn solve(joints: &[Segment], root_parent: DMat4, goal: DVec3, iterations: u32) -> Vec<DQuat> {
+    solve_limited(joints, root_parent, goal, iterations, std::f64::consts::PI)
+}
+
+/// `turn` with its angle held to at most `limit` radians (the same axis, the angle cut back).
+fn limited(turn: DQuat, limit: f64) -> DQuat {
+    let turn = if turn.w < 0.0 { -turn } else { turn };
+    let angle = 2.0 * turn.w.clamp(-1.0, 1.0).acos();
+    if angle <= limit || angle < 1.0e-12 {
+        turn
+    } else {
+        DQuat::IDENTITY.slerp(turn, limit / angle).normalize()
+    }
+}
+
+/// [`solve`] where no bone may turn more than `limit` radians from its rest pose. A goal the limits make unreachable is approached as far as they
+/// allow.
+#[must_use]
+pub fn solve_limited(
+    joints: &[Segment],
+    root_parent: DMat4,
+    goal: DVec3,
+    iterations: u32,
+    limit: f64,
+) -> Vec<DQuat> {
     let mut turns = vec![DQuat::IDENTITY; joints.len()];
     let reach: f64 = joints
         .iter()
@@ -103,10 +128,91 @@ pub fn solve(joints: &[Segment], root_parent: DMat4, goal: DVec3, iterations: u3
             } else {
                 rotation_of(worlds[i - 1])
             };
-            turns[i] = (parent.inverse() * delta * parent * turns[i]).normalize();
+            turns[i] = limited(
+                (parent.inverse() * delta * parent * turns[i]).normalize(),
+                limit,
+            );
         }
     }
     turns
+}
+
+/// Solves a chain of exactly two bones analytically (see [`crate::ik_limb`]: pole, soften, twist, weight) and returns each bone's local
+/// turn, in the same form as [`solve`]. Any other length is left at rest.
+#[must_use]
+pub fn solve_two_bone(joints: &[Segment], root_parent: DMat4, goal: &TwoBoneGoal) -> Vec<DQuat> {
+    let rest = vec![DQuat::IDENTITY; joints.len()];
+    if joints.len() != 2 {
+        return rest;
+    }
+    let (_, heads, tip) = forward(joints, root_parent, &rest);
+    let chain = TwoBone {
+        start: heads[0],
+        mid: heads[1],
+        end: tip,
+    };
+    let solution = two_bone(&chain, goal);
+    // A world rotation of a bone is a local turn in its parent's frame.
+    let root = rotation_of(root_parent);
+    let upper = (root.inverse() * solution.start * root).normalize();
+    let (worlds, _, _) = forward(joints, root_parent, &[upper, DQuat::IDENTITY]);
+    let carried = rotation_of(worlds[0]);
+    let lower = (carried.inverse() * solution.mid * carried).normalize();
+    vec![upper, lower]
+}
+
+/// Turns a single bone part to look at the goal (see [`crate::ik_limb::aim`]): its direction at rest (head to tail) points at the target and
+/// `up` (a rest-world direction) leans towards the pole. Returns the bone's local turn; any other length is left at rest.
+#[must_use]
+pub fn solve_aim(joints: &[Segment], root_parent: DMat4, goal: &AimGoal, up: DVec3) -> Vec<DQuat> {
+    let [joint] = joints else {
+        return vec![DQuat::IDENTITY; joints.len()];
+    };
+    let (head, tail) = (point(joint.head), point(joint.tail));
+    let rotation = rotation_of(root_parent);
+    let solution = aim(
+        &Aim {
+            position: root_parent.transform_point3(head),
+            rotation,
+            forward: tail - head,
+            up,
+        },
+        goal,
+    );
+    // The bone's world rotation is the parent's times its own turn; the correction is applied on top of it.
+    vec![(rotation.inverse() * solution.correction * rotation).normalize()]
+}
+
+/// The viewer's entry point for [`solve_aim`], in plain arrays: the bone's local pose matrix.
+#[must_use]
+pub fn solve_aim_poses(
+    joints: &[Segment],
+    root_parent: [f32; 16],
+    goal: &AimGoal,
+    up: [f32; 3],
+) -> Vec<[f32; 16]> {
+    let parent = DMat4::from_cols_array(&root_parent.map(f64::from));
+    let up = DVec3::new(f64::from(up[0]), f64::from(up[1]), f64::from(up[2]));
+    joints
+        .iter()
+        .zip(&solve_aim(joints, parent, goal, up))
+        .map(|(joint, turn)| bone_pose(joint, *turn))
+        .collect()
+}
+
+/// The viewer's entry point for [`solve_two_bone`], in plain arrays: each bone's local pose matrix, root first.
+#[must_use]
+pub fn solve_two_bone_poses(
+    joints: &[Segment],
+    root_parent: [f32; 16],
+    goal: &TwoBoneGoal,
+) -> Vec<[f32; 16]> {
+    let parent = DMat4::from_cols_array(&root_parent.map(f64::from));
+    joints
+        .iter()
+        .zip(&solve_two_bone(joints, parent, goal))
+        .map(|(joint, turn)| bone_pose(joint, *turn))
+        .collect()
 }
 
 /// The viewer's entry point, in plain arrays: solves the chain for `goal` (world) hanging from `root_parent` (a
@@ -117,9 +223,16 @@ pub fn solve_poses(
     root_parent: [f32; 16],
     goal: [f32; 3],
     iterations: u32,
+    limit_degrees: f32,
 ) -> Vec<[f32; 16]> {
     let parent = DMat4::from_cols_array(&root_parent.map(f64::from));
-    let turns = solve(joints, parent, point(goal), iterations);
+    let turns = solve_limited(
+        joints,
+        parent,
+        point(goal),
+        iterations,
+        f64::from(limit_degrees).to_radians(),
+    );
     joints
         .iter()
         .zip(&turns)

@@ -1,0 +1,27 @@
+# A ROPE BRIDGE THAT CAN BE CUT, from a simulation program. 41 planks hang between two posts as a chain (each plank pulled to its
+# neighbours' spacing, both ends pinned), so the bridge sags like a real one. The program has a `cut` parameter: -1 leaves the bridge whole;
+# set it to a link number at run time (the world call sim.set_param {name:"cut", values:20}) and that link snaps, the two halves swing down
+# from their posts. No bridge node, no physics bodies: the rule is three kernels of SimL (library="bridge"; the text is in
+# crates/ve-world/src/sim/library.rs and works as a model for any chain: ropes, chains, hair).
+sky = scene.sky@1(sun_elevation=28, sun_azimuth=-35, sun_intensity=2.0, turbidity=2.5, ground_color=[0.12, 0.12, 0.12], clouds=true, haze=0.0)
+output sky = sky
+env = scene.environment@1(sky_color=[0.55, 0.62, 0.8], ground_color=[0.2, 0.18, 0.15], intensity=0.9, reflection=0.3)
+output env = env
+
+gorge_s = solid.box@1(size=[60, 0.5, 30])
+gorge_a = xform.move@1(gorge_s, by=[0, -8, 0])
+gorge_m = solid.material@1(gorge_a, color=[0.18, 0.16, 0.14], roughness=0.95)
+output gorge = gorge_m
+
+cliff_l_s = solid.box@1(size=[6, 10, 8])
+cliff_l_a = xform.move@1(cliff_l_s, by=[-13, 0, 0])
+cliff_l_m = solid.material@1(cliff_l_a, color=[0.3, 0.27, 0.24], roughness=0.9)
+output cliff_left = cliff_l_m
+cliff_r_s = solid.box@1(size=[6, 10, 8])
+cliff_r_a = xform.move@1(cliff_r_s, by=[13, 0, 0])
+cliff_r_m = solid.material@1(cliff_r_a, color=[0.3, 0.27, 0.24], roughness=0.9)
+output cliff_right = cliff_r_m
+
+bridge = sim.program@1(library="bridge", size=0.55, rate=60)
+planks = solid.material@1(bridge, color=[0.45, 0.28, 0.12], roughness=0.8)
+output planks = planks

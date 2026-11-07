@@ -1,4 +1,3 @@
-
 /// Adds a joint to the body on the input.
 pub(crate) fn joint(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
     let input = inputs
@@ -78,14 +77,13 @@ pub(crate) fn check(parts: &mut [Part]) -> Vec<EvaluationWarning> {
         }
         let reason = if part.transforms.is_some() {
             Some("an instance set cannot be a physics body; make each copy its own part")
-        } else if !part.animation.is_empty()
-            || part.parent.is_some()
+        } else if ((!part.animation.is_empty() || part.parent.is_some()) && part.body.as_ref().is_none_or(|b| b.kind != BodyKind::Kinematic))
             || part.skin.is_some()
             || part.bone.is_some()
             || part.ik.is_some()
         {
             Some(
-                "a part with its own tracks, parent, bones or skin moves by animation; use phys.body only on parts that are not animated (a kinematic body is moved by hand or by play)",
+                "a part with its own bones or skin, or a dynamic or static body on a part with tracks or a parent, moves by animation; use phys.body only on parts that are not animated (a kinematic body may have tracks or a parent: the world follows it)",
             )
         } else if part.positions.is_empty() {
             Some("it has no geometry")
@@ -99,6 +97,7 @@ pub(crate) fn check(parts: &mut [Part]) -> Vec<EvaluationWarning> {
                 warnings.push(EvaluationWarning {
                     code: "phys.body_dropped".to_owned(),
                     node: part.node.to_string(),
+                    related: Vec::new(),
                     message: format!("{} is not simulated: {text}", part.name),
                 });
                 part.body = None;
@@ -118,6 +117,7 @@ pub(crate) fn check(parts: &mut [Part]) -> Vec<EvaluationWarning> {
             warnings.push(EvaluationWarning {
                 code: "phys.world_duplicate".to_owned(),
                 node,
+                related: Vec::new(),
                 message: format!(
                     "{name} has phys.world, but the scene already has one; only the first is used"
                 ),
@@ -148,6 +148,7 @@ pub(crate) fn check(parts: &mut [Part]) -> Vec<EvaluationWarning> {
                 warnings.push(EvaluationWarning {
                     code: "phys.joint_dropped".to_owned(),
                     node: node.clone(),
+                    related: Vec::new(),
                     message: format!(
                         "{name} has a joint to \"{}\" that is ignored: {reason}",
                         joint.to

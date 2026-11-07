@@ -1,0 +1,25 @@
+# A KINEMATIC BODY ON AN ANIMATED PART: a paddle slides along x on a keyframed track (3 s, 6 m) and carries a kinematic physics body with it;
+# the physics world follows the part every step, so the paddle shoves the dynamic ball in its way across the floor. Press play.
+sky = scene.sky@1(sun_elevation=40, sun_azimuth=-30, sun_intensity=2.2, turbidity=2.5, ground_color=[0.2, 0.2, 0.2], clouds=false, haze=0.0)
+output sky = sky
+env = scene.environment@1(sky_color=[0.55, 0.65, 0.85], ground_color=[0.18, 0.17, 0.15], intensity=0.9, reflection=0.4)
+output env = env
+
+floor_s = solid.box@1(size=[24, 0.4, 24])
+floor_a = xform.move@1(floor_s, by=[0, -0.2, 0])
+floor_m = solid.material@1(floor_a, color=[0.35, 0.36, 0.3], roughness=0.9)
+floor_p = phys.body@1(floor_m, kind="static")
+output floor = floor_p
+
+paddle_s = solid.box@1(size=[0.4, 0.8, 1.5])
+paddle_a = xform.move@1(paddle_s, by=[-3, 0.4, 0])
+paddle_m = solid.material@1(paddle_a, color=[0.7, 0.15, 0.15], roughness=0.5)
+paddle_p = phys.body@1(paddle_m, kind="kinematic")
+paddle_t = anim.track@1(paddle_p, property="position", keys="0:0,0,0; 3:6,0,0", interpolation="linear", loop=false)
+output paddle = paddle_t
+
+ball_s = solid.sphere@1(radius=0.3, segments=24)
+ball_a = xform.move@1(ball_s, by=[0, 0.3, 0])
+ball_m = solid.material@1(ball_a, color=[0.2, 0.4, 0.8], roughness=0.4)
+ball_p = phys.body@1(ball_m, kind="dynamic", density=1, friction=0.4, linear_damping=0.2)
+output ball = ball_p

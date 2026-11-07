@@ -51,11 +51,19 @@ pub(super) enum Stmt {
         op: String,
         op_span: Span,
         args: Vec<Arg>,
+        piped: bool,
     },
     Output {
         name: String,
         name_span: Span,
         node: Option<(String, Span)>,
+    },
+    /// `name = other`: another name for an earlier node (gone again once the statements are read: see [`resolve_aliases`]).
+    Alias {
+        name: String,
+        name_span: Span,
+        target: String,
+        target_span: Span,
     },
     /// `group name ... end`: node statements, `expose` lines and one `result`.
     Group {
@@ -78,6 +86,7 @@ pub(super) struct Expose {
 }
 
 mod group;
+mod pipe;
 
 struct Parser {
     tokens: Vec<Token>,
@@ -241,7 +250,7 @@ impl Parser {
         }
     }
 
-    fn statement(&mut self) -> Result<Stmt, Fail> {
+    fn statement(&mut self) -> Result<Vec<Stmt>, Fail> {
         let (first, first_span) = self.word("a node name, `group` or `output`")?;
         // A node may be called `group`; the keyword is `group` followed by a name, not by `=`.
         if first == "group"
@@ -253,7 +262,7 @@ impl Parser {
                 })
             )
         {
-            return self.group();
+            return self.group().map(|s| vec![s]);
         }
         if first == "output" {
             let (name, name_span) = self.word("the output's name")?;
@@ -269,26 +278,84 @@ impl Parser {
             } else {
                 None
             };
-            return Ok(Stmt::Output {
+            return Ok(vec![Stmt::Output {
                 name,
                 name_span,
                 node,
-            });
+            }]);
         }
         self.expect(
             &Tok::Equals,
             "= after the node name (form: name = family.op(...))",
         )?;
-        let (op, op_span) = self.word("an operator such as solid.revolve")?;
-        self.expect(&Tok::Open, "( after the operator")?;
-        Ok(Stmt::Node {
-            name: first,
-            name_span: first_span,
-            op,
-            op_span,
-            args: self.args()?,
-        })
+        self.pipe(first, first_span)
     }
+}
+
+/// Replaces every alias (`a = b`) by the node it names: later statements that read `a`, `output x = a` and a group's `result a` read
+/// `b` instead, and the alias statements disappear. Aliases may chain; one that names itself or loops is an error.
+fn resolve_aliases(statements: Vec<Stmt>) -> Result<Vec<Stmt>, Fail> {
+    let mut direct: std::collections::HashMap<String, (String, Span)> = std::collections::HashMap::new();
+    for statement in &statements {
+        if let Stmt::Alias { name, name_span, target, target_span } = statement {
+            if direct.insert(name.clone(), (target.clone(), *target_span)).is_some() {
+                return Err(syntax(*name_span, "this alias name is already used by another alias"));
+            }
+        }
+    }
+    if direct.is_empty() {
+        return Ok(statements);
+    }
+    for statement in &statements {
+        if let Stmt::Node { name, name_span, .. } = statement
+            && direct.contains_key(name)
+        {
+            return Err(syntax(*name_span, "this name is already an alias of another node"));
+        }
+    }
+    let resolve = |name: &str| -> Result<String, Fail> {
+        let mut at = name.to_owned();
+        for _ in 0..=direct.len() {
+            match direct.get(&at) {
+                Some((next, _)) => at.clone_from(next),
+                None => return Ok(at),
+            }
+        }
+        let span = direct.get(name).map_or(Span { line: 1, col: 1, len: 1 }, |(_, span)| *span);
+        Err(syntax(span, "aliases that name each other in a loop"))
+    };
+    fn rewrite(statements: Vec<Stmt>, resolve: &dyn Fn(&str) -> Result<String, Fail>) -> Result<Vec<Stmt>, Fail> {
+        let mut out = Vec::with_capacity(statements.len());
+        for statement in statements {
+            out.push(match statement {
+                Stmt::Alias { .. } => continue,
+                Stmt::Node { name, name_span, op, op_span, mut args, piped } => {
+                    for arg in &mut args {
+                        if let Arg::Input { name, .. } = arg {
+                            *name = resolve(name)?;
+                        }
+                    }
+                    Stmt::Node { name, name_span, op, op_span, args, piped }
+                }
+                Stmt::Output { name, name_span, node } => {
+                    let node = match node {
+                        Some((target, span)) => Some((resolve(&target)?, span)),
+                        None => None,
+                    };
+                    Stmt::Output { name, name_span, node }
+                }
+                Stmt::Group { name, name_span, body, exposes, result } => {
+                    let result = match result {
+                        Some((target, span)) => Some((resolve(&target)?, span)),
+                        None => None,
+                    };
+                    Stmt::Group { name, name_span, body: rewrite(body, resolve)?, exposes, result }
+                }
+            });
+        }
+        Ok(out)
+    }
+    rewrite(statements, &resolve)
 }
 
 /// Parses every statement; the first syntax error stops parsing.
@@ -310,9 +377,9 @@ pub(super) fn parse(source: &str) -> Result<Vec<Stmt>, Fail> {
     loop {
         parser.skip_newlines();
         if parser.peek().is_none() {
-            return Ok(out);
+            return resolve_aliases(out);
         }
-        out.push(parser.statement()?);
+        out.extend(parser.statement()?);
         match parser.peek() {
             None
             | Some(Token {

@@ -60,11 +60,12 @@ fn a_placed_shape_counts_once_against_the_stored_budget() {
 }
 
 #[test]
-fn a_heavy_shape_still_hits_the_stored_budget_however_few_copies() {
-    // A sphere refined far past the preview limit is refused on its own, placed or not.
-    let sphere = "tree = solid.sphere@1(radius=1, segments=512)";
-    let error = run(&forest(sphere, 2), Quality::Preview).unwrap_err();
-    assert!(error.contains("budget.triangles"), "{error}");
+fn a_heavy_shape_is_accepted_there_is_no_stored_triangle_limit() {
+    // A sphere refined far past what the old budgets allowed evaluates (owner decision 2026-11-06).
+    let sphere = "tree = solid.torus@1(major=0.5, minor=0.2, segments=512, tube_segments=256)";
+    let result = run(&forest(sphere, 2), Quality::Preview).unwrap();
+    let stored: usize = result.parts.iter().map(|p| p.indices.len() / 3).sum();
+    assert!(stored > 200_000, "{stored} stored");
 }
 
 #[test]
@@ -102,8 +103,9 @@ fn a_light_scene_gets_no_heavy_warning() {
 }
 
 #[test]
-fn what_the_placements_would_draw_has_a_hard_bound() {
-    // About 32,000 triangles a copy, 16,000 copies: far beyond the 200 million drawn limit, though stored it is only one mesh.
+fn what_the_placements_would_draw_has_no_hard_bound_but_is_warned_about() {
+    // About 32,000 triangles a copy, 16,000 copies: over 500 million drawn, though stored it is only one mesh. No limit any more
+    // (owner decision 2026-11-06); the author still gets the heavy-scene warning.
     let sphere = "tree = solid.sphere@1(radius=1, segments=256)";
     let one = run(&format!("{sphere}\noutput tree = tree"), Quality::Final).unwrap();
     let per_copy = one.parts[0].indices.len() / 3;
@@ -111,6 +113,11 @@ fn what_the_placements_would_draw_has_a_hard_bound() {
         per_copy * 16_000 > 200_000_000,
         "the premise: {per_copy} a copy"
     );
-    let error = run(&forest(sphere, 16_000), Quality::Final).unwrap_err();
-    assert!(error.contains("budget.drawn_triangles"), "{error}");
+    let result = run(&forest(sphere, 16_000), Quality::Final).unwrap();
+    assert!(
+        result
+            .warnings
+            .iter()
+            .any(|w| w.code == "budget.drawn_heavy")
+    );
 }

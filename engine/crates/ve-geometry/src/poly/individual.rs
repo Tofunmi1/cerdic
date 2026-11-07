@@ -55,7 +55,7 @@ pub fn grid(width: f32, height: f32, columns: u32, rows: u32) -> Result<PolyMesh
             )]
             positions.push([
                 width * (column as f32 / columns as f32 - 0.5),
-                height * (row as f32 / rows as f32),
+                height * (row as f32 / rows as f32 - 0.5),
                 0.0,
             ]);
         }

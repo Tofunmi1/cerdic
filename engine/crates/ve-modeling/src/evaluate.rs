@@ -14,7 +14,10 @@ struct Job {
     doc: Document,
     /// Which instance and member each unfolded node came from, for diagnostics.
     origins: BTreeMap<NodeId, Origin>,
+    /// The written name of each authored node (instances and group members included), to name a failure.
+    labels: BTreeMap<NodeId, String>,
     plan: plan::Plan,
+    scripts: Vec<crate::ScriptDef>,
     quality: Quality,
     next: usize,
     context: ExecutionContext,
@@ -26,6 +29,48 @@ struct Job {
     executed: usize,
     hits: usize,
     bytes: usize,
+    /// For each node, the outputs (by index in the plan) that read it, directly or through other nodes.
+    feeds: BTreeMap<NodeId, Vec<usize>>,
+}
+
+/// For each node, the outputs that depend on it: found by walking every output's inputs back to the nodes that feed it.
+fn output_feeds(doc: &Document, outputs: &[ve_graph::Output]) -> BTreeMap<NodeId, Vec<usize>> {
+    let inputs: BTreeMap<&NodeId, Vec<&NodeId>> = doc
+        .nodes
+        .iter()
+        .map(|node| {
+            (
+                &node.id,
+                node.inputs
+                    .values()
+                    .flatten()
+                    .map(|link| &link.node)
+                    .collect(),
+            )
+        })
+        .collect();
+    let mut feeds: BTreeMap<NodeId, Vec<usize>> = BTreeMap::new();
+    for (index, output) in outputs.iter().enumerate() {
+        let mut seen = std::collections::BTreeSet::new();
+        let mut stack = vec![&output.from.node];
+        while let Some(id) = stack.pop() {
+            if !seen.insert(id) {
+                continue;
+            }
+            feeds.entry(id.clone()).or_default().push(index);
+            stack.extend(inputs.get(id).into_iter().flatten().copied());
+        }
+    }
+    feeds
+}
+
+/// The node the next [`Evaluator::step`] will run.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NextNode {
+    /// The operator family, such as `solid.box`.
+    pub operator: String,
+    /// The name the program gave it; inside a group, the instance and the member (`hall, member base`).
+    pub label: Option<String>,
 }
 
 /// Evaluates immutable documents with a bounded mesh cache; it never owns authoring history.
@@ -34,6 +79,10 @@ pub struct Evaluator {
     ao_cache: crate::ao::Cache,
     job: Option<Job>,
     last_executed: usize,
+    /// For each output (by index), the newest result of any node that feeds it: the shape as it is built up so far.
+    latest: BTreeMap<usize, Rc<Value>>,
+    /// The outputs whose `latest` changed since [`Evaluator::take_drafts`] last ran.
+    dirty: std::collections::BTreeSet<usize>,
 }
 
 impl Default for Evaluator {
@@ -51,6 +100,61 @@ impl Evaluator {
             ao_cache: crate::ao::Cache::default(),
             job: None,
             last_executed: 0,
+            latest: BTreeMap::new(),
+            dirty: std::collections::BTreeSet::new(),
+        }
+    }
+    /// The parts of every output that has grown since the last call, as they stand now: the shape built up to the node that last fed it, with
+    /// the mesh and material exactly as the nodes made them, before the passes that need the whole scene (ambient occlusion, parenting,
+    /// rigging, motion checks). A page can show them while the rest of the document is still evaluating, so a model grows step by step; the
+    /// finished [`Evaluation`] replaces them. Each part's `node` is its output's node, so a newer draft replaces an older one of the same output.
+    pub fn take_drafts(&mut self) -> Vec<crate::Part> {
+        let dirty = std::mem::take(&mut self.dirty);
+        let (Some(job), latest) = (self.job.as_ref(), &self.latest) else {
+            return Vec::new();
+        };
+        let mut parts = Vec::new();
+        for index in dirty {
+            let (Some(output), Some(value)) = (job.plan.outputs.get(index), latest.get(&index))
+            else {
+                continue;
+            };
+            // A draft is only a preview: a shape that cannot be built yet is left for the finished evaluation to report.
+            if let Ok(made) = crate::instances::parts(output, value) {
+                parts.extend(made);
+            }
+        }
+        parts
+    }
+    /// Remembers the result of the node that just ran as the newest stage of every output it feeds.
+    fn collect_drafts(&mut self, job: &Job) {
+        let Some(&index) = job
+            .next
+            .checked_sub(1)
+            .and_then(|last| job.plan.order.get(last))
+        else {
+            return;
+        };
+        let Some(node) = job.doc.nodes.get(index) else {
+            return;
+        };
+        let (Some((_, value)), Some(feeds)) = (job.values.get(&node.id), job.feeds.get(&node.id))
+        else {
+            return;
+        };
+        if value.light.is_some()
+            || value.environment.is_some()
+            || value
+                .game
+                .as_ref()
+                .is_some_and(|fragment| fragment.definition.is_some())
+            || value.mesh.triangle_count() == 0
+        {
+            return;
+        }
+        for &output in feeds {
+            self.latest.insert(output, Rc::clone(value));
+            self.dirty.insert(output);
         }
     }
     /// Retained mesh cache bytes, including charged metadata and map overhead.
@@ -63,6 +167,29 @@ impl Evaluator {
     pub fn evaluated_nodes(&self) -> usize {
         self.job.as_ref().map_or(self.last_executed, |j| j.executed)
     }
+    /// Which node the next step runs, or `None` with no job or once every node has run (the next step then finishes the scene).
+    /// A caller can time each step and say which line of the program was slow.
+    #[must_use]
+    pub fn next_node(&self) -> Option<NextNode> {
+        let job = self.job.as_ref()?;
+        let node = job.doc.nodes.get(*job.plan.order.get(job.next)?)?;
+        let label = match job.origins.get(&node.id) {
+            Some(origin) => match (
+                job.labels.get(&origin.instance),
+                job.labels.get(&origin.member),
+            ) {
+                (Some(i), Some(m)) => Some(format!("{i}, member {m}")),
+                (Some(i), None) => Some(i.clone()),
+                (None, Some(m)) => Some(m.clone()),
+                (None, None) => None,
+            },
+            None => job.labels.get(&node.id).cloned(),
+        };
+        Some(NextNode {
+            operator: node.op.family().as_str().to_owned(),
+            label,
+        })
+    }
     /// Preflights a document before creating any kernel geometry.
     ///
     /// # Errors
@@ -71,12 +198,22 @@ impl Evaluator {
         self.cancel();
         self.last_executed = 0;
         let expanded = ve_graph::expand(doc)?;
-        let plan = plan::build(&expanded.doc, quality).map_err(|e| remap(e, &expanded.origins))?;
+        let labels: BTreeMap<NodeId, String> = doc
+            .nodes
+            .iter()
+            .filter_map(|n| Some((n.id.clone(), n.label.clone()?)))
+            .collect();
+        let plan = plan::build(&expanded.doc, quality)
+            .map_err(|e| remap(e, &expanded.origins, &labels))?;
+        let scripts = crate::script_nodes::collect(doc)?;
         let context = ExecutionContext::new().map_err(|e| fail("kernel.failed", e.to_string()))?;
+        let feeds = output_feeds(&expanded.doc, &plan.outputs);
         self.job = Some(Job {
             doc: expanded.doc,
             origins: expanded.origins,
+            labels,
             plan,
+            scripts,
             quality,
             next: 0,
             context,
@@ -86,11 +223,14 @@ impl Evaluator {
             executed: 0,
             hits: 0,
             bytes: 0,
+            feeds,
         });
         Ok(())
     }
     /// Permanently cancels and discards the current job. Its staged values never enter the cache.
     pub fn cancel(&mut self) {
+        self.latest.clear();
+        self.dirty.clear();
         if let Some(job) = self.job.take() {
             job.context.cancel();
             self.last_executed = job.executed;
@@ -107,7 +247,8 @@ impl Evaluator {
         if job.next < job.plan.order.len() {
             let result = self.node(&mut job);
             self.last_executed = job.executed;
-            result.map_err(|e| remap(e, &job.origins))?;
+            result.map_err(|e| remap(e, &job.origins, &job.labels))?;
+            self.collect_drafts(&job);
             self.job = Some(job);
             return Ok(None);
         }
@@ -131,6 +272,81 @@ impl Evaluator {
             if let Some(result) = self.step()? {
                 return Ok(result);
             }
+        }
+    }
+
+    /// Runs the document and records every node in the order it ran: operator, parameters, inputs, what it produced and what it changed from its main input
+    /// (see [`crate::inspect`]). Nothing from the run is kept in the cache.
+    ///
+    /// # Errors
+    /// The same diagnostics as [`Evaluator::evaluate`]; a failure names the node it came from.
+    pub fn trace(
+        &mut self,
+        doc: &Document,
+        quality: Quality,
+    ) -> Result<Vec<crate::inspect::NodeTrace>, Fail> {
+        self.begin(doc, quality)?;
+        loop {
+            let Some(mut job) = self.job.take() else {
+                return Err(fail("eval.no_job", "no active evaluation"));
+            };
+            if job.next >= job.plan.order.len() {
+                let traces = job
+                    .plan
+                    .order
+                    .iter()
+                    .filter_map(|index| job.doc.nodes.get(*index))
+                    .filter_map(|node| {
+                        let (_, value) = job.values.get(&node.id)?;
+                        let label_of = |id: &NodeId| {
+                            job.labels
+                                .get(id)
+                                .cloned()
+                                .unwrap_or_else(|| id.to_string())
+                        };
+                        let inputs: Vec<crate::inspect::InputTrace> = node
+                            .inputs
+                            .iter()
+                            .flat_map(|(port, links)| links.iter().map(move |r| (port, r)))
+                            .map(|(port, r)| crate::inspect::InputTrace {
+                                port: port.to_string(),
+                                from: label_of(&r.node),
+                            })
+                            .collect();
+                        // The first link that is geometry (not a number socket) is the main input.
+                        let main = node
+                            .inputs
+                            .iter()
+                            .filter(|(port, _)| !crate::values::is_socket(node, port))
+                            .flat_map(|(_, links)| links)
+                            .find_map(|r| job.values.get(&r.node).map(|(_, v)| v));
+                        let (kind, summary, facts) = crate::inspect::describe(value);
+                        Some(crate::inspect::NodeTrace {
+                            id: node.id.to_string(),
+                            label: job.labels.get(&node.id).cloned(),
+                            operator: node.op.to_string(),
+                            params: serde_json::to_value(&node.params)
+                                .unwrap_or(serde_json::Value::Null),
+                            inputs,
+                            kind: kind.to_owned(),
+                            summary,
+                            facts,
+                            effect: crate::inspect::effect(main.map(AsRef::as_ref), value),
+                            warnings: value
+                                .warnings
+                                .iter()
+                                .map(|w| format!("{}: {}", w.code, w.message))
+                                .collect(),
+                        })
+                    })
+                    .collect();
+                self.last_executed = job.executed;
+                return Ok(traces);
+            }
+            let result = self.node(&mut job);
+            self.last_executed = job.executed;
+            result.map_err(|e| remap(e, &job.origins, &job.labels))?;
+            self.job = Some(job);
         }
     }
 
@@ -195,6 +411,7 @@ impl Evaluator {
                 &inputs,
                 &job.context,
                 job.quality,
+                &job.labels,
             )?);
             job.executed += 1;
             if value.mesh.triangle_count() > job.quality.triangles() {
@@ -208,10 +425,10 @@ impl Evaluator {
             value
         };
         job.bytes = job.bytes.saturating_add(value.bytes());
-        if job.bytes > 256 * 1024 * 1024 {
+        if job.bytes > budget::MEMORY_LIMIT {
             return Err(budget::exceeded(
                 "budget.memory",
-                256 * 1024 * 1024,
+                budget::MEMORY_LIMIT,
                 job.bytes,
             ));
         }
@@ -224,17 +441,36 @@ impl Evaluator {
 
 /// A failure inside an unfolded group, reported against the instance: the diagnostic names the
 /// instance and lists the member (and any member it relates to) so an editor can select them.
-fn remap(mut failure: Fail, origins: &BTreeMap<NodeId, Origin>) -> Fail {
+///
+/// The message ends with the name the program gave the node (`at rough`, or `at the_slab, member n` inside a group), so a
+/// model finds the line by what it wrote, not by an id.
+fn remap(
+    mut failure: Fail,
+    origins: &BTreeMap<NodeId, Origin>,
+    labels: &BTreeMap<NodeId, String>,
+) -> Fail {
     let member_of = |id: &NodeId| {
         origins
             .get(id)
             .map_or_else(|| id.clone(), |o| o.member.clone())
     };
+    let mut at = failure.node.as_ref().and_then(|n| labels.get(n)).cloned();
     if let Some(node) = failure.node.clone()
         && let Some(origin) = origins.get(&node)
     {
+        let instance = labels.get(&origin.instance);
+        let member = labels.get(&origin.member);
+        at = match (instance, member) {
+            (Some(i), Some(m)) => Some(format!("{i}, member {m}")),
+            (Some(i), None) => Some(i.clone()),
+            (None, Some(m)) => Some(m.clone()),
+            (None, None) => None,
+        };
         failure.node = Some(origin.instance.clone());
         failure.related.insert(0, origin.member.clone());
+    }
+    if let Some(at) = at {
+        failure.message = format!("{} (at {at})", failure.message);
     }
     for related in &mut failure.related {
         *related = member_of(related);
@@ -260,6 +496,13 @@ fn finish(job: &Job, ao_cache: &mut crate::ao::Cache) -> Result<Evaluation, Fail
             light.name.clone_from(&output.name);
             light.node.clone_from(&output.from.node);
             lights.push(light);
+            continue;
+        }
+        if value
+            .game
+            .as_ref()
+            .is_some_and(|fragment| fragment.definition.is_some())
+        {
             continue;
         }
         if let Some(scene) = &value.environment {
@@ -306,10 +549,60 @@ fn finish(job: &Job, ao_cache: &mut crate::ao::Cache) -> Result<Evaluation, Fail
         triangles.add(&output.from.node, &generated, job.quality)?;
         parts.extend(generated);
     }
+    // The game is the first scene output that carries one; only that one has to be playable.
+    let mut game = None;
+    for output in &job.plan.outputs {
+        let fragment = job
+            .values
+            .get(&output.from.node)
+            .and_then(|(_, value)| value.game.as_ref());
+        if let Some(found) = fragment.map(|f| f.finish()).transpose()?.flatten() {
+            game = Some(found);
+            break;
+        }
+    }
     crate::ao::bake(&mut parts, job.quality, ao_cache)?;
+    let defined_clips: std::collections::BTreeSet<&str> = parts
+        .iter()
+        .flat_map(|part| part.animation.iter().map(|track| track.clip.as_str()))
+        .collect();
+    let mut machine_warnings = Vec::new();
+    let mut warned = std::collections::BTreeSet::new();
+    for (_, value) in job.values.values() {
+        let (Some(machine), Some(node)) = (&value.state_machine, &value.state_machine_node) else {
+            continue;
+        };
+        let clips = machine
+            .states
+            .iter()
+            .flat_map(|state| match &state.motion {
+                ve_animstate::Motion::Clip { clip, .. } => vec![clip.as_str()],
+                ve_animstate::Motion::Blend1D { points, .. } => {
+                    points.iter().map(|point| point.clip.as_str()).collect()
+                }
+            })
+            // An overlay layer plays a clip of its own: it must exist too.
+            .chain(machine.extras.layers.iter().map(|layer| layer.clip.as_str()));
+        for clip in clips {
+            if !defined_clips.contains(clip) && warned.insert((node.clone(), clip.to_owned())) {
+                machine_warnings.push(EvaluationWarning {
+                    code: "anim.machine.missing_clip".to_owned(),
+                    node: node.to_string(),
+                    related: Vec::new(),
+                    message: format!("the machine plays clip \"{clip}\", which no animation track defines; add anim.track or anim.wave nodes with clip=\"{clip}\""),
+                });
+            }
+        }
+    }
     let mut hierarchy_warnings = crate::hierarchy::resolve(&mut parts);
+    let motion_warnings = crate::check_motion::evaluate(&job.doc, &job.plan.outputs, &parts)?;
+    hierarchy_warnings.extend(motion_warnings);
     hierarchy_warnings.extend(crate::rig::weigh(&mut parts));
     hierarchy_warnings.extend(crate::rig::resolve_ik(&mut parts));
+    hierarchy_warnings.extend(crate::fx::check_parts(&mut parts));
+    hierarchy_warnings.extend(crate::ragdoll::resolve(&mut parts));
+    hierarchy_warnings.extend(crate::cloth_sim::resolve(&mut parts));
+    hierarchy_warnings.extend(crate::fluid_sim::resolve(&mut parts));
     hierarchy_warnings.extend(crate::physics::check(&mut parts));
     hierarchy_warnings.extend(triangles.heavy_warning());
     lights.extend(crate::emitters::from_parts(&parts));
@@ -324,6 +617,8 @@ fn finish(job: &Job, ao_cache: &mut crate::ao::Cache) -> Result<Evaluation, Fail
         parts,
         lights,
         environment,
+        scripts: job.scripts.clone(),
+        game,
         evaluated_nodes: job.executed,
         cache_hits: job.hits,
         cache_bytes: 0,
@@ -331,7 +626,8 @@ fn finish(job: &Job, ao_cache: &mut crate::ao::Cache) -> Result<Evaluation, Fail
             job.values
                 .values()
                 .flat_map(|(_, value)| value.warnings.iter().cloned())
-                .chain(hierarchy_warnings),
+                .chain(hierarchy_warnings)
+                .chain(machine_warnings),
         ),
     })
 }

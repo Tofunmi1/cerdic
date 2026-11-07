@@ -246,6 +246,7 @@ fn generated_uv_grid_keeps_normalized_uvs_through_subdivision() {
     for (corner, &point) in result.mesh.corners().iter().enumerate() {
         let position = result.mesh.positions()[point as usize];
         assert!((u[corner] - (position[0] + 1.0) * 0.5).abs() < 1.0e-6);
-        assert!((v[corner] - position[1]).abs() < 1.0e-6);
+        // the grid is 1 tall and centred on y = 0, so v (0 to 1) is y + 0.5
+        assert!((v[corner] - (position[1] + 0.5)).abs() < 1.0e-6);
     }
 }

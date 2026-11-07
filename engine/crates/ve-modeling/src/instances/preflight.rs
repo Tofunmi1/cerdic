@@ -40,8 +40,13 @@ pub(crate) fn estimate(node: &Node, placements: &BTreeMap<NodeId, usize>) -> Res
             product(count(node, "count_x"), count(node, "count_y"))?,
             count(node, "count_z"),
         )?,
-        "inst.radial" | "inst.repeat" | "inst.scatter" | "inst.scatter_on" => count(node, "count"),
+        "inst.radial" | "inst.repeat" | "inst.scatter" | "inst.scatter_on" | "inst.program"
+        | "inst.along_curve" => count(node, "count"),
         "inst.mirror" => 2,
+        "inst.place" => match node.params.get("at") {
+            Some(Value::List(points)) => points.len().max(1),
+            _ => 1,
+        },
         _ => 1,
     };
     product(base, copies)
@@ -50,14 +55,16 @@ pub(crate) fn realization(triangles: usize, count: usize) -> Result<usize, Fail>
     let total = triangles
         .checked_mul(count)
         .ok_or_else(|| fail("budget.triangles", "realization count overflow"))?;
-    if total > 4_000_000 {
-        return Err(budget::exceeded("budget.triangles", 4_000_000, total));
-    }
+    // No triangle limit for realizing placements either (owner decision 2026-11-06); the memory check below still applies.
     let bytes = total
         .checked_mul(96)
         .ok_or_else(|| fail("budget.memory", "realization storage overflow"))?;
-    if bytes > 256 * 1024 * 1024 {
-        return Err(budget::exceeded("budget.memory", 256 * 1024 * 1024, bytes));
+    if bytes > budget::MEMORY_LIMIT {
+        return Err(budget::exceeded(
+            "budget.memory",
+            budget::MEMORY_LIMIT,
+            bytes,
+        ));
     }
     Ok(total)
 }

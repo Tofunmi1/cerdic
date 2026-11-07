@@ -279,5 +279,101 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
     )];
     ops.push(joint());
     ops.push(world());
+    ops.push(ragdoll());
     ops
+}
+
+fn ragdoll() -> Option<OperatorSpec> {
+    let text = |name: &'static str, default: &str, max_len: usize, doc: &'static str| ParamSpec {
+        name,
+        ty: ParamType::Str { max_len },
+        default: Some(Value::Str(default.to_owned())),
+        doc,
+    };
+    spec(
+        "phys.ragdoll@1",
+        "Makes a rigged character (a skeleton of rig.bone parts, each anim.parent-ed to the one above it) able to go LIMP: on command it stops following its animation and falls and \
+         tumbles as a ragdoll, colliding with every phys.body in the scene, starting from whatever pose it was in. Put this on any small shape (a marker is fine); `bones` lists the \
+         OUTPUT names of the bone parts, parents first, for example \"pelvis; spine; head; arm_l; forearm_l; thigh_l; shin_l\". Every bone must carry rig.bone. Trigger it in play mode with the world \
+         call physics.ragdoll {name}, which can add an `impulse` (a shot, an explosion); a game does the same from a script when a creature dies. The floor and walls need phys.body \
+         kind=\"static\" or the ragdoll falls through them. Joints are sockets with a swing cone and a twist limit; list elbows and knees in `hinges` to make them hinges that bend one way.",
+        vec![single("in", COLOURABLE)],
+        OutputSpec::SameAsInput("in"),
+        vec![
+            text(
+                "name",
+                "",
+                32,
+                "The ragdoll's name (letters, digits, _ or -), used to trigger it.",
+            ),
+            text(
+                "bones",
+                "",
+                512,
+                "Output names of the bone parts, separated by semicolons, parents before children (1 to 32).",
+            ),
+            number(
+                "swing",
+                1.0,
+                0.0,
+                3.1416,
+                Unit::Angle,
+                "Socket freedom: how far a limb may swing away from its parent's line, in degrees (about 60 for shoulders and hips, 30 for a neck).",
+            ),
+            number(
+                "twist",
+                0.5,
+                0.0,
+                3.1416,
+                Unit::Angle,
+                "How far a limb may twist about its own length either way, in degrees.",
+            ),
+            text(
+                "hinges",
+                "",
+                512,
+                "Output names of the bones that are hinges (elbows, knees), separated by semicolons; the others are sockets.",
+            ),
+            ParamSpec {
+                name: "hinge_limits",
+                ty: ParamType::Vec2 {
+                    unit: Unit::Angle,
+                    min: -3.1416,
+                    max: 3.1416,
+                },
+                default: Some(Value::List(vec![Value::Num(0.0), Value::Num(2.4)])),
+                doc: "Lowest and highest hinge angle in degrees: [0, 140] bends one way only, like a knee.",
+            },
+            vector(
+                "hinge_axis",
+                [1.0, 0.0, 0.0],
+                Unit::None,
+                "Which way a straight hinge bone bends about (world axis); a bone that is already bent at rest bends in its own plane. A person standing facing +z has knees [-1, 0, 0].",
+            ),
+            number(
+                "density",
+                500.0,
+                10.0,
+                5000.0,
+                Unit::None,
+                "Mass per cubic metre of the bones (a person is about 500 to 1000).",
+            ),
+            number(
+                "damping",
+                0.3,
+                0.0,
+                20.0,
+                Unit::None,
+                "How much the joints resist moving: 0 is limp jelly, 3 is stiff.",
+            ),
+            number(
+                "radius",
+                0.0,
+                0.0,
+                2.0,
+                Unit::Length,
+                "Thickness of every bone's collision capsule in metres; 0 sizes each from its length.",
+            ),
+        ],
+    )
 }

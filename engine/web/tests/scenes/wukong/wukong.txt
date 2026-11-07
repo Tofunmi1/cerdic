@@ -1,0 +1,762 @@
+# THE MONKEY KING AND THE BULL DEMON: a third-person action RPG boss fight in a ruined mountain temple above the clouds.
+# Everything here is built in the language: the models (fields, sweeps, revolves, scripts), the set, the animation clips and the game.
+# kind: world
+let fur_prog = "base = expr(code=\"u = p.x; v = p.y; f = fbm(vec2(u*9.0, v*60.0)); g = fbm(vec2(u*3.0, v*6.0)); out = vec4(vec3(0.82, 0.57, 0.25) * (0.66 + 0.5*f) * (0.88 + 0.28*g), 1.0)\"); rough = expr(code=\"out = vec4(vec3(0.82), 1.0)\"); albedo = base; roughness = rough"
+let tiger_prog = "a = expr(code=\"u = p.x; v = p.y; w = fbm(vec2(u*5.0, v*3.0)); s = smoothstep(0.42, 0.52, abs(sin((u + w*0.35)*26.0))); out = vec4(mix(vec3(0.95, 0.52, 0.1), vec3(0.05, 0.035, 0.03), s), 1.0)\"); albedo = a"
+let gold_prog = "a = expr(code=\"u = p.x; v = p.y; f = fbm(vec2(u*14.0, v*14.0)); e = smoothstep(0.46, 0.5, abs(fbm(vec2(u*5.0, v*5.0)) - 0.5)); out = vec4(vec3(1.0, 0.84, 0.36) * (1.0 + 0.2*f) * (0.9 + 0.1*e), 1.0)\"); albedo = a"
+
+sky = scene.sky@1(sun_elevation=26, sun_azimuth=-35, sun_intensity=2.6, turbidity=3.0, ground_color=[0.7, 0.66, 0.62], clouds=true, cloud_cover=0.55, seed=11, haze=0.12, haze_color=[0.95, 0.78, 0.6], light_shafts=0.4)
+env = scene.environment@1(sky_color=[0.72, 0.78, 0.92], ground_color=[0.6, 0.55, 0.5], intensity=1.0, reflection=0.6, bounce=0.5, gi=true)
+
+
+# ---------------- Sun Wukong: parts hang off the torso, each its own part so the clips can move them ----------------
+# a tapered limb: a tube between two points turned into a solid (h is half the box the solid is built in)
+def limb(tag, x0, y0, z0, x1, y1, z1, r0, r1, h, par)
+  s{tag}_f = field.tube@1(points=[[{x0}, {y0}, {z0}], [{x1}, {y1}, {z1}]], radius={r0}, end_radius={r1})
+  s{tag}_n = field.noise@1(s{tag}_f, amplitude=0.006, scale=0.06, octaves=2)
+  s{tag}_s = field.to_solid@1(s{tag}_n, min=[{(x0 + x1) / 2 - h}, {(y0 + y1) / 2 - h}, {(z0 + z1) / 2 - h}], max=[{(x0 + x1) / 2 + h}, {(y0 + y1) / 2 + h}, {(z0 + z1) / 2 + h}], edge_length=0.018)
+  s{tag}_m = solid.material@1(s{tag}_s, color=[0.82, 0.57, 0.25], roughness=0.85)
+  s{tag}_t = solid.texture@1(s{tag}_m, program="${fur_prog}", tile=0.5, size="256")
+  s{tag}_p = anim.parent@1(s{tag}_t, parent="${par}")
+end
+# a gold armour piece: an ellipsoid shell (radii rx, ry, rz at x, y, z) with a clear coat
+def plate(tag, rx, ry, rz, x, y, z, par)
+  g{tag}_f = field.ellipsoid@1(radii=[{rx}, {ry}, {rz}])
+  g{tag}_m = field.move@1(g{tag}_f, by=[{x}, {y}, {z}])
+  g{tag}_n = field.noise@1(g{tag}_m, amplitude=0.004, scale=0.05, octaves=2, mode="ridged")
+  g{tag}_s = field.to_solid@1(g{tag}_n, min=[{x - rx - 0.04}, {y - ry - 0.04}, {z - rz - 0.04}], max=[{x + rx + 0.04}, {y + ry + 0.04}, {z + rz + 0.04}], edge_length=0.015)
+  g{tag}_c = solid.material@1(g{tag}_s, color=[1.0, 0.8, 0.3], metallic=0.85, roughness=0.24)
+  g{tag}_t = solid.texture@1(g{tag}_c, program="${gold_prog}", tile=0.4, size="256")
+  g{tag}_x = solid.finish@1(g{tag}_t, clearcoat=0.5, clearcoat_roughness=0.2)
+  g{tag}_p = anim.parent@1(g{tag}_x, parent="${par}")
+end
+
+# torso, pelvis, neck and trapezius as one soft field
+t_chest = field.ellipsoid@1(radii=[0.3, 0.26, 0.19])
+t_chest_m = field.move@1(t_chest, by=[0, 1.32, 0])
+t_abd = field.ellipsoid@1(radii=[0.22, 0.17, 0.15])
+t_abd_m = field.move@1(t_abd, by=[0, 1.08, 0.01])
+t_pel = field.ellipsoid@1(radii=[0.24, 0.14, 0.16])
+t_pel_m = field.move@1(t_pel, by=[0, 0.92, 0])
+t_neck = field.tube@1(points=[[0, 1.5, 0.02], [0, 1.64, 0.05]], radius=0.085, end_radius=0.075)
+t_trap = field.ellipsoid@1(radii=[0.2, 0.07, 0.11])
+t_trap_m = field.move@1(t_trap, by=[0, 1.52, -0.02])
+t_u1 = field.smooth_union@1(t_chest_m, t_abd_m, radius=0.15)
+t_u2 = field.smooth_union@1(t_u1, t_pel_m, radius=0.12)
+t_u3 = field.smooth_union@1(t_u2, t_neck, radius=0.08)
+t_u4 = field.smooth_union@1(t_u3, t_trap_m, radius=0.1)
+t_n = field.noise@1(t_u4, amplitude=0.01, scale=0.07, octaves=3)
+t_s = field.to_solid@1(t_n, min=[-0.42, 0.7, -0.3], max=[0.42, 1.75, 0.32], edge_length=0.02)
+t_m = solid.material@1(t_s, color=[0.82, 0.57, 0.25], roughness=0.85)
+t_t = solid.texture@1(t_m, program="${fur_prog}", tile=0.5, size="256")
+t_idle = anim.track@1(t_t, property="rotation", keys="0:0,0,0; 1.5:1.4,0,0; 3:0,0,0", interpolation="smooth", clip="idle", pivot=[0, 0.95, 0])
+t_run = anim.track@1(t_idle, property="rotation", keys="0:-9,0,2.5; 0.25:-9,0,-2.5; 0.5:-9,0,2.5", interpolation="smooth", clip="run", pivot=[0, 0.95, 0])
+t_bob = anim.track@1(t_run, property="position", keys="0:0,0,0; 0.125:0,0.06,0; 0.25:0,0,0; 0.375:0,0.06,0; 0.5:0,0,0", interpolation="smooth", clip="run")
+t_slash = anim.track@1(t_bob, property="rotation", keys="0:0,0,0; 0.2:2,34,0; 0.32:-4,-52,0; 0.67:0,0,0", interpolation="smooth", loop=false, clip="slash", pivot=[0, 0.95, 0])
+t_slash2 = anim.track@1(t_slash, property="rotation", keys="0:0,0,0; 0.16:0,-40,0; 0.3:-6,58,0; 0.67:0,0,0", interpolation="smooth", loop=false, clip="slash2", pivot=[0, 0.95, 0])
+t_heavy = anim.track@1(t_slash2, property="rotation", keys="0:0,0,0; 0.4:-22,0,0; 0.55:36,0,0; 1.1:0,0,0", interpolation="smooth", loop=false, clip="heavy", pivot=[0, 0.95, 0])
+t_roll = anim.track@1(t_heavy, property="rotation", keys="0:0,0,0; 0.1:80,0,0; 0.2:170,0,0; 0.3:260,0,0; 0.4:350,0,0; 0.45:360,0,0", interpolation="linear", loop=false, clip="roll", pivot=[0, 0.95, 0])
+t_rollp = anim.track@1(t_roll, property="position", keys="0:0,0,0; 0.2:0,-0.25,0; 0.45:0,0,0", interpolation="smooth", loop=false, clip="roll")
+t_hit = anim.track@1(t_rollp, property="rotation", keys="0:0,0,0; 0.08:-20,0,5; 0.45:0,0,0", interpolation="smooth", loop=false, clip="hit", pivot=[0, 0.95, 0])
+t_block = anim.track@1(t_hit, property="rotation", keys="0:0,0,0; 0.1:8,0,0; 0.5:8,0,0", interpolation="smooth", loop=false, clip="block", pivot=[0, 0.95, 0])
+t_cast = anim.track@1(t_block, property="rotation", keys="0:0,0,0; 0.3:-14,0,0; 1.0:-14,0,0; 1.3:0,0,0", interpolation="smooth", loop=false, clip="cast", pivot=[0, 0.95, 0])
+t_death = anim.track@1(t_cast, property="rotation", keys="0:0,0,0; 0.3:-20,0,0; 1.4:-84,0,0", interpolation="smooth", loop=false, clip="death", pivot=[0, 0.1, -0.2])
+t_deathp = anim.track@1(t_death, property="position", keys="0:0,0,0; 1.4:0,-0.75,-0.35", interpolation="smooth", loop=false, clip="death")
+t_machine = anim.machine@1(t_deathp, program="entry move;state move blend=speed idle@0 run@3.4;state slash clip=slash once;state slash2 clip=slash2 once;state heavy clip=heavy once;state roll clip=roll once;state hit clip=hit once;state block clip=block once;state cast clip=cast once;state death clip=death once;transition any -> slash when trigger:slash fade=0.05;transition any -> slash2 when trigger:slash2 fade=0.05;transition any -> heavy when trigger:heavy fade=0.06;transition any -> roll when trigger:roll fade=0.04;transition any -> hit when trigger:hit_react fade=0.04;transition any -> block when trigger:block fade=0.06;transition any -> cast when trigger:cast fade=0.08;transition any -> death when trigger:death fade=0.1;transition slash -> move exit=0.95;transition slash2 -> move exit=0.95;transition heavy -> move exit=0.95;transition roll -> move exit=0.95;transition hit -> move exit=0.95;transition block -> move exit=0.95;transition cast -> move exit=0.95")
+output wukong = t_machine
+
+# armour on the torso: chest and back plates with a jade gem, a belt with a gold buckle, a tiger-skin kilt and a fur collar
+plate("chest", 0.285, 0.225, 0.095, 0, 1.33, 0.115, "wukong")
+output w_chest = gchest_p
+plate("back", 0.27, 0.22, 0.08, 0, 1.33, -0.13, "wukong")
+output w_back = gback_p
+gem_s = solid.sphere@1(radius=0.04, segments=20)
+gem_a = xform.move@1(gem_s, by=[0, 1.37, 0.215])
+gem_m = solid.material@1(gem_a, color=[0.1, 0.8, 0.65], roughness=0.1, metallic=0.2, emissive=[0.1, 1.2, 0.9])
+gem_p = anim.parent@1(gem_m, parent="wukong")
+output w_gem = gem_p
+belt_s = solid.cylinder@1(radius=0.235, height=0.075, segments=40)
+belt_a = xform.move@1(belt_s, by=[0, 1.0, 0])
+belt_m = solid.material@1(belt_a, color=[0.6, 0.07, 0.06], roughness=0.6, recipe="fabric", texture_scale=8)
+belt_p = anim.parent@1(belt_m, parent="wukong")
+output w_belt = belt_p
+buckle_s = solid.box@1(size=[0.11, 0.09, 0.035])
+buckle_c = solid.chamfer@1(buckle_s, width=0.012)
+buckle_a = xform.move@1(buckle_c, by=[0, 1.0, 0.235])
+buckle_m = solid.material@1(buckle_a, color=[1.0, 0.76, 0.24], metallic=1.0, roughness=0.25)
+buckle_p = anim.parent@1(buckle_m, parent="wukong")
+output w_buckle = buckle_p
+kilt_s = solid.cone@1(radius=0.31, top_radius=0.235, height=0.34, segments=40)
+kilt_a = xform.move@1(kilt_s, by=[0, 0.8, 0])
+kilt_m = solid.material@1(kilt_a, color=[0.95, 0.52, 0.1], roughness=0.8)
+kilt_t = solid.texture@1(kilt_m, program="${tiger_prog}", tile=0.5, size="256")
+kilt_p = anim.parent@1(kilt_t, parent="wukong")
+output w_kilt = kilt_p
+col_a = field.ellipsoid@1(radii=[0.24, 0.085, 0.19])
+col_m = field.move@1(col_a, by=[0, 1.52, 0.0])
+col_c = field.ellipsoid@1(radii=[0.13, 0.12, 0.12])
+col_cm = field.move@1(col_c, by=[0, 1.55, 0.02])
+col_d = field.subtract@1(col_m, col_cm)
+col_n = field.noise@1(col_d, amplitude=0.02, scale=0.05, octaves=3, mode="ridged")
+col_s = field.to_solid@1(col_n, min=[-0.35, 1.38, -0.28], max=[0.35, 1.7, 0.28], edge_length=0.012)
+col_mat = solid.material@1(col_s, color=[0.82, 0.57, 0.25], roughness=0.9)
+col_t = solid.texture@1(col_mat, program="${fur_prog}", tile=0.35, size="256")
+col_p = anim.parent@1(col_t, parent="wukong")
+output w_collar = col_p
+
+# head: skull, a long muzzle, brow ridge, cheeks, ears, a mouth line and eye sockets; the face is paler than the fur
+h_skull = field.ellipsoid@1(radii=[0.135, 0.145, 0.14])
+h_skull_m = field.move@1(h_skull, by=[0, 1.74, 0.03])
+h_muzzle = field.ellipsoid@1(radii=[0.085, 0.07, 0.085])
+h_muzzle_m = field.move@1(h_muzzle, by=[0, 1.69, 0.145])
+h_brow = field.ellipsoid@1(radii=[0.125, 0.034, 0.07])
+h_brow_m = field.move@1(h_brow, by=[0, 1.775, 0.115])
+h_cheekl = field.ellipsoid@1(radii=[0.05, 0.05, 0.05])
+h_cheekl_m = field.move@1(h_cheekl, by=[0.09, 1.68, 0.1])
+h_cheekr = field.ellipsoid@1(radii=[0.05, 0.05, 0.05])
+h_cheekr_m = field.move@1(h_cheekr, by=[-0.09, 1.68, 0.1])
+h_earl = field.ellipsoid@1(radii=[0.035, 0.06, 0.025])
+h_earl_m = field.move@1(h_earl, by=[0.145, 1.75, 0.02])
+h_earr = field.ellipsoid@1(radii=[0.035, 0.06, 0.025])
+h_earr_m = field.move@1(h_earr, by=[-0.145, 1.75, 0.02])
+h_u1 = field.smooth_union@1(h_skull_m, h_muzzle_m, radius=0.05)
+h_u2 = field.smooth_union@1(h_u1, h_brow_m, radius=0.03)
+h_u3 = field.smooth_union@1(h_u2, h_cheekl_m, radius=0.04)
+h_u4 = field.smooth_union@1(h_u3, h_cheekr_m, radius=0.04)
+h_u5 = field.smooth_union@1(h_u4, h_earl_m, radius=0.02)
+h_u6 = field.smooth_union@1(h_u5, h_earr_m, radius=0.02)
+h_mouth = field.box@1(half=[0.06, 0.004, 0.04], rounding=0.003)
+h_mouth_m = field.move@1(h_mouth, by=[0, 1.655, 0.195])
+h_sockl = field.ellipsoid@1(radii=[0.04, 0.026, 0.03])
+h_sockl_m = field.move@1(h_sockl, by=[0.062, 1.752, 0.158])
+h_sockr = field.ellipsoid@1(radii=[0.04, 0.026, 0.03])
+h_sockr_m = field.move@1(h_sockr, by=[-0.062, 1.752, 0.158])
+h_u7 = field.subtract@1(h_u6, h_mouth_m)
+h_u8 = field.subtract@1(h_u7, h_sockl_m)
+h_u9 = field.subtract@1(h_u8, h_sockr_m)
+h_s = field.to_solid@1(h_u9, min=[-0.25, 1.52, -0.15], max=[0.25, 1.92, 0.3], edge_length=0.008)
+h_m = solid.material@1(h_s, color=[0.9, 0.66, 0.46], roughness=0.7)
+h_f = solid.finish@1(h_m, subsurface=0.3)
+h_p = anim.parent@1(h_f, parent="wukong")
+h_idle = anim.track@1(h_p, property="rotation", keys="0:0,0,0; 1.5:-2,3,0; 3:0,0,0", interpolation="smooth", clip="idle", pivot=[0, 1.6, 0])
+h_cast = anim.track@1(h_idle, property="rotation", keys="0:0,0,0; 0.3:-14,0,0; 1.0:-14,0,0; 1.3:0,0,0", interpolation="smooth", loop=false, clip="cast", pivot=[0, 1.6, 0])
+h_hit = anim.track@1(h_cast, property="rotation", keys="0:0,0,0; 0.08:-16,0,0; 0.45:0,0,0", interpolation="smooth", loop=false, clip="hit", pivot=[0, 1.6, 0])
+output w_head = h_hit
+fur_s = field.ellipsoid@1(radii=[0.15, 0.13, 0.14])
+fur_m = field.move@1(fur_s, by=[0, 1.77, -0.01])
+fur_cut = field.ellipsoid@1(radii=[0.112, 0.12, 0.11])
+fur_cut_m = field.move@1(fur_cut, by=[0, 1.71, 0.075])
+fur_d = field.subtract@1(fur_m, fur_cut_m)
+fur_n = field.noise@1(fur_d, amplitude=0.02, scale=0.04, octaves=3, mode="ridged")
+fur_x = field.to_solid@1(fur_n, min=[-0.25, 1.55, -0.2], max=[0.25, 1.98, 0.25], edge_length=0.01)
+fur_mat = solid.material@1(fur_x, color=[0.82, 0.57, 0.25], roughness=0.9)
+fur_tex = solid.texture@1(fur_mat, program="${fur_prog}", tile=0.4, size="256")
+fur_p = anim.parent@1(fur_tex, parent="w_head")
+output w_ruff = fur_p
+eye_l = solid.sphere@1(radius=0.026, segments=16)
+eye_l_m = xform.move@1(eye_l, by=[0.062, 1.752, 0.158])
+eye_r = solid.sphere@1(radius=0.026, segments=16)
+eye_r_m = xform.move@1(eye_r, by=[-0.062, 1.752, 0.158])
+eyes_u = solid.union@1(eye_l_m, eye_r_m)
+eyes_m = solid.material@1(eyes_u, color=[1.0, 0.85, 0.3], roughness=0.2, emissive=[2.4, 1.6, 0.3])
+eyes_p = anim.parent@1(eyes_m, parent="w_head")
+output w_eyes = eyes_p
+
+# the phoenix-wing cap: a gold band, a swept crest and two long pheasant feathers that stream behind
+band_t = solid.torus@1(major=0.14, minor=0.014, segments=48, tube_segments=10)
+band_m = xform.move@1(band_t, by=[0, 1.82, 0.02])
+band_r = solid.material@1(band_m, color=[1.0, 0.76, 0.24], metallic=1.0, roughness=0.25)
+band_p = anim.parent@1(band_r, parent="w_head")
+output w_band = band_p
+crest_path = curve.bezier@1(points=[[0, 1.84, 0.15], [0, 2.0, 0.15], [0, 2.12, 0.09], [0, 2.16, -0.04]], steps=20)
+crest_ring = profile.circle@1(radius=0.02, segments=10)
+crest_s = solid.sweep@1(crest_path, crest_ring, scale_end=0.25)
+crest_m = solid.material@1(crest_s, color=[1.0, 0.76, 0.24], metallic=1.0, roughness=0.3)
+crest_p = anim.parent@1(crest_m, parent="w_head")
+output w_crest = crest_p
+def feather(tag, sx)
+  f{tag}_path = curve.bezier@1(points=[[{sx * 0.08}, 1.86, 0.0], [{sx * 0.17}, 2.25, -0.25], [{sx * 0.32}, 2.52, -0.8], [{sx * 0.55}, 2.4, -1.45]], steps=28)
+  f{tag}_ring = profile.circle@1(radius=0.034, segments=10)
+  f{tag}_s = solid.sweep@1(f{tag}_path, f{tag}_ring, scale_end=0.15)
+  f{tag}_m = solid.material@1(f{tag}_s, color=[0.2, 0.6, 0.55], metallic=0.3, roughness=0.4, emissive=[0.02, 0.2, 0.17])
+  f{tag}_p = anim.parent@1(f{tag}_m, parent="w_head")
+  f{tag}_w = anim.wave@1(f{tag}_p, property="rotation", amplitude=[3, 5, 2], period=2.4, phase={0.25 + sx * 0.25}, pivot=[{sx * 0.08}, 1.86, 0])
+  output w_feather_{tag} = f{tag}_w
+end
+feather("l", 1)
+feather("r", -1)
+
+# arms: upper arm and forearm are separate parts so the elbow can bend; the staff is held in the right hand (his right is -x)
+limb("ual", 0.33, 1.44, 0.0, 0.4, 1.14, 0.04, 0.078, 0.062, 0.3, "wukong")
+sual_a = anim.track@1(sual_p, property="rotation", keys="0:-4,0,-5; 1.5:-6,0,-7; 3:-4,0,-5", interpolation="smooth", clip="idle", pivot=[0.33, 1.44, 0])
+sual_r = anim.track@1(sual_a, property="rotation", keys="0:35,0,-6; 0.25:-35,0,-6; 0.5:35,0,-6", interpolation="smooth", clip="run", pivot=[0.33, 1.44, 0])
+sual_b = anim.track@1(sual_r, property="rotation", keys="0:0,0,0; 0.1:-50,0,25; 0.5:-50,0,25", interpolation="smooth", loop=false, clip="block", pivot=[0.33, 1.44, 0])
+sual_c = anim.track@1(sual_b, property="rotation", keys="0:0,0,0; 0.3:-150,0,-10; 1.0:-150,0,-10; 1.3:0,0,0", interpolation="smooth", loop=false, clip="cast", pivot=[0.33, 1.44, 0])
+output w_ua_l = sual_c
+limb("fal", 0.4, 1.14, 0.04, 0.38, 0.88, 0.18, 0.062, 0.052, 0.3, "w_ua_l")
+sfal_a = anim.track@1(sfal_p, property="rotation", keys="0:-10,0,0; 0.25:-60,0,0; 0.5:-10,0,0", interpolation="smooth", clip="run", pivot=[0.4, 1.14, 0.04])
+sfal_b = anim.track@1(sfal_a, property="rotation", keys="0:0,0,0; 0.1:-70,0,0; 0.5:-70,0,0", interpolation="smooth", loop=false, clip="block", pivot=[0.4, 1.14, 0.04])
+output w_fa_l = sfal_b
+limb("uar", -0.33, 1.44, 0.0, -0.4, 1.14, 0.06, 0.078, 0.062, 0.3, "wukong")
+suar_a = anim.track@1(suar_p, property="rotation", keys="0:-30,0,6; 1.5:-32,0,8; 3:-30,0,6", interpolation="smooth", clip="idle", pivot=[-0.33, 1.44, 0])
+suar_r = anim.track@1(suar_a, property="rotation", keys="0:-30,0,6; 0.25:-30,0,6", interpolation="smooth", clip="run", pivot=[-0.33, 1.44, 0])
+suar_s1 = anim.track@1(suar_r, property="rotation", keys="0:-30,0,6; 0.2:-35,50,40; 0.32:-80,-60,-20; 0.67:-30,0,6", interpolation="smooth", loop=false, clip="slash", pivot=[-0.33, 1.44, 0])
+suar_s2 = anim.track@1(suar_s1, property="rotation", keys="0:-30,0,6; 0.16:-70,-50,-20; 0.3:-30,60,30; 0.67:-30,0,6", interpolation="smooth", loop=false, clip="slash2", pivot=[-0.33, 1.44, 0])
+suar_h = anim.track@1(suar_s2, property="rotation", keys="0:-30,0,6; 0.4:-170,0,10; 0.55:-60,0,0; 1.1:-30,0,6", interpolation="smooth", loop=false, clip="heavy", pivot=[-0.33, 1.44, 0])
+suar_c = anim.track@1(suar_h, property="rotation", keys="0:-30,0,6; 0.3:-150,0,10; 1.0:-150,0,10; 1.3:-30,0,6", interpolation="smooth", loop=false, clip="cast", pivot=[-0.33, 1.44, 0])
+output w_ua_r = suar_c
+limb("far", -0.4, 1.14, 0.06, -0.37, 0.9, 0.24, 0.062, 0.052, 0.3, "w_ua_r")
+output w_fa_r = sfar_p
+plate("pal", 0.14, 0.08, 0.14, 0.34, 1.5, 0.0, "w_ua_l")
+output w_paul_l = gpal_p
+plate("par", 0.14, 0.08, 0.14, -0.34, 1.5, 0.0, "w_ua_r")
+output w_paul_r = gpar_p
+plate("brl", 0.065, 0.1, 0.065, 0.385, 0.99, 0.11, "w_fa_l")
+output w_brace_l = gbrl_p
+plate("brr", 0.065, 0.1, 0.065, -0.385, 1.0, 0.15, "w_fa_r")
+output w_brace_r = gbrr_p
+fist_l = solid.sphere@1(radius=0.066, segments=18)
+fist_lm = xform.move@1(fist_l, by=[0.375, 0.86, 0.2])
+fist_lc = solid.material@1(fist_lm, color=[0.9, 0.66, 0.46], roughness=0.7)
+fist_lp = anim.parent@1(fist_lc, parent="w_fa_l")
+output w_fist_l = fist_lp
+fist_r = solid.sphere@1(radius=0.066, segments=18)
+fist_rm = xform.move@1(fist_r, by=[-0.36, 0.87, 0.27])
+fist_rc = solid.material@1(fist_rm, color=[0.9, 0.66, 0.46], roughness=0.7)
+fist_rp = anim.parent@1(fist_rc, parent="w_fa_r")
+output w_fist_r = fist_rp
+
+# the staff Ruyi Jingu Bang: red lacquer with gold caps and bands, held across the body, base near the ground
+def rod(tag, y0, h, r, cr, cg, cb, met, par)
+  r{tag}_s = solid.cylinder@1(radius={r}, height={h}, segments=24)
+  r{tag}_a = xform.move@1(r{tag}_s, by=[0, {y0 + h / 2}, 0])
+  r{tag}_l = xform.rotate@1(r{tag}_a, angles=[6, 0, 3])
+  r{tag}_h = xform.move@1(r{tag}_l, by=[-0.36, 0, 0.27])
+  r{tag}_m = solid.material@1(r{tag}_h, color=[{cr}, {cg}, {cb}], metallic={met}, roughness=0.3)
+  r{tag}_p = anim.parent@1(r{tag}_m, parent="${par}")
+end
+rod("staff", 0.0, 2.25, 0.034, 0.62, 0.06, 0.05, 0.1, "wukong")
+rstaff_f = solid.finish@1(rstaff_m, clearcoat=0.6, clearcoat_roughness=0.15)
+rstaff_p2 = anim.parent@1(rstaff_f, parent="wukong")
+rstaff_i = anim.track@1(rstaff_p2, property="rotation", keys="0:0,0,0; 1.5:1,0,1; 3:0,0,0", interpolation="smooth", clip="idle", pivot=[-0.36, 0.9, 0.3])
+rstaff_r = anim.track@1(rstaff_i, property="rotation", keys="0:-8,0,0; 0.25:8,0,0; 0.5:-8,0,0", interpolation="smooth", clip="run", pivot=[-0.36, 0.9, 0.3])
+rstaff_s1 = anim.track@1(rstaff_r, property="rotation", keys="0:0,0,0; 0.2:-20,70,30; 0.32:-40,-85,-20; 0.67:0,0,0", interpolation="smooth", loop=false, clip="slash", pivot=[-0.36, 0.9, 0.3])
+rstaff_s2 = anim.track@1(rstaff_s1, property="rotation", keys="0:0,0,0; 0.16:-30,-80,-20; 0.3:-20,75,25; 0.67:0,0,0", interpolation="smooth", loop=false, clip="slash2", pivot=[-0.36, 0.9, 0.3])
+rstaff_hv = anim.track@1(rstaff_s2, property="rotation", keys="0:0,0,0; 0.4:-150,0,0; 0.55:-20,0,0; 1.1:0,0,0", interpolation="smooth", loop=false, clip="heavy", pivot=[-0.36, 0.9, 0.3])
+rstaff_b = anim.track@1(rstaff_hv, property="rotation", keys="0:0,0,0; 0.1:-10,0,70; 0.5:-10,0,70", interpolation="smooth", loop=false, clip="block", pivot=[-0.36, 0.9, 0.3])
+rstaff_c = anim.track@1(rstaff_b, property="rotation", keys="0:0,0,0; 0.3:-100,0,0; 1.0:-100,0,0; 1.3:0,0,0", interpolation="smooth", loop=false, clip="cast", pivot=[-0.36, 0.9, 0.3])
+output w_staff = rstaff_c
+rod("capa", 2.03, 0.26, 0.052, 1.0, 0.76, 0.24, 1.0, "w_staff")
+output w_cap_a = rcapa_p
+rod("capb", -0.02, 0.26, 0.052, 1.0, 0.76, 0.24, 1.0, "w_staff")
+output w_cap_b = rcapb_p
+rod("ringa", 0.9, 0.06, 0.042, 1.0, 0.76, 0.24, 1.0, "w_staff")
+output w_ring_a = rringa_p
+rod("ringb", 1.3, 0.06, 0.042, 1.0, 0.76, 0.24, 1.0, "w_staff")
+output w_ring_b = rringb_p
+
+# legs: thigh and shin, gold greaves and boots; they swing in the run cycle
+limb("thl", 0.13, 0.92, 0.0, 0.14, 0.52, 0.04, 0.098, 0.07, 0.3, "wukong")
+sthl_r = anim.track@1(sthl_p, property="rotation", keys="0:38,0,0; 0.25:-38,0,0; 0.5:38,0,0", interpolation="smooth", clip="run", pivot=[0.13, 0.92, 0])
+output w_th_l = sthl_r
+limb("shl", 0.14, 0.52, 0.04, 0.14, 0.1, 0.0, 0.068, 0.05, 0.32, "w_th_l")
+sshl_r = anim.track@1(sshl_p, property="rotation", keys="0:0,0,0; 0.125:-5,0,0; 0.25:-55,0,0; 0.5:0,0,0", interpolation="smooth", clip="run", pivot=[0.14, 0.52, 0.04])
+output w_sh_l = sshl_r
+limb("thr", -0.13, 0.92, 0.0, -0.14, 0.52, 0.04, 0.098, 0.07, 0.3, "wukong")
+sthr_r = anim.track@1(sthr_p, property="rotation", keys="0:-38,0,0; 0.25:38,0,0; 0.5:-38,0,0", interpolation="smooth", clip="run", pivot=[-0.13, 0.92, 0])
+output w_th_r = sthr_r
+limb("shr", -0.14, 0.52, 0.04, -0.14, 0.1, 0.0, 0.068, 0.05, 0.32, "w_th_r")
+sshr_r = anim.track@1(sshr_p, property="rotation", keys="0:-55,0,0; 0.25:0,0,0; 0.375:-5,0,0; 0.5:-55,0,0", interpolation="smooth", clip="run", pivot=[-0.14, 0.52, 0.04])
+output w_sh_r = sshr_r
+plate("grl", 0.085, 0.2, 0.085, 0.14, 0.3, 0.025, "w_sh_l")
+output w_greave_l = ggrl_p
+plate("grr", 0.085, 0.2, 0.085, -0.14, 0.3, 0.025, "w_sh_r")
+output w_greave_r = ggrr_p
+plate("btl", 0.085, 0.06, 0.15, 0.14, 0.06, 0.06, "w_sh_l")
+output w_boot_l = gbtl_p
+plate("btr", 0.085, 0.06, 0.15, -0.14, 0.06, 0.06, "w_sh_r")
+output w_boot_r = gbtr_p
+plate("kgl", 0.075, 0.075, 0.06, 0.14, 0.52, 0.1, "w_th_l")
+output w_knee_l = gkgl_p
+plate("kgr", 0.075, 0.075, 0.06, -0.14, 0.52, 0.1, "w_th_r")
+output w_knee_r = gkgr_p
+
+# tail: a long tapering curve that sways
+tail_path = curve.bezier@1(points=[[0, 0.98, -0.14], [0, 0.88, -0.42], [0, 1.15, -0.62], [0, 1.55, -0.55]], steps=24)
+tail_ring = profile.circle@1(radius=0.045, segments=12)
+tail_s = solid.sweep@1(tail_path, tail_ring, scale_end=0.45)
+tail_m = solid.material@1(tail_s, color=[0.82, 0.57, 0.25], roughness=0.85)
+tail_t = solid.texture@1(tail_m, program="${fur_prog}", tile=0.5, size="256")
+tail_p = anim.parent@1(tail_t, parent="wukong")
+tail_w = anim.wave@1(tail_p, property="rotation", amplitude=[4, 14, 3], period=2.2, pivot=[0, 0.98, -0.14])
+output w_tail = tail_w
+
+# a red scarf from the neck that streams behind
+scarf_path = curve.bezier@1(points=[[0.0, 1.56, -0.14], [0.0, 1.42, -0.5], [0.04, 1.1, -0.8], [0.0, 0.8, -1.0]], steps=24)
+scarf_prof = profile.rect@1(size=[0.16, 0.012])
+scarf_s = solid.sweep@1(scarf_path, scarf_prof, scale_end=1.4)
+scarf_m = solid.material@1(scarf_s, color=[0.7, 0.07, 0.06], roughness=0.6, recipe="fabric", texture_scale=6)
+scarf_p = anim.parent@1(scarf_m, parent="wukong")
+scarf_w = anim.wave@1(scarf_p, property="rotation", amplitude=[6, 10, 5], period=1.8, pivot=[0, 1.56, -0.14])
+output w_scarf = scarf_w
+# ======================= the Bull Demon King: a 6 m horned demon of cinders and iron =======================
+let ash_prog = "c = expr(code=\"u = p.x; v = p.y; f = fbm(vec2(u*2.0, v*2.0)); g = abs(fbm(vec2(u*4.0 + f*2.0, v*4.0 - f*2.0)) - 0.5); out = vec4(vec3(1.0 - smoothstep(0.0, 0.03, g)), 1.0)\"); base = expr(code=\"u = p.x; v = p.y; f = fbm(vec2(u*8.0, v*8.0)); h = fbm(vec2(u*40.0, v*40.0)); out = vec4(vec3(0.1, 0.085, 0.08) * (0.6 + 0.6*f + 0.3*h), 1.0)\"); hot = expr(code=\"out = vec4(1.0, 0.3, 0.04, 1.0)\"); glow = expr(code=\"out = vec4(2.4, 0.5, 0.06, 1.0)\"); none = expr(code=\"out = vec4(0, 0, 0, 1.0)\"); albedo = blend(hot, base, c, blend_type=normal, amount=1.0); emissive = blend(glow, none, c, blend_type=normal, amount=1.0); roughness = expr(code=\"out = vec4(vec3(0.88), 1.0)\"); hs = colorize(c, gradient=[0:#808080, 1:#a8a8a8]); height = hs"
+let bone_prog = "base = expr(code=\"u = p.x; v = p.y; f = fbm(vec2(u*5.0, v*18.0)); r = smoothstep(0.45, 0.55, fract(v*7.0)); out = vec4(vec3(0.86, 0.78, 0.62) * (0.7 + 0.4*f) * (0.7 + 0.3*r), 1.0)\"); albedo = base; roughness = expr(code=\"out = vec4(vec3(0.55), 1.0)\")"
+let cloth_prog = "a = expr(code=\"u = p.x; v = p.y; f = fbm(vec2(u*6.0, v*6.0)); e = smoothstep(0.88, 0.95, v); out = vec4(mix(vec3(0.42, 0.04, 0.04) * (0.6 + 0.6*f), vec3(1.0, 0.72, 0.2), e), 1.0)\"); albedo = a"
+
+def blimb(tag, x0, y0, z0, x1, y1, z1, r0, r1, h, par)
+  d{tag}_f = field.tube@1(points=[[{x0}, {y0}, {z0}], [{x1}, {y1}, {z1}]], radius={r0}, end_radius={r1})
+  d{tag}_n = field.noise@1(d{tag}_f, amplitude=0.07, scale=0.45, octaves=3, mode="ridged")
+  d{tag}_s = field.to_solid@1(d{tag}_n, min=[{(x0 + x1) / 2 - h - 0.45}, {(y0 + y1) / 2 - h - 0.45}, {(z0 + z1) / 2 - h - 0.45}], max=[{(x0 + x1) / 2 + h + 0.45}, {(y0 + y1) / 2 + h + 0.45}, {(z0 + z1) / 2 + h + 0.45}], edge_length=0.055)
+  d{tag}_m = solid.material@1(d{tag}_s, color=[0.5, 0.5, 0.5], roughness=0.85)
+  d{tag}_t = solid.texture@1(d{tag}_m, program="${ash_prog}", tile=1.6, size="512")
+  d{tag}_p = anim.parent@1(d{tag}_t, parent="${par}")
+end
+# armour: dark iron or gold shells (an ellipsoid at x, y, z)
+def bplate(tag, rx, ry, rz, x, y, z, cr, cg, cb, met, par)
+  q{tag}_f = field.ellipsoid@1(radii=[{rx}, {ry}, {rz}])
+  q{tag}_m = field.move@1(q{tag}_f, by=[{x}, {y}, {z}])
+  q{tag}_n = field.noise@1(q{tag}_m, amplitude=0.03, scale=0.3, octaves=2, mode="ridged")
+  q{tag}_s = field.to_solid@1(q{tag}_n, min=[{x - rx - 0.15}, {y - ry - 0.15}, {z - rz - 0.15}], max=[{x + rx + 0.15}, {y + ry + 0.15}, {z + rz + 0.15}], edge_length=0.045)
+  q{tag}_c = solid.material@1(q{tag}_s, color=[{cr}, {cg}, {cb}], metallic={met}, roughness=0.32)
+  q{tag}_x = solid.finish@1(q{tag}_c, clearcoat=0.4, clearcoat_roughness=0.25)
+  q{tag}_p = anim.parent@1(q{tag}_x, parent="${par}")
+end
+
+# torso, belly, pelvis, neck and shoulder humps as one field
+b_chest = field.ellipsoid@1(radii=[1.35, 1.1, 0.95])
+b_chest_m = field.move@1(b_chest, by=[0, 3.6, 0])
+b_belly = field.ellipsoid@1(radii=[1.05, 0.95, 0.9])
+b_belly_m = field.move@1(b_belly, by=[0, 2.65, 0.05])
+b_pelvis = field.ellipsoid@1(radii=[1.1, 0.6, 0.8])
+b_pelvis_m = field.move@1(b_pelvis, by=[0, 2.0, 0])
+b_neck = field.tube@1(points=[[0, 4.2, 0.2], [0, 4.8, 0.55]], radius=0.75, end_radius=0.6)
+b_humpl = field.ellipsoid@1(radii=[0.75, 0.55, 0.65])
+b_humpl_m = field.move@1(b_humpl, by=[1.15, 4.15, -0.1])
+b_humpr = field.ellipsoid@1(radii=[0.75, 0.55, 0.65])
+b_humpr_m = field.move@1(b_humpr, by=[-1.15, 4.15, -0.1])
+b_u1 = field.smooth_union@1(b_chest_m, b_belly_m, radius=0.5)
+b_u2 = field.smooth_union@1(b_u1, b_pelvis_m, radius=0.4)
+b_u3 = field.smooth_union@1(b_u2, b_neck, radius=0.35)
+b_u4 = field.smooth_union@1(b_u3, b_humpl_m, radius=0.35)
+b_u5 = field.smooth_union@1(b_u4, b_humpr_m, radius=0.35)
+b_n = field.noise@1(b_u5, amplitude=0.1, scale=0.55, octaves=4, mode="ridged")
+b_s = field.to_solid@1(b_n, min=[-2.3, 1.2, -1.6], max=[2.3, 5.5, 1.7], edge_length=0.055)
+b_m = solid.material@1(b_s, color=[0.5, 0.5, 0.5], roughness=0.85)
+b_t = solid.texture@1(b_m, program="${ash_prog}", tile=1.6, size="512")
+b_idle = anim.track@1(b_t, property="rotation", keys="0:0,0,0; 1.8:1.5,0,0; 3.6:0,0,0", interpolation="smooth", clip="idle", pivot=[0, 2.0, 0])
+b_walk = anim.track@1(b_idle, property="rotation", keys="0:-4,0,3; 0.6:-4,0,-3; 1.2:-4,0,3", interpolation="smooth", clip="walk", pivot=[0, 2.0, 0])
+b_walkp = anim.track@1(b_walk, property="position", keys="0:0,0,0; 0.3:0,0.12,0; 0.6:0,0,0; 0.9:0,0.12,0; 1.2:0,0,0", interpolation="smooth", clip="walk")
+b_slam = anim.track@1(b_walkp, property="rotation", keys="0:0,0,0; 0.9:-16,0,0; 1.05:30,0,0; 1.9:0,0,0", interpolation="smooth", loop=false, clip="slam", pivot=[0, 2.0, 0])
+b_sweep = anim.track@1(b_slam, property="rotation", keys="0:0,0,0; 0.7:0,60,0; 0.95:0,-75,0; 1.7:0,0,0", interpolation="smooth", loop=false, clip="sweep", pivot=[0, 2.0, 0])
+b_stomp = anim.track@1(b_sweep, property="rotation", keys="0:0,0,0; 0.7:-10,0,0; 0.95:14,0,0; 1.6:0,0,0", interpolation="smooth", loop=false, clip="stomp", pivot=[0, 2.0, 0])
+b_roar = anim.track@1(b_stomp, property="rotation", keys="0:0,0,0; 0.7:-16,0,0; 1.8:-16,0,0; 2.4:0,0,0", interpolation="smooth", loop=false, clip="roar", pivot=[0, 2.0, 0])
+b_charge = anim.track@1(b_roar, property="rotation", keys="0:0,0,0; 0.6:26,0,0; 1.6:26,0,0; 2.2:0,0,0", interpolation="smooth", loop=false, clip="charge", pivot=[0, 2.0, 0])
+b_breath = anim.track@1(b_charge, property="rotation", keys="0:0,0,0; 0.6:-12,0,0; 1.8:6,0,0; 2.4:0,0,0", interpolation="smooth", loop=false, clip="breath", pivot=[0, 2.0, 0])
+b_hit = anim.track@1(b_breath, property="rotation", keys="0:0,0,0; 0.1:-5,0,2; 0.5:0,0,0", interpolation="smooth", loop=false, clip="hit", pivot=[0, 2.0, 0])
+b_death = anim.track@1(b_hit, property="rotation", keys="0:0,0,0; 1.0:-10,0,3; 3.6:-82,0,0", interpolation="smooth", loop=false, clip="death", pivot=[0, 0.3, -0.8])
+b_deathp = anim.track@1(b_death, property="position", keys="0:0,0,0; 3.6:0,-1.9,-1.6", interpolation="smooth", loop=false, clip="death")
+b_machine = anim.machine@1(b_deathp, program="entry move;state move blend=speed idle@0 walk@2.6;state slam clip=slam once;state sweep clip=sweep once;state stomp clip=stomp once;state roar clip=roar once;state charge clip=charge once;state breath clip=breath once;state hit clip=hit once;state death clip=death once;transition any -> slam when trigger:slam fade=0.1;transition any -> sweep when trigger:sweep fade=0.1;transition any -> stomp when trigger:stomp fade=0.1;transition any -> roar when trigger:roar fade=0.1;transition any -> charge when trigger:charge fade=0.1;transition any -> breath when trigger:breath fade=0.1;transition any -> hit when trigger:hit_react fade=0.05;transition any -> death when trigger:death fade=0.2;transition slam -> move exit=0.95;transition sweep -> move exit=0.95;transition stomp -> move exit=0.95;transition roar -> move exit=0.95;transition charge -> move exit=0.95;transition breath -> move exit=0.95;transition hit -> move exit=0.95")
+output bull = b_machine
+
+# head: skull, a heavy muzzle, brow, jaw, ears; the horns, nose ring and eyes are parts of their own
+bh_skull = field.ellipsoid@1(radii=[0.68, 0.62, 0.72])
+bh_skull_m = field.move@1(bh_skull, by=[0, 5.1, 0.85])
+bh_muzzle = field.ellipsoid@1(radii=[0.46, 0.38, 0.55])
+bh_muzzle_m = field.move@1(bh_muzzle, by=[0, 4.88, 1.5])
+bh_jaw = field.ellipsoid@1(radii=[0.4, 0.2, 0.52])
+bh_jaw_m = field.move@1(bh_jaw, by=[0, 4.52, 1.38])
+bh_brow = field.ellipsoid@1(radii=[0.74, 0.17, 0.34])
+bh_brow_m = field.move@1(bh_brow, by=[0, 5.4, 1.25])
+bh_earl = field.ellipsoid@1(radii=[0.32, 0.12, 0.1])
+bh_earl_m = field.move@1(bh_earl, by=[0.82, 5.3, 0.6])
+bh_earr = field.ellipsoid@1(radii=[0.32, 0.12, 0.1])
+bh_earr_m = field.move@1(bh_earr, by=[-0.82, 5.3, 0.6])
+bh_u1 = field.smooth_union@1(bh_skull_m, bh_muzzle_m, radius=0.3)
+bh_u2 = field.smooth_union@1(bh_u1, bh_jaw_m, radius=0.12)
+bh_u3 = field.smooth_union@1(bh_u2, bh_brow_m, radius=0.18)
+bh_u4 = field.smooth_union@1(bh_u3, bh_earl_m, radius=0.1)
+bh_u5 = field.smooth_union@1(bh_u4, bh_earr_m, radius=0.1)
+bh_mouth = field.box@1(half=[0.34, 0.025, 0.4], rounding=0.01)
+bh_mouth_m = field.move@1(bh_mouth, by=[0, 4.67, 1.45])
+bh_nostl = field.ellipsoid@1(radii=[0.07, 0.06, 0.12])
+bh_nostl_m = field.move@1(bh_nostl, by=[0.16, 4.95, 2.0])
+bh_nostr = field.ellipsoid@1(radii=[0.07, 0.06, 0.12])
+bh_nostr_m = field.move@1(bh_nostr, by=[-0.16, 4.95, 2.0])
+bh_sockl = field.ellipsoid@1(radii=[0.17, 0.11, 0.14])
+bh_sockl_m = field.move@1(bh_sockl, by=[0.36, 5.25, 1.45])
+bh_sockr = field.ellipsoid@1(radii=[0.17, 0.11, 0.14])
+bh_sockr_m = field.move@1(bh_sockr, by=[-0.36, 5.25, 1.45])
+bh_d1 = field.subtract@1(bh_u5, bh_mouth_m)
+bh_d2 = field.subtract@1(bh_d1, bh_nostl_m)
+bh_d3 = field.subtract@1(bh_d2, bh_nostr_m)
+bh_d4 = field.subtract@1(bh_d3, bh_sockl_m)
+bh_d5 = field.subtract@1(bh_d4, bh_sockr_m)
+bh_n = field.noise@1(bh_d5, amplitude=0.035, scale=0.3, octaves=3, mode="ridged")
+bh_s = field.to_solid@1(bh_n, min=[-1.2, 4.2, 0.0], max=[1.2, 5.9, 2.2], edge_length=0.03)
+bh_m = solid.material@1(bh_s, color=[0.5, 0.5, 0.5], roughness=0.8)
+bh_t = solid.texture@1(bh_m, program="${ash_prog}", tile=1.2, size="512")
+bh_p = anim.parent@1(bh_t, parent="bull")
+bh_idle = anim.track@1(bh_p, property="rotation", keys="0:0,0,0; 1.8:-3,6,0; 3.6:0,0,0", interpolation="smooth", clip="idle", pivot=[0, 4.7, 0.5])
+bh_roar = anim.track@1(bh_idle, property="rotation", keys="0:0,0,0; 0.7:-34,0,0; 1.8:-34,0,0; 2.4:0,0,0", interpolation="smooth", loop=false, clip="roar", pivot=[0, 4.7, 0.5])
+bh_breath = anim.track@1(bh_roar, property="rotation", keys="0:0,0,0; 0.6:-28,0,0; 1.8:6,0,0; 2.4:0,0,0", interpolation="smooth", loop=false, clip="breath", pivot=[0, 4.7, 0.5])
+bh_slam = anim.track@1(bh_breath, property="rotation", keys="0:0,0,0; 0.9:-10,0,0; 1.05:22,0,0; 1.9:0,0,0", interpolation="smooth", loop=false, clip="slam", pivot=[0, 4.7, 0.5])
+bh_sweep = anim.track@1(bh_slam, property="rotation", keys="0:0,0,0; 0.7:0,25,0; 0.95:0,-30,0; 1.7:0,0,0", interpolation="smooth", loop=false, clip="sweep", pivot=[0, 4.7, 0.5])
+bh_charge = anim.track@1(bh_sweep, property="rotation", keys="0:0,0,0; 0.6:30,0,0; 1.6:30,0,0; 2.2:0,0,0", interpolation="smooth", loop=false, clip="charge", pivot=[0, 4.7, 0.5])
+bh_hit = anim.track@1(bh_charge, property="rotation", keys="0:0,0,0; 0.1:-14,0,0; 0.5:0,0,0", interpolation="smooth", loop=false, clip="hit", pivot=[0, 4.7, 0.5])
+output b_head = bh_hit
+def horn(tag, sx)
+  hn{tag}_path = curve.bezier@1(points=[[{sx * 0.55}, 5.5, 0.75], [{sx * 1.5}, 5.6, 0.6], [{sx * 2.3}, 6.05, 1.0], [{sx * 2.35}, 6.85, 1.6]], steps=28)
+  hn{tag}_ring = profile.circle@1(radius=0.2, segments=14)
+  hn{tag}_s = solid.sweep@1(hn{tag}_path, hn{tag}_ring, scale_end=0.1)
+  hn{tag}_m = solid.material@1(hn{tag}_s, color=[0.9, 0.82, 0.66], roughness=0.5)
+  hn{tag}_t = solid.texture@1(hn{tag}_m, program="${bone_prog}", tile=1.0, size="256")
+  hn{tag}_p = anim.parent@1(hn{tag}_t, parent="b_head")
+  output b_horn_{tag} = hn{tag}_p
+end
+horn("l", 1)
+horn("r", -1)
+bring_t = solid.torus@1(major=0.24, minor=0.045, segments=32, tube_segments=10)
+bring_r = xform.rotate@1(bring_t, angles=[90, 0, 0])
+bring_m = xform.move@1(bring_r, by=[0, 4.72, 2.0])
+bring_c = solid.material@1(bring_m, color=[1.0, 0.8, 0.3], metallic=1.0, roughness=0.22)
+bring_p = anim.parent@1(bring_c, parent="b_head")
+output b_ring = bring_p
+beye_l = solid.sphere@1(radius=0.1, segments=16)
+beye_lm = xform.move@1(beye_l, by=[0.36, 5.25, 1.47])
+beye_r = solid.sphere@1(radius=0.1, segments=16)
+beye_rm = xform.move@1(beye_r, by=[-0.36, 5.25, 1.47])
+beyes_u = solid.union@1(beye_lm, beye_rm)
+beyes_m = solid.material@1(beyes_u, color=[1.0, 0.4, 0.1], roughness=0.2, emissive=[4.0, 1.0, 0.1])
+beyes_p = anim.parent@1(beyes_m, parent="b_head")
+output b_eyes = beyes_p
+
+# arms and legs, with iron and gold armour; the mace is in the right hand (his right is -x)
+blimb("ual", 1.7, 4.1, 0.0, 2.0, 3.0, 0.35, 0.58, 0.48, 1.0, "bull")
+dual_a = anim.track@1(dual_p, property="rotation", keys="0:-6,0,-4; 1.8:-9,0,-6; 3.6:-6,0,-4", interpolation="smooth", clip="idle", pivot=[1.7, 4.1, 0])
+dual_w = anim.track@1(dual_a, property="rotation", keys="0:-30,0,-4; 0.6:30,0,-4; 1.2:-30,0,-4", interpolation="smooth", clip="walk", pivot=[1.7, 4.1, 0])
+dual_sl = anim.track@1(dual_w, property="rotation", keys="0:-6,0,-4; 0.9:-30,0,30; 1.05:20,0,0; 1.9:-6,0,-4", interpolation="smooth", loop=false, clip="slam", pivot=[1.7, 4.1, 0])
+dual_r = anim.track@1(dual_sl, property="rotation", keys="0:-6,0,-4; 0.7:-20,0,70; 1.8:-20,0,70; 2.4:-6,0,-4", interpolation="smooth", loop=false, clip="roar", pivot=[1.7, 4.1, 0])
+output b_ua_l = dual_r
+blimb("fal", 2.0, 3.0, 0.35, 1.9, 2.05, 1.0, 0.48, 0.42, 1.0, "b_ua_l")
+output b_fa_l = dfal_p
+blimb("uar", -1.7, 4.1, 0.0, -2.0, 3.0, 0.35, 0.58, 0.48, 1.0, "bull")
+duar_a = anim.track@1(duar_p, property="rotation", keys="0:-8,0,4; 1.8:-11,0,6; 3.6:-8,0,4", interpolation="smooth", clip="idle", pivot=[-1.7, 4.1, 0])
+duar_w = anim.track@1(duar_a, property="rotation", keys="0:30,0,4; 0.6:-30,0,4; 1.2:30,0,4", interpolation="smooth", clip="walk", pivot=[-1.7, 4.1, 0])
+duar_sl = anim.track@1(duar_w, property="rotation", keys="0:-8,0,4; 0.9:-165,0,-10; 1.05:-25,0,0; 1.9:-8,0,4", interpolation="smooth", loop=false, clip="slam", pivot=[-1.7, 4.1, 0])
+duar_sw = anim.track@1(duar_sl, property="rotation", keys="0:-8,0,4; 0.7:-70,60,0; 0.95:-80,-85,0; 1.7:-8,0,4", interpolation="smooth", loop=false, clip="sweep", pivot=[-1.7, 4.1, 0])
+duar_r = anim.track@1(duar_sw, property="rotation", keys="0:-8,0,4; 0.7:-20,0,-70; 1.8:-20,0,-70; 2.4:-8,0,4", interpolation="smooth", loop=false, clip="roar", pivot=[-1.7, 4.1, 0])
+duar_c = anim.track@1(duar_r, property="rotation", keys="0:-8,0,4; 0.6:30,0,0; 1.6:30,0,0; 2.2:-8,0,4", interpolation="smooth", loop=false, clip="charge", pivot=[-1.7, 4.1, 0])
+output b_ua_r = duar_c
+blimb("far", -2.0, 3.0, 0.35, -1.9, 2.05, 1.0, 0.48, 0.42, 1.0, "b_ua_r")
+output b_fa_r = dfar_p
+bplate("pal", 0.85, 0.5, 0.8, 1.55, 4.45, -0.05, 0.12, 0.1, 0.1, 0.9, "b_ua_l")
+output b_paul_l = qpal_p
+bplate("par", 0.85, 0.5, 0.8, -1.55, 4.45, -0.05, 0.12, 0.1, 0.1, 0.9, "b_ua_r")
+output b_paul_r = qpar_p
+bplate("brl", 0.5, 0.5, 0.5, 1.95, 2.35, 0.75, 1.0, 0.8, 0.3, 0.85, "b_fa_l")
+output b_brace_l = qbrl_p
+bplate("brr", 0.5, 0.5, 0.5, -1.95, 2.35, 0.75, 1.0, 0.8, 0.3, 0.85, "b_fa_r")
+output b_brace_r = qbrr_p
+bfist_l = solid.sphere@1(radius=0.52, segments=24)
+bfist_lm = xform.move@1(bfist_l, by=[1.88, 1.85, 1.1])
+bfist_lc = solid.material@1(bfist_lm, color=[0.5, 0.5, 0.5], roughness=0.85)
+bfist_lt = solid.texture@1(bfist_lc, program="${ash_prog}", tile=1.2, size="256")
+bfist_lp = anim.parent@1(bfist_lt, parent="b_fa_l")
+output b_fist_l = bfist_lp
+bfist_r = solid.sphere@1(radius=0.52, segments=24)
+bfist_rm = xform.move@1(bfist_r, by=[-1.88, 1.85, 1.1])
+bfist_rc = solid.material@1(bfist_rm, color=[0.5, 0.5, 0.5], roughness=0.85)
+bfist_rt = solid.texture@1(bfist_rc, program="${ash_prog}", tile=1.2, size="256")
+bfist_rp = anim.parent@1(bfist_rt, parent="b_fa_r")
+output b_fist_r = bfist_rp
+# the mace: a long shaft, a spiked iron head, gold bands
+mace_shaft = solid.cylinder@1(radius=0.17, height=4.2, segments=20)
+mace_sa = xform.move@1(mace_shaft, by=[-1.9, 2.9, 1.15])
+mace_sm = solid.material@1(mace_sa, color=[0.2, 0.12, 0.08], roughness=0.6, recipe="wood", texture_scale=2)
+mace_sp = anim.parent@1(mace_sm, parent="b_fa_r")
+output b_mace_shaft = mace_sp
+mace_head = solid.sphere@1(radius=0.62, segments=24)
+mace_spike = solid.cone@1(radius=0.17, top_radius=0.0, height=0.55, segments=12)
+mace_spk_a = xform.move@1(mace_spike, by=[0, 0.55, 0])
+mace_spk_r = inst.radial@1(mace_spk_a, count=10, radius=0.45)
+mace_spk_x = inst.realize@1(mace_spk_r)
+mace_spk_t = xform.rotate@1(mace_spike, angles=[0, 0, 0])
+mace_hu = solid.union@1(mace_head, mace_spk_x)
+mace_hm = xform.move@1(mace_hu, by=[-1.9, 5.1, 1.15])
+mace_hc = solid.material@1(mace_hm, color=[0.1, 0.09, 0.09], metallic=0.9, roughness=0.35)
+mace_hx = solid.finish@1(mace_hc, clearcoat=0.3, clearcoat_roughness=0.3)
+mace_hp = anim.parent@1(mace_hx, parent="b_fa_r")
+output b_mace_head = mace_hp
+blimb("thl", 0.7, 2.0, 0.0, 0.85, 1.1, 0.25, 0.7, 0.52, 1.0, "bull")
+dthl_w = anim.track@1(dthl_p, property="rotation", keys="0:32,0,0; 0.6:-32,0,0; 1.2:32,0,0", interpolation="smooth", clip="walk", pivot=[0.7, 2.0, 0])
+output b_th_l = dthl_w
+blimb("shl", 0.85, 1.1, 0.25, 0.85, 0.4, 0.0, 0.5, 0.4, 0.9, "b_th_l")
+dshl_w = anim.track@1(dshl_p, property="rotation", keys="0:0,0,0; 0.3:-40,0,0; 0.6:0,0,0", interpolation="smooth", clip="walk", pivot=[0.85, 1.1, 0.25])
+output b_sh_l = dshl_w
+blimb("thr", -0.7, 2.0, 0.0, -0.85, 1.1, 0.25, 0.7, 0.52, 1.0, "bull")
+dthr_w = anim.track@1(dthr_p, property="rotation", keys="0:-32,0,0; 0.6:32,0,0; 1.2:-32,0,0", interpolation="smooth", clip="walk", pivot=[-0.7, 2.0, 0])
+dthr_st = anim.track@1(dthr_w, property="rotation", keys="0:0,0,0; 0.7:-70,0,0; 0.95:5,0,0; 1.6:0,0,0", interpolation="smooth", loop=false, clip="stomp", pivot=[-0.7, 2.0, 0])
+output b_th_r = dthr_st
+blimb("shr", -0.85, 1.1, 0.25, -0.85, 0.4, 0.0, 0.5, 0.4, 0.9, "b_th_r")
+dshr_w = anim.track@1(dshr_p, property="rotation", keys="0:-40,0,0; 0.3:0,0,0; 0.6:-40,0,0; 1.2:-40,0,0", interpolation="smooth", clip="walk", pivot=[-0.85, 1.1, 0.25])
+output b_sh_r = dshr_w
+bplate("hfl", 0.5, 0.3, 0.7, 0.85, 0.28, 0.2, 0.07, 0.06, 0.06, 0.6, "b_sh_l")
+output b_hoof_l = qhfl_p
+bplate("hfr", 0.5, 0.3, 0.7, -0.85, 0.28, 0.2, 0.07, 0.06, 0.06, 0.6, "b_sh_r")
+output b_hoof_r = qhfr_p
+bplate("gvl", 0.52, 0.5, 0.5, 0.85, 0.78, 0.15, 1.0, 0.8, 0.3, 0.85, "b_sh_l")
+output b_greave_l = qgvl_p
+bplate("gvr", 0.52, 0.5, 0.5, -0.85, 0.78, 0.15, 1.0, 0.8, 0.3, 0.85, "b_sh_r")
+output b_greave_r = qgvr_p
+
+# a chest harness of gold, a belt, a loincloth and a necklace of skulls-in-beads
+bplate("chest", 1.2, 0.85, 0.5, 0, 3.7, 0.7, 0.12, 0.1, 0.1, 0.9, "bull")
+output b_chest = qchest_p
+bplate("ring", 1.0, 0.18, 0.95, 0, 3.0, 0.1, 1.0, 0.8, 0.3, 0.85, "bull")
+output b_belt = qring_p
+loin_s = solid.cone@1(radius=1.15, top_radius=0.85, height=1.0, segments=36)
+loin_a = xform.move@1(loin_s, by=[0, 1.55, 0])
+loin_m = solid.material@1(loin_a, color=[0.5, 0.5, 0.5], roughness=0.8)
+loin_t = solid.texture@1(loin_m, program="${cloth_prog}", tile=1.2, size="256")
+loin_p = anim.parent@1(loin_t, parent="bull")
+output b_loin = loin_p
+bead = solid.sphere@1(radius=0.14, segments=14)
+bead_r = inst.radial@1(bead, count=18, radius=1.0)
+bead_x = inst.realize@1(bead_r)
+bead_m = xform.move@1(bead_x, by=[0, 4.35, 0.15])
+bead_c = solid.material@1(bead_m, color=[0.86, 0.78, 0.62], roughness=0.5)
+bead_p = anim.parent@1(bead_c, parent="bull")
+output b_beads = bead_p
+
+# a long swishing tail and a tattered cape
+btail_path = curve.bezier@1(points=[[0, 2.1, -0.7], [0, 1.6, -1.8], [0, 2.4, -2.5], [0, 3.1, -2.2]], steps=24)
+btail_ring = profile.circle@1(radius=0.22, segments=12)
+btail_s = solid.sweep@1(btail_path, btail_ring, scale_end=0.5)
+btail_m = solid.material@1(btail_s, color=[0.5, 0.5, 0.5], roughness=0.85)
+btail_t = solid.texture@1(btail_m, program="${ash_prog}", tile=1.2, size="256")
+btail_p = anim.parent@1(btail_t, parent="bull")
+btail_w = anim.wave@1(btail_p, property="rotation", amplitude=[5, 18, 4], period=3.0, pivot=[0, 2.1, -0.7])
+output b_tail = btail_w
+cape_path = curve.bezier@1(points=[[0, 4.7, -0.8], [0, 3.6, -1.4], [0, 2.2, -1.7], [0, 0.9, -1.8]], steps=24)
+cape_prof = profile.rect@1(size=[2.4, 0.06])
+cape_s = solid.sweep@1(cape_path, cape_prof, scale_end=1.5)
+cape_m = solid.material@1(cape_s, color=[0.5, 0.5, 0.5], roughness=0.7)
+cape_t = solid.texture@1(cape_m, program="${cloth_prog}", tile=2.5, size="256")
+cape_p = anim.parent@1(cape_t, parent="bull")
+cape_w = anim.wave@1(cape_p, property="rotation", amplitude=[3, 7, 4], period=3.4, pivot=[0, 4.7, -0.8])
+output b_cape = cape_w
+# ======================= the set: a temple courtyard on a mountain peak above a sea of cloud =======================
+let rock_prog = "h = surface_height(low=-60, high=70); c = colorize(h, gradient=[0:#3b3c38, 0.45:#6a6a5e, 0.75:#58744a, 1:#86a85a]); albedo = c"
+let stone_prog = "a = expr(code=\"u = p.x; v = p.y; f = fbm(vec2(u*10.0, v*10.0)); s = smoothstep(0.02, 0.05, abs(fract(u*8.0) - 0.5) - 0.44 + 0.0) ; g = fbm(vec2(u*40.0, v*40.0)); out = vec4(vec3(0.62, 0.58, 0.5) * (0.7 + 0.45*f) * (0.88 + 0.2*g), 1.0)\"); albedo = a"
+let tile_prog = "a = expr(code=\"u = p.x; v = p.y; f = fbm(vec2(u*6.0, v*6.0)); r = 0.78 + 0.22*abs(sin(u*60.0)); out = vec4(vec3(0.09, 0.42, 0.34) * r * (0.75 + 0.4*f), 1.0)\"); albedo = a"
+let wood_red_prog = "a = expr(code=\"u = p.x; v = p.y; f = fbm(vec2(u*4.0, v*40.0)); out = vec4(vec3(0.62, 0.07, 0.05) * (0.7 + 0.45*f), 1.0)\"); albedo = a"
+
+# the courtyard: a round stone floor with gold rings and eight trigram bars inlaid, a low rim, on a pedestal of rock that falls into the clouds
+court_s = solid.cylinder@1(radius=17, height=4.0, segments=96)
+court_a = xform.move@1(court_s, by=[0, -2.0, 0])
+court_m = solid.material@1(court_a, color=[0.6, 0.56, 0.5], roughness=0.85)
+court_t = solid.texture@1(court_m, program="${stone_prog}", tile=3, size="512")
+output court = court_t
+ring_a = solid.torus@1(major=14.5, minor=0.07, segments=128, tube_segments=8)
+ring_b = solid.torus@1(major=6.0, minor=0.07, segments=96, tube_segments=8)
+ring_ab = solid.union@1(ring_a, ring_b)
+ring_m = xform.move@1(ring_ab, by=[0, 0.01, 0])
+ring_c = solid.material@1(ring_m, color=[1.0, 0.8, 0.3], metallic=1.0, roughness=0.3, emissive=[0.25, 0.17, 0.03])
+output court_rings = ring_c
+bar = solid.box@1(size=[0.5, 0.03, 2.6])
+bar_p = xform.move@1(bar, by=[0, 0.015, 10.2])
+bar_r = inst.radial@1(bar_p, count=8, radius=0.0)
+bar_x = inst.realize@1(bar_r)
+bar_c = solid.material@1(bar_x, color=[1.0, 0.8, 0.3], metallic=1.0, roughness=0.3, emissive=[0.2, 0.13, 0.02])
+output court_bars = bar_c
+rim_t = solid.torus@1(major=17.1, minor=0.45, segments=128, tube_segments=12)
+rim_a = xform.move@1(rim_t, by=[0, 0.25, 0])
+rim_m = solid.material@1(rim_a, color=[0.58, 0.54, 0.48], roughness=0.85)
+rim_x = solid.texture@1(rim_m, program="${stone_prog}", tile=2, size="256")
+output court_rim = rim_x
+ped_f = field.ellipsoid@1(radii=[19, 36, 19])
+ped_c0 = field.move@1(ped_f, by=[0, 35, 0])
+ped_t = field.taper@1(ped_c0, axis="y", from=0.001, to=70, scale_start=0.15, scale_end=1.0)
+ped_m = field.move@1(ped_t, by=[0, -74.3, 0])
+ped_n = field.noise@1(ped_m, amplitude=2.6, scale=9, octaves=4, mode="ridged")
+ped_s = field.to_solid@1(ped_n, min=[-26, -80, -26], max=[26, 3.0, 26], edge_length=1.0)
+ped_c = solid.material@1(ped_s, color=[0.5, 0.5, 0.5], roughness=0.9)
+ped_x = solid.texture@1(ped_c, program="${rock_prog}", tile=0, size="512")
+output pedestal = ped_x
+
+# eight stone pillars round the courtyard with red bands, gold caps and paper lanterns
+pil_prof = profile.polygon@1(points=[[0.0, 0.0], [0.75, 0.0], [0.75, 0.4], [0.58, 0.55], [0.5, 0.7], [0.46, 5.4], [0.55, 5.55], [0.75, 5.9], [0.78, 6.3], [0.0, 6.3]])
+pil_s = solid.revolve@1(pil_prof, angle=360deg, segments=28)
+pil_p = xform.move@1(pil_s, by=[0, 0, 17.2])
+pil_r = inst.radial@1(pil_p, count=8, radius=0.0)
+pil_x = inst.realize@1(pil_r)
+pil_m = solid.material@1(pil_x, color=[0.58, 0.54, 0.48], roughness=0.85)
+pil_t = solid.texture@1(pil_m, program="${stone_prog}", tile=2, size="256")
+output pillars = pil_t
+pband = solid.cylinder@1(radius=0.53, height=0.5, segments=24)
+pband_p = xform.move@1(pband, by=[0, 4.6, 17.2])
+pband_r = inst.radial@1(pband_p, count=8, radius=0.0)
+pband_x = inst.realize@1(pband_r)
+pband_m = solid.material@1(pband_x, color=[0.75, 0.08, 0.06], roughness=0.5)
+output pillar_bands = pband_m
+cap = solid.cylinder@1(radius=0.82, height=0.12, segments=24)
+cap_p = xform.move@1(cap, by=[0, 6.36, 17.2])
+cap_r = inst.radial@1(cap_p, count=8, radius=0.0)
+cap_x = inst.realize@1(cap_r)
+cap_m = solid.material@1(cap_x, color=[1.0, 0.8, 0.3], metallic=1.0, roughness=0.28)
+output pillar_caps = cap_m
+lan = solid.sphere@1(radius=0.55, segments=20)
+lan_s = xform.scale@1(lan, by=[1.0, 1.25, 1.0])
+lan_p = xform.move@1(lan_s, by=[0, 7.2, 17.2])
+lan_r = inst.radial@1(lan_p, count=8, radius=0.0)
+lan_x = inst.realize@1(lan_r)
+lan_m = solid.material@1(lan_x, color=[0.9, 0.12, 0.06], roughness=0.5, emissive=[1.6, 0.35, 0.08])
+output lanterns = lan_m
+lan_w = anim.wave@1(lan_m, property="rotation", amplitude=[2, 0, 2], period=3.5, pivot=[0, 8, 0])
+
+# the gate: two red columns, three beams and a curved green-tiled roof with gold ridge ends
+def gcol(tag, x)
+  gc{tag}_s = solid.cylinder@1(radius=0.55, height=9, segments=24)
+  gc{tag}_a = xform.move@1(gc{tag}_s, by=[{x}, 4.5, -23])
+  gc{tag}_m = solid.material@1(gc{tag}_a, color=[0.5, 0.5, 0.5], roughness=0.5)
+  gc{tag}_t = solid.texture@1(gc{tag}_m, program="${wood_red_prog}", tile=1.5, size="256")
+  output gate_col_{tag} = gc{tag}_t
+end
+gcol("l", 5.2)
+gcol("r", -5.2)
+gbeam = solid.box@1(size=[13.6, 0.7, 0.8])
+gbeam_a = xform.move@1(gbeam, by=[0, 8.2, -23])
+gbeam_b = xform.move@1(gbeam, by=[0, 6.6, -23])
+gbeam_u = solid.union@1(gbeam_a, gbeam_b)
+gbeam_m = solid.material@1(gbeam_u, color=[0.5, 0.5, 0.5], roughness=0.5)
+gbeam_t = solid.texture@1(gbeam_m, program="${wood_red_prog}", tile=1.5, size="256")
+output gate_beams = gbeam_t
+groof_prof = profile.polygon@1(points=[[-8.6, 0.0], [-6.0, 0.25], [-3.0, 0.7], [0.0, 0.9], [3.0, 0.7], [6.0, 0.25], [8.6, 0.0], [8.9, 0.7], [6.2, 1.0], [3.0, 1.5], [0.0, 1.75], [-3.0, 1.5], [-6.2, 1.0], [-8.9, 0.7]])
+groof_s = solid.extrude@1(groof_prof, height=3.4)
+groof_r = xform.rotate@1(groof_s, angles=[90, 0, 0])
+groof_a = xform.move@1(groof_r, by=[0, 9.0, -23])
+groof_m = solid.material@1(groof_a, color=[0.5, 0.5, 0.5], roughness=0.4)
+groof_t = solid.texture@1(groof_m, program="${tile_prog}", tile=1.2, size="512")
+groof_f = solid.finish@1(groof_t, clearcoat=0.6, clearcoat_roughness=0.2)
+output gate_roof = groof_f
+gorn = solid.sphere@1(radius=0.42, segments=16)
+gorn_a = xform.move@1(gorn, by=[8.8, 10.0, -23])
+gorn_b = xform.move@1(gorn, by=[-8.8, 10.0, -23])
+gorn_u = solid.union@1(gorn_a, gorn_b)
+gorn_m = solid.material@1(gorn_u, color=[1.0, 0.8, 0.3], metallic=1.0, roughness=0.25)
+output gate_ornaments = gorn_m
+gplaque = solid.box@1(size=[3.6, 1.1, 0.2])
+gplaque_a = xform.move@1(gplaque, by=[0, 7.4, -23.45])
+gplaque_m = solid.material@1(gplaque_a, color=[1.0, 0.8, 0.3], metallic=1.0, roughness=0.3, emissive=[0.2, 0.14, 0.02])
+output gate_plaque = gplaque_m
+
+# a five-tier pagoda behind the boss: red walls, green roofs with gold finials
+def tier(tag, y, w, rw)
+  pg{tag}_w = solid.box@1(size=[{w}, 3.4, {w}])
+  pg{tag}_a = xform.move@1(pg{tag}_w, by=[0, {y + 1.7}, 0])
+  pg{tag}_b = solid.material@1(pg{tag}_a, color=[0.5, 0.5, 0.5], roughness=0.5)
+  pg{tag}_c = solid.texture@1(pg{tag}_b, program="${wood_red_prog}", tile=1.5, size="256")
+  pg{tag}_r = solid.cone@1(radius={rw}, top_radius={w * 0.12}, height=2.4, segments=4)
+  pg{tag}_rr = xform.rotate@1(pg{tag}_r, angles=[0, 45, 0])
+  pg{tag}_ra = xform.move@1(pg{tag}_rr, by=[0, {y + 3.4 + 1.2}, 0])
+  pg{tag}_rm = solid.material@1(pg{tag}_ra, color=[0.5, 0.5, 0.5], roughness=0.4)
+  pg{tag}_rt = solid.texture@1(pg{tag}_rm, program="${tile_prog}", tile=1.2, size="256")
+  pg{tag}_u = solid.union@1(pg{tag}_c, pg{tag}_rt)
+end
+tier("a", 0, 11, 9.8)
+tier("b", 5.8, 9, 8.2)
+tier("c", 11.6, 7.4, 6.8)
+tier("d", 17.4, 6, 5.6)
+tier("e", 23.2, 4.8, 4.6)
+pg_all = solid.union@1(pga_u, pgb_u)
+pg_all2 = solid.union@1(pg_all, pgc_u)
+pg_all3 = solid.union@1(pg_all2, pgd_u)
+pg_all4 = solid.union@1(pg_all3, pge_u)
+pg_fin_s = solid.cone@1(radius=0.25, top_radius=0.0, height=3.4, segments=12)
+pg_fin_a = xform.move@1(pg_fin_s, by=[0, 29.4, 0])
+pg_fin_m = solid.material@1(pg_fin_a, color=[1.0, 0.8, 0.3], metallic=1.0, roughness=0.25)
+pg_place = xform.move@1(pg_all4, by=[-12, 0, 46])
+output pagoda = pg_place
+pg_fin_p = xform.move@1(pg_fin_m, by=[-12, 0, 46])
+output pagoda_finial = pg_fin_p
+
+# karst peaks: tall noisy spires that rise out of the clouds all round, mossy at the top
+def spire(tag, x, z, h, r, seed)
+  sp{tag}_f = field.ellipsoid@1(radii=[{r}, {h}, {r}])
+  sp{tag}_c0 = field.move@1(sp{tag}_f, by=[0, {h}, 0])
+  sp{tag}_t = field.taper@1(sp{tag}_c0, axis="y", from=0.001, to={h * 2}, scale_start=1.0, scale_end=0.35)
+  sp{tag}_n = field.noise@1(sp{tag}_t, amplitude={r * 0.18}, scale={r * 0.7}, octaves=4, mode="ridged", seed={seed})
+  sp{tag}_s = field.to_solid@1(sp{tag}_n, min=[-{r * 1.5}, -{r * 0.9}, -{r * 1.5}], max=[{r * 1.5}, {h * 2 + r * 1.6}, {r * 1.5}], edge_length={r * 0.078})
+  sp{tag}_m = solid.material@1(sp{tag}_s, color=[0.5, 0.5, 0.5], roughness=0.9)
+  sp{tag}_c = solid.texture@1(sp{tag}_m, program="${rock_prog}", tile=0, size="512")
+  sp{tag}_p = xform.move@1(sp{tag}_c, by=[{x}, -50, {z}])
+  output peak_{tag} = sp{tag}_p
+end
+spire("a", -70, 60, 62, 14, 1)
+spire("b", 20, 95, 80, 17, 2)
+spire("c", 90, 40, 55, 12, 3)
+spire("d", 110, -30, 70, 15, 4)
+spire("e", -95, -20, 66, 13, 5)
+spire("f", -40, -85, 58, 12, 6)
+spire("g", 50, -90, 74, 16, 7)
+spire("h", -125, 40, 90, 18, 8)
+
+# a sea of cloud far below, and mist drifting over the courtyard
+cloud_s = solid.sphere@1(radius=14, segments=18)
+cloud_f = xform.scale@1(cloud_s, by=[1.0, 0.28, 1.0])
+cloud_sc = inst.scatter@1(cloud_f, count=45, width=330, depth=330, min_spacing=22, seed=5, yaw_jitter=180, scale_jitter=0.5)
+cloud_x = inst.realize@1(cloud_sc)
+cloud_p = xform.move@1(cloud_x, by=[0, -26, 0])
+cloud_m = solid.material@1(cloud_p, color=[0.97, 0.95, 0.93], roughness=1.0, emissive=[0.28, 0.26, 0.24])
+output cloud_sea = cloud_m
+mist_pt = solid.sphere@1(radius=0.05, segments=6)
+mist_e = fx.emitter@1(mist_pt, name="mist", rate=18, lifetime=[6, 11], speed=[0.1, 0.3], direction=[1, 0.05, 0.2], cone=0.5, shape="disc", extent=[16, 0, 16], size=[2.5, 6], colour=[0.95, 0.92, 0.88], colour_end=[0.95, 0.92, 0.88], alpha=[0.0, 0.18], blend="alpha", max_particles=160)
+petal_e = fx.emitter@1(mist_pt, name="petals", rate=10, lifetime=[7, 12], speed=[0.2, 0.6], direction=[0.3, -0.4, 0.1], cone=0.8, shape="box", extent=[22, 0, 22], size=[0.06, 0.14], colour=[1.0, 0.7, 0.75], colour_end=[1.0, 0.85, 0.5], alpha=[0.9, 0.0], blend="alpha", max_particles=140)
+mist_p = xform.move@1(mist_e, by=[0, 0.5, 0])
+petal_p = xform.move@1(petal_e, by=[0, 9, 0])
+output mist_fx = mist_p
+output petal_fx = petal_p
+# ======================= the game: parts for the things that fly and burn, kinds, the libraries and three scripts =======================
+fb_s = solid.sphere@1(radius=0.42, segments=20)
+fb_m = solid.material@1(fb_s, color=[1.0, 0.45, 0.1], roughness=0.3, emissive=[4.0, 1.4, 0.2])
+fb_w = anim.wave@1(fb_m, property="glow", amplitude=[0.5, 0, 0], period=0.35, pivot=[0, 0, 0])
+output fireball = fb_w
+def ring(tag, r)
+  r{tag}_s = solid.cylinder@1(radius={r}, height=0.05, segments=48)
+  r{tag}_a = xform.move@1(r{tag}_s, by=[0, 0.04, 0])
+  r{tag}_m = solid.material@1(r{tag}_a, color=[0.9, 0.1, 0.05], roughness=0.5, opacity=0.4, emissive=[1.6, 0.14, 0.05])
+  r{tag}_w = anim.wave@1(r{tag}_m, property="glow", amplitude=[0.6, 0, 0], period=0.5)
+  output {tag} = r{tag}_w
+end
+ring("tele_big", 6.8)
+ring("tele_front", 3.1)
+ring("flame_tele", 2.0)
+flm_s = solid.cylinder@1(radius=2.0, height=0.06, segments=40)
+fl_a = xform.move@1(flm_s, by=[0, 0.05, 0])
+fl_cone = solid.cone@1(radius=0.34, top_radius=0.0, height=1.7, segments=10)
+fl_cm = xform.move@1(fl_cone, by=[0, 0.85, 0])
+fl_cr = inst.radial@1(fl_cm, count=8, radius=1.25)
+fl_cx = inst.realize@1(fl_cr)
+fl_u = solid.union@1(fl_a, fl_cx)
+flm_m = solid.material@1(fl_u, color=[1.0, 0.4, 0.06], roughness=0.4, emissive=[3.2, 0.9, 0.1])
+flm_w = anim.wave@1(flm_m, property="scale", amplitude=[0.12, 0.35, 0.12], period=0.45, pivot=[0, 0, 0])
+output flame = flm_w
+
+k_hero = game.kind@1(name="hero", size=0.45, speed=5, part="wukong", tags=["hero"])
+k_boss = game.kind@1(name="boss", size=1.8, speed=3, part="bull", tags=["boss"])
+k_fire = game.kind@1(name="fireball", size=0.4, part="fireball", tags=["hazard"])
+k_tbig = game.kind@1(name="tele_big", size=0.1, part="tele_big")
+k_tfront = game.kind@1(name="tele_front", size=0.1, part="tele_front")
+k_ftele = game.kind@1(name="flame_tele", size=0.1, part="flame_tele")
+k_flame = game.kind@1(name="flame", size=0.1, part="flame")
+s_hero = game.spawn@1(kind="hero", at=[0, 0, -9], heading=0)
+s_boss = game.spawn@1(kind="boss", at=[0, 0, 8], heading=180)
+rpg_lib = game.script@1(lib="rpg")
+combat_lib = game.script@1(lib="combat")
+moves = game.script@1(name="moves", source="combat.attack_def('slash', { startup: 0.2, active: 0.12, recovery: 0.35, cancel_from: 0.08, next: 'slash2', cost: { stamina: 8 }, shape: { range: 2.4, arc: 150 }, damage: { amount: 22, poise: 14 }, hitstop: 0.07, knockback: 0.12, lunge: 0.45 });\ncombat.attack_def('slash2', { startup: 0.16, active: 0.14, recovery: 0.37, cancel_from: 0.08, next: 'slash', cost: { stamina: 8 }, shape: { range: 2.5, arc: 160 }, damage: { amount: 26, poise: 16 }, hitstop: 0.08, knockback: 0.15, lunge: 0.45 });\ncombat.attack_def('heavy', { startup: 0.4, active: 0.15, recovery: 0.55, cost: { stamina: 22 }, shape: { range: 2.8, arc: 130 }, damage: { amount: 58, poise: 42 }, hitstop: 0.15, knockback: 0.3, lunge: 0.8 });\ncombat.dodge_def('roll', { duration: 0.45, i_frames: [0, 0.3], distance: 3.2, cost: { stamina: 18 } });\ncombat.attack_def('slam', { startup: 0.9, active: 0.2, recovery: 0.8, shape: { range: 4.4, arc: 80 }, damage: { amount: 52, poise: 30 }, hitstop: 0.1, knockback: 1.0 });\ncombat.attack_def('sweep', { startup: 0.7, active: 0.25, recovery: 0.75, shape: { range: 5.2, arc: 190 }, damage: { amount: 38, poise: 22 }, hitstop: 0.08, knockback: 1.4 });\ncombat.attack_def('stomp', { startup: 0.7, active: 0.25, recovery: 0.65, shape: { range: 6.8, arc: 360 }, damage: { amount: 44, poise: 30 }, hitstop: 0.08, knockback: 2.0 });\ncombat.attack_def('charge', { startup: 0.6, active: 1.0, recovery: 0.6, shape: { range: 3.0, arc: 220 }, damage: { amount: 62, poise: 40 }, hitstop: 0.1, knockback: 2.5 });\ncombat.attack_def('breath', { startup: 0.6, active: 0.9, recovery: 0.9, shape: { range: 0.1, arc: 10 }, damage: { amount: 0, poise: 0 } });\ncombat.attack_def('roar', { startup: 0.7, active: 1.1, recovery: 0.6, shape: { range: 0.1, arc: 10 }, damage: { amount: 0, poise: 0 } });")
+hero_js = game.script@1(name="hero", source="const R = 15.6;\nrpg.limits.focus = { min: 0, max: 'max_focus' };\nconst wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));\non('start', () => {\n  const [h] = find('kind:hero'); const [b] = find('kind:boss');\n  rpg.actor(h, { attributes: { health: 180, max_health: 180, stamina: 100, max_stamina: 100, stamina_regen: 26, focus: 30, max_focus: 100, armor: 12, poise: 45, max_poise: 45, stagger_time: 0.7, block: 0.65 }, tags: ['team.a'] });\n  rpg.actor(b, { attributes: { health: 1300, max_health: 1300, poise: 260, max_poise: 260, stagger_time: 2.4, armor: 22 }, tags: ['team.b', 'hyper'] });\n  state.hid = h.id; state.bid = b.id; state.cam = { yaw: 0, pitch: 0.5, x: 0, y: 4, z: -18 }; state.blocking = false; state.speed = -1; state.spellAt = 0;\n});\non('emit:combat_hit', (e) => { if (e.b && e.b.kind === 'hero') rpg.add_base(e.b, 'focus', 7); });\non('emit:rpg_died', (e) => { if (e.a) game.effect('anim', 'death', e.a); });\non('emit:rpg_staggered', (e) => { if (e.a && e.a.kind === 'boss') game.effect('anim', 'hit_react', e.a); });\non('tick', (e) => {\n  const h = entity(state.hid), b = entity(state.bid); if (!h || !b || !h.alive) return;\n  const dt = 1 / 60, cam = state.cam, dead = rpg.is_dead(h), bossAlive = !rpg.is_dead(b);\n  cam.yaw -= input.axis('lx') * 0.0024 * dt; cam.pitch = Math.min(1.1, Math.max(0.12, cam.pitch + input.axis('ly') * 0.002 * dt));\n  const mx = input.axis('mx'), mz = input.axis('mz'), sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw);\n  const dx = sy * mz - cy * mx, dz = cy * mz + sy * mx, len = Math.hypot(dx, dz), moving = len > 0.1;\n  const bx = b.pos[0] - h.pos[0], bz = b.pos[2] - h.pos[2], bd = Math.hypot(bx, bz);\n  let speedNow = 0;\n  if (!dead) {\n    const free = !combat.busy(h) && !combat.frozen(h) && !rpg.has_tag(h, 'state.staggered') && !rpg.has_tag(h, 'state.casting');\n    const held = input.held('block') && free;\n    if (held && !state.blocking) { combat.input(h, 'block_on'); game.effect('anim', 'block', h); state.blocking = true; }\n    if (!input.held('block') && state.blocking) { combat.input(h, 'block_off'); state.blocking = false; }\n    if (moving && free) { const sp = held ? 2.2 : 5.6; h.pos = [h.pos[0] + dx / len * sp * dt, 0, h.pos[2] + dz / len * sp * dt]; h.heading = Math.atan2(dx, dz); speedNow = sp; }\n    const aim = () => { if (bossAlive && bd < 7) h.heading = Math.atan2(bx, bz); else if (moving) h.heading = Math.atan2(dx, dz); };\n    if (input.pressed('light')) { aim(); combat.input(h, 'slash'); }\n    if (input.pressed('heavy')) { aim(); combat.input(h, 'heavy'); }\n    if (input.pressed('dodge') && !state.over) { if (moving) h.heading = Math.atan2(dx, dz); combat.input(h, 'roll'); }\n    if (input.pressed('spell') && free && bossAlive && rpg.get(h, 'focus') >= 30) { rpg.add_base(h, 'focus', -30); game.effect('anim', 'cast', h); rpg.add_tag(h, 'state.casting', 'spell', e.tick + 80); h.heading = Math.atan2(bx, bz); state.spellAt = e.tick + 28; }\n    if (state.spellAt && e.tick >= state.spellAt) { state.spellAt = 0; rpg.add_tag(b, 'state.frozen', 'spell', e.tick + 210); if (state.combat && state.combat[b.id]) state.combat[b.id].act = null; game.effect('particles', 'freeze', b); game.effect('anim', 'hit_react', b); game.effect('shake', 'spell'); }\n    if (bossAlive && bd < 2.4 && bd > 0.01) h.pos = [b.pos[0] - bx / bd * 2.4, 0, b.pos[2] - bz / bd * 2.4];\n    const d0 = Math.hypot(h.pos[0], h.pos[2]); if (d0 > R) h.pos = [h.pos[0] * R / d0, 0, h.pos[2] * R / d0];\n  }\n  if (Math.abs(speedNow - state.speed) > 0.25) { state.speed = speedNow; game.effect('anim_set', 'speed', h, speedNow); }\n  if (bossAlive && !dead && Math.abs(input.axis('lx')) < 30 && bd < 30) cam.yaw += wrap(Math.atan2(bx, bz) - cam.yaw) * 0.014;\n  const dist = 8.6 + Math.min(5, bd / 5), tx = h.pos[0], tz = h.pos[2];\n  const wx = tx - Math.sin(cam.yaw) * dist * Math.cos(cam.pitch), wz = tz - Math.cos(cam.yaw) * dist * Math.cos(cam.pitch), wy = 1.5 + dist * Math.sin(cam.pitch);\n  cam.x += (wx - cam.x) * 0.22; cam.y += (wy - cam.y) * 0.22; cam.z += (wz - cam.z) * 0.22;\n  camera.look([cam.x, cam.y, cam.z], [tx + Math.sin(cam.yaw) * 1.5, 2.2, tz + Math.cos(cam.yaw) * 1.5]);\n});")
+boss_js = game.script@1(name="boss", source="const BR = 15.4;\nconst lerpA = (a, b, k) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k;\nconst clampBoss = (b) => { const d = Math.hypot(b.pos[0], b.pos[2]); if (d > BR) b.pos = [b.pos[0] * BR / d, 0, b.pos[2] * BR / d]; };\nconst volley = (b, h, n, tick) => {\n  const f = b.forward, ox = b.pos[0] + f[0] * 1.8, oz = b.pos[2] + f[2] * 1.8, aim = Math.atan2(h.pos[0] - ox, h.pos[2] - oz);\n  for (let i = 0; i < n; i++) {\n    const a = aim + (i - (n - 1) / 2) * 0.3, speed = 11, dist = Math.hypot(h.pos[0] - ox, h.pos[2] - oz), T = Math.max(0.4, dist / speed);\n    const p = spawn('fireball', [ox, 3.4, oz]);\n    state.proj.push({ id: p.id, vx: Math.sin(a) * speed, vz: Math.cos(a) * speed, vy: (1.0 - 3.4) / T, life: 150 });\n  }\n  game.effect('shake', 'breath');\n};\nconst rain = (h, n, tick) => {\n  for (let i = 0; i < n; i++) {\n    const a = Math.random() * Math.PI * 2, r = i === 0 ? 0 : 2 + Math.random() * 7;\n    let x = h.pos[0] + Math.cos(a) * r, z = h.pos[2] + Math.sin(a) * r; const d = Math.hypot(x, z); if (d > 14) { x *= 14 / d; z *= 14 / d; }\n    const t = spawn('flame_tele', [x, 0, z]); state.flames.push({ id: t.id, t: 0, x, z });\n  }\n};\non('start', () => { state.proj = []; state.flames = []; state.cool = 120; state.phase = 1; state.pending = null; state.tele = null; state.bspeed = -1; });\non('emit:rpg_died', (e) => { if (e.a && e.a.kind === 'boss') { for (const p of state.proj) { const f = entity(p.id); if (f) f.destroy(); } state.proj = []; } });\non('tick', (e) => {\n  const h = entity(state.hid), b = entity(state.bid); if (!h || !b || !b.alive) return;\n  const dt = 1 / 60, hdead = rpg.is_dead(h), bdead = rpg.is_dead(b);\n  state.proj = state.proj.filter((p) => { const f = entity(p.id); if (!f || !f.alive) return false; p.life--; f.pos = [f.pos[0] + p.vx * dt, Math.max(0.6, f.pos[1] + p.vy * dt), f.pos[2] + p.vz * dt];\n    if (!hdead && Math.hypot(f.pos[0] - h.pos[0], f.pos[2] - h.pos[2]) < 0.95 && f.pos[1] < 2.4) { rpg.damage(h, { amount: 30, type: 'fire', source: b, poise: 20 }); game.effect('particles', 'fire_burst', f); f.destroy(); return false; }\n    if (p.life <= 0 || Math.hypot(f.pos[0], f.pos[2]) > 19) { f.destroy(); return false; } return true; });\n  state.flames = state.flames.filter((fl) => { fl.t++; if (fl.t === 72) { const old = entity(fl.id); if (old) old.destroy(); fl.id = spawn('flame', [fl.x, 0, fl.z]).id; }\n    if (fl.t > 72 && fl.t % 30 === 0 && !hdead && Math.hypot(h.pos[0] - fl.x, h.pos[2] - fl.z) < 2.0) rpg.damage(h, { amount: 9, type: 'fire', source: b });\n    if (fl.t > 312 || bdead) { const f = entity(fl.id); if (f) f.destroy(); return false; } return true; });\n  if (state.tele && (e.tick >= state.tele.until || bdead)) { const t = entity(state.tele.id); if (t) t.destroy(); state.tele = null; }\n  let speedNow = 0;\n  if (!bdead && !hdead) {\n    const frozen = rpg.has_tag(b, 'state.frozen'), stag = rpg.has_tag(b, 'state.staggered');\n    const dx = h.pos[0] - b.pos[0], dz = h.pos[2] - b.pos[2], dist = Math.hypot(dx, dz), busy = combat.busy(b);\n    const hp = rpg.get(b, 'health') / rpg.get(b, 'max_health'), phase = hp > 0.66 ? 1 : hp > 0.33 ? 2 : 3;\n    if (phase !== state.phase) { state.phase = phase; state.pending = 'roar'; state.phaseAt = e.tick; }\n    if (!frozen && !stag && !combat.frozen(b)) {\n      const sp = [0, 2.8, 3.6, 4.4][phase];\n      if (!busy) {\n        b.heading = lerpA(b.heading, Math.atan2(dx, dz), 0.1);\n        const walk = () => { if (dist > 3.6) { b.pos = [b.pos[0] + dx / dist * sp * dt, 0, b.pos[2] + dz / dist * sp * dt]; speedNow = sp; } };\n        if (state.pending) { combat.input(b, state.pending); state.pending = null; if (phase === 3) rain(h, 7, e.tick); state.cool = 40; }\n        else if (state.cool > 0) { state.cool--; walk(); }\n        else {\n          const r = Math.random(); let pick = null;\n          if (dist < 5.6) pick = r < 0.38 ? 'slam' : r < 0.72 ? 'sweep' : 'stomp';\n          else if (dist < 15 && phase >= 2) pick = r < 0.3 ? 'charge' : r < 0.55 ? 'breath' : (phase === 3 && r < 0.7 ? 'roar' : null);\n          if (!pick) walk();\n          else {\n            b.heading = Math.atan2(dx, dz); combat.input(b, pick); state.cool = [0, 55, 36, 20][phase];\n            const f = b.forward;\n            if (pick === 'slam') { state.tele = { id: spawn('tele_front', [b.pos[0] + f[0] * 3.3, 0, b.pos[2] + f[2] * 3.3]).id, until: e.tick + 70 }; }\n            if (pick === 'stomp') { state.tele = { id: spawn('tele_big', [b.pos[0], 0, b.pos[2]]).id, until: e.tick + 58 }; }\n            if (pick === 'roar' && phase === 3) rain(h, 5, e.tick);\n          }\n        }\n      } else {\n        const cur = combat.current(b), cs = state.combat && state.combat[b.id], t = cs ? cs.t : 0;\n        if (cur === 'charge' && t > 36 && t < 96) { const f = b.forward; b.pos = [b.pos[0] + f[0] * 12 * dt, 0, b.pos[2] + f[2] * 12 * dt]; speedNow = 6; }\n        if (cur === 'breath' && t === 40) volley(b, h, phase === 3 ? 5 : 3, e.tick);\n      }\n    }\n    clampBoss(b);\n  }\n  if (Math.abs(speedNow - state.bspeed) > 0.25) { state.bspeed = speedNow; game.effect('anim_set', 'speed', b, speedNow); }\n});")
+flow_js = game.script@1(name="flow", source="on('start', () => { state.trailH = 180; state.trailB = 1300; state.over = 0; state.hint = 900; state.phaseShow = 0; });\non('emit:rpg_died', (e) => { if (e.a) state.over = e.a.kind === 'boss' ? 1 : 2; });\non('tick', (e) => {\n  const h = entity(state.hid), b = entity(state.bid); if (!h || !b) return;\n  const hp = rpg.get(h, 'health'), bp = rpg.get(b, 'health');\n  state.trailH = Math.max(hp, state.trailH - 0.9); state.trailB = Math.max(bp, state.trailB - 3);\n  ui.stack('hero', [\n    { id: 'n', t: 'text', text: 'SUN WUKONG', size: 0.026, font: 'techno', color: 'rgb(255,215,106)' },\n    { id: 'hp', t: 'bar', value: hp, max: rpg.get(h, 'max_health'), trail: state.trailH, size: [0.36, 0.028], color: 'rgb(222,74,58)' },\n    { id: 'st', t: 'bar', value: rpg.get(h, 'stamina'), max: rpg.get(h, 'max_stamina'), size: [0.36, 0.014], color: 'rgb(232,200,70)' },\n    { id: 'fo', t: 'bar', value: rpg.get(h, 'focus'), max: rpg.get(h, 'max_focus'), size: [0.36, 0.014], color: 'rgb(90,170,255)' },\n  ], { anchor: 'bl', gap: 0.008 });\n  ui.text('spell', rpg.get(h, 'focus') >= 30 ? '[Q] IMMOBILIZE' : '[Q] IMMOBILIZE  (needs 30 focus)', { anchor: 'bl', at: [0, -0.2], size: 0.018, font: 'techno', color: rpg.get(h, 'focus') >= 30 ? 'rgb(120,200,255)' : 'rgb(140,140,150)' });\n  if (!rpg.is_dead(b) || state.over === 1) ui.stack('boss', [\n    { id: 'n', t: 'text', text: 'THE BULL DEMON KING', size: 0.03, font: 'bold', color: 'rgb(255,190,120)' },\n    { id: 'hp', t: 'bar', value: bp, max: rpg.get(b, 'max_health'), trail: state.trailB, size: [0.62, 0.026], color: 'rgb(200,50,40)' },\n  ], { anchor: 'tc', gap: 0.008 });\n  if (state.hint > 0) { state.hint--; ui.text('hint', 'WASD move   mouse look (click the view first)   LMB / J light   RMB / K heavy   SPACE roll   SHIFT block   Q immobilize', { anchor: 'bc', at: [0, -0.02], size: 0.017, plate: true, color: 'rgb(240,240,240)' }); } else ui.remove('hint');\n  if (b.alive && state.phase > 1 && e.tick - (state.phaseAt || 0) < 150) ui.text('phase', state.phase === 2 ? 'PHASE II  -  THE DEMON AWAKENS' : 'PHASE III  -  CINDERS AND FURY', { anchor: 'tc', at: [0, 0.13], size: 0.034, font: 'bold', color: 'rgb(255,140,60)' }); else ui.remove('phase');\n  if (state.over === 1) { ui.text('end', 'DESTINY FULFILLED', { anchor: 'c', size: 0.09, font: 'bold', color: 'rgb(255,215,106)', plate: true }); ui.text('end2', 'press SPACE to fight again', { anchor: 'c', at: [0, 0.12], size: 0.024, font: 'techno' }); }\n  if (state.over === 2) { ui.text('end', 'THE DESTINED ONE HAS FALLEN', { anchor: 'c', size: 0.07, font: 'bold', color: 'rgb(230,80,70)', plate: true }); ui.text('end2', 'press SPACE to try again', { anchor: 'c', at: [0, 0.1], size: 0.024, font: 'techno' }); }\n  if (state.over && input.pressed('dodge')) game.reset();\n});")
+all = game.collect@1(k_hero, k_boss, k_fire, k_tbig, k_tfront, k_ftele, k_flame, s_hero, s_boss, rpg_lib, combat_lib, moves, hero_js, boss_js, flow_js, name="wukong")
+output rules = all

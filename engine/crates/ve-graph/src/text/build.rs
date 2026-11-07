@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::group::{Block, lower_group};
 use super::instance::{Groups, known_groups, lower_instance};
 use super::lex::{Fail, error, fail};
+use super::near;
 use super::node::{Known, links, node_commands, node_ref};
 use super::parse::{Arg, Stmt, parse};
 use crate::command::{Command, OutRef};
@@ -13,25 +14,7 @@ use crate::doc::Document;
 use crate::id::NodeId;
 use crate::spec::{OpId, OperatorRegistry, OperatorSpec, Readiness};
 
-/// Commands read from text, with the source span each one came from.
-#[derive(Clone, Debug)]
-pub struct TextBatch {
-    /// The commands, in an order that is valid to apply.
-    pub commands: Vec<Command>,
-    /// For each command, where in the text it was written.
-    pub spans: Vec<Span>,
-}
-
-impl TextBatch {
-    /// Adds the source span to a diagnostic that names a command of this batch.
-    #[must_use]
-    pub fn locate(&self, diagnostic: Diagnostic) -> Diagnostic {
-        match diagnostic.command.and_then(|i| self.spans.get(i)) {
-            Some(span) => diagnostic.at_span(*span),
-            None => diagnostic,
-        }
-    }
-}
+pub use super::batch::TextBatch;
 
 pub(super) fn valid_name(name: &str) -> bool {
     let mut chars = name.chars();
@@ -71,15 +54,19 @@ pub(super) fn resolve<'r>(
             ),
         )),
         None => {
-            let near = registry.suggest(&if text.contains('@') {
-                text.to_owned()
-            } else {
-                format!("{text}@1")
-            });
+            let candidates: Vec<_> = registry
+                .ready()
+                .map(|s| {
+                    if text.contains('@') {
+                        s.id.to_string()
+                    } else {
+                        s.id.family().to_string()
+                    }
+                })
+                .collect();
             let message = format!("unknown operator {text}");
             Err(Box::new(Diagnostic {
-                suggestion: (!near.is_empty())
-                    .then(|| format!("did you mean {}?", near.join(" or "))),
+                suggestion: near::suggestion(text, candidates.iter().map(String::as_str), None),
                 ..error("parse.unknown_op", span, message)
             }))
         }
@@ -143,11 +130,23 @@ pub(super) fn input_errors(
                     ));
                 }
                 None if known.contains_key(source.as_str()) => {}
-                None => out.push(error(
-                    "parse.unknown_name",
-                    *span,
-                    format!("no node is named {source}"),
-                )),
+                None => out.push(Diagnostic {
+                    suggestion: near::suggestion(
+                        source,
+                        names
+                            .defined
+                            .iter()
+                            .filter(|(_, at)| **at < index)
+                            .map(|(n, _)| *n)
+                            .chain(known.keys().map(String::as_str)),
+                        None,
+                    ),
+                    ..error(
+                        "parse.unknown_name",
+                        *span,
+                        format!("no node is named {source}"),
+                    )
+                }),
             }
         }
     }
@@ -179,12 +178,23 @@ pub(super) fn collect_names<'a>(
                 *name_span,
                 format!("{name:?} is not a usable node name (letters, digits, _; at most 32)"),
             ));
-        } else if names.defined.insert(name, index).is_some() || known.contains_key(name.as_str()) {
+        } else if names.defined.contains_key(name.as_str()) || known.contains_key(name.as_str()) {
+            // The first definition stays the one reads are checked against, so a read between two definitions is not
+            // also reported as a forward reference.
             errors.push(error(
-                "parse.duplicate_name",
+                if statements
+                    .iter()
+                    .any(|s| matches!(s, Stmt::Node { name: n, piped: true, .. } if n == name))
+                {
+                    "parse.name_taken"
+                } else {
+                    "parse.duplicate_name"
+                },
                 *name_span,
                 format!("{name} is already the name of a node"),
             ));
+        } else {
+            names.defined.insert(name, index);
         }
         let reads = args.iter().filter_map(|a| match a {
             Arg::Input { name, .. } => Some(name.as_str()),
@@ -219,11 +229,22 @@ fn output_command(
         )
     })
     .ok_or_else(|| {
-        fail(
-            "parse.unknown_name",
-            span,
-            format!("no node is named {source}"),
-        )
+        Box::new(Diagnostic {
+            suggestion: near::suggestion(
+                source,
+                names
+                    .defined
+                    .keys()
+                    .copied()
+                    .chain(known.keys().map(String::as_str)),
+                None,
+            ),
+            ..error(
+                "parse.unknown_name",
+                span,
+                format!("no node is named {source}"),
+            )
+        })
     })
 }
 
@@ -279,21 +300,13 @@ fn parse_with(
     source: &str,
 ) -> Result<TextBatch, Vec<Diagnostic>> {
     // Constants and `{expression}` values are folded into plain numbers before the parser sees the text.
-    let (expanded, constants) = super::expr::expand(source).map_err(|e| vec![*e])?;
-    let statements = parse(&expanded).map_err(|e| vec![*e])?;
+    let expanded = super::repeat::expand(source).map_err(|e| vec![*e])?;
+    let constants = &expanded.constants;
+    let statements = parse(&expanded.text).map_err(|e| vec![expanded.locate(*e)])?;
     let mut errors = Vec::new();
     let names = collect_names(&statements, known, &mut errors);
     input_errors(&statements, &names, known, &mut errors);
-    let mut batch = TextBatch {
-        commands: Vec::new(),
-        spans: Vec::new(),
-    };
-    let mut push = |items: Vec<(Command, Span)>| {
-        for (command, span) in items {
-            batch.commands.push(command);
-            batch.spans.push(span);
-        }
-    };
+    let mut batch = TextBatch::default();
     let mut serial = 0;
     for statement in &statements {
         match statement {
@@ -304,11 +317,12 @@ fn parse_with(
                 op,
                 op_span,
                 args,
+                ..
             } if !op.contains('.') => {
                 let (added, mut found) =
                     lower_instance(name, *name_span, op, *op_span, args, &groups, known);
                 errors.append(&mut found);
-                push(added);
+                batch.extend(added);
             }
             Stmt::Node {
                 name,
@@ -316,17 +330,20 @@ fn parse_with(
                 op,
                 op_span,
                 args,
+                ..
             } => match resolve(registry, op, *op_span) {
                 Ok(spec) => {
                     let (added, mut e1) = node_commands(spec, name, args, *name_span);
                     let (linked, e2) = links(spec, name, args, known);
                     errors.append(&mut e1);
                     errors.extend(e2);
-                    push(added);
-                    push(linked);
+                    batch.extend(added);
+                    batch.extend(linked);
                 }
                 Err(e) => errors.push(*e),
             },
+            // aliases were replaced by the nodes they name when the statements were read
+            Stmt::Alias { .. } => {}
             Stmt::Group {
                 name,
                 name_span,
@@ -343,30 +360,21 @@ fn parse_with(
                 };
                 let (added, mut found) = lower_group(registry, &block, &mut groups, &mut serial);
                 errors.append(&mut found);
-                push(added);
+                batch.extend(added);
             }
             Stmt::Output {
                 name,
                 name_span,
                 node,
             } => match output_command(name, *name_span, node.as_ref(), &names, known) {
-                Ok(item) => push(vec![item]),
+                Ok(item) => batch.extend(vec![item]),
                 Err(e) => errors.push(*e),
             },
         }
     }
-    // A constant used where a node is expected (`radius=w` instead of `radius={w}`) gets the fix spelled out.
-    for error in &mut errors {
-        let name = error.message.rsplit(' ').next().unwrap_or("").to_owned();
-        if error.code == "parse.unknown_name"
-            && error.suggestion.is_none()
-            && constants.contains(&name)
-        {
-            error.suggestion = Some(format!(
-                "{name} is a constant, not a node: write {{{name}}} where its value goes"
-            ));
-        }
-    }
+    super::expr::hint_constants(&mut errors, constants);
+    batch.remap(&expanded);
+    errors = errors.into_iter().map(|e| expanded.locate(e)).collect();
     errors.sort_by_key(|e| e.span.map(|s| (s.line, s.col)));
     if errors.is_empty() {
         Ok(batch)

@@ -1,0 +1,7 @@
+
+k_hero = game.kind@1(name="hero", size=0.45, speed=5, part="h_root", tags=["hero"])
+k_boss = game.kind@1(name="boss", size=1.0, speed=3, part="b_root", tags=["boss"])
+s_hero = game.spawn@1(kind="hero", at=[-4, 0, 0], heading=0)
+s_boss = game.spawn@1(kind="boss", at=[4, 0, 0], heading=0)
+all = game.collect@1(k_hero, k_boss, s_hero, s_boss, name="emberfall")
+output rules = all

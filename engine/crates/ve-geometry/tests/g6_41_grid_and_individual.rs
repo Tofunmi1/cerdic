@@ -40,7 +40,8 @@ fn g6_41_a_grid_is_an_open_quad_sheet_facing_plus_z() {
                 )
             });
     assert!((low[0] + 3.0).abs() < 1.0e-6 && (high[0] - 3.0).abs() < 1.0e-6);
-    assert!(low[1].abs() < 1.0e-6 && (high[1] - 4.0).abs() < 1.0e-6);
+    // centred on x = 0 and on y = 0 (the grid is 6 wide and 4 tall)
+    assert!((low[1] + 2.0).abs() < 1.0e-6 && (high[1] - 2.0).abs() < 1.0e-6);
     // The first cell winds counter-clockwise seen from +z: its normal points to +z.
     let p = |i: usize| wall.positions()[wall.corners()[i] as usize];
     let (a, b, c) = (p(0), p(1), p(2));

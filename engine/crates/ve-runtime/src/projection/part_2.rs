@@ -26,18 +26,47 @@ pub(crate) fn update(
                 .extend(candidate.uploaded.into_iter().map(|item| item.handle));
             return;
         }
-        if let Some(chunk) = candidate.queue.pop_front() {
+        // Several chunks a frame while they are cheap, up to a few milliseconds and a byte cap: one chunk a frame made a scene of
+        // hundreds of chunks last hundreds of frames, which passed a minute on a machine drawing the scene at a few frames a second.
+        let frame_began = now();
+        let mut frame_bytes = 0;
+        let mut drained = false;
+        while let Some(chunk) = candidate.queue.pop_front() {
+            drained = true;
             let began = now();
             let bytes = size_of_val(chunk.data.as_slice());
+            frame_bytes += bytes;
             candidate.queued_bytes -= bytes;
-            let skinned =
-                chunk.region == 0 && chunk.group == 0 && candidate.skins.contains_key(&chunk.node);
+            // A live cloth keeps its corner bookkeeping like a skin does (its chunks find their vertices by corner offset).
+            let skinned = chunk.region == 0
+                && chunk.group == 0
+                && (candidate.skins.contains_key(&chunk.node)
+                    || candidate.cloths.contains_key(&chunk.node)
+                    || candidate.fluids.contains_key(&chunk.node)
+                    || candidate.sims.contains_key(&chunk.node));
             let corners = skinned.then(|| candidate.corners.entry(chunk.node.clone()).or_default());
-            candidate.uploaded.push(upload(chunk, &mut meshes, corners));
+            let skin = skinned
+                .then(|| candidate.skins.get(&chunk.node))
+                .flatten()
+                .cloned();
+            // A skinned part with procedural relief keeps its rest position in the vertex colour for the pixel shader (see `detail.wesl`).
+            let relief = skinned
+                && candidate
+                    .materials
+                    .get(&(chunk.node.clone(), chunk.region))
+                    .is_some_and(|material| material.finish.relief > 0.0);
+            candidate
+                .uploaded
+                .push(upload(chunk, &mut meshes, corners, skin.as_deref(), relief));
             state.last_ms = now() - began;
             state.max_ms = state.max_ms.max(state.last_ms);
+            if now() - frame_began > FRAME_UPLOAD_MS || frame_bytes >= FRAME_UPLOAD_BYTES {
+                break;
+            }
+        }
+        if drained {
             state.upload_frames += 1;
-            state.max_frame_bytes = state.max_frame_bytes.max(bytes);
+            state.max_frame_bytes = state.max_frame_bytes.max(frame_bytes);
         }
         if candidate.finished
             && candidate.queue.is_empty()
@@ -45,7 +74,7 @@ pub(crate) fn update(
                 .uploaded
                 .iter()
                 .all(|item| mesh_ready(item.handle.id()))
-            && staging::accept(&candidate.token)
+            && (candidate.draft || staging::accept(&candidate.token))
         {
             for (entity, mesh) in old.iter().chain(gallery.iter()) {
                 commands.entity(entity).despawn();
@@ -57,11 +86,15 @@ pub(crate) fn update(
                     meshes.remove(level.mesh.id());
                 }
             }
-            for entity in &old_lights {
-                commands.entity(entity).despawn();
+            // A draft leaves the lights, sky, wind and light probes of the scene on screen alone: it carries none of them.
+            if !candidate.draft {
+                for entity in &old_lights {
+                    commands.entity(entity).despawn();
+                }
+                lights::spawn(&mut commands, &candidate.lights, &candidate.token);
+                state.light_count = candidate.lights.len();
             }
-            lights::spawn(&mut commands, &candidate.lights, &candidate.token);
-            state.light_count = candidate.lights.len();
+            if !candidate.draft {
             // An authored environment replaces the scene ambient; a document without one restores
             // what the built-in scene set at startup.
             *ambient = candidate
@@ -71,18 +104,36 @@ pub(crate) fn update(
             *sky_background = candidate
                 .environment
                 .as_ref()
-                .and_then(|scene| scene.sky.as_ref())
-                .map(|sky| ve_render::SkyBackground {
-                    enabled: true,
-                    horizon: sky.horizon_color,
-                    zenith: sky.zenith_color,
-                    ground: sky.ground_color,
-                    sun_direction: sky.sun_direction,
-                    sun_intensity: sky.sun_intensity,
-                    turbidity: sky.turbidity,
-                    clouds: sky.clouds,
-                    cloud_cover: sky.cloud_cover,
-                    seed: sky.seed,
+                .map(|scene| {
+                    // The document's distance haze, light shafts and camera effects, which the renderer had never read. An
+                    // environment without a sky still carries them (the sky pass stays off).
+                    let carried = ve_render::SkyBackground {
+                        haze: scene.haze.density,
+                        haze_color: scene.haze.color,
+                        haze_height: scene.haze.height,
+                        shafts: scene.haze.shafts,
+                        focus_distance: scene.haze.focus_distance,
+                        aperture: scene.haze.aperture,
+                        motion_blur: scene.haze.motion_blur,
+                        contact_shadows: scene.haze.contact_shadows,
+                        ..ve_render::SkyBackground::default()
+                    };
+                    scene
+                        .sky
+                        .as_ref()
+                        .map_or(carried, |sky| ve_render::SkyBackground {
+                            enabled: true,
+                            horizon: sky.horizon_color,
+                            zenith: sky.zenith_color,
+                            ground: sky.ground_color,
+                            sun_direction: sky.sun_direction,
+                            sun_intensity: sky.sun_intensity,
+                            turbidity: sky.turbidity,
+                            clouds: sky.clouds,
+                            cloud_cover: sky.cloud_cover,
+                            seed: sky.seed,
+                            ..carried
+                        })
                 })
                 .unwrap_or_default();
             state.environment.clone_from(&candidate.environment);
@@ -97,8 +148,12 @@ pub(crate) fn update(
             };
             // Light probes are traced from the geometry collected below; until they finish the scene keeps the sky ambient.
             gi::clear(&mut probes);
-            let mut collector =
-                gi::Collector::new(candidate.environment.as_ref(), gi::sun(&candidate.lights));
+            }
+            let mut collector = if candidate.draft {
+                None
+            } else {
+                gi::Collector::new(candidate.environment.as_ref(), gi::sun(&candidate.lights))
+            };
             state.parts.clear();
             state.instance_sets.clear();
             candidate.count_instance_sets(&mut state.instance_sets);
@@ -106,10 +161,12 @@ pub(crate) fn update(
             let materials = std::mem::take(&mut candidate.materials);
             // The new scene's maps replace the old ones; each region keeps the layers it was given.
             let layers = assign_layers(&mut textures, std::mem::take(&mut candidate.maps));
+            maps::remember_layers(&layers);
             state.texture_maps = textures.len();
             state.texture_bytes = textures.bytes();
             let mut animated = 0_usize;
             let uploaded = std::mem::take(&mut candidate.uploaded);
+            let mut survey = survey::Collector::new(&uploaded, &candidate.placements, &meshes);
             let bodies = candidate.body_specs(&uploaded);
             for item in uploaded {
                 state
@@ -123,6 +180,7 @@ pub(crate) fn update(
                 });
                 surface.map_layers = layers.get(&key).copied().unwrap_or([-1; 4]);
                 let placements = candidate.placements.get(&item.group);
+                survey.add(&item, placements, &meshes);
                 if let Some(collector) = collector.as_mut() {
                     collector.add(
                         &item,
@@ -143,11 +201,14 @@ pub(crate) fn update(
                     &motion,
                 );
             }
+            survey.publish();
             if let Some(collector) = collector {
                 collector.start();
             }
             state.animated_parts = animated;
-            state.committed = Some(candidate.token);
+            if !candidate.draft {
+                state.committed = Some(candidate.token);
+            }
             return;
         }
         state.candidate = Some(candidate);

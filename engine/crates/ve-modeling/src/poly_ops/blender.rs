@@ -32,6 +32,19 @@ pub(super) fn handles(family: &str) -> bool {
             | "poly.spin"
             | "poly.mirror"
             | "poly.loop_cut"
+            | "poly.recalc_normals"
+            | "poly.smooth"
+            | "poly.fill_holes"
+            | "poly.beautify"
+            | "poly.planar_faces"
+            | "poly.join_triangles"
+            | "poly.dissolve_degenerate"
+            | "poly.split_edges"
+            | "poly.rotate_edges"
+            | "poly.connect_vertices"
+            | "poly.space_loops"
+            | "poly.relax_loops"
+            | "poly.circularize"
     )
 }
 
@@ -49,6 +62,13 @@ pub(super) fn ignores_selection(family: &str) -> bool {
             | "poly.mirror"
             | "poly.loop_cut"
             | "poly.pack_uv"
+            | "poly.recalc_normals"
+            | "poly.smooth"
+            | "poly.fill_holes"
+            | "poly.beautify"
+            | "poly.planar_faces"
+            | "poly.join_triangles"
+            | "poly.dissolve_degenerate"
     )
 }
 
@@ -69,6 +89,16 @@ pub(super) fn apply(
 ) -> Result<PolyMesh, Fail> {
     let (faces, edges) = chosen(node, family, selection)?;
     let vertices = chosen_vertices(node, family, selection)?;
+    if family == "poly.connect_vertices" && vertices.len() < 2 {
+        return Err(super::errors::refuse(
+            node,
+            "poly.connect_needs_two_vertices",
+            format!(
+                "only {} vertex was selected; select at least two vertices on the same face (poly.select element=vertex) to cut between them",
+                vertices.len()
+            ),
+        ));
+    }
     if family == "poly.loop_cut" {
         check_loop_cut(node, poly, context)?;
     }
@@ -226,7 +256,7 @@ fn chosen_vertices(
     family: &str,
     selection: Option<&Selection>,
 ) -> Result<Vec<u32>, Fail> {
-    if family != "poly.remove_doubles" {
+    if family != "poly.remove_doubles" && family != "poly.connect_vertices" {
         return Ok(Vec::new());
     }
     match selection.map(|selection| &selection.elements) {
@@ -263,14 +293,36 @@ fn chosen(node: &Node, family: &str, selection: Option<&Selection>) -> Result<Ch
     let Some(selection) = selection else {
         return Ok((Vec::new(), Vec::new()));
     };
-    if family == "poly.remove_doubles" && matches!(&selection.elements, Elements::Vertices(_)) {
+    if matches!(family, "poly.remove_doubles" | "poly.connect_vertices")
+        && matches!(&selection.elements, Elements::Vertices(_))
+    {
         return Ok((Vec::new(), Vec::new()));
     }
+    if family == "poly.connect_vertices" {
+        return Err(wrong("vertex", selection.elements.kind()));
+    }
     match (&selection.elements, family) {
-        (Elements::Edges(items), "poly.subdivide_edges" | "poly.unwrap_uv" | "poly.spin") => {
-            Ok((Vec::new(), items.clone()))
-        }
-        (other, "poly.subdivide_edges" | "poly.unwrap_uv") => Err(wrong("edge", other.kind())),
+        (
+            Elements::Edges(items),
+            "poly.subdivide_edges"
+            | "poly.unwrap_uv"
+            | "poly.spin"
+            | "poly.split_edges"
+            | "poly.rotate_edges"
+            | "poly.space_loops"
+            | "poly.relax_loops"
+            | "poly.circularize",
+        ) => Ok((Vec::new(), items.clone())),
+        (
+            other,
+            "poly.subdivide_edges"
+            | "poly.unwrap_uv"
+            | "poly.split_edges"
+            | "poly.rotate_edges"
+            | "poly.space_loops"
+            | "poly.relax_loops"
+            | "poly.circularize",
+        ) => Err(wrong("edge", other.kind())),
         (Elements::Faces(items), _) => Ok((items.clone(), Vec::new())),
         (other, _) => Err(wrong("face", other.kind())),
     }
@@ -341,6 +393,53 @@ fn operator(node: &Node, family: &str) -> Result<MeshOp, Fail> {
         "poly.triangulate" => MeshOp::Triangulate,
         "poly.remove_doubles" => MeshOp::RemoveDoubles {
             distance: number(node, "distance")?,
+        },
+        "poly.recalc_normals" => MeshOp::RecalcNormals {
+            inside: text(node, "direction")? == "inward",
+        },
+        "poly.smooth" => MeshOp::Smooth {
+            factor: number(node, "factor")?,
+            iterations: super::params::count(node, "iterations")?,
+        },
+        "poly.fill_holes" => MeshOp::FillHoles {
+            sides: super::params::count(node, "max_sides")?,
+        },
+        "poly.beautify" => MeshOp::Beautify {
+            by_angle: text(node, "method")? == "angle",
+        },
+        "poly.planar_faces" => MeshOp::PlanarFaces {
+            iterations: super::params::count(node, "iterations")?,
+            factor: number(node, "factor")?,
+        },
+        "poly.join_triangles" => MeshOp::JoinTriangles {
+            face_angle: number(node, "face_angle")?,
+            shape_angle: number(node, "shape_angle")?,
+        },
+        "poly.dissolve_degenerate" => MeshOp::DissolveDegenerate {
+            distance: number(node, "distance")?,
+        },
+        "poly.split_edges" => MeshOp::SplitEdges,
+        "poly.rotate_edges" => MeshOp::RotateEdges {
+            counter_clockwise: text(node, "direction")? == "counter_clockwise",
+        },
+        "poly.connect_vertices" => MeshOp::ConnectVertices {
+            check_degenerate: flag(node, "check_degenerate")?,
+        },
+        "poly.space_loops" => MeshOp::SpaceEdgeLoops {
+            factor: number(node, "factor")?,
+            linear: text(node, "interpolation")? == "linear",
+        },
+        "poly.relax_loops" => MeshOp::RelaxEdgeLoops {
+            iterations: super::params::count(node, "iterations")?,
+            linear: text(node, "interpolation")? == "linear",
+            even_spacing: flag(node, "even_spacing")?,
+        },
+        "poly.circularize" => MeshOp::Circularize {
+            factor: number(node, "factor")?,
+            radius: number(node, "radius")?,
+            angle: number(node, "angle")?,
+            flatten: number(node, "flatten")?,
+            regular: flag(node, "regular")?,
         },
         _ => MeshOp::Symmetrize {
             axis: match text(node, "axis")? {

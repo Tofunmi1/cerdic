@@ -1,0 +1,398 @@
+# THE ORRERY GOD: a colossal clockwork sky-machine over a ruined temple on a floating rock.
+# A burning star hangs at the centre. Five bronze gimbal rings, nested like a gyroscope, turn about different axes, each carried by the one outside it,
+# so the whole machine tumbles; gear-toothed bands, runes that pulse, planets (gas giant, ocean world, lava world, ice world) with moons that ride the rings,
+# plasma streaming off the star in a vortex, drifting debris and a ring of broken columns below. Everything is built from the language's own nodes. Metres, y up; centre (0, 15, 0).
+sky = scene.sky@1(sun_elevation=-5, sun_azimuth=20, sun_intensity=0.35, turbidity=1, ground_color=[0.02, 0.02, 0.05], clouds=false, haze=0.0, contact_shadows=true)
+output sky = sky
+env = scene.environment@1(sky_color=[0.25, 0.2, 0.55], ground_color=[0.06, 0.05, 0.14], intensity=0.35, reflection=0.4)
+
+# one carrier lifts the whole machine and its rock clear of the ground plane (everything that is not already carried hangs from it)
+lift_s = solid.sphere@1(radius=0.05, segments=8)
+lift_m = solid.material@1(lift_s, color=[0.2, 0.2, 0.2], roughness=0.5)
+lift_k = anim.track@1(lift_m, property="position", keys="0:0,14,0; 4:0,14,0", interpolation="linear")
+output lift = lift_k
+output env = env
+
+# ---------- texture programs ----------
+let bronze = "albedo = expr(code=\"n = fbm(vec2(p.x * 12.0, p.y * 12.0)); m = fbm(vec2(p.x * 40.0, p.y * 40.0)); pat = smoothstep(0.55, 0.8, n); out = vec4(mix(vec3(0.62, 0.38, 0.16), vec3(0.2, 0.5, 0.42), pat * 0.6) * (0.75 + 0.5 * m), 1.0)\"); roughness = expr(code=\"n = fbm(vec2(p.x * 25.0, p.y * 25.0)); out = vec4(vec3(0.3 + 0.35 * n), 1.0)\")"
+let rock = "albedo = expr(code=\"n = fbm(vec2(p.x * 8.0, p.y * 8.0)); m = fbm(vec2(p.x * 40.0, p.y * 40.0)); out = vec4(mix(vec3(0.16, 0.14, 0.15), vec3(0.34, 0.3, 0.28), n) * (0.7 + 0.6 * m), 1.0)\"); roughness = expr(code=\"out = vec4(vec3(0.95), 1.0)\")"
+let marble = "albedo = expr(code=\"n = fbm(vec2(p.x * 6.0, p.y * 6.0)); v = abs(fbm(vec2(p.x * 3.0 + n * 1.5, p.y * 3.0)) - 0.5); vein = 1.0 - smoothstep(0.0, 0.04, v); out = vec4(mix(vec3(0.7, 0.68, 0.72), vec3(0.3, 0.28, 0.4), vein * 0.5), 1.0)\"); roughness = expr(code=\"out = vec4(vec3(0.4), 1.0)\")"
+let fire = "albedo = expr(code=\"out = vec4(1.0, 0.5, 0.1, 1.0)\"); emissive = expr(code=\"n = fbm(vec2(p.x * 7.0, p.y * 7.0)); m = fbm(vec2(p.x * 20.0 + n * 3.0, p.y * 20.0)); out = vec4(mix(vec3(1.4, 0.25, 0.03), vec3(3.6, 1.9, 0.5), m) * (0.45 + 0.9 * n), 1.0)\")"
+let gas = "albedo = expr(code=\"w = fbm(vec2(p.x * 3.0, p.y * 9.0)); b = 0.5 + 0.5 * sin(p.y * 38.0 + w * 5.0); out = vec4(mix(vec3(0.82, 0.6, 0.4), vec3(0.5, 0.28, 0.2), b) * (0.85 + 0.3 * w), 1.0)\"); roughness = expr(code=\"out = vec4(vec3(0.7), 1.0)\")"
+let ocean = "albedo = expr(code=\"n = fbm(vec2(p.x * 5.0, p.y * 5.0)); land = smoothstep(0.52, 0.58, n); ice = smoothstep(0.42, 0.5, abs(p.y - 0.5)); c = mix(vec3(0.05, 0.2, 0.5), vec3(0.2, 0.45, 0.18), land); c = mix(c, vec3(0.92, 0.95, 1.0), ice); out = vec4(c, 1.0)\"); roughness = expr(code=\"out = vec4(vec3(0.5), 1.0)\")"
+let lava = "albedo = expr(code=\"n = fbm(vec2(p.x * 8.0, p.y * 8.0)); out = vec4(vec3(0.1, 0.07, 0.07) * (0.6 + n), 1.0)\"); emissive = expr(code=\"n = fbm(vec2(p.x * 8.0, p.y * 8.0)); g = abs(fbm(vec2(p.x * 14.0 + n * 2.0, p.y * 14.0)) - 0.5); out = vec4(vec3(5.0, 1.3, 0.15) * (1.0 - smoothstep(0.0, 0.05, g)), 1.0)\")"
+let ice = "albedo = expr(code=\"n = fbm(vec2(p.x * 10.0, p.y * 10.0)); c = abs(fbm(vec2(p.x * 24.0 + n, p.y * 24.0)) - 0.5); crack = 1.0 - smoothstep(0.0, 0.03, c); out = vec4(mix(vec3(0.7, 0.88, 1.0), vec3(0.3, 0.5, 0.85), crack), 1.0)\"); roughness = expr(code=\"out = vec4(vec3(0.15), 1.0)\")"
+let moonrock = "albedo = expr(code=\"n = fbm(vec2(p.x * 14.0, p.y * 14.0)); out = vec4(vec3(0.55, 0.53, 0.5) * (0.7 + 0.5 * n), 1.0)\"); roughness = expr(code=\"out = vec4(vec3(0.95), 1.0)\")"
+
+# ---------- the star: a boiling sphere with a pulsing glow, a vortex of plasma, and the light that makes the whole scene ----------
+st_s = solid.sphere@1(radius=2.2, segments=64)
+st_a = xform.move@1(st_s, by=[0, 15, 0])
+st_m = solid.material@1(st_a, color=[1, 0.6, 0.2], roughness=0.6)
+st_t = solid.texture@1(st_m, program="${fire}", tile=0, size="512")
+st_r = anim.track@1(st_t, property="rotation", keys="0:0,0,0; 6:0,90,0; 12:0,180,0; 18:0,270,0; 24:0,360,0", interpolation="linear", pivot=[0, 15, 0])
+st_g = anim.track@1(st_r, property="glow", keys="0:1; 1.3:1.7; 2.6:1", interpolation="smooth")
+st_p = anim.parent@1(st_g, parent="lift")
+output star = st_p
+corona_s = solid.sphere@1(radius=2.6, segments=48)
+corona_a = xform.move@1(corona_s, by=[0, 15, 0])
+corona_m = solid.material@1(corona_a, color=[1, 0.5, 0.15], roughness=0.8, emissive=[1.6, 0.6, 0.12])
+corona_g = anim.track@1(corona_m, property="glow", keys="0:0.6; 1.9:1.4; 3.8:0.6", interpolation="smooth")
+corona_v = anim.track@1(corona_g, property="scale", keys="0:1,1,1; 1.9:1.12,1.12,1.12; 3.8:1,1,1", interpolation="smooth", pivot=[0, 15, 0])
+corona_p = anim.parent@1(corona_v, parent="lift")
+sun_light = light.point@1(position=[0, 29, 0], color=[1.0, 0.62, 0.28], intensity=9000, range=90)
+output star_light = sun_light
+pl_b = solid.box@1(size=[0.1, 0.1, 0.1])
+pl_a = xform.move@1(pl_b, by=[0, 15, 0])
+pl_e = fx.emitter@1(pl_a, name="plasma", rate=110, lifetime=[1.8, 3.6], speed=[2.5, 7], direction=[0, 1, 0], cone=85, shape="sphere", extent=[2.2, 2.2, 2.2], max_particles=500, size=[0.9, 0.15], colour=[1.0, 0.8, 0.35], colour_end=[0.9, 0.2, 0.05], alpha=[0.9, 0], glow=4, blend="additive")
+pl_f = fx.force@1(pl_e, emitter="plasma", kind="vortex", centre=[0, 29, 0], strength=9, radius=30)
+pl_g = fx.force@1(pl_f, emitter="plasma", kind="turbulence", strength=3, scale=0.8, speed=0.4)
+pl_p = anim.parent@1(pl_g, parent="lift")
+output plasma = pl_p
+pm_b = solid.box@1(size=[0.1, 0.1, 0.1])
+pm_a = xform.move@1(pm_b, by=[0, 15, 0])
+pm_e = fx.emitter@1(pm_a, name="embers", rate=60, lifetime=[3, 6], speed=[1.5, 5], direction=[0, -1, 0], cone=85, shape="sphere", extent=[2.4, 2.4, 2.4], max_particles=400, size=[0.12, 0.03], colour=[1.0, 0.7, 0.3], colour_end=[0.8, 0.1, 0.02], alpha=[1, 0], glow=5, blend="additive")
+pm_f = fx.force@1(pm_e, emitter="embers", kind="gravity", vector=[0, -1.2, 0])
+pm_p = anim.parent@1(pm_f, parent="lift")
+output embers = pm_p
+
+# ---------- the gimbal rings ----------
+# A band (a lathe with a flange), gear teeth on its rim, tilted into its plane, moved to the centre, bronze; a spin about the ring's own axis, carried by the ring outside it.
+# Runes are a separate glowing part on the ring.
+def ring(k, R, hw, hh, ax, az, spin, par, gk)
+  rgp_{k} = profile.polygon@1(points=[[{R - hw}, {0 - hh}], [{R + hw}, {0 - hh}], [{R + hw * 1.3}, {0 - hh * 0.5}], [{R + hw * 1.3}, {hh * 0.5}], [{R + hw}, {hh}], [{R - hw}, {hh}]])
+  rgs_{k} = solid.revolve@1(rgp_{k}, angle=360deg, segments=96)
+  rtb_{k} = solid.box@1(size=[{hw * 1.6}, 0.3, 0.3])
+  rtm_{k} = xform.move@1(rtb_{k}, by=[0, {hh + 0.12}, 0])
+  rtr_{k} = xform.radial@1(rtm_{k}, count=36, radius={R})
+  rgu_{k} = solid.union@1(rgs_{k}, rtr_{k})
+  rgo_{k} = xform.rotate@1(rgu_{k}, angles=[{ax}, 0, {az}])
+  rgc_{k} = xform.move@1(rgo_{k}, by=[0, 15, 0])
+  rgm_{k} = solid.material@1(rgc_{k}, color=[1, 1, 1], metallic=0.9, roughness=0.4)
+  rgt_{k} = solid.texture@1(rgm_{k}, program="${bronze}", tile=0, size="512")
+  rgk_{k} = anim.track@1(rgt_{k}, property="rotation", keys={spin}, interpolation="linear", pivot=[0, 15, 0])
+  rgp2_{k} = anim.parent@1(rgk_{k}, parent={par})
+  output ring{k} = rgp2_{k}
+  rub_{k} = solid.box@1(size=[0.1, {hh * 0.9}, 0.34])
+  rur_{k} = xform.radial@1(rub_{k}, count=24, radius={R + hw * 1.3 + 0.03})
+  ruo_{k} = xform.rotate@1(rur_{k}, angles=[{ax}, 0, {az}])
+  ruc_{k} = xform.move@1(ruo_{k}, by=[0, 15, 0])
+  rum_{k} = solid.material@1(ruc_{k}, color=[0.4, 0.8, 1.0], roughness=0.3, emissive=[0.8, 2.6, 5.0])
+  rug_{k} = anim.track@1(rum_{k}, property="glow", keys={gk}, interpolation="smooth")
+  rus_{k} = anim.track@1(rug_{k}, property="rotation", keys={spin}, interpolation="linear", pivot=[0, 15, 0])
+  rup_{k} = anim.parent@1(rus_{k}, parent={par})
+  output runes{k} = rup_{k}
+end
+# the outermost ring needs a part to hang from: the world itself (no parent)
+let nospin = "0:0,0,0; 1:0,0,0"
+gimbal_s = solid.sphere@1(radius=0.05, segments=8)
+gimbal_a = xform.move@1(gimbal_s, by=[0, 15, 0])
+gimbal_m = solid.material@1(gimbal_a, color=[0.3, 0.3, 0.3], roughness=0.5)
+gimbal_p = anim.parent@1(gimbal_m, parent="lift")
+output gimbal = gimbal_p
+ring("1", 12.2, 0.4, 0.6, 0, 0, "0:0,0,0; 10:0,90,0; 20:0,180,0; 30:0,270,0; 40:0,360,0", "gimbal", "0:1; 1.6:2.6; 3.2:1")
+ring("2", 10.0, 0.36, 0.55, 90, 0, "0:0,0,0; 7:0,0,-90; 14:0,0,-180; 21:0,0,-270; 28:0,0,-360", "ring1", "0:2; 1.1:0.8; 2.2:2")
+ring("3", 8.0, 0.34, 0.5, 0, 90, "0:0,0,0; 5:90,0,0; 10:180,0,0; 15:270,0,0; 20:360,0,0", "ring2", "0:1; 0.9:2.8; 1.8:1")
+ring("4", 6.3, 0.3, 0.45, 0, 0, "0:0,0,0; 4:0,-90,0; 8:0,-180,0; 12:0,-270,0; 16:0,-360,0", "ring3", "0:1.5; 1.3:0.6; 2.6:1.5")
+ring("5", 4.9, 0.26, 0.4, 90, 0, "0:0,0,0; 3:0,0,90; 6:0,0,180; 9:0,0,270; 12:0,0,360", "ring4", "0:1; 0.7:2.4; 1.4:1")
+
+# ---------- planets on the rings, each with a spin; moons on the planets, each with an orbit ----------
+def pbody(tag, x, y, z, r)
+  pb_{tag}_s = solid.sphere@1(radius={r}, segments=48)
+  pb{tag} = xform.move@1(pb_{tag}_s, by=[{x}, {y}, {z}])
+end
+def pfinish(tag, par, x, y, z, spin)
+  pf_{tag}_k = anim.track@1(ptex{tag}, property="rotation", keys={spin}, interpolation="linear", pivot=[{x}, {y}, {z}])
+  pf_{tag}_p = anim.parent@1(pf_{tag}_k, parent={par})
+  output planet_{tag} = pf_{tag}_p
+end
+def moon(tag, par, x, y, z, r, px, py, pz, orbit)
+  mn_{tag}_s = solid.sphere@1(radius={r}, segments=24)
+  mn_{tag}_a = xform.move@1(mn_{tag}_s, by=[{x}, {y}, {z}])
+  mn_{tag}_m = solid.material@1(mn_{tag}_a, color=[1, 1, 1], roughness=0.95)
+  mn_{tag}_t = solid.texture@1(mn_{tag}_m, program="${moonrock}", tile=0, size="256")
+  mn_{tag}_k = anim.track@1(mn_{tag}_t, property="rotation", keys={orbit}, interpolation="linear", pivot=[{px}, {py}, {pz}])
+  mn_{tag}_p = anim.parent@1(mn_{tag}_k, parent={par})
+  output moon_{tag} = mn_{tag}_p
+end
+let spin1 = "0:0,0,0; 2:0,90,0; 4:0,180,0; 6:0,270,0; 8:0,360,0"
+let spin2 = "0:0,0,0; 1.5:0,-90,0; 3:0,-180,0; 4.5:0,-270,0; 6:0,-360,0"
+let orb1 = "0:0,0,0; 1:0,90,0; 2:0,180,0; 3:0,270,0; 4:0,360,0"
+let orb2 = "0:0,0,0; 1.6:0,-90,0; 3.2:0,-180,0; 4.8:0,-270,0; 6.4:0,-360,0"
+# a gas giant on ring 1 (at the +x end of its plane), with two moons
+pbody("g", 12.2, 15, 0, 1.9)
+pgm = solid.material@1(pbg, color=[1, 1, 1], roughness=0.7)
+ptexg = solid.texture@1(pgm, program="${gas}", tile=0, size="512")
+pfinish("g", "ring1", 12.2, 15, 0, "${spin1}")
+moon("g1", "planet_g", 12.2, 15, 3.1, 0.45, 12.2, 15, 0, "${orb1}")
+moon("g2", "planet_g", 15.4, 15.8, 0, 0.3, 12.2, 15, 0, "${orb2}")
+# an ocean world on ring 2 (circle in XY: at the top)
+pbody("o", 0, 25, 0, 1.3)
+pom = solid.material@1(pbo, color=[1, 1, 1], roughness=0.5)
+ptexo = solid.texture@1(pom, program="${ocean}", tile=0, size="512")
+pfinish("o", "ring2", 0, 25, 0, "${spin2}")
+moon("o1", "planet_o", 0, 25, 2.2, 0.35, 0, 25, 0, "${orb1}")
+# a lava world on ring 3 (circle in YZ: at the +z end)
+pbody("l", 0, 15, 8, 1.0)
+plm = solid.material@1(pbl, color=[1, 1, 1], roughness=0.8)
+ptexl = solid.texture@1(plm, program="${lava}", tile=0, size="512")
+pfinish("l", "ring3", 0, 15, 8, "${spin1}")
+# an ice world on ring 5, small and fast
+pbody("i", 4.9, 15, 0, 0.6)
+pim = solid.material@1(pbi, color=[1, 1, 1], roughness=0.15)
+ptexi = solid.texture@1(pim, program="${ice}", tile=0, size="512")
+pfinish("i", "ring5", 4.9, 15, 0, "${spin2}")
+moon("i1", "planet_i", 4.9, 15, 1.1, 0.18, 4.9, 15, 0, "${orb2}")
+
+# ---------- the floating rock: an inverted cone roughened by noise, a marble floor with a glowing rune ring, a circle of broken columns ----------
+rk_c = solid.cone@1(radius=2.0, top_radius=11.5, height=11, segments=24)
+rs_c = solid.cone@1(radius=0.3, top_radius=2.6, height=7, segments=12)
+rs_m = xform.move@1(rs_c, by=[7.2, -1.5, 0])
+rs_r = xform.radial@1(rs_m, count=7, radius=0)
+rs_t = xform.rotate@1(rs_r, angles=[0, 17, 0])
+rk_u = solid.union@1(rk_c, rs_t)
+rk_a = xform.move@1(rk_u, by=[0, -5.5, 0])
+rk_m = solid.material@1(rk_a, color=[1, 1, 1], roughness=0.95)
+rk_t = solid.texture@1(rk_m, program="${rock}", tile=0, size="512")
+rk_p = anim.parent@1(rk_t, parent="lift")
+output rock = rk_p
+fl_c = solid.cylinder@1(radius=11.2, height=0.7, segments=96)
+fl_a = xform.move@1(fl_c, by=[0, -0.2, 0])
+fl_m = solid.material@1(fl_a, color=[1, 1, 1], roughness=0.4)
+fl_t = solid.texture@1(fl_m, program="${marble}", tile=0, size="512")
+fl_p = anim.parent@1(fl_t, parent="lift")
+output floor = fl_p
+rr_t = solid.torus@1(major=7.6, minor=0.1, segments=96, tube_segments=8)
+rr_a = xform.move@1(rr_t, by=[0, 0.2, 0])
+rr_m = solid.material@1(rr_a, color=[0.4, 0.8, 1.0], roughness=0.3, emissive=[0.8, 2.6, 5.0])
+rr_g = anim.track@1(rr_m, property="glow", keys="0:1; 1.5:2.5; 3:1", interpolation="smooth")
+rr_p = anim.parent@1(rr_g, parent="lift")
+output floor_ring = rr_p
+cl_p = profile.polygon@1(points=[[0.0, 0.0], [0.72, 0.0], [0.72, 0.3], [0.52, 0.3], [0.48, 4.0], [0.42, 6.2], [0.42, 6.6], [0.58, 6.75], [0.64, 7.05], [0.0, 7.05]])
+cl_s = solid.revolve@1(cl_p, angle=360deg, segments=32)
+cl_b = solid.box@1(size=[1.6, 2.5, 3.0])
+cl_d = xform.move@1(cl_b, by=[0.2, 7.6, 0])
+cl_x = solid.difference@1(cl_s, cl_d)
+cl_f = xform.move@1(cl_x, by=[0, 0, 0])
+cl_r = xform.radial@1(cl_f, count=12, radius=9.2)
+cl_m = solid.material@1(cl_r, color=[1, 1, 1], roughness=0.5)
+cl_t = solid.texture@1(cl_m, program="${marble}", tile=0, size="512")
+cl_p2 = anim.parent@1(cl_t, parent="lift")
+output columns = cl_p2
+ar_p = profile.polygon@1(points=[[8.5, 7.1], [9.9, 7.1], [9.9, 8.1], [8.5, 8.1]])
+ar_s = solid.revolve@1(ar_p, angle=360deg, segments=96)
+ar_b = solid.box@1(size=[4.5, 3.0, 7.0])
+ar_c = xform.move@1(ar_b, by=[8.8, 7.6, 3.0])
+ar_d = solid.difference@1(ar_s, ar_c)
+ar_m = solid.material@1(ar_d, color=[1, 1, 1], roughness=0.5)
+ar_t = solid.texture@1(ar_m, program="${marble}", tile=0, size="512")
+ar_p2 = anim.parent@1(ar_t, parent="lift")
+output architrave = ar_p2
+
+# ---------- debris drifting round the machine ----------
+def deb(tag, x, y, z, s, keys)
+  db_{tag}_b = solid.box@1(size=[{s}, {s * 0.7}, {s * 0.9}])
+  db_{tag}_r = solid.round@1(db_{tag}_b, radius={s * 0.15}, segments=6)
+  db_{tag}_n = xform.noise@1(db_{tag}_r, amplitude={s * 0.08}, scale=0.6, seed=2, tolerance=0.05)
+  db_{tag}_a = xform.move@1(db_{tag}_n, by=[{x}, {y}, {z}])
+  db_{tag}_m = solid.material@1(db_{tag}_a, color=[1, 1, 1], roughness=0.95)
+  db_{tag}_t = solid.texture@1(db_{tag}_m, program="${rock}", tile=0, size="256")
+  db_{tag}_k = anim.track@1(db_{tag}_t, property="rotation", keys={keys}, interpolation="linear", pivot=[0, 15, 0])
+  db_{tag}_p = anim.parent@1(db_{tag}_k, parent="lift")
+  output debris_{tag} = db_{tag}_p
+end
+deb("a", 16, 12, 0, 1.2, "0:0,0,0; 12:0,90,0; 24:0,180,0; 36:0,270,0; 48:0,360,0")
+deb("b", -17, 18, 3, 0.9, "0:0,0,0; 9:0,-90,0; 18:0,-180,0; 27:0,-270,0; 36:0,-360,0")
+deb("c", 14, 22, -8, 1.5, "0:0,0,0; 15:0,90,0; 30:0,180,0; 45:0,270,0; 60:0,360,0")
+deb("d", -12, 9, -14, 1.0, "0:0,0,0; 10:0,-90,0; 20:0,-180,0; 30:0,-270,0; 40:0,-360,0")
+deb("e", 3, 27, 15, 0.8, "0:0,0,0; 8:0,90,0; 16:0,180,0; 24:0,270,0; 32:0,360,0")
+deb("f", -6, 5, 17, 1.3, "0:0,0,0; 14:0,-90,0; 28:0,-180,0; 42:0,-270,0; 56:0,-360,0")
+
+# ---------- THE CLOCKWORK TITAN: waist-deep in the storm sea behind the machine (z = +110), facing it. Two colossal hands rise to cup the floating temple; a face with burning eyes and a spinning halo
+# watches from the horizon; a clock face and cogwheels turn on its chest and shoulders; steam blows from its shoulder stacks. All static plates are one iron solid; every moving wheel is its own part. ----------
+let iron = "albedo = expr(code=\"n = fbm(vec2(p.x * 9.0, p.y * 9.0)); m = fbm(vec2(p.x * 50.0, p.y * 50.0)); out = vec4(mix(vec3(0.1, 0.11, 0.14), vec3(0.28, 0.25, 0.22), n) * (0.7 + 0.6 * m), 1.0)\"); roughness = expr(code=\"n = fbm(vec2(p.x * 20.0, p.y * 20.0)); out = vec4(vec3(0.45 + 0.4 * n), 1.0)\")"
+# torso (a lathe squashed front to back), shoulders, neck, head with brow, nose and jaw
+tt_p = profile.polygon@1(points=[[0, -6], [19, -6], [20, 10], [24, 24], [31, 40], [33, 50], [28, 58], [0, 60]])
+tt_s = solid.revolve@1(tt_p, angle=360deg, segments=40)
+tt_q = xform.scale@1(tt_s, by=[1.0, 1.0, 0.62])
+tt_a = xform.move@1(tt_q, by=[0, 0, 110])
+sh_s = solid.sphere@1(radius=12, segments=24)
+sh_q = xform.scale@1(sh_s, by=[1.0, 0.85, 0.8])
+sh_a = xform.move@1(sh_q, by=[33, 50, 108])
+nk_c = solid.cylinder@1(radius=7.5, height=12, segments=24)
+nk_a = xform.move@1(nk_c, by=[0, 62, 110])
+hd_p = profile.polygon@1(points=[[0, 0], [9, 0], [13, 6], [15, 16], [13, 26], [8, 32], [0, 34]])
+hd_s = solid.revolve@1(hd_p, angle=360deg, segments=32)
+hd_q = xform.scale@1(hd_s, by=[1.0, 1.0, 1.05])
+hd_a = xform.move@1(hd_q, by=[0, 66, 110])
+br_b = solid.box@1(size=[24, 3.5, 5])
+br_c = solid.chamfer@1(br_b, width=0.8)
+br_a = xform.move@1(br_c, by=[0, 86, 95.5])
+ns_c = solid.cone@1(radius=3, top_radius=0.4, height=12, segments=4)
+ns_r = xform.rotate@1(ns_c, angles=[-90, 0, 0])
+ns_a = xform.move@1(ns_r, by=[0, 78, 98])
+jw_b = solid.box@1(size=[17, 6, 8])
+jw_c = solid.chamfer@1(jw_b, width=1.0)
+jw_a = xform.move@1(jw_c, by=[0, 68, 100])
+gr_b2 = solid.box@1(size=[1.2, 4, 1.2])
+gr_a2 = xform.move@1(gr_b2, by=[-4, 69, 95.5])
+gr_c2 = xform.array@1(gr_a2, count_x=5, count_y=1, count_z=1, spacing=[2, 0, 0])
+crown_c = solid.cone@1(radius=1.6, top_radius=0.0, height=12, segments=8)
+crown_m = xform.move@1(crown_c, by=[0, 103, 0])
+crown_q = xform.radial@1(crown_m, count=9, radius=9)
+crown_r = xform.move@1(crown_q, by=[0, 0, 110])
+# the arms: shoulder to elbow to wrist, then the hand: a palm, four fingers and a thumb curling round the temple
+ua_c = curve.bezier@1(points=[[33, 50, 106], [36, 34, 96], [32, 24, 80], [27, 16, 60]], steps=24)
+ua_p = profile.circle@1(radius=6, segments=24)
+ua_s = solid.sweep@1(ua_c, ua_p, scale_end=0.85)
+fa_c2 = curve.bezier@1(points=[[27, 16, 60], [24, 12, 40], [22, 9, 22], [21, 8, 9]], steps=24)
+fa_p3 = profile.circle@1(radius=5.2, segments=24)
+fa_s2 = solid.sweep@1(fa_c2, fa_p3, scale_end=0.8)
+el_s = solid.sphere@1(radius=7, segments=20)
+el_a = xform.move@1(el_s, by=[27, 16, 60])
+wr_s = solid.sphere@1(radius=4.6, segments=20)
+wr_a = xform.move@1(wr_s, by=[21, 8, 9])
+pm_b2 = solid.box@1(size=[13, 3, 15])
+pm_c2 = solid.chamfer@1(pm_b2, width=0.7)
+pm_a2 = xform.move@1(pm_c2, by=[16, 6.2, 1])
+def finger(tag, zc)
+  fg_{tag}_c = curve.bezier@1(points=[[21, 7.5, {zc}], [27.5, 11, {zc}], [28.5, 19, {zc}], [22.5, 25, {zc}]], steps=18)
+  fg_{tag}_p = profile.circle@1(radius=1.35, segments=12)
+  fg_{tag}_s = solid.sweep@1(fg_{tag}_c, fg_{tag}_p, scale_end=0.7)
+  fg_{tag}_k = solid.sphere@1(radius=1.9, segments=12)
+  fg_{tag}_m = xform.move@1(fg_{tag}_k, by=[21, 7.5, {zc}])
+  fg{tag} = solid.union@1(fg_{tag}_s, fg_{tag}_m)
+end
+finger("a", -6)
+finger("b", -2.1)
+finger("c", 1.8)
+finger("d", 5.7)
+th_c = curve.bezier@1(points=[[14, 7.5, -7.5], [18, 10, -13], [22, 17, -14.5], [21, 24, -10]], steps=18)
+th_p = profile.circle@1(radius=1.7, segments=12)
+th_s = solid.sweep@1(th_c, th_p, scale_end=0.7)
+hn_1 = solid.union@1(ua_s, fa_s2)
+hn_2 = solid.union@1(hn_1, el_a)
+hn_3 = solid.union@1(hn_2, wr_a)
+hn_4 = solid.union@1(hn_3, pm_a2)
+hn_5 = solid.union@1(hn_4, fga)
+hn_6 = solid.union@1(hn_5, fgb)
+hn_7 = solid.union@1(hn_6, fgc)
+hn_8 = solid.union@1(hn_7, fgd)
+hn_9 = solid.union@1(hn_8, th_s)
+hn_m = xform.mirror@1(hn_9, axis="x")
+tw_1 = solid.union@1(tt_a, sh_a)
+tw_2 = solid.union@1(tw_1, nk_a)
+tw_3 = solid.union@1(tw_2, hd_a)
+tw_4 = solid.union@1(tw_3, br_a)
+tw_5 = solid.union@1(tw_4, ns_a)
+tw_6 = solid.union@1(tw_5, jw_a)
+tw_7 = solid.union@1(tw_6, crown_r)
+tw_m = xform.mirror@1(sh_a, axis="x")
+tw_8 = solid.union@1(tw_7, tw_m)
+tw_9 = solid.union@1(tw_8, hn_m)
+tw_k = solid.material@1(tw_9, color=[1, 1, 1], metallic=0.8, roughness=0.5)
+tw_t = solid.texture@1(tw_k, program="${iron}", tile=0, size="512")
+output titan = tw_t
+# burning eyes and the mouth's grille glow
+ey_b = solid.box@1(size=[6, 1.8, 2])
+ey_a = xform.move@1(ey_b, by=[6.5, 80, 95])
+ey_m = xform.mirror@1(ey_a, axis="x")
+ey_k = solid.material@1(ey_m, color=[0.5, 0.9, 1.0], roughness=0.3, emissive=[2.5, 6.0, 9.0])
+ey_g = anim.track@1(ey_k, property="glow", keys="0:1; 1.7:2.4; 3.4:1", interpolation="smooth")
+output eyes = ey_g
+gl_m = solid.material@1(gr_c2, color=[1.0, 0.5, 0.1], roughness=0.4, emissive=[4.0, 1.4, 0.2])
+gl_g = anim.track@1(gl_m, property="glow", keys="0:0.6; 2.2:1.6; 4.4:0.6", interpolation="smooth")
+output grille = gl_g
+# a cogwheel part: a ringed disc with spokes and a toothed rim, standing in a plane facing the machine, turning about its own axis
+def cog(tag, cx, cy, cz, R, teeth, keys)
+  cg_{tag}_p = profile.polygon@1(points=[[{R * 0.22}, -0.9], [{R}, -0.9], [{R}, 0.9], [{R * 0.22}, 0.9]])
+  cg_{tag}_s = solid.revolve@1(cg_{tag}_p, angle=360deg, segments=48)
+  cg_{tag}_t = solid.box@1(size=[{R * 0.16}, 1.8, {R * 0.1}])
+  cg_{tag}_u = xform.move@1(cg_{tag}_t, by=[0, 0, 0])
+  cg_{tag}_r = xform.radial@1(cg_{tag}_u, count={teeth}, radius={R * 1.04})
+  cg_{tag}_k = solid.box@1(size=[{R * 0.8}, 1.2, {R * 0.1}])
+  cg_{tag}_q = xform.radial@1(cg_{tag}_k, count=4, radius={R * 0.5})
+  cg_{tag}_1 = solid.union@1(cg_{tag}_s, cg_{tag}_r)
+  cg_{tag}_2 = solid.union@1(cg_{tag}_1, cg_{tag}_q)
+  cg_{tag}_o = xform.rotate@1(cg_{tag}_2, angles=[90, 0, 0])
+  cg_{tag}_a = xform.move@1(cg_{tag}_o, by=[{cx}, {cy}, {cz}])
+  cg_{tag}_m = solid.material@1(cg_{tag}_a, color=[1, 1, 1], metallic=0.9, roughness=0.4)
+  cg_{tag}_x = solid.texture@1(cg_{tag}_m, program="${bronze}", tile=0, size="512")
+  cg_{tag}_n = anim.track@1(cg_{tag}_x, property="rotation", keys={keys}, interpolation="linear", pivot=[{cx}, {cy}, {cz}])
+  output cog_{tag} = cg_{tag}_n
+end
+cog("sl", 33, 50, 96, 8, 16, "0:0,0,0; 3.5:0,0,90; 7:0,0,180; 10.5:0,0,270; 14:0,0,360")
+cog("sr", -33, 50, 96, 8, 16, "0:0,0,0; 3.5:0,0,-90; 7:0,0,-180; 10.5:0,0,-270; 14:0,0,-360")
+cog("cl", 17, 28, 91, 7, 14, "0:0,0,0; 2.5:0,0,-90; 5:0,0,-180; 7.5:0,0,-270; 10:0,0,-360")
+cog("cr", -17, 28, 91, 7, 14, "0:0,0,0; 2.5:0,0,90; 5:0,0,180; 7.5:0,0,270; 10:0,0,360")
+cog("hl", 27, 18, 58, 5, 12, "0:0,0,0; 2:0,0,90; 4:0,0,180; 6:0,0,270; 8:0,0,360")
+cog("hr", -27, 18, 58, 5, 12, "0:0,0,0; 2:0,0,-90; 4:0,0,-180; 6:0,0,-270; 8:0,0,-360")
+cog("halo", 0, 83, 120, 30, 48, "0:0,0,0; 15:0,0,90; 30:0,0,180; 45:0,0,270; 60:0,0,360")
+# the clock on the chest: a face, twelve hour marks and three hands
+ck_p = profile.polygon@1(points=[[0, -0.6], [15, -0.6], [15, 0.6], [0, 0.6]])
+ck_s = solid.revolve@1(ck_p, angle=360deg, segments=48)
+ck_r = xform.rotate@1(ck_s, angles=[90, 0, 0])
+ck_a = xform.move@1(ck_r, by=[0, 40, 90])
+ck_m = solid.material@1(ck_a, color=[0.9, 0.86, 0.75], roughness=0.5)
+output clock_face = ck_m
+tk_b = solid.box@1(size=[0.8, 0.8, 2.4])
+tk_a = xform.move@1(tk_b, by=[0, 0, 0])
+tk_r = xform.radial@1(tk_a, count=12, radius=12.5)
+tk_o = xform.rotate@1(tk_r, angles=[90, 0, 0])
+tk_c = xform.move@1(tk_o, by=[0, 40, 89.2])
+tk_m = solid.material@1(tk_c, color=[0.1, 0.1, 0.12], roughness=0.5)
+output clock_marks = tk_m
+def hand(tag, len, wid, keys, cr, cg2, cb)
+  hd_{tag}_b = solid.box@1(size=[{wid}, {len}, 0.6])
+  hd_{tag}_a = xform.move@1(hd_{tag}_b, by=[0, {40 + len * 0.5}, 88.6])
+  hd_{tag}_m = solid.material@1(hd_{tag}_a, color=[{cr}, {cg2}, {cb}], roughness=0.4)
+  hd_{tag}_k = anim.track@1(hd_{tag}_m, property="rotation", keys={keys}, interpolation="linear", pivot=[0, 40, 89])
+  output hand_{tag} = hd_{tag}_k
+end
+hand("hour", 8, 1.2, "0:0,0,0; 60:0,0,-90; 120:0,0,-180; 180:0,0,-270; 240:0,0,-360", 0.08, 0.08, 0.1)
+hand("minute", 11.5, 0.8, "0:0,0,0; 10:0,0,-90; 20:0,0,-180; 30:0,0,-270; 40:0,0,-360", 0.08, 0.08, 0.1)
+hand("second", 12.5, 0.3, "0:0,0,0; 1.5:0,0,-90; 3:0,0,-180; 4.5:0,0,-270; 6:0,0,-360", 0.8, 0.1, 0.08)
+# steam from two shoulder stacks
+sk_c3 = solid.cylinder@1(radius=2.2, height=9, segments=16)
+sk_a3 = xform.move@1(sk_c3, by=[22, 62, 106])
+sk_m3 = xform.mirror@1(sk_a3, axis="x")
+sk_k3 = solid.material@1(sk_m3, color=[1, 1, 1], metallic=0.8, roughness=0.5)
+sk_t3 = solid.texture@1(sk_k3, program="${iron}", tile=0, size="256")
+output stacks = sk_t3
+sm_b = solid.box@1(size=[0.1, 0.1, 0.1])
+sm_a = xform.move@1(sm_b, by=[22, 67, 106])
+sm_e = fx.emitter@1(sm_a, name="steam_l", rate=22, lifetime=[3, 6], speed=[3, 7], direction=[0, 1, 0], cone=12, shape="sphere", extent=[1.5, 1.5, 1.5], max_particles=200, size=[3, 14], colour=[0.6, 0.6, 0.66], colour_end=[0.3, 0.3, 0.38], alpha=[0.5, 0], glow=0, blend="alpha")
+sm_f = fx.force@1(sm_e, emitter="steam_l", kind="wind", vector=[2, 0, -3], strength=1)
+output steam_left = sm_f
+sn_b = solid.box@1(size=[0.1, 0.1, 0.1])
+sn_a = xform.move@1(sn_b, by=[-22, 67, 106])
+sn_e = fx.emitter@1(sn_a, name="steam_r", rate=22, lifetime=[3, 6], speed=[3, 7], direction=[0, 1, 0], cone=12, shape="sphere", extent=[1.5, 1.5, 1.5], max_particles=200, size=[3, 14], colour=[0.6, 0.6, 0.66], colour_end=[0.3, 0.3, 0.38], alpha=[0.5, 0], glow=0, blend="alpha")
+sn_f = fx.force@1(sn_e, emitter="steam_r", kind="wind", vector=[2, 0, -3], strength=1)
+output steam_right = sn_f
+# the titan lights its own face
+face_light = light.point@1(position=[0, 82, 80], color=[0.5, 0.8, 1.0], intensity=4000, range=70)
+output face_light = face_light
+
+# ---------- the night: our own sky (a huge dome turned inside out, black with procedural stars and a nebula) and a sea of storm cloud below that flickers with lightning ----------
+let night = "albedo = expr(code=\"out = vec4(0.0, 0.0, 0.0, 1.0)\"); emissive = expr(code=\"a = p.x * 6.2831; sx = sin(a) * 1.6; cx = cos(a) * 1.6; n = fbm(vec2(sx + p.y * 2.0, cx + p.y * 3.0)); m = fbm(vec2(sx * 1.7 + n * 2.0 + 5.0, cx * 1.7 + p.y * 5.0)); neb = n * m; band = smoothstep(0.5, 0.0, abs(p.y - 0.55)); c = vec3(0.03, 0.04, 0.12) + vec3(0.5, 0.1, 0.6) * neb * neb * 2.4 * band + vec3(0.08, 0.2, 0.7) * m * m * 0.6; h = hash(vec2(floor(p.x * 1024.0), floor(p.y * 512.0))); star = smoothstep(0.9975, 0.9995, h); c = c + vec3(1.0, 0.95, 0.88) * star * 1.4; out = vec4(c, 1.0)\")"
+let storm = "albedo = expr(code=\"n = fbm(vec2(p.x * 40.0, p.y * 40.0)); m = fbm(vec2(p.x * 120.0 + n, p.y * 120.0)); out = vec4(mix(vec3(0.05, 0.04, 0.1), vec3(0.2, 0.15, 0.28), n) * (0.7 + 0.5 * m), 1.0)\"); roughness = expr(code=\"out = vec4(vec3(1.0), 1.0)\"); emissive = expr(code=\"n = fbm(vec2(p.x * 30.0, p.y * 30.0)); f = fbm(vec2(p.x * 90.0 + n * 4.0, p.y * 90.0)); fl = smoothstep(0.74, 0.8, f) * smoothstep(0.45, 0.7, n); out = vec4(vec3(0.9, 1.1, 2.4) * fl * 3.0, 1.0)\")"
+dm_s = solid.sphere@1(radius=300, segments=64)
+dm_p = poly.from_solid@1(dm_s)
+dm_a = poly.select@1(dm_p, element="face", by="all")
+dm_f = poly.flip_faces@1(dm_p, dm_a)
+dm_m = solid.material@1(dm_f, color=[0, 0, 0], roughness=1.0)
+dm_t = solid.texture@1(dm_m, program="${night}", tile=0, size="1024")
+dm_x = anim.track@1(dm_t, property="rotation", keys="0:0,0,0; 150:0,90,0; 300:0,180,0; 450:0,270,0; 600:0,360,0", interpolation="linear")
+output night_sky = dm_x
+sea_c = solid.cylinder@1(radius=1500, height=2, segments=96)
+sea_a = xform.move@1(sea_c, by=[0, 1.0, 0])
+sea_m = solid.material@1(sea_a, color=[1, 1, 1], roughness=1.0)
+sea_t = solid.texture@1(sea_m, program="${storm}", tile=0, size="512")
+sea_g = anim.track@1(sea_t, property="glow", keys="0:0.2; 1.3:1.8; 1.5:0.3; 3.1:0.2; 3.3:2.2; 3.45:0.25; 6:0.2", interpolation="smooth")
+output storm_sea = sea_g
+
+# ---------- a cinematic camera that circles the machine, rising and falling (a game script holds the camera, which also hides the studio room) ----------
+ko = game.kind@1(name="orrery", size=1, part="lift", tags=["machine"])
+so = game.spawn@1(kind="orrery", at=[0, 0, 0])
+cam_js = game.script@1(name="camera", source="const ctr = [0, 28, 10];\nconst fwd = (y, p) => [Math.cos(y) * Math.cos(p), Math.sin(p), Math.sin(y) * Math.cos(p)];\non('tick', () => {\n  const s = state;\n  if (!s.init) { s.init = 1; s.n = 0; s.manual = 0; s.pos = [62, 26, 0]; s.yaw = Math.PI; s.pitch = 0; }\n  const mx = input.axis('mx'), mz = input.axis('mz'), lx = input.axis('lx'), ly = input.axis('ly');\n  const boost = input.axis('block') > 0.5 ? 3 : 1;\n  if (input.pressed('dodge')) s.manual = s.manual ? 0 : 1;\n  if (!s.manual && Math.abs(mx) + Math.abs(mz) + Math.abs(lx) + Math.abs(ly) > 0.01) s.manual = 1;\n  if (!s.manual) {\n    s.n += 1;\n    const a = s.n * 0.0032;\n    const r = 62 + 12 * Math.sin(s.n * 0.0021);\n    const h = 26 + 14 * Math.sin(s.n * 0.0017 + 1.2);\n    s.pos = [r * Math.cos(a), h, r * Math.sin(a)];\n    const d = [ctr[0] - s.pos[0], ctr[1] - s.pos[1], ctr[2] - s.pos[2]];\n    s.yaw = Math.atan2(d[2], d[0]);\n    s.pitch = Math.asin(d[1] / Math.hypot(d[0], d[1], d[2]));\n  } else {\n    s.yaw += lx * 0.0025 / 60;\n    s.pitch = Math.max(-1.5, Math.min(1.5, s.pitch - ly * 0.0025 / 60));\n    const g = fwd(s.yaw, s.pitch);\n    const rt = [-Math.sin(s.yaw), 0, Math.cos(s.yaw)];\n    const v = 11 * boost / 60;\n    for (let i = 0; i < 3; i++) s.pos[i] += (g[i] * mz + rt[i] * mx) * v;\n  }\n  const f = fwd(s.yaw, s.pitch);\n  camera.look(s.pos, [s.pos[0] + f[0], s.pos[1] + f[1], s.pos[2] + f[2]]);\n});")
+all = game.collect@1(ko, so, cam_js, name="orrery")
+output rules = all

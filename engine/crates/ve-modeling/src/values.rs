@@ -55,7 +55,7 @@ pub(crate) fn resolve<'a>(node: &'a Node, values: &Values) -> Result<Cow<'a, Nod
                 fail_suggest(
                     "value.not_a_number",
                     format!("{} gets {port} from {}, which does not produce a number", node.id, link.node),
-                    "link a value.number, value.math or value.size node, or type the number in the parameter",
+                    "link a value.number, value.math, value.size or value.point node, or type the number in the parameter",
                 )
             })?;
         let target = filled.get_or_insert_with(|| node.clone());
@@ -127,10 +127,12 @@ pub(crate) fn run(node: &Node, inputs: &[Rc<Value>]) -> Option<Result<Value, Fai
         "value.number" => Ok(Value::number(real(node, "value"))),
         "value.math" => math(node),
         "value.size" => size(node, inputs),
+        "value.point" => point(node, inputs),
+        "value.motion" => motion(node, inputs),
         _ => Err(fail_suggest(
             "parse.unknown_op",
             format!("{family} is not a value operator"),
-            "the value operators are value.number, value.math and value.size",
+            "the value operators are value.number, value.math, value.size, value.point and value.motion",
         )),
     })
 }
@@ -190,6 +192,127 @@ fn size(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
         "volume" => input.volume,
         "area" => area(&input.mesh),
         _ => extent[1],
+    };
+    Ok(Value::number(result))
+}
+
+/// `value.point`: one coordinate of the head or tail of a bone, or of the min, centre or max of a part's bounding box.
+fn point(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
+    let Some(input) = inputs.first() else {
+        return Err(fail_suggest(
+            "graph.missing_input",
+            format!("{} needs a part to read", node.id),
+            "link the node that makes the part",
+        ));
+    };
+    let axis = match text(node, "axis") {
+        "x" => 0,
+        "z" => 2,
+        _ => 1,
+    };
+    let at = text(node, "at");
+    let found = match at {
+        "head" | "tail" => {
+            let segment = input.bone.ok_or_else(|| {
+                fail_suggest(
+                    "value.not_a_bone",
+                    format!("{}: at={at:?} needs the part to be a bone", node.id),
+                    "read a body.bone or rig.bone, or use at=min, center or max for any part",
+                )
+            })?;
+            f64::from(
+                if at == "head" {
+                    segment.head
+                } else {
+                    segment.tail
+                }[axis],
+            )
+        }
+        _ => {
+            if input.mesh.positions.is_empty() {
+                return Err(fail_suggest(
+                    "value.nothing_to_measure",
+                    format!("{}: its input has no geometry", node.id),
+                    "link the node that makes the part to read",
+                ));
+            }
+            let (mut low, mut high) = (f32::INFINITY, f32::NEG_INFINITY);
+            for position in &input.mesh.positions {
+                low = low.min(position[axis]);
+                high = high.max(position[axis]);
+            }
+            f64::from(match at {
+                "min" => low,
+                "max" => high,
+                _ => (low + high) * 0.5,
+            })
+        }
+    };
+    Ok(Value::number(found))
+}
+
+/// `value.motion`: how far a clip moves a part. The part's position tracks in the named clip are added up (the clip's offsets from where the part
+/// stands), sampled every sixtieth of a second: the straight horizontal travel from start to end, the horizontal path length, the duration, the
+/// speed (travel over duration) and the vertical lift. A walk cycle's travel over its duration is the speed a state machine's `walk@` should say.
+fn motion(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
+    use crate::anim::TrackProperty;
+    let Some(input) = inputs.first() else {
+        return Err(fail_suggest(
+            "graph.missing_input",
+            format!("{} needs a part with tracks", node.id),
+            "link the node that makes the part and its anim.track",
+        ));
+    };
+    let clip = text(node, "clip");
+    let tracks: Vec<&crate::anim::Track> = input
+        .animation
+        .iter()
+        .filter(|t| t.property == TrackProperty::Position && t.clip == clip)
+        .collect();
+    if tracks.is_empty() {
+        return Err(fail_suggest(
+            "value.no_motion",
+            format!(
+                "{}: the part has no position track in the clip {clip:?}",
+                node.id
+            ),
+            "link the part after its position anim.track, and check the clip name (empty is the main clip)",
+        ));
+    }
+    let duration = tracks.iter().map(|t| t.duration()).fold(0.0_f32, f32::max);
+    let at = |s: f32| {
+        let mut sum = [0.0_f32; 3];
+        for t in &tracks {
+            // A looping track wraps at its end, so the end of the clip is its last key, not a sample at that time.
+            let v = if s >= t.duration() {
+                t.keys.last().map_or([0.0; 3], |k| k.value)
+            } else {
+                t.sample(s)
+            };
+            for a in 0..3 {
+                sum[a] += v[a];
+            }
+        }
+        sum
+    };
+    let steps = ((duration * 60.0).ceil() as usize).max(1);
+    let (mut path, mut lo, mut hi) = (0.0_f64, f32::MAX, f32::MIN);
+    let mut previous = at(0.0);
+    for i in 0..=steps {
+        let p = at(duration * i as f32 / steps as f32);
+        path += f64::from(((p[0] - previous[0]).powi(2) + (p[2] - previous[2]).powi(2)).sqrt());
+        lo = lo.min(p[1]);
+        hi = hi.max(p[1]);
+        previous = p;
+    }
+    let (first, last) = (at(0.0), at(duration));
+    let travel = f64::from(((last[0] - first[0]).powi(2) + (last[2] - first[2]).powi(2)).sqrt());
+    let result = match text(node, "measure") {
+        "path" => path,
+        "duration" => f64::from(duration),
+        "speed" => travel / f64::from(duration.max(1.0e-6)),
+        "lift" => f64::from(hi - lo),
+        _ => travel,
     };
     Ok(Value::number(result))
 }

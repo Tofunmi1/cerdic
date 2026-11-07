@@ -60,7 +60,7 @@ fn g6_16_a_hundred_thousand_faces_pass_through_each_operator() {
         source
     );
     // One face edited in a sheet of 100,000.
-    let one = "one = poly.select@1(wall, by=\"box\", box_min=[-0.1, 158.4, -1], box_max=[0.1, 158.6, 1], expect=\"one\")\n";
+    let one = "one = poly.select@1(wall, by=\"box\", box_min=[-0.1, -0.1, -1], box_max=[0.1, 0.1, 1], expect=\"one\")\n";
     assert_eq!(
         run(
             "delete",

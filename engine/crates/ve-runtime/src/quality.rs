@@ -15,7 +15,49 @@ thread_local! {
     static REQUESTED_SSAO: Cell<Option<bool>> = const { Cell::new(None) };
     static REQUESTED_BLOOM: Cell<Option<bool>> = const { Cell::new(None) };
     static REQUESTED_AUTO_EXPOSURE: Cell<Option<bool>> = const { Cell::new(None) };
+    static REQUESTED_SMAA: Cell<Option<bool>> = const { Cell::new(None) };
+    static REQUESTED_SHADOW_SIZE: Cell<Option<u32>> = const { Cell::new(None) };
+    static REQUESTED_EFFECTS: std::cell::RefCell<Vec<(String, bool)>> = const { std::cell::RefCell::new(Vec::new()) };
     static CURRENT: Cell<QualityTier> = const { Cell::new(QualityTier::High) };
+}
+
+/// Turns one surface effect on or off in the viewer, on the next frame: `"subsurface"`, `"clearcoat"`, `"translucency"`, `"iridescence"`, `"sheen"`,
+/// `"relief"`, `"wetness"`, `"anisotropy"` or `"maps"` (the baked and procedural texture maps). The document is not touched: every surface keeps
+/// what its author gave it, and the viewer simply stops drawing that layer.
+///
+/// # Errors
+/// Fails if the name is not one of those.
+#[wasm_bindgen]
+pub fn set_effect(name: &str, enabled: bool) -> Result<(), JsError> {
+    if !ve_render::Effects::NAMES.contains(&name) {
+        return Err(JsError::new(&format!(
+            "unknown effect {name:?}; the effects are {}",
+            ve_render::Effects::NAMES.join(", ")
+        )));
+    }
+    REQUESTED_EFFECTS.with(|list| list.borrow_mut().push((name.to_owned(), enabled)));
+    Ok(())
+}
+
+/// Turns the post-process edge smoothing (SMAA) on or off on the next frame.
+#[wasm_bindgen]
+pub fn set_antialiasing(enabled: bool) {
+    REQUESTED_SMAA.with(|slot| slot.set(Some(enabled)));
+}
+
+/// Sets the sun shadow map's side in texels (`0` turns shadows off; `512`, `1024`, `2048` and `4096` are the usual sizes).
+///
+/// # Errors
+/// Fails if the size is not 0 or a power of two from 256 to 4096.
+#[wasm_bindgen]
+pub fn set_shadow_resolution(texels: u32) -> Result<(), JsError> {
+    if texels != 0 && !(texels.is_power_of_two() && (256..=4096).contains(&texels)) {
+        return Err(JsError::new(
+            "the shadow resolution is 0 (off) or 256, 512, 1024, 2048 or 4096",
+        ));
+    }
+    REQUESTED_SHADOW_SIZE.with(|slot| slot.set(Some(texels)));
+    Ok(())
 }
 
 /// Asks for a tier; the app switches to it on its next frame.
@@ -101,24 +143,40 @@ pub(crate) fn apply_requested(
         CURRENT.with(|slot| slot.set(tier));
         if quality.tier != tier {
             // Settings the person chose stay across a tier change.
-            let (specular_aa_enabled, auto_exposure_enabled) =
-                (quality.specular_aa_enabled, quality.auto_exposure_enabled);
+            let (specular_aa_enabled, auto_exposure_enabled, smaa_enabled, effects) = (
+                quality.specular_aa_enabled,
+                quality.auto_exposure_enabled,
+                quality.smaa_enabled,
+                quality.effects,
+            );
             *quality = RenderQuality::for_tier(tier);
             quality.specular_aa_enabled = specular_aa_enabled;
             quality.auto_exposure_enabled = auto_exposure_enabled;
+            quality.smaa_enabled = smaa_enabled;
+            quality.effects = effects;
         }
     }
     if let Some(enabled) = REQUESTED_SHADOWS.with(Cell::take) {
         quality.shadow_resolution = if enabled {
             match quality.tier {
                 QualityTier::Low => 0,
-                QualityTier::Medium => 1024,
+                QualityTier::Quest | QualityTier::Medium => 1024,
                 QualityTier::High => 2048,
             }
         } else {
             0
         };
         quality.shadow_pcf_radius = u32::from(enabled && quality.tier == QualityTier::High);
+    }
+    if let Some(texels) = REQUESTED_SHADOW_SIZE.with(Cell::take) {
+        quality.shadow_resolution = texels;
+        quality.shadow_pcf_radius = u32::from(texels > 0 && quality.tier == QualityTier::High);
+    }
+    if let Some(enabled) = REQUESTED_SMAA.with(Cell::take) {
+        quality.smaa_enabled = enabled;
+    }
+    for (name, enabled) in REQUESTED_EFFECTS.with(|list| std::mem::take(&mut *list.borrow_mut())) {
+        quality.effects.set(&name, enabled);
     }
     if let Some(enabled) = REQUESTED_SPECULAR_AA.with(Cell::take) {
         quality.specular_aa_enabled = enabled;
@@ -133,6 +191,10 @@ pub(crate) fn apply_requested(
         quality.auto_exposure_enabled = enabled;
     }
     // Occlusion reads its own single-sample depth texture (`ve_render::ao_depth`), so it does not limit the sample count.
+    // Bevy's renderer (`ve-bevy`) sets the cameras' sample count itself, from the same settings.
+    if cfg!(any(feature = "bevy-webgl", feature = "bevy-webgpu")) {
+        return;
+    }
     let wanted = Msaa::from_samples(quality.msaa_samples);
     for mut msaa in &mut cameras {
         if *msaa != wanted {

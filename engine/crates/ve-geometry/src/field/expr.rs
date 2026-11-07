@@ -1,8 +1,62 @@
 //! Validated field-expression values and distance-guarantee propagation.
+use super::expr_validate::{finite_vec, hard_boolean_guarantee, non_negative, positive};
 use super::model::{Combine, DistanceGuarantee, Field, FieldExpr, Transform};
 use crate::GeometryError;
 
 impl Field {
+    /// Adds one bounded domain warp. Kind 0 is taper, 1 twist, and 2 bend.
+    ///
+    /// # Errors
+    /// Returns an error for invalid axes, ranges, or scale/angle values.
+    pub fn warp(
+        self,
+        kind: u8,
+        axis: u8,
+        toward: u8,
+        from: f64,
+        to: f64,
+        start: f64,
+        end: f64,
+    ) -> Result<Self, GeometryError> {
+        if kind > 2
+            || axis > 2
+            || toward > 2
+            || axis == toward
+            || !from.is_finite()
+            || !to.is_finite()
+            || from == to
+            || !start.is_finite()
+            || !end.is_finite()
+            || (kind == 0 && (!(0.01..=100.0).contains(&start) || !(0.01..=100.0).contains(&end)))
+            // a twist or bend runs from no angle at `from` (start 0) to `end` degrees at `to`
+            || (kind != 0 && (start != 0.0 || end.abs() > if kind == 1 { 3600.0 } else { 360.0 }))
+        {
+            return Err(GeometryError::FieldParameter(
+                "field warp parameters (to must differ from from)",
+            ));
+        }
+        if kind == 0 && start == 1.0 && end == 1.0 || kind != 0 && end == 0.0 {
+            return Ok(self);
+        }
+        let guarantee = if kind == 0 && start == end {
+            self.guarantee
+        } else {
+            DistanceGuarantee::None
+        };
+        Ok(Self::new(
+            FieldExpr::Warp {
+                child: Box::new(self.expr),
+                kind,
+                axis,
+                toward,
+                from,
+                to,
+                start,
+                end,
+            },
+            guarantee,
+        ))
+    }
     /// Creates a constant-radius field around an ordered polyline.
     ///
     /// # Errors
@@ -319,74 +373,55 @@ impl Field {
         ))
     }
 
+    /// Displaces a field with bounded deterministic fractal noise.
+    ///
+    /// # Errors
+    /// Rejects parameters outside the documented finite ranges.
+    pub fn noise(
+        self,
+        amplitude: f64,
+        scale: f64,
+        octaves: u8,
+        persistence: f64,
+        seed: u32,
+        ridged: bool,
+    ) -> Result<Self, GeometryError> {
+        if !amplitude.is_finite()
+            || !(0.0..=1.0e6).contains(&amplitude)
+            || !scale.is_finite()
+            || !(0.001..=1.0e6).contains(&scale)
+            || !(1..=6).contains(&octaves)
+            || !persistence.is_finite()
+            || !(0.0..=1.0).contains(&persistence)
+        {
+            return Err(GeometryError::FieldParameter("field noise parameters"));
+        }
+        let guarantee = if amplitude == 0.0 {
+            self.guarantee
+        } else {
+            DistanceGuarantee::None
+        };
+        Ok(Self::new(
+            FieldExpr::Noise {
+                child: Box::new(self.expr),
+                amplitude,
+                scale,
+                octaves,
+                persistence,
+                seed,
+                ridged,
+            },
+            guarantee,
+        ))
+    }
+
     /// Distance guarantee propagated by the expression.
     #[must_use]
     pub const fn guarantee(&self) -> DistanceGuarantee {
         self.guarantee
     }
 
-    /// Approximate heap bytes owned by this expression tree.
-    #[must_use]
-    pub fn estimated_bytes(&self) -> usize {
-        expr_bytes(&self.expr)
-    }
-
     pub(crate) fn new(expr: FieldExpr, guarantee: DistanceGuarantee) -> Self {
         Self { expr, guarantee }
-    }
-}
-
-fn expr_bytes(expr: &FieldExpr) -> usize {
-    let node = std::mem::size_of::<FieldExpr>();
-    match expr {
-        FieldExpr::Combine { a, b, .. } | FieldExpr::SmoothUnion { a, b, .. } => node
-            .saturating_add(expr_bytes(a))
-            .saturating_add(expr_bytes(b)),
-        FieldExpr::Transform { child, .. }
-        | FieldExpr::Repeat { child, .. }
-        | FieldExpr::Offset { child, .. }
-        | FieldExpr::Shell { child, .. } => node.saturating_add(expr_bytes(child)),
-        FieldExpr::Sphere { .. }
-        | FieldExpr::Ellipsoid { .. }
-        | FieldExpr::Box { .. }
-        | FieldExpr::Torus { .. }
-        | FieldExpr::Capsule { .. }
-        | FieldExpr::Cylinder { .. }
-        | FieldExpr::Plane { .. } => node,
-        FieldExpr::Tube { points, .. } => {
-            node.saturating_add(points.len().saturating_mul(std::mem::size_of::<[f64; 3]>()))
-        }
-    }
-}
-
-fn hard_boolean_guarantee(a: DistanceGuarantee, b: DistanceGuarantee) -> DistanceGuarantee {
-    if a == DistanceGuarantee::None || b == DistanceGuarantee::None {
-        DistanceGuarantee::None
-    } else {
-        DistanceGuarantee::LowerBound
-    }
-}
-
-fn finite_vec(values: [f64; 3], name: &'static str) -> Result<(), GeometryError> {
-    if values.into_iter().all(f64::is_finite) {
-        Ok(())
-    } else {
-        Err(GeometryError::FieldParameter(name))
-    }
-}
-
-fn positive(value: f64, name: &'static str) -> Result<(), GeometryError> {
-    if value.is_finite() && value > 0.0 {
-        Ok(())
-    } else {
-        Err(GeometryError::FieldParameter(name))
-    }
-}
-
-fn non_negative(value: f64, name: &'static str) -> Result<(), GeometryError> {
-    if value.is_finite() && value >= 0.0 {
-        Ok(())
-    } else {
-        Err(GeometryError::FieldParameter(name))
     }
 }

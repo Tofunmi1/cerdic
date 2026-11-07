@@ -1,0 +1,226 @@
+# AN AK-47 (type 3 stamped-receiver pattern), built only with the language's own nodes: hollow lathed barrel with a muzzle brake, gas block, gas tube and cleaning rod,
+# wooden upper and lower handguards, a front sight with a hooded post, a tangent rear sight, a stamped receiver cut by booleans (ejection port, magazine well) with a
+# ribbed dust cover and rivets, a swept banana magazine, a swept pistol grip and stock, a trigger group, a selector, a charging handle and a bolt carrier that cycle.
+# A 4 s loop fires a three-round burst: recoil climbs, the carrier and handle reciprocate, three brass cases fly out, the muzzle flashes. Metres; the muzzle points to +z; port on the right (-x).
+sky = scene.sky@1(sun_elevation=38, sun_azimuth=-35, sun_intensity=4.5, turbidity=3, clouds=false, contact_shadows=true)
+output sky = sky
+
+let wood = "albedo = expr(code=\"w = fbm(vec2(p.x * 2.5, p.y * 5.0)); g = fbm(vec2(p.x * 3.0 + w * 2.5, p.y * 50.0 + w * 6.0)); rings = smoothstep(0.35, 0.65, g); out = vec4(mix(vec3(0.34, 0.12, 0.05), vec3(0.62, 0.28, 0.1), rings) * (0.9 + 0.2 * w), 1.0)\"); roughness = expr(code=\"out = vec4(vec3(0.45), 1.0)\")"
+let steel = "albedo = expr(code=\"n = fbm(vec2(p.x * 40.0, p.y * 40.0)); out = vec4(vec3(0.07, 0.075, 0.08) * (0.8 + 0.5 * n), 1.0)\"); roughness = expr(code=\"n = fbm(vec2(p.x * 30.0, p.y * 30.0)); out = vec4(vec3(0.32 + 0.2 * n), 1.0)\")"
+let slabtex = "albedo = expr(code=\"n = fbm(vec2(p.x * 30.0, p.y * 30.0)); out = vec4(vec3(0.07, 0.08, 0.1) * (0.8 + 0.4 * n), 1.0)\"); roughness = expr(code=\"out = vec4(vec3(0.9), 1.0)\")"
+
+tb_b = solid.box@1(size=[1.6, 0.04, 1.6])
+tb_m = solid.material@1(tb_b, color=[1, 1, 1], roughness=0.9)
+tb_t = solid.texture@1(tb_m, program="${slabtex}", tile=0, size="512")
+tb_p = xform.move@1(tb_t, by=[0, -0.25, 0.1])
+output slab = tb_p
+
+# ---------- the carrier every part rides: lifted, then the burst's recoil climb ----------
+gr_s = solid.sphere@1(radius=0.004, segments=8)
+gr_m = solid.material@1(gr_s, color=[0.05, 0.05, 0.05], roughness=0.6)
+gr_0 = anim.track@1(gr_m, property="position", keys="0:0,0.45,0; 4:0,0.45,0", interpolation="linear")
+gr_a = anim.track@1(gr_0, property="rotation", keys="0:0,0,0; 0.5:0,0,0; 0.52:-3,0,0; 0.6:-2,0,0; 0.62:-5,0.4,0; 0.7:-3.5,0.4,0; 0.74:-7,0.9,0; 0.85:-6,0.9,0; 1.6:0,0,0; 4:0,0,0", interpolation="smooth", pivot=[0, -0.04, -0.34])
+gr_b = anim.track@1(gr_a, property="position", keys="0:0,0,0; 0.5:0,0,0; 0.52:0,0.003,-0.018; 0.6:0,0.001,-0.008; 0.62:0,0.004,-0.03; 0.7:0,0.002,-0.014; 0.74:0,0.006,-0.04; 0.85:0,0.004,-0.03; 1.6:0,0,0; 4:0,0,0", interpolation="smooth")
+output gun = gr_b
+
+# ---------- barrel, brake, gas system, sights ----------
+br_p = profile.polygon@1(points=[[0.0045, 0.0], [0.0125, 0.0], [0.0125, 0.1], [0.0108, 0.24], [0.0108, 0.37], [0.0045, 0.37]])
+br_s = solid.revolve@1(br_p, angle=360deg, segments=40)
+br_r = xform.rotate@1(br_s, angles=[90, 0, 0])
+br_a = xform.move@1(br_r, by=[0, 0, 0.1])
+mb_p = profile.polygon@1(points=[[0.0045, 0.0], [0.0135, 0.0], [0.0135, 0.012], [0.0115, 0.014], [0.0115, 0.04], [0.0135, 0.042], [0.0135, 0.052], [0.0045, 0.052]])
+mb_s = solid.revolve@1(mb_p, angle=360deg, segments=32)
+mb_r = xform.rotate@1(mb_s, angles=[90, 0, 0])
+mb_a = xform.move@1(mb_r, by=[0, 0, 0.468])
+sl_b = solid.box@1(size=[0.04, 0.003, 0.018])
+sl_a = xform.move@1(sl_b, by=[0, 0, 0.5])
+mb_d = solid.difference@1(mb_a, sl_a)
+gb_b = solid.box@1(size=[0.02, 0.018, 0.06])
+gb_c = solid.chamfer@1(gb_b, width=0.002)
+gb_a = xform.move@1(gb_c, by=[0, 0.016, 0.33])
+gt_c = solid.cylinder@1(radius=0.0095, height=0.25, segments=20)
+gt_r = xform.rotate@1(gt_c, angles=[90, 0, 0])
+gt_a = xform.move@1(gt_r, by=[0, 0.0235, 0.21])
+fs_b = solid.box@1(size=[0.014, 0.046, 0.02])
+fs_a = xform.move@1(fs_b, by=[0, 0.0235, 0.435])
+fp_b = solid.box@1(size=[0.0025, 0.026, 0.003])
+fp_a = xform.move@1(fp_b, by=[0, 0.056, 0.435])
+fh_p = profile.polygon@1(points=[[0.0085, 0.0], [0.0103, 0.0], [0.0103, 0.022], [0.0085, 0.022]])
+fh_s = solid.revolve@1(fh_p, angle=360deg, segments=24)
+fh_a = xform.move@1(fh_s, by=[0, 0.044, 0.435])
+cr_c = solid.cylinder@1(radius=0.0035, height=0.33, segments=10)
+cr_r = xform.rotate@1(cr_c, angles=[90, 0, 0])
+cr_a = xform.move@1(cr_r, by=[0, -0.0255, 0.33])
+rs_b = solid.box@1(size=[0.022, 0.012, 0.05])
+rs_a = xform.move@1(rs_b, by=[0, 0.0345, 0.095])
+rl_b = solid.box@1(size=[0.014, 0.003, 0.11])
+rl_r = xform.rotate@1(rl_b, angles=[-6, 0, 0])
+rl_a = xform.move@1(rl_r, by=[0, 0.043, 0.17])
+bw_1 = solid.union@1(br_a, mb_d)
+bw_2 = solid.union@1(bw_1, gb_a)
+bw_3 = solid.union@1(bw_2, gt_a)
+bw_4 = solid.union@1(bw_3, fs_a)
+bw_5 = solid.union@1(bw_4, fp_a)
+bw_6 = solid.union@1(bw_5, fh_a)
+bw_7 = solid.union@1(bw_6, cr_a)
+bw_8 = solid.union@1(bw_7, rs_a)
+bw_9 = solid.union@1(bw_8, rl_a)
+bl_m = solid.material@1(bw_9, color=[1, 1, 1], metallic=0.9, roughness=0.35)
+bl_t = solid.texture@1(bl_m, program="${steel}", tile=0, size="512")
+bl_p = anim.parent@1(bl_t, parent="gun")
+output barrel_group = bl_p
+
+# ---------- handguards: rounded wood, upper over the gas tube, lower under the barrel ----------
+uh_b = solid.box@1(size=[0.044, 0.026, 0.19])
+uh_r = solid.round@1(uh_b, radius=0.01, segments=8)
+uh_a = xform.move@1(uh_r, by=[0, 0.026, 0.215])
+lh_b = solid.box@1(size=[0.05, 0.044, 0.17])
+lh_r = solid.round@1(lh_b, radius=0.012, segments=8)
+lh_a = xform.move@1(lh_r, by=[0, -0.012, 0.225])
+hg_u = solid.union@1(uh_a, lh_a)
+hg_m = solid.material@1(hg_u, color=[1, 1, 1], roughness=0.45)
+hg_t = solid.texture@1(hg_m, program="${wood}", tile=0, size="512")
+hg_f = solid.finish@1(hg_t, clearcoat=0.3)
+hg_p = anim.parent@1(hg_f, parent="gun")
+output handguards = hg_p
+
+# ---------- stamped receiver: a chamfered box, ejection port and magazine well cut out, trunnion, ribbed dust cover, rivets ----------
+rc_b = solid.box@1(size=[0.038, 0.058, 0.3])
+rc_c = solid.chamfer@1(rc_b, width=0.003)
+rc_a = xform.move@1(rc_c, by=[0, -0.008, 0.0])
+po_b = solid.box@1(size=[0.03, 0.026, 0.09])
+po_a = xform.move@1(po_b, by=[-0.019, 0.004, 0.04])
+mw_b = solid.box@1(size=[0.024, 0.03, 0.05])
+mw_a = xform.move@1(mw_b, by=[0, -0.04, 0.03])
+rc_d = solid.difference@1(rc_a, po_a, mw_a)
+tn_p = profile.polygon@1(points=[[0.011, 0.0], [0.0215, 0.0], [0.0215, 0.04], [0.011, 0.04]])
+tn_s = solid.revolve@1(tn_p, angle=360deg, segments=32)
+tn_r = xform.rotate@1(tn_s, angles=[90, 0, 0])
+tn_a = xform.move@1(tn_r, by=[0, 0, 0.13])
+dc_b = solid.box@1(size=[0.034, 0.012, 0.29])
+dc_a = xform.move@1(dc_b, by=[0, 0.027, 0.0])
+rb_b = solid.box@1(size=[0.003, 0.004, 0.27])
+rb_a = xform.move@1(rb_b, by=[-0.009, 0.0345, 0.0])
+rb_c = xform.array@1(rb_a, count_x=3, count_y=1, count_z=1, spacing=[0.009, 0, 0])
+rv_s = solid.sphere@1(radius=0.0024, segments=8)
+rv_a = xform.move@1(rv_s, by=[0.0192, 0.01, -0.12])
+rv_b = xform.array@1(rv_a, count_x=1, count_y=1, count_z=6, spacing=[0, 0, 0.045])
+rv_c = xform.mirror@1(rv_b, axis="x")
+rc_1 = solid.union@1(rc_d, tn_a)
+rc_2 = solid.union@1(rc_1, dc_a)
+rc_3 = solid.union@1(rc_2, rb_c)
+rc_4 = solid.union@1(rc_3, rv_c)
+rc_m = solid.material@1(rc_4, color=[0.12, 0.125, 0.13], metallic=0.85, roughness=0.42)
+rc_p = anim.parent@1(rc_m, parent="gun")
+output receiver = rc_p
+
+# ---------- the banana magazine: a rectangle swept along an arc, rounded ----------
+mg_c = curve.bezier@1(points=[[0, -0.03, 0.03], [0, -0.1, 0.025], [0, -0.17, 0.045], [0, -0.225, 0.115]], steps=24)
+mg_p = profile.rect@1(size=[0.026, 0.05])
+mg_s = solid.sweep@1(mg_c, mg_p, scale_end=1.05)
+mg_r = solid.round@1(mg_s, radius=0.004, segments=6)
+mg_m = solid.material@1(mg_r, color=[0.12, 0.125, 0.13], metallic=0.85, roughness=0.45)
+mg_p2 = anim.parent@1(mg_m, parent="gun")
+output magazine = mg_p2
+
+# ---------- pistol grip, trigger guard, trigger, selector ----------
+pg_c = curve.bezier@1(points=[[0, -0.032, -0.075], [0, -0.07, -0.088], [0, -0.115, -0.105], [0, -0.16, -0.125]], steps=18)
+pg_p = profile.rect@1(size=[0.03, 0.036])
+pg_s = solid.sweep@1(pg_c, pg_p, scale_end=1.05)
+pg_r = solid.round@1(pg_s, radius=0.006, segments=6)
+pg_m = solid.material@1(pg_r, color=[1, 1, 1], roughness=0.5)
+pg_t = solid.texture@1(pg_m, program="${wood}", tile=0, size="512")
+pg_p2 = anim.parent@1(pg_t, parent="gun")
+output grip = pg_p2
+tg_c = curve.bezier@1(points=[[0, -0.034, -0.01], [0, -0.078, -0.012], [0, -0.088, -0.05], [0, -0.05, -0.078]], steps=18)
+tg_p = profile.rect@1(size=[0.008, 0.0055])
+tg_s = solid.sweep@1(tg_c, tg_p)
+tr_b = solid.box@1(size=[0.004, 0.026, 0.006])
+tr_r = xform.rotate@1(tr_b, angles=[-22, 0, 0])
+tr_a = xform.move@1(tr_r, by=[0, -0.05, -0.028])
+sel_b = solid.box@1(size=[0.003, 0.008, 0.16])
+sel_a = xform.move@1(sel_b, by=[-0.0205, 0.006, -0.03])
+tg_u = solid.union@1(tg_s, tr_a)
+tg_v = solid.union@1(tg_u, sel_a)
+tg_m = solid.material@1(tg_v, color=[0.14, 0.14, 0.15], metallic=0.8, roughness=0.4)
+tg_q = anim.parent@1(tg_m, parent="gun")
+output trigger_group = tg_q
+
+# ---------- stock: wood swept from the receiver back to the butt, wider at the end, with a steel butt plate and swivels ----------
+sk_c = curve.bezier@1(points=[[0, 0.002, -0.15], [0, 0.0, -0.23], [0, -0.012, -0.31], [0, -0.04, -0.385]], steps=22)
+sk_p = profile.rect@1(size=[0.034, 0.058])
+sk_s = solid.sweep@1(sk_c, sk_p, scale_end=1.5)
+sk_r = solid.round@1(sk_s, radius=0.006, segments=8)
+sk_m = solid.material@1(sk_r, color=[1, 1, 1], roughness=0.45)
+sk_t = solid.texture@1(sk_m, program="${wood}", tile=0, size="1024")
+sk_f = solid.finish@1(sk_t, clearcoat=0.3)
+sk_p2 = anim.parent@1(sk_f, parent="gun")
+output stock = sk_p2
+bp_b = solid.box@1(size=[0.04, 0.095, 0.008])
+bp_r = xform.rotate@1(bp_b, angles=[-14, 0, 0])
+bp_a = xform.move@1(bp_r, by=[0, -0.04, -0.4])
+sw_t = solid.torus@1(major=0.007, minor=0.0016, segments=24, tube_segments=8)
+sw_r = xform.rotate@1(sw_t, angles=[0, 0, 90])
+sw_a = xform.move@1(sw_r, by=[0, -0.034, -0.34])
+sw_b = xform.move@1(sw_r, by=[0, 0.0, 0.4])
+bp_u = solid.union@1(bp_a, sw_a)
+bp_v = solid.union@1(bp_u, sw_b)
+bp_m = solid.material@1(bp_v, color=[0.12, 0.125, 0.13], metallic=0.85, roughness=0.4)
+bp_p2 = anim.parent@1(bp_m, parent="gun")
+output butt_and_swivels = bp_p2
+
+# ---------- the action: bolt carrier seen in the port and the charging handle outside, cycling three times in the burst ----------
+let cycle = "0:0,0,0; 0.5:0,0,0; 0.54:0,0,-0.075; 0.58:0,0,0; 0.62:0,0,0; 0.66:0,0,-0.075; 0.7:0,0,0; 0.74:0,0,0; 0.78:0,0,-0.075; 0.82:0,0,0; 4:0,0,0"
+bc_b = solid.box@1(size=[0.014, 0.016, 0.07])
+bc_c = solid.chamfer@1(bc_b, width=0.0015)
+bc_a = xform.move@1(bc_c, by=[-0.002, 0.006, 0.05])
+bc_m = solid.material@1(bc_a, color=[0.72, 0.74, 0.78], metallic=1.0, roughness=0.22)
+bc_k = anim.track@1(bc_m, property="position", keys="${cycle}", interpolation="smooth")
+bc_p = anim.parent@1(bc_k, parent="gun")
+output bolt_carrier = bc_p
+ch_a = solid.box@1(size=[0.008, 0.008, 0.02])
+ch_b = xform.move@1(ch_a, by=[-0.0235, 0.016, 0.07])
+ch_c = solid.cylinder@1(radius=0.006, height=0.012, segments=14)
+ch_d = xform.rotate@1(ch_c, angles=[0, 0, 90])
+ch_e = xform.move@1(ch_d, by=[-0.032, 0.016, 0.07])
+ch_u = solid.union@1(ch_b, ch_e)
+ch_m = solid.material@1(ch_u, color=[0.16, 0.16, 0.17], metallic=0.9, roughness=0.3)
+ch_k = anim.track@1(ch_m, property="position", keys="${cycle}", interpolation="smooth")
+ch_p = anim.parent@1(ch_k, parent="gun")
+output charging_handle = ch_p
+
+# ---------- three brass cases thrown from the port, one per shot, each tumbling away ----------
+cs_p = profile.polygon@1(points=[[0.0, 0.0], [0.0057, 0.0], [0.0057, 0.03], [0.0045, 0.034], [0.0045, 0.039], [0.0, 0.039]])
+cs_s = solid.revolve@1(cs_p, angle=360deg, segments=16)
+cs_r = xform.rotate@1(cs_s, angles=[90, 0, 0])
+cs_a = xform.move@1(cs_r, by=[-0.002, 0.008, 0.03])
+scasea = solid.material@1(cs_a, color=[0.86, 0.62, 0.22], metallic=1.0, roughness=0.3)
+scaseb = solid.material@1(cs_a, color=[0.86, 0.62, 0.22], metallic=1.0, roughness=0.3)
+scasec = solid.material@1(cs_a, color=[0.86, 0.62, 0.22], metallic=1.0, roughness=0.3)
+def casing(tag, pk, rk, vk)
+  cp_{tag} = anim.track@1(s{tag}, property="position", keys={pk}, interpolation="smooth")
+  cx_{tag} = anim.track@1(cp_{tag}, property="rotation", keys={rk}, interpolation="linear", pivot=[-0.002, 0.008, 0.045])
+  cv_{tag} = anim.track@1(cx_{tag}, property="visible", keys={vk}, interpolation="step")
+  cq_{tag} = anim.parent@1(cv_{tag}, parent="gun")
+  output case_{tag} = cq_{tag}
+end
+casing("casea", "0:0,0,0; 0.52:0,0,0; 0.58:-0.07,0.05,-0.03; 0.9:-0.4,-0.1,-0.1; 1.5:-0.6,-0.8,-0.2; 4:-0.6,-0.8,-0.2", "0:0,0,0; 0.52:0,0,0; 1.5:700,200,90; 4:700,200,90", "0:0; 0.52:1; 1.5:0; 4:0")
+casing("caseb", "0:0,0,0; 0.64:0,0,0; 0.7:-0.07,0.06,-0.04; 1.0:-0.45,-0.05,-0.12; 1.6:-0.65,-0.8,-0.22; 4:-0.65,-0.8,-0.22", "0:0,0,0; 0.64:0,0,0; 1.6:-600,150,60; 4:-600,150,60", "0:0; 0.64:1; 1.6:0; 4:0")
+casing("casec", "0:0,0,0; 0.76:0,0,0; 0.82:-0.07,0.07,-0.05; 1.1:-0.5,0.0,-0.14; 1.7:-0.7,-0.8,-0.24; 4:-0.7,-0.8,-0.24", "0:0,0,0; 0.76:0,0,0; 1.7:650,-180,100; 4:650,-180,100", "0:0; 0.76:1; 1.7:0; 4:0")
+
+# ---------- the shots: a flash cone for each round, sparks and a smoke cloud at the muzzle ----------
+mf_c = solid.cone@1(radius=0.05, top_radius=0.0, height=0.26, segments=20)
+mf_r = xform.rotate@1(mf_c, angles=[90, 0, 0])
+mf_a = xform.move@1(mf_r, by=[0, 0, 0.6])
+mf_m = solid.material@1(mf_a, color=[1.0, 0.7, 0.25], roughness=0.5, emissive=[9.0, 5.0, 1.4])
+mf_v = anim.track@1(mf_m, property="visible", keys="0:0; 0.5:0; 0.505:1; 0.55:0; 0.62:0; 0.625:1; 0.67:0; 0.74:0; 0.745:1; 0.79:0; 4:0", interpolation="step")
+mf_p = anim.parent@1(mf_v, parent="gun")
+output flash = mf_p
+sp_b = solid.box@1(size=[0.01, 0.01, 0.01])
+sp_a = xform.move@1(sp_b, by=[0, 0.0, 0.52])
+sp_e = fx.emitter@1(sp_a, name="sparksa", rate=0, burst=40, burst_at=0.5, duration=4, loop=true, lifetime=[0.08, 0.3], speed=[3, 9], direction=[0, 0, 1], cone=26, shape="point", max_particles=120, size=[0.04, 0.008], colour=[1.0, 0.85, 0.45], colour_end=[1.0, 0.3, 0.05], alpha=[1, 0], glow=6, blend="additive")
+sp_f = fx.emitter@1(sp_e, name="sparksb", rate=0, burst=40, burst_at=0.62, duration=4, loop=true, lifetime=[0.08, 0.3], speed=[3, 9], direction=[0, 0, 1], cone=26, shape="point", max_particles=120, size=[0.04, 0.008], colour=[1.0, 0.85, 0.45], colour_end=[1.0, 0.3, 0.05], alpha=[1, 0], glow=6, blend="additive")
+sp_g = fx.emitter@1(sp_f, name="sparksc", rate=0, burst=40, burst_at=0.74, duration=4, loop=true, lifetime=[0.08, 0.3], speed=[3, 9], direction=[0, 0, 1], cone=26, shape="point", max_particles=120, size=[0.04, 0.008], colour=[1.0, 0.85, 0.45], colour_end=[1.0, 0.3, 0.05], alpha=[1, 0], glow=6, blend="additive")
+sp_h = fx.emitter@1(sp_g, name="smoke", rate=0, burst=60, burst_at=0.6, duration=4, loop=true, lifetime=[1.2, 2.6], speed=[0.4, 1.8], direction=[0, 0.3, 1], cone=35, shape="sphere", extent=[0.03, 0.03, 0.03], max_particles=150, size=[0.05, 0.45], colour=[0.55, 0.55, 0.55], colour_end=[0.25, 0.25, 0.27], alpha=[0.5, 0], glow=0, blend="alpha")
+sp_p = anim.parent@1(sp_h, parent="gun")
+output shot = sp_p

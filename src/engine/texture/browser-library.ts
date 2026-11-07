@@ -10,7 +10,10 @@ let cached: Promise<BrowserTextureLibrary> | undefined;
 export function loadBrowserTextureLibrary(baseUrl = './texture-library/'): Promise<BrowserTextureLibrary> {
   if (cached) return cached;
   const loading = (async () => {
-    const base = new URL(baseUrl, import.meta.url);
+    // The engine's files (this library included) sit next to the engine bundle: on the plain viewer page that is next to this code; in the studio
+    // the page names the folder (`__veEngineBase`), because this code is then inside the app's own bundle.
+    const home = (globalThis as { __veEngineBase?: string }).__veEngineBase ?? import.meta.url;
+    const base = new URL(baseUrl, home);
     const indexResponse = await fetch(new URL('index.json', base));
     if (!indexResponse.ok) throw new Error(`texture library index unavailable (${indexResponse.status})`);
     const names = await indexResponse.json() as string[];

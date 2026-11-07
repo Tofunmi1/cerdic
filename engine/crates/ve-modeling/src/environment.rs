@@ -67,6 +67,29 @@ pub(crate) fn wind(node: &Node) -> crate::Wind {
     }
 }
 
+/// Haze settings authored by either scene-lighting node.
+pub(crate) fn haze(node: &Node) -> crate::Haze {
+    let default = crate::Haze::default();
+    let color = vector(node, "haze_color").unwrap_or([0.72, 0.78, 0.86]);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "haze parameters are bounded by the operator spec"
+    )]
+    crate::Haze {
+        density: scalar(node, "haze", f64::from(default.density)) as f32,
+        color: cast(color),
+        height: scalar(node, "haze_height", f64::from(default.height)) as f32,
+        shafts: scalar(node, "light_shafts", f64::from(default.shafts)) as f32,
+        focus_distance: scalar(node, "focus_distance", f64::from(default.focus_distance)) as f32,
+        aperture: scalar(node, "aperture", f64::from(default.aperture)) as f32,
+        motion_blur: scalar(node, "motion_blur", f64::from(default.motion_blur)) as f32,
+        contact_shadows: matches!(
+            node.params.get("contact_shadows"),
+            Some(ve_graph::Value::Bool(true))
+        ),
+    }
+}
+
 /// Adds a `scene.sky` node's sky to the environment already authored: the environment's ambient stands, the sky is added, and
 /// light probes or a wind the environment left unset are taken from the sky node.
 pub(crate) fn add_sky(existing: &mut SceneEnvironment, scene: &SceneEnvironment, sky: &SceneSky) {
@@ -74,6 +97,9 @@ pub(crate) fn add_sky(existing: &mut SceneEnvironment, scene: &SceneEnvironment,
     existing.gi = existing.gi.or(scene.gi);
     if existing.wind == crate::Wind::default() {
         existing.wind = scene.wind;
+    }
+    if existing.haze == crate::Haze::default() {
+        existing.haze = scene.haze;
     }
 }
 
@@ -89,6 +115,9 @@ pub(crate) fn over_sky(
         merged.gi = merged.gi.or(current.gi);
         if merged.wind == crate::Wind::default() {
             merged.wind = current.wind;
+        }
+        if merged.haze == crate::Haze::default() {
+            merged.haze = current.haze;
         }
     }
     merged
@@ -120,5 +149,6 @@ pub(crate) fn execute(node: &Node) -> Result<Value, Fail> {
         sky: None,
         gi: probes(node),
         wind: wind(node),
+        haze: haze(node),
     }))
 }

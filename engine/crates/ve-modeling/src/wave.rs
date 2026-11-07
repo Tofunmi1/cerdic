@@ -8,7 +8,9 @@ use ve_graph::{Node, Value as Param};
 
 use crate::{
     Fail,
-    anim::{Interpolation, MAX_TRACKS, Track, TrackProperty, clip_name, parse_keys, phases, pivot},
+    anim::{
+        Interpolation, MAX_TRACKS, Track, TrackProperty, clip_name, parse_keys, phases, pivot_for,
+    },
     cache::Value,
     fail,
 };
@@ -126,7 +128,7 @@ pub(crate) fn wave(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
         keys,
         interpolation: Interpolation::Linear,
         looped: true,
-        pivot: pivot(node),
+        pivot: pivot_for(node, input)?,
         clip: clip_name(node)?,
         phase_step,
         phase_jitter,
