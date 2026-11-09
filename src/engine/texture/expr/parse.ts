@@ -168,7 +168,7 @@ class Parser {
     const rule = Object.hasOwn(FUNCTIONS, token.value) ? FUNCTIONS[token.value] : undefined;
     if (!rule) {
       const near = nearest(token.value);
-      throw this.fail('expr.unknown_name', `Unknown function '${token.value}'`, near ? `Did you mean ${near}()?` : 'Use a GLSL math function (sin, mix, smoothstep, length, ...) or hash, noise, snoise, fbm, hsv, rot.', token.pos);
+      throw this.fail('expr.unknown_name', `Unknown function '${token.value}'`, near ? `Did you mean ${near}()?` : 'Use a GLSL math function (sin, mix, smoothstep, length, ...) or hash, noise, snoise, fbm, voronoi, stretch, warp, hsv, rot.', token.pos);
     }
     try {
       return { kind: 'call', name: token.value, args, size: rule(args.map((arg) => arg.size)) };

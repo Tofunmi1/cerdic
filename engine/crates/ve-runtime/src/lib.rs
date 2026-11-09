@@ -15,10 +15,21 @@ mod behavior;
 mod bench_scene;
 mod document;
 pub mod document_exports;
+mod effects;
 mod fx;
+mod fx_bursts;
 mod gallery;
+mod game;
+mod game_camera;
+mod game_ground;
+mod game_hands;
+mod game_models;
+mod game_nav;
+mod game_view;
 mod gizmo;
 mod gizmo_exports;
+mod hud;
+mod locomotion;
 pub use gizmo_exports::{
     gizmo_begin, gizmo_begin_camera_plane, gizmo_begin_profile, gizmo_cancel, gizmo_update,
     viewer_gizmo, viewer_gizmo_at,
@@ -29,23 +40,43 @@ mod instance_probe;
 mod interact;
 mod measure_exports;
 pub use measure_exports::measure_mesh;
+mod survey_exports;
+pub use survey_exports::survey_plan;
+mod water_sim;
+mod world_api;
+mod world_api_game;
+pub use game::game_ui_frame;
+pub use world_api::{world_call, world_events_since, world_take};
+mod reflect_spike;
+pub use reflect_spike::{
+    reflect_spike_direct, reflect_spike_get, reflect_spike_set, reflect_spike_setup,
+};
 mod mock_hmd;
 mod perf;
 mod projection;
 pub use instance_exports::{
-    eval_projection_animation, eval_projection_behavior, eval_projection_body,
-    eval_projection_chunk_group, eval_projection_chunk_part, eval_projection_environment,
-    eval_projection_ik, eval_projection_instances, eval_projection_lights, eval_projection_maps,
-    eval_projection_material_region, eval_projection_parent, eval_projection_skin,
-    viewer_animation, viewer_animation_speed, viewer_behaviors, viewer_flag, viewer_physics,
-    viewer_play_mode, viewer_press,
+    animation_set_bool, animation_set_float, animation_trigger, eval_projection_animation,
+    eval_projection_behavior, eval_projection_body, eval_projection_chunk_group,
+    eval_projection_chunk_part, eval_projection_cloth, eval_projection_environment,
+    eval_projection_fluid, eval_projection_fx, eval_projection_ik, eval_projection_instances,
+    eval_projection_lights, eval_projection_machine, eval_projection_maps,
+    eval_projection_material_region, eval_projection_parent, eval_projection_ragdoll,
+    eval_projection_sim, eval_projection_skin, viewer_animation, viewer_animation_speed,
+    viewer_behaviors, viewer_cloth, viewer_flag, viewer_fluid, viewer_physics, viewer_play_mode,
+    viewer_press, viewer_sim, viewer_texture_update,
 };
 pub use tangent_exports::eval_tangents;
+mod cloth_live;
+mod fluid_live;
+mod sim_api;
+mod sim_live;
 mod physics;
 pub mod quality;
 mod scene;
 mod selection;
 mod skinning;
+#[cfg(any(feature = "bevy-webgl", feature = "bevy-webgpu"))]
+mod skinning_gpu;
 mod status;
 mod studio;
 mod tangent_exports;
@@ -79,6 +110,75 @@ pub fn start(canvas_id: &str, scene: &str) -> Result<(), JsError> {
 #[must_use]
 pub fn status() -> String {
     status::snapshot()
+}
+
+/// Loads and resets the live game from evaluator text; returns an empty string on success.
+#[wasm_bindgen]
+#[must_use]
+pub fn game_load(text: &str) -> String {
+    game::load(text)
+}
+
+/// JSON snapshot of the current live game, its entities, drawings, and recent effects.
+#[wasm_bindgen]
+#[must_use]
+pub fn game_status() -> String {
+    game::status()
+}
+
+/// Asks the live game for a save (everything its deterministic state holds). The game writes it on its next frame; read it with
+/// `game_save_take`.
+#[wasm_bindgen]
+pub fn game_save_request() {
+    game::request_save();
+}
+
+/// The save the game wrote since `game_save_request`, as JSON text; empty while it has not written one, or when no game is running.
+#[wasm_bindgen]
+#[must_use]
+pub fn game_save_take() -> String {
+    game::take_save()
+}
+
+/// Queues a save game (the text `game_save_take` gave) to be loaded into the running game. Returns the reason when the text is not a save
+/// game, or an empty string when it was queued; `game_save_result` says on the next frame whether it fitted the game.
+#[wasm_bindgen]
+#[must_use]
+pub fn game_save_load(text: &str) -> String {
+    game::request_restore(text)
+}
+
+/// How the last `game_save_load` went: empty while pending, `ok`, or the reason the running game refused the save.
+#[wasm_bindgen]
+#[must_use]
+pub fn game_save_result() -> String {
+    game::restore_result()
+}
+
+/// Sets the desktop hand's grip and trigger for the live game (the page maps keys to them). A headset uses its controllers instead.
+#[wasm_bindgen]
+pub fn game_desktop_hand(grip: bool, trigger: bool) {
+    game_hands::set_desktop(grip, trigger);
+}
+
+/// Replaces every hand of the live game with `[{"side": "left"|"right", "position": [x, y, z], "grip": bool, "trigger": bool}]` (for tests and
+/// recordings); an empty string goes back to the controllers or the desktop hand. Returns false for text that is not that.
+#[wasm_bindgen]
+#[must_use]
+pub fn game_set_hands(json: &str) -> bool {
+    game_hands::set_override(json)
+}
+
+/// JSON array of the live game's effects numbered after `after` (pass the last `seq` seen, or 0): `{seq, kind, name, target, position}`.
+#[wasm_bindgen]
+#[must_use]
+pub fn game_effects_since(after: f64) -> String {
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "sequence numbers are small whole numbers passed through a JavaScript number"
+    )]
+    game::effects_since(after.max(0.0) as u64)
 }
 
 /// Turns the automatic quality governor on or off. When on, the quality tier follows measured frame
@@ -273,6 +373,14 @@ pub fn eval_projection_chunk(token: &str, node: &str, name: &str, vertices: &[f3
 #[must_use]
 pub fn eval_projection_finish(token: &str) -> bool {
     projection::finish(token)
+}
+
+/// Marks the staged scene as a draft: the parts finished so far, shown while the evaluation continues. It replaces the scene on screen
+/// when its meshes are ready but does not commit the document; the finished evaluation replaces it.
+#[wasm_bindgen]
+#[must_use]
+pub fn eval_projection_finish_draft(token: &str) -> bool {
+    projection::finish_draft(token)
 }
 
 /// Projection resource and upload counters.

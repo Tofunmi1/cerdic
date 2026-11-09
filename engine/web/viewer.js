@@ -1,4 +1,5 @@
 import { attachFxAudio } from "./fx-audio.js";
+import { startGamepad } from "./gamepad.js";
 
 // Desktop viewer for the engine: look around any scene on a laptop, with a wide field of view and an
 // optional split-screen mock headset. Opt in with ?viewer=1 (the tests and the headset pages are
@@ -13,6 +14,15 @@ const SCENES = [
   ["showcase", "Showcase: colourful props, studio lights"],
   ["stage", "Studio: your model in a lit room"],
   ["viaduct", "Model: Stone aqueduct · 150k triangles"],
+  ["pegasus_studio", "Model: white pegasus in the studio"],
+  ["angel_studio", "Model: winged angel in the studio"],
+  ["building_asset", "Model: Art Deco building asset"],
+  ["architecture_gallery", "City: 12 architecture families + streetscape"],
+  ["church_sanctuary", "Model: Gothic parish church and garden"],
+  ["main_street", "City: main street block with park and street life"],
+  ["model_y", "Model: electric crossover in the studio"],
+  ["anime_girl", "Model: anime girl with a bouquet in the studio"],
+  ["eiffel_tower", "Model: Eiffel Tower lattice in the studio"],
   ["physics", "Demo: physics playground (press Play)"],
   ["physics_big", "Demo: bowling, dominoes, brick wall, funnel (press Play)"],
   ["physics_joints", "Demo: pendulum, door, drawer, spring, windmill, bridge, bell (press Play)"],
@@ -27,6 +37,7 @@ const SCENES = [
   ["outdoor_sky", "Demo: terrain, trees and lake under a real sky, cascaded sun shadows"],
   ["materials_grid", "Demo: roughness x metal spheres reflecting the sky"],
   ["lit_room", "Demo: a lit room (the dark-room reference for global illumination)"],
+  ["modern_room", "Room: contemporary living room with detailed furniture and warm materials"],
   ["mannequin", "Demo: procedural character with skeleton and walk cycle"],
   ["toon_gallery", "Demo: cel-shading gallery (physical vs 1 to 4 bands)"],
   ["gallery", "Editor comparison scene"],
@@ -51,6 +62,45 @@ const KEYS = {
   KeyE: [0, 1, 0], Space: [0, 1, 0],
   KeyQ: [0, -1, 0], KeyC: [0, -1, 0],
 };
+
+/**
+ * A small panel for worlds that carry an animation state machine (`anim.machine`): a speed slider, a jump button and a box to set any
+ * parameter or raise any trigger by name. It appears by itself once such a world is on screen and goes away when the world has none,
+ * so a person can drive a character the model built (a game will drive the same parameters from its rules).
+ */
+function mountAnimationControls(api) {
+  let panel = null;
+  const build = () => {
+    panel = document.createElement("div");
+    panel.id = "anim-controls";
+    panel.style.cssText = "position:fixed;left:12px;bottom:12px;z-index:30;padding:10px 12px;border-radius:10px;background:rgba(20,22,28,.82);color:#eee;font:12px/1.4 system-ui,sans-serif;min-width:230px;backdrop-filter:blur(8px)";
+    panel.innerHTML = `<div style="font-weight:600;margin-bottom:6px">Animation</div>
+      <label style="display:flex;gap:8px;align-items:center">speed <input id="ac-speed" type="range" min="0" max="4" step="0.05" value="0" style="flex:1"><span id="ac-speed-v" style="width:30px;text-align:right">0</span></label>
+      <div style="display:flex;gap:6px;margin-top:8px"><button id="ac-jump">jump</button><button id="ac-air">in air</button><button id="ac-ground">on ground</button></div>
+      <div style="display:flex;gap:6px;margin-top:8px"><input id="ac-name" placeholder="name" style="width:80px"><input id="ac-value" placeholder="value (blank = trigger)" style="flex:1"><button id="ac-set">go</button></div>`;
+    document.body.appendChild(panel);
+    const speed = panel.querySelector("#ac-speed");
+    const shown = panel.querySelector("#ac-speed-v");
+    speed.addEventListener("input", () => { shown.textContent = speed.value; api.animation_set_float("", "speed", Number(speed.value)); });
+    panel.querySelector("#ac-jump").addEventListener("click", () => api.animation_trigger("", "jump"));
+    panel.querySelector("#ac-air").addEventListener("click", () => api.animation_set_bool("", "grounded", false));
+    panel.querySelector("#ac-ground").addEventListener("click", () => api.animation_set_bool("", "grounded", true));
+    panel.querySelector("#ac-set").addEventListener("click", () => {
+      const name = panel.querySelector("#ac-name").value.trim();
+      const value = panel.querySelector("#ac-value").value.trim();
+      if (!name) return;
+      if (value === "") api.animation_trigger("", name);
+      else if (value === "true" || value === "false") api.animation_set_bool("", name, value === "true");
+      else if (Number.isFinite(Number(value))) api.animation_set_float("", name, Number(value));
+    });
+    api.viewer_animation(true, -1);
+  };
+  setInterval(() => {
+    const has = Boolean(globalThis.__ve?.evaluation?.parts?.some((part) => part.state_machine));
+    if (has && !panel) build();
+    else if (!has && panel) { panel.remove(); panel = null; }
+  }, 1000);
+}
 
 export function startViewer({ canvas, api, params, frameBounds = () => null, frameSelectionBounds = () => null,
   frameSocketPivot = () => null, profilePoints = () => null, curveControlPoints = () => null,
@@ -612,8 +662,12 @@ export function startViewer({ canvas, api, params, frameBounds = () => null, fra
   };
   window.addEventListener("pointerup", endOrbit, true);
   window.addEventListener("pointercancel", endOrbit, true);
+  // The desktop hand of a game: hold G to grip (pick things up), hold T to pull the trigger (use). A headset uses its controllers.
+  const handKeys = { KeyG: false, KeyT: false };
+  const sendHand = () => api.game_desktop_hand?.(handKeys.KeyG, handKeys.KeyT);
   window.addEventListener("keydown", (event) => {
     if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement) return;
+    if (event.code in handKeys) { if (!handKeys[event.code]) { handKeys[event.code] = true; sendHand(); } return; }
     if (event.code === "KeyF") { frame(); return; }
     if (event.code === "KeyE" && params.get("scene") === "fx") api.fx_explode?.();
     if (event.code === "KeyO") { state.orbitMode = !state.orbitMode; syncControls(); return; }
@@ -625,10 +679,26 @@ export function startViewer({ canvas, api, params, frameBounds = () => null, fra
     else if (event.code === "KeyH") hud.hidden = !hud.hidden;
   });
   window.addEventListener("keyup", (event) => {
+    if (event.code in handKeys) { handKeys[event.code] = false; sendHand(); return; }
     if (event.code in KEYS) { held.delete(event.code); sendMotion(); }
     else if (event.code === "ShiftLeft" || event.code === "ShiftRight") { sprint = false; sendMotion(); }
   });
-  window.addEventListener("blur", () => { held.clear(); sprint = false; sendMotion(); });
+  window.addEventListener("blur", () => { held.clear(); sprint = false; sendMotion(); handKeys.KeyG = handKeys.KeyT = false; sendHand(); });
+  // Scripts hear the keyboard and, while the mouse is locked to the view, its buttons: on("key", e) with e = { code: "KeyQ" | "Mouse0" ..., down, repeat }.
+  const typing = (target) => target instanceof HTMLSelectElement || target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
+  const tell = (code, down, repeat = false) => globalThis.__ve?.scripts?.emit("key", { code, down, repeat });
+  window.addEventListener("keydown", (event) => { if (!typing(event.target)) tell(event.code, true, event.repeat); });
+  window.addEventListener("keyup", (event) => { if (!typing(event.target)) tell(event.code, false); });
+  window.addEventListener("mousedown", (event) => { if (document.pointerLockElement === canvas) tell(`Mouse${event.button}`, true); });
+  window.addEventListener("mouseup", (event) => { if (document.pointerLockElement === canvas) tell(`Mouse${event.button}`, false); });
+  window.addEventListener("contextmenu", (event) => { if (document.pointerLockElement === canvas) event.preventDefault(); });
+  // ?play=1 starts play mode (physics, walking, scripts' player) as soon as the scene has something to play, so a shared link opens straight into the game.
+  if (params.get("play") === "1") {
+    const autoPlay = setInterval(() => {
+      const button = document.getElementById("play-mode");
+      if (button && !button.hidden) { clearInterval(autoPlay); if (button.getAttribute("aria-pressed") !== "true") button.click(); }
+    }, 500);
+  }
 
   // The panel: scene, field of view, split screen, quality, and the key reference.
   const hud = document.createElement("div");
@@ -687,7 +757,7 @@ export function startViewer({ canvas, api, params, frameBounds = () => null, fra
       <option value="off">Flat perspective</option>
       <option value="fisheye">Fisheye (whole view)</option>
       <option value="headset">Headset lenses (split screen)</option></select>
-    <label>Quality</label><select id="v-quality"><option>low</option><option>medium</option><option selected>high</option></select>
+    <label>Quality</label><select id="v-quality"><option>low</option><option>quest</option><option>medium</option><option selected>high</option></select>
     <label><input id="v-shadows" type="checkbox"> Sun shadows</label>
     <label><input id="v-specular-aa" type="checkbox"> Specular anti-aliasing</label>
     <label><input id="v-ssao" type="checkbox"> Screen-space ambient occlusion</label>
@@ -699,9 +769,14 @@ export function startViewer({ canvas, api, params, frameBounds = () => null, fra
       <option value="studio">Studio</option>
       <option value="warm">Warm</option>
       <option value="cool">Cool</option>
-      <option value="mono">Mono</option></select>
+      <option value="mono">Mono</option>
+      <option value="sunset">Sunset</option>
+      <option value="vivid">Vivid</option>
+      <option value="film">Film</option>
+      <option value="night">Night</option>
+      <option value="noir">Noir</option></select>
     <div class="keys">Click the view to look around (Esc to release).<br>
-      WASD / arrows move, Space / Q up/down, Shift sprint,<br>R reset view, V split screen, L lens, H hide this panel.<br>
+      WASD / arrows move, Space / Q up/down, Shift sprint,<br>R reset view, V split screen, L lens, H hide this panel.<br>In a game: hold G to grip (pick up), hold T to pull the trigger (use).<br>
       Not holding the mouse: wheel or scroll zooms, Alt + drag (or O, then drag) orbits, F frames the model.<br>
       Released: hover, click and drag objects. Held: the dot picks and grabs; the wheel pushes and pulls.</div>
     <div class="keys">Headset benchmark pages (for a Quest on the LAN server):
@@ -724,7 +799,7 @@ export function startViewer({ canvas, api, params, frameBounds = () => null, fra
     <label><input id="gizmo-bounds" type="checkbox"> Bounds</label>
     <label><input id="gizmo-wire" type="checkbox"> Wire</label>
     <label><input id="gizmo-normals" type="checkbox"> Normals</label>
-    <label><input id="gizmo-diagnostics" type="checkbox"> Diagnostics</label>
+    <label><input id="gizmo-diagnostics" type="checkbox"> Diagnostics</label><div id="gizmo-floating-parts" aria-live="polite"></div>
     <span id="viewer-gizmo-status">Select a part to show handles.</span>`;
   document.body.append(gizmoControls);
   const gizmoStatus = gizmoControls.querySelector("#viewer-gizmo-status");
@@ -737,16 +812,39 @@ export function startViewer({ canvas, api, params, frameBounds = () => null, fra
   const wireToggle = gizmoControls.querySelector("#gizmo-wire");
   const normalsToggle = gizmoControls.querySelector("#gizmo-normals");
   const diagnosticsToggle = gizmoControls.querySelector("#gizmo-diagnostics");
+  const floatingParts = gizmoControls.querySelector("#gizmo-floating-parts");
   boundsToggle.addEventListener("change", drawGizmo);
   wireToggle.addEventListener("change", drawGizmo);
   normalsToggle.addEventListener("change", drawGizmo);
   diagnosticsToggle.addEventListener("change", drawGizmo);
+  floatingParts.style.cssText = "display:none;max-width:380px;max-height:100px;overflow:auto;font:11px system-ui,sans-serif";
+  const renderFloatingParts = () => {
+    floatingParts.replaceChildren();
+    if (!diagnosticsToggle.checked) { floatingParts.style.display = "none"; return; }
+    floatingParts.style.display = "block";
+    const attachments = globalThis.__ve?.evaluation?.attachments;
+    const title = document.createElement("strong"); title.textContent = "Floating parts"; floatingParts.append(title);
+    if (!attachments) { floatingParts.append(document.createTextNode(" · measuring final result…")); return; }
+    if (attachments.error) { floatingParts.append(document.createTextNode(` · ${attachments.error}`)); return; }
+    if (!attachments.floating.length) { floatingParts.append(document.createTextNode(" · all parts attached")); return; }
+    for (const part of attachments.floating) {
+      const row = document.createElement("button");
+      row.type = "button"; row.textContent = `${part.name}  ${part.gap.toFixed(2)} m from  ${part.nearest}`;
+      row.style.cssText = "display:block;width:100%;text-align:left;background:transparent;color:inherit;border:0;padding:2px;cursor:pointer";
+      row.addEventListener("click", () => {
+        const match = globalThis.__ve?.evaluation?.parts?.find(candidate => candidate.name === part.name);
+        if (match) globalThis.__ve?.docPanel?.selection?.select(match.node);
+      });
+      floatingParts.append(row);
+    }
+  };
   gizmoControls.querySelector("#gizmo-mode").addEventListener("change", (event) => {
     state.gizmoMode = event.target.value;
     drawGizmo();
   });
   window.addEventListener("resize", drawGizmo);
   setInterval(drawGizmo, 120);
+  setInterval(renderFloatingParts, 250);
   const cross = document.createElement("div");
   cross.id = "crosshair";
   document.body.append(cross);
@@ -756,12 +854,13 @@ export function startViewer({ canvas, api, params, frameBounds = () => null, fra
   sceneSelect.value = params.get("model") || params.get("scene") || (evalOn ? "stage" : "xr");
   sceneSelect.addEventListener("change", () => {
     const next = new URLSearchParams(location.search);
-    if (["viaduct", "physics", "physics_big", "physics_joints", "physics_walk", "animation", "scenery", "village", "village_hd", "beach_arch", "mannequin", "toon_gallery", "weathered_stone", "style_gallery", "outdoor_sky", "materials_grid", "lit_room"].includes(sceneSelect.value)) {
+    if (["viaduct", "physics", "physics_big", "physics_joints", "physics_walk", "animation", "scenery", "village", "village_hd", "beach_arch", "mannequin", "toon_gallery", "weathered_stone", "style_gallery", "outdoor_sky", "materials_grid", "lit_room", "modern_room", "pegasus_studio", "angel_studio", "building_asset", "architecture_gallery", "model_y", "anime_girl", "eiffel_tower"].includes(sceneSelect.value)) {
       // Demos that bring their own sky and ground sit in the bare `open` scene; the rest sit in the stage room.
-      next.set("scene", ["outdoor_sky", "materials_grid", "lit_room"].includes(sceneSelect.value) ? "open" : "stage");
+      next.set("scene", ["outdoor_sky", "materials_grid", "lit_room", "modern_room", "building_asset", "architecture_gallery", "church_sanctuary", "main_street"].includes(sceneSelect.value) ? "open" : "stage");
       next.set("model", sceneSelect.value);
       next.set("eval", "1");
       next.set("docname", `spatial-lab-${sceneSelect.value}`);
+      if (["pegasus_studio", "angel_studio", "building_asset", "architecture_gallery", "model_y", "anime_girl", "eiffel_tower"].includes(sceneSelect.value)) next.set("frame", "1");
     } else {
       next.set("scene", sceneSelect.value);
       next.delete("model");
@@ -801,7 +900,8 @@ export function startViewer({ canvas, api, params, frameBounds = () => null, fra
   api.set_specular_aa(specularAa.checked);
   specularAa.addEventListener("change", () => api.set_specular_aa(specularAa.checked));
   const ssao = hud.querySelector("#v-ssao");
-  ssao.checked = params.get("ssao") === "on";
+  // Contact shadows are on unless asked off: they are most of what makes surfaces sit in a scene instead of floating on it.
+  ssao.checked = params.get("ssao") !== "off";
   api.set_ssao(ssao.checked);
   ssao.addEventListener("change", () => api.set_ssao(ssao.checked));
   const bloom = hud.querySelector("#v-bloom");
@@ -841,7 +941,10 @@ export function startViewer({ canvas, api, params, frameBounds = () => null, fra
     document.body.classList.toggle("look", document.pointerLockElement === canvas);
   });
 
+  mountAnimationControls(api);
+  // A controller does what the keyboard, mouse and desktop hand do (see gamepad.js); with none connected it costs a comparison a frame.
+  const stopGamepad = startGamepad(api);
   apply();
   // `api` is returned so tests can drive the viewer without a real pointer lock.
-  return { state, hud, api };
+  return { state, hud, api, stopGamepad };
 }

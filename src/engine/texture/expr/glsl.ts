@@ -11,7 +11,7 @@ const TAU = '6.28318530717959';
 const COUNTERS = ['i', 'j'];
 
 /** The functions of the language that are helper source rather than GLSL built-ins; emitted as `ex_<name>` so they cannot clash with other shader code. */
-const SNIPPETS = new Set(['hash', 'noise', 'snoise', 'fbm', 'hsv', 'rot']);
+const SNIPPETS = new Set(['hash', 'noise', 'snoise', 'fbm', 'hsv', 'rot', 'voronoi', 'stretch', 'warp']);
 
 const type = (size: Size): string => (size === 1 ? 'float' : `vec${size}`);
 
@@ -96,7 +96,23 @@ vec3 ex_hsv(float h, float s, float v) {
   vec3 k = mod(vec3(5.0, 3.0, 1.0) + h * 6.0, 6.0);
   return v - v * s * clamp(min(k, 4.0 - k), 0.0, 1.0);
 }
-vec2 ex_rot(vec2 p, float a) { return vec2(cos(a) * p.x - sin(a) * p.y, sin(a) * p.x + cos(a) * p.y); }`;
+vec2 ex_rot(vec2 p, float a) { return vec2(cos(a) * p.x - sin(a) * p.y, sin(a) * p.x + cos(a) * p.y); }
+vec2 ex_voronoi(vec2 p) {
+  vec2 b = floor(p);
+  float f1 = 8.0;
+  float f2 = 8.0;
+  for (int vj = -1; vj <= 1; vj++) {
+    for (int vi = -1; vi <= 1; vi++) {
+      vec2 c = b + vec2(float(vi), float(vj));
+      vec2 d = c + vec2(ex_hash(c), ex_hash(c + vec2(37.1, 17.3))) - p;
+      float l = length(d);
+      if (l < f1) { f2 = f1; f1 = l; } else if (l < f2) { f2 = l; }
+    }
+  }
+  return vec2(f1, f2);
+}
+vec2 ex_stretch(vec2 p, float a, float r) { return vec2((cos(a) * p.x + sin(a) * p.y) / r, -sin(a) * p.x + cos(a) * p.y); }
+vec2 ex_warp(vec2 p, float a) { return p + a * vec2(ex_snoise(p + vec2(5.2, 1.3)), ex_snoise(p + vec2(9.7, 8.1))); }`;
 
 /** The helper functions (put them before `main`) and the body (put it inside `main`, after defining `p`, `q` and `t`). */
 export function emitGlsl(program: Program): { functions: string; body: string } {

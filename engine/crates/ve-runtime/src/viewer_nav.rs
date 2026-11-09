@@ -48,6 +48,12 @@ fn with_pending<T>(f: impl FnOnce(&mut Pending) -> T) -> T {
     PENDING.with(|p| f(&mut p.borrow_mut()))
 }
 
+/// The wheel and drag movement the page queued since last frame, taken off the queue: `(zoom, orbit in pixels)`. A game camera uses
+/// these as the player's adjustments instead of letting the free viewer move.
+pub(crate) fn take_adjustments() -> (f32, Vec2) {
+    with_pending(|p| (std::mem::take(&mut p.zoom), std::mem::take(&mut p.orbit)))
+}
+
 /// Wheel movement to zoom by on the next frame (positive zooms out). One notch is about 100.
 pub(crate) fn zoom(amount: f32) {
     if amount.is_finite() {

@@ -1,0 +1,52 @@
+# A third-person walker: the hero is a game.controller (acceleration, coyote time, a double jump, step-up onto low ledges) seen through a
+# game.camera (orbit with the mouse, a shoulder offset, smoothing). WASD walks relative to where the camera looks, Space jumps. A second camera
+# ("above", top down) is declared; a rule switches to it on an event with effect:camera:above:1 (not on a timer: rule every= is in seconds and would make the view flip back and forth).
+sky = scene.sky@1(sun_elevation=40, sun_azimuth=30, ground_color=[0.25, 0.3, 0.22])
+ambient = scene.environment@1(sky_color=[0.62, 0.74, 0.92], ground_color=[0.3, 0.32, 0.26], intensity=0.55)
+
+floor_box = solid.box@1(size=[60, 0.4, 60])
+floor_at = xform.move@1(floor_box, by=[0, -0.2, 0])
+floor = solid.material@1(floor_at, color=[0.36, 0.42, 0.28], roughness=0.95)
+output floor = floor
+
+# the hero: a rounded body, a head and a pack, so turning is readable from behind
+hero_body = solid.capsule@1(radius=0.3, height=1.3)
+hero_up = xform.move@1(hero_body, by=[0, 0.75, 0])
+hero_head = solid.sphere@1(radius=0.2, segments=24)
+hero_hup = xform.move@1(hero_head, by=[0, 1.62, 0])
+hero_pack = solid.box@1(size=[0.4, 0.5, 0.22])
+hero_pup = xform.move@1(hero_pack, by=[0, 1.0, -0.3])
+hero_u1 = solid.union@1(hero_up, hero_hup)
+hero_u2 = solid.union@1(hero_u1, hero_pup)
+hero_m = solid.material@1(hero_u2, color=[0.85, 0.35, 0.2], roughness=0.5)
+output hero = hero_m
+
+# ledges to climb: a stair of boxes and a tall block that needs the double jump
+ledge = solid.box@1(size=[2.4, 1.0, 2.4])
+ledge_up = xform.move@1(ledge, by=[0, 0.5, 0])
+ledge_m = solid.material@1(ledge_up, color=[0.55, 0.52, 0.48], roughness=0.8, recipe="concrete")
+output ledge = ledge_m
+
+k_hero = game.kind@1(name="player", size=0.3, speed=5, tags=["hero"], part="hero")
+k_ledge = game.kind@1(name="ledge", size=1.2, solid=[2.4, 1.0, 2.4], part="ledge")
+tall = game.kind@1(name="tall", size=1.2, solid=[2.4, 1.0, 2.4], part="ledge")
+
+s_hero = game.spawn@1(kind="player", at=[0, 0, 0])
+s_a = game.spawn@1(kind="ledge", at=[4, 0.5, 3])
+s_b = game.spawn@1(kind="ledge", at=[6.4, 1.0, 3])
+s_c = game.spawn@1(kind="ledge", at=[8.8, 1.5, 3])
+s_d = game.spawn@1(kind="ledge", at=[-5, 0.5, -4])
+s_e = game.spawn@1(kind="ledge", at=[-5, 1.5, -4])
+
+ground = game.ground@1(y=0)
+move = game.input@1(name="move", axis="x,z", target="tag:hero")
+jump = game.input@1(name="jump", key="press", target="tag:hero")
+ctl = game.controller@1(kind="player", speed=5, accel=40, decel=50, jump=8, gravity=24, extra_jumps=1, relative="camera", turn=720)
+cam = game.camera@1(name="behind", mode="third", distance=5, height=1.6, shoulder=0.5, smoothing=0.08)
+top = game.camera@1(name="above", mode="top_down", distance=16)
+eyes = game.camera@1(name="eyes", mode="first", height=1.6)
+view = game.input@1(name="view", key="press", target="tag:hero", keys="KeyV", pad="button3", label="View")
+r_view = game.rule@1(on="input:view", do="effect:camera:next:0.4")
+
+all = game.collect@1(k_hero, k_ledge, tall, s_hero, s_a, s_b, s_c, s_d, s_e, ground, move, jump, ctl, cam, top, eyes, view, r_view, name="walker")
+output rules = all

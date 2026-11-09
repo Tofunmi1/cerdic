@@ -1,0 +1,70 @@
+# A top-down room: walls and pillars block the hero (game.controller in top_down mode: no gravity, no jump), the camera hangs above
+# (game.camera top_down), and four gems around the room are the goal. WASD moves relative to the view.
+sky = scene.sky@1(sun_elevation=50, sun_azimuth=20, ground_color=[0.2, 0.2, 0.22])
+ambient = scene.environment@1(sky_color=[0.6, 0.65, 0.75], ground_color=[0.3, 0.28, 0.26], intensity=0.7)
+
+floor_box = solid.box@1(size=[18, 0.4, 14])
+floor_at = xform.move@1(floor_box, by=[0, -0.2, 0])
+floor = solid.material@1(floor_at, color=[0.42, 0.36, 0.3], roughness=0.9, recipe="planks")
+output floor = floor
+
+hero_body = solid.cylinder@1(radius=0.3, height=0.9, segments=24)
+hero_up = xform.move@1(hero_body, by=[0, 0.45, 0])
+hero_head = solid.sphere@1(radius=0.24, segments=24)
+hero_hup = xform.move@1(hero_head, by=[0, 1.05, 0])
+hero_nose = solid.box@1(size=[0.1, 0.1, 0.25])
+hero_nup = xform.move@1(hero_nose, by=[0, 1.05, 0.28])
+hero_u1 = solid.union@1(hero_up, hero_hup)
+hero_u2 = solid.union@1(hero_u1, hero_nup)
+hero_m = solid.material@1(hero_u2, color=[0.3, 0.55, 0.85], roughness=0.5)
+output hero = hero_m
+
+wall_h = solid.box@1(size=[18, 2, 0.6])
+wall_hm = solid.material@1(wall_h, color=[0.6, 0.58, 0.55], roughness=0.8, recipe="brick")
+output wall_h = wall_hm
+wall_v = solid.box@1(size=[0.6, 2, 14])
+wall_vm = solid.material@1(wall_v, color=[0.6, 0.58, 0.55], roughness=0.8, recipe="brick")
+output wall_v = wall_vm
+pillar = solid.box@1(size=[1.2, 2, 1.2])
+pillar_m = solid.material@1(pillar, color=[0.5, 0.5, 0.52], roughness=0.8, recipe="concrete")
+output pillar = pillar_m
+gem_body = solid.sphere@1(radius=0.28, segments=16)
+gem_up = xform.move@1(gem_body, by=[0, 0.5, 0])
+gem_m = solid.material@1(gem_up, color=[0.3, 0.9, 0.7], roughness=0.15, metallic=0.2)
+output gem = gem_m
+
+k_hero = game.kind@1(name="player", size=0.3, speed=5, tags=["hero"], part="hero")
+k_wh = game.kind@1(name="wall_h", size=1, solid=[18, 2, 0.6], part="wall_h")
+k_wv = game.kind@1(name="wall_v", size=1, solid=[0.6, 2, 14], part="wall_v")
+k_pillar = game.kind@1(name="pillar", size=1, solid=[1.2, 2, 1.2], part="pillar")
+k_gem = game.kind@1(name="gem", size=0.35, tags=["gem"], part="gem")
+
+s_hero = game.spawn@1(kind="player", at=[0, 0, 0])
+w_n = game.spawn@1(kind="wall_h", at=[0, 1, 7])
+w_s = game.spawn@1(kind="wall_h", at=[0, 1, -7])
+w_e = game.spawn@1(kind="wall_v", at=[9, 1, 0])
+w_w = game.spawn@1(kind="wall_v", at=[-9, 1, 0])
+p_a = game.spawn@1(kind="pillar", at=[-3, 1, 2])
+p_b = game.spawn@1(kind="pillar", at=[3, 1, -2])
+p_c = game.spawn@1(kind="pillar", at=[0, 1, 4.5])
+g_a = game.spawn@1(kind="gem", at=[-7, 0, 5])
+g_b = game.spawn@1(kind="gem", at=[7, 0, 5])
+g_c = game.spawn@1(kind="gem", at=[7, 0, -5])
+g_d = game.spawn@1(kind="gem", at=[-7, 0, -5])
+
+gems = game.var@1(name="gems", value=0)
+ground = game.ground@1(y=0)
+move = game.input@1(name="move", axis="x,z", target="tag:hero")
+ctl = game.controller@1(kind="player", mode="top_down", speed=5, accel=45, decel=60, relative="camera", turn=900)
+cam = game.camera@1(name="above", mode="top_down", distance=16, smoothing=0.12, collide=false)
+# V cycles the view: top down, behind the hero, through its eyes
+cam_third = game.camera@1(name="behind", mode="third", distance=5, height=1.6, shoulder=0.4, smoothing=0.08)
+cam_first = game.camera@1(name="eyes", mode="first", height=0.9)
+view = game.input@1(name="view", key="press", target="tag:hero", keys="KeyV", pad="button3", label="View")
+r_view = game.rule@1(on="input:view", do="effect:camera:next:0.4")
+take = game.rule@1(on="touch", a="tag:hero", b="tag:gem", do="add:gems:1;destroy:b")
+won = game.goal@1(outcome="win", when="gems>=4")
+hud = game.hud@1(text="Gems {gems} / 4", anchor="top", size=0.004)
+
+all = game.collect@1(k_hero, k_wh, k_wv, k_pillar, k_gem, s_hero, w_n, w_s, w_e, w_w, p_a, p_b, p_c, g_a, g_b, g_c, g_d, gems, ground, move, ctl, cam, cam_third, cam_first, view, r_view, take, won, hud, name="toproom")
+output rules = all

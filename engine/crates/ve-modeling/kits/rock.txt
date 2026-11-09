@@ -1,0 +1,11 @@
+group rock
+  e = field.ellipsoid@1(radii=[0.5, 0.32, 0.4])
+  e_at = field.move@1(e, by=[0, 0.22, 0])
+  rough = field.noise@1(e_at, amplitude=0.08, scale=0.5, octaves=3, seed=2)
+  stone = field.to_solid@1(rough, min=[-0.9, -0.3, -0.9], max=[0.9, 0.8, 0.9], edge_length=0.04)
+  stone_m = solid.material@1(stone, color=[0.5, 0.5, 0.48], roughness=0.9)
+  stone_t = solid.texture@1(stone_m, program="n = fbm(scale_x=3, scale_y=3, iterations=5); f = fbm(scale_x=26, scale_y=26, iterations=3); ao = surface_ao(strength=0.4); grey = colorize(n, gradient=[0:#6b6a64, 0.5:#8e8c84, 1:#b4b2a8]); dirt = colorize(ao, gradient=[0:#3a382f, 1:#d8d6cc]); a0 = blend(grey, dirt, ao, blend_type=normal, amount=0.5); moss = colorize(f, gradient=[0:#2e4a1c, 1:#6f9a3a]); up = surface_up(power=3); albedo = blend(moss, a0, up, blend_type=normal, amount=0.7)")
+  stone_f = solid.finish@1(stone_t, relief=0.12, relief_scale=22)
+  expose seed = rough.seed
+  result stone_f
+end

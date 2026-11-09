@@ -80,6 +80,11 @@ thread_local! {
     static CAMERA: Cell<Option<CameraView>> = const { Cell::new(None) };
 }
 
+/// The vertical field of view the viewer renders with, in degrees (the page's, or the default of 60).
+pub(crate) fn fov_degrees() -> f32 {
+    with_input(|input| if input.fov_deg > 0.0 { input.fov_deg } else { 60.0 })
+}
+
 /// A desktop viewer camera ray for a pointer at normalized device coordinates.
 pub(crate) fn pointer_ray(x: f32, y: f32, aspect: f32) -> Option<ve_interact::Ray> {
     CAMERA
@@ -198,6 +203,15 @@ pub(crate) struct ViewerRig {
     locked: bool,
     /// Physics walks the viewer (play mode with a walker): keys no longer fly it, they steer the walker.
     walking: bool,
+    /// A game camera owns the view this frame: `Some(true)` when the player's look steers it (first and third person), `Some(false)` when it
+    /// holds a fixed angle (so the mouse, wheel and orbit drags are not applied and nothing twitches).
+    driven: Option<bool>,
+    /// The yaw and pitch a game camera is drawn with this frame (set with the eye); the player's own look stays in `yaw` and `pitch`.
+    view: Option<(f32, f32)>,
+    /// What the player has done to a game camera: a zoom multiplier (1 is none) and how far the view is turned and tilted, in radians.
+    user_zoom: f32,
+    user_yaw: f32,
+    user_pitch: f32,
 }
 
 impl Default for ViewerRig {
@@ -210,7 +224,68 @@ impl Default for ViewerRig {
             native_stereo: false,
             locked: false,
             walking: false,
+            driven: None,
+            view: None,
+            user_zoom: 1.0,
+            user_yaw: 0.0,
+            user_pitch: 0.0,
         }
+    }
+}
+
+impl ViewerRig {
+    /// Current eye position in the viewer rig's world space.
+    pub(crate) fn position(&self) -> Vec3 {
+        self.position
+    }
+
+    /// Where the player is looking: yaw and pitch in radians (the viewer faces -z at yaw 0).
+    pub(crate) fn look(&self) -> (f32, f32) {
+        (self.yaw, self.pitch)
+    }
+
+    /// Puts the view where a game camera says. The player's look (`yaw`, `pitch`) is NOT overwritten: a blend between cameras passes through
+    /// angles the player never chose, and feeding those back as the look made a third-person camera stick at its pitch limit after a blend.
+    /// `orbit` says whether the player's look steers this camera; a fixed-angle camera ignores the mouse and wheel.
+    pub(crate) fn set_view(&mut self, eye: Vec3, yaw: f32, pitch: f32, orbit: bool) {
+        self.position = eye;
+        self.view = Some((yaw, pitch));
+        self.driven = Some(orbit);
+    }
+
+    /// Gives the view back to the free viewer (no game camera, or its target is gone).
+    pub(crate) fn release(&mut self) {
+        self.driven = None;
+        self.view = None;
+        (self.user_zoom, self.user_yaw, self.user_pitch) = (1.0, 0.0, 0.0);
+    }
+
+    /// Points the player's look somewhere (the viewer faces -z at yaw 0; pitch is up positive).
+    pub(crate) fn set_look(&mut self, yaw: f32, pitch: f32) {
+        (self.yaw, self.pitch) = (yaw, pitch);
+    }
+
+    /// The player's adjustments of the game camera: zoom multiplier, turn and tilt in radians.
+    pub(crate) fn adjustments(&self) -> (f32, f32, f32) {
+        (self.user_zoom, self.user_yaw, self.user_pitch)
+    }
+
+    /// Takes the wheel and drag the page queued and applies them to a game camera. The wheel zooms (a notch is about a tenth). A drag turns
+    /// the look of a camera the player steers (first and third person) and the view of a fixed-angle one.
+    pub(crate) fn adjust_game_camera(&mut self, zoom: f32, orbit: Vec2) {
+        self.user_zoom = (self.user_zoom * (zoom * 0.001).exp()).clamp(0.2, 5.0);
+        if self.driven == Some(true) {
+            self.yaw -= orbit.x * SENSITIVITY * 2.0;
+            self.pitch = (self.pitch - orbit.y * SENSITIVITY * 2.0).clamp(-FRAC_PI_2 + 0.01, FRAC_PI_2 - 0.01);
+        } else {
+            self.user_yaw -= orbit.x * 0.006;
+            self.user_pitch = (self.user_pitch - orbit.y * 0.006).clamp(-1.0, 1.0);
+        }
+    }
+
+    /// The view a game camera set this frame, as an eye and a rotation, or `None` when the viewer is free.
+    pub(crate) fn driven_pose(&self) -> Option<(Vec3, Quat)> {
+        self.driven.map(|_| (self.position, self.rotation()))
     }
 }
 
@@ -254,16 +329,13 @@ impl ViewerRig {
     pub(crate) fn place_eye(&mut self, eye: Vec3) {
         self.position = eye;
     }
-
-    /// Whether the viewer is being walked by physics.
-    pub(crate) fn is_walking(&self) -> bool {
-        self.walking
-    }
 }
 
 impl ViewerRig {
-    fn rotation(&self) -> Quat {
-        Quat::from_euler(EulerRot::YXZ, self.yaw, self.pitch, 0.0)
+    /// The rotation the camera is drawn with: the game camera's view while one has it (which may be mid-blend), otherwise the player's look.
+    pub(crate) fn rotation(&self) -> Quat {
+        let (yaw, pitch) = self.view.unwrap_or((self.yaw, self.pitch));
+        Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0)
     }
 
     /// Where the viewer stands and looks, for the status report.

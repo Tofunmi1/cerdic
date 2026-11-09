@@ -1,0 +1,27 @@
+# Today's tree system, all six species side by side at level of detail 0, for judging what to improve. Metres, y up.
+sky = scene.sky@1(sun_elevation=38, sun_azimuth=-60, sun_intensity=5.0, turbidity=2.6, ground_color=[0.2, 0.2, 0.18], clouds=false, haze=0.02)
+output sky = sky
+env = scene.environment@1(sky_color=[0.6, 0.72, 0.9], ground_color=[0.25, 0.22, 0.18], intensity=1.1, reflection=0.3)
+output env = env
+ground_s = solid.box@1(size=[80, 0.4, 30])
+ground_a = xform.move@1(ground_s, by=[0, -0.2, 0])
+ground_m = solid.material@1(ground_a, color=[0.3, 0.38, 0.2], roughness=0.95)
+output ground = ground_m
+oak = flora.tree@1(kind="oak", height=8, seed=3, lod=0)
+oak_p = inst.place@1(oak, at=[[-16, 0, 0]])
+output oak = oak_p
+pine = flora.tree@1(kind="pine", height=10, seed=5, lod=0)
+pine_p = inst.place@1(pine, at=[[-9.5, 0, 0]])
+output pine = pine_p
+birch = flora.tree@1(kind="birch", height=8, seed=7, lod=0)
+birch_p = inst.place@1(birch, at=[[-3, 0, 0]])
+output birch = birch_p
+willow = flora.tree@1(kind="willow", height=8, seed=9, lod=0)
+willow_p = inst.place@1(willow, at=[[4, 0, 0]])
+output willow = willow_p
+shrub = flora.tree@1(kind="shrub", height=2, seed=11, lod=0)
+shrub_p = inst.place@1(shrub, at=[[10, 0, 0]])
+output shrub = shrub_p
+palm = flora.tree@1(kind="palm", height=7, seed=13, lod=0)
+palm_p = inst.place@1(palm, at=[[15, 0, 0]])
+output palm = palm_p

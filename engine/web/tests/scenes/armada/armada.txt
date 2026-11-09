@@ -1,0 +1,225 @@
+# THE DROWNED ARMADA. An island harbour at dusk, centred on the origin; metres, y up, sea level y = 0.
+sky = scene.sky@1(sun_elevation=5, sun_azimuth=-145, sun_intensity=3.0, turbidity=3.5, ground_color=[0.05, 0.06, 0.08], clouds=true, haze=0.06, haze_color=[1.0, 0.55, 0.38], haze_height=60)
+output sky = sky
+env = scene.environment@1(sky_color=[0.75, 0.55, 0.55], ground_color=[0.16, 0.15, 0.17], intensity=1.6, reflection=0.2)
+output env = env
+
+# ---------- the island: four terrain tiles around the origin (same seed, so they join), painted by height and slope ----------
+let ground = "grass=[0.2, 0.3, 0.12], rock=[0.4, 0.36, 0.32], sand=[0.7, 0.62, 0.45], sand_line=2.2, sand_blend=1.2, rock_slope=34"
+def tile(tag, tx, tz, sd)
+  t{tag}_a = terrain.tile@1(size=[60, 60], cell=1, tile_x={tx}, tile_z={tz}, seed=21, height=26, scale=70, octaves=5, roughness=0.5, warp=6, island_radius=46, island_reach=0.55)
+  t{tag}_s = xform.move@1(t{tag}_a, by=[0, -0.4, 0])
+  t{tag}_b = terrain.material@1(t{tag}_s, ${ground})
+  output land_{tag} = t{tag}_b
+  t{tag}_trees = scatter.place@1(oak, t{tag}_a, radius=6, density=0.5, seed={sd}, max_slope=28, min_height=2.2, max_height=15, scale=[0.8, 1.2], sink=0.45)
+  output trees_{tag} = t{tag}_trees
+  t{tag}_pines = scatter.place@1(pine, t{tag}_a, radius=7, density=0.4, seed={sd}1, max_slope=32, min_height=9, max_height=24, scale=[0.8, 1.15], sink=0.45)
+  output pines_{tag} = t{tag}_pines
+end
+oak = flora.tree@1(kind="oak", height=7, seed=5, leaves=[0.2, 0.34, 0.1], lod=1)
+pine = flora.tree@1(kind="pine", height=9, seed=9, leaves=[0.1, 0.24, 0.14], lod=1)
+tile("nw", -1, -1, 11)
+tile("ne", 0, -1, 12)
+tile("sw", -1, 0, 13)
+tile("se", 0, 0, 14)
+
+# ---------- the sea: a grid whose every vertex is driven by a sum of three travelling waves (SimL, mesh mode) ----------
+sea_g = poly.grid@1(width=240, height=240, columns=140, rows=140)
+sea_r = xform.rotate@1(sea_g, angles=[-90, 0, 0])
+sea_up = xform.move@1(sea_r, by=[0, 2, 0])
+sea_p = sim.program@1(sea_up, rate=30, source="sim ocean\ninput mesh sea\nstate pos: vec3[sea]\nkernel wave each i in pos {\n  let r = rest(sea, i)\n  let x = r.x\n  let z = r.z\n  let h = 0.9 * sin(0.21 * x + 0.13 * z - 0.9 * t) + 0.5 * sin(-0.11 * x + 0.27 * z - 1.3 * t + 1.7) + 0.22 * sin(0.43 * x + 0.37 * z - 2.1 * t + 0.6)\n  pos[i] = vec3(x, r.y + h, z)\n}\nschedule wave\noutput mesh pos\n")
+sea_m = solid.material@1(sea_p, color=[0.04, 0.16, 0.24], roughness=0.6, metallic=0.0)
+output sea = sea_m
+bed_s = solid.box@1(size=[240, 1, 240])
+bed_a = xform.move@1(bed_s, by=[0, -1.2, 0])
+bed_m = solid.material@1(bed_a, color=[0.03, 0.07, 0.1], roughness=0.9)
+output seabed = bed_m
+
+# ---------- the lighthouse: a rounded square tower tapered and twisted by field warps, a gallery ring and a lamp room ----------
+lh_box = field.box@1(half=[3, 22, 3], rounding=0.5)
+lh_tap = field.taper@1(lh_box, axis="y", from=-22, to=22, scale_start=1, scale_end=0.55)
+lh_twi = field.twist@1(lh_tap, axis="y", from=-22, to=22, angle=50)
+lh_ring = field.cylinder@1(radius=4.4, half_height=0.35)
+lh_ring_a = field.move@1(lh_ring, by=[0, 19.6, 0])
+lh_room = field.sphere@1(radius=2.7)
+lh_room_a = field.move@1(lh_room, by=[0, 23.2, 0])
+lh_all = field.smooth_union@1(lh_twi, lh_ring_a, radius=0.4)
+lh_all2 = field.smooth_union@1(lh_all, lh_room_a, radius=0.8)
+lh_s = field.to_solid@1(lh_all2, min=[-5.2, -23, -5.2], max=[5.2, 27, 5.2], edge_length=0.2)
+lh_a = xform.move@1(lh_s, by=[-6, 20, -4])
+lh_m = solid.material@1(lh_a, color=[0.92, 0.9, 0.84], roughness=0.65)
+lh_f = solid.finish@1(lh_m, relief=0.3, relief_scale=18)
+output lighthouse = lh_f
+lh_light = light.point@1(position=[-6, 43.2, -4], color=[1.0, 0.85, 0.55], intensity=2500, range=140)
+lh_bulb = solid.sphere@1(radius=1.1, segments=20)
+lh_bulb_a = xform.move@1(lh_bulb, by=[-6, 43.2, -4])
+lh_bulb_m = solid.material@1(lh_bulb_a, color=[1, 0.9, 0.6], roughness=0.3, emissive=[12, 9, 4])
+output lamp = lh_bulb_m
+
+# the banner on the lighthouse: a cloth written in SimL (adjacent springs, pull, wind with gusts), its left edge fixed to the pole
+pole_s = solid.cylinder@1(radius=0.12, height=9)
+pole_a = xform.move@1(pole_s, by=[-6, 50, -4])
+pole_m = solid.material@1(pole_a, color=[0.75, 0.75, 0.75], roughness=0.4, metallic=0.8)
+output banner_pole = pole_m
+ban_g = poly.grid@1(width=5, height=3, columns=28, rows=16)
+ban_a = xform.move@1(ban_g, by=[-3.5, 52.5, -4])
+ban_p = sim.program@1(ban_a, values="pole=-5.95", rate=60, source="sim banner\nparam wind = vec3(3.0, 0.0, 1.8)\nparam gust = 0.9\nparam damping = 0.985\nparam pole = 0.0\ninput mesh flag\nstate pos: vec3[flag]\nstate prev: vec3[flag]\nkernel init each i in pos {\n  pos[i] = rest(flag, i)\n  prev[i] = rest(flag, i)\n}\nkernel predict each i in pos {\n  let r = rest(flag, i)\n  if r.x < pole {\n    pos[i] = r\n    prev[i] = r\n  } else {\n    let v = (pos[i] - prev[i]) * damping\n    prev[i] = pos[i]\n    let puff = wind * (1.0 + gust * sin(t * 2.3 + r.x * 1.1 + r.y * 0.9))\n    pos[i] += v + (vec3(0.0, -9.8, 0.0) + puff * 5.0) * dt * dt\n  }\n}\nkernel solve each i in pos {\n  let r = rest(flag, i)\n  let p = pos[i]\n  if r.x >= pole {\n    let corr = vec3(0.0)\n    let count = 0.0\n    for j, len in adjacent(flag, i) {\n      let share = select(rest(flag, j).x < pole, 1.0, 0.5)\n      corr += pull(p, pos[j], len) * share\n      count += 1.0\n    }\n    if count > 0.0 {\n      p += corr * (1.3 / count)\n    }\n  }\n  pos[i] = p\n}\nschedule predict; repeat 14 { solve }\noutput mesh pos\n")
+ban_m = solid.material@1(ban_p, color=[0.7, 0.08, 0.08], roughness=0.8)
+output banner = ban_m
+
+# ---------- the galleon: ONE model at the origin (the water line is y = 0, its centre of buoyancy the origin), spawned three times below ----------
+# hull: a smooth ellipsoid cut flat at deck height, a raised stern castle, a bowsprit
+hl_e = field.ellipsoid@1(radii=[8.2, 2.1, 2.7])
+hl_top = field.box@1(half=[10, 3, 4], rounding=0)
+hl_top_a = field.move@1(hl_top, by=[0, 4.2, 0])
+hl_cut = field.subtract@1(hl_e, hl_top_a)
+hl_castle = field.box@1(half=[2.6, 0.9, 2.2], rounding=0.35)
+hl_castle_a = field.move@1(hl_castle, by=[-5.6, 2.1, 0])
+hl_sprit = field.tube@1(points=[[7.0, 1.0, 0], [12.5, 2.8, 0]], radius=0.2, end_radius=0.08)
+hl_u1 = field.smooth_union@1(hl_cut, hl_castle_a, radius=0.5)
+hl_u2 = field.smooth_union@1(hl_u1, hl_sprit, radius=0.3)
+hl_s = field.to_solid@1(hl_u2, min=[-9.5, -2.4, -3.2], max=[13, 3.6, 3.2], edge_length=0.14)
+# masts and yards (solids joined to the hull so the whole ship is one body)
+def mast(tag, mx, y0, h)
+  m{tag}_s = solid.cylinder@1(radius=0.22, height={h}, segments=12)
+  m{tag}_a = xform.move@1(m{tag}_s, by=[{mx}, {y0}, 0])
+end
+mast("1", 1.0, 10.4, 18.4)
+mast("2", 5.6, 8.2, 14)
+mast("3", -5.2, 8.2, 10.6)
+def yard(tag, mx, y, w)
+  y{tag}_s = solid.box@1(size=[0.18, 0.18, {w}])
+  y{tag}_a = xform.move@1(y{tag}_s, by=[{mx}, {y}, 0])
+end
+yard("1a", 1.0, 17.6, 10)
+yard("1b", 1.0, 11.0, 12)
+yard("2a", 5.6, 14.2, 8)
+yard("2b", 5.6, 9.4, 9)
+yard("3a", -5.2, 10.8, 6.4)
+yard("3b", -5.2, 6.4, 7.4)
+ship_u = solid.union@1(hl_s, m1_a, m2_a, m3_a, y1a_a, y1b_a, y2a_a, y2b_a, y3a_a, y3b_a)
+ship_m = solid.material@1(ship_u, color=[0.34, 0.2, 0.1], roughness=0.75, recipe="planks")
+ship_b = phys.body@1(ship_m, kind="dynamic", density=0.5, linear_damping=0.15, angular_damping=2.0)
+output hull = ship_b
+
+# the sails: a cloth per sail, top edge and lower corners fixed to this ship's hull (bone_point), the rest blown by gusty wind in world space
+let sail_src = "sim sail\nparam wind = vec3(6.0, 0.0, 2.2)\nparam gust = 0.6\nparam damping = 0.98\nparam top = 0.0\nparam bot = 0.0\nparam hw = 1.0\ninput mesh sail\ninput bone hull\nstate pos: vec3[sail]\nstate prev: vec3[sail]\nkernel init each i in pos {\n  let w = bone_point(hull, rest(sail, i))\n  pos[i] = w\n  prev[i] = w\n}\nkernel predict each i in pos {\n  let r = rest(sail, i)\n  let pin = r.y > top - 0.05 || (r.y < bot + 0.05 && abs(r.z) > hw - 0.5)\n  let w = bone_point(hull, r)\n  if pin || distance(pos[i], w) > 8.0 {\n    pos[i] = w\n    prev[i] = w\n  } else {\n    let v = (pos[i] - prev[i]) * damping\n    v = v * min(1.0, 0.12 / max(length(v), 0.0001))\n    prev[i] = pos[i]\n    let puff = wind * (1.0 + gust * sin(t * 1.7 + r.y * 0.6 + r.z * 0.5))\n    pos[i] += v + (vec3(0.0, -9.8, 0.0) + puff * 2.4) * dt * dt\n  }\n}\nkernel solve each i in pos {\n  let r = rest(sail, i)\n  let pin = r.y > top - 0.05 || (r.y < bot + 0.05 && abs(r.z) > hw - 0.5)\n  let p = pos[i]\n  if !pin {\n    let corr = vec3(0.0)\n    let count = 0.0\n    for j, len in adjacent(sail, i) {\n      let rj = rest(sail, j)\n      let pj = rj.y > top - 0.05 || (rj.y < bot + 0.05 && abs(rj.z) > hw - 0.5)\n      corr += pull(p, pos[j], len) * select(pj, 1.0, 0.5)\n      count += 1.0\n    }\n    if count > 0.0 {\n      p += corr * (1.3 / count)\n    }\n  }\n  pos[i] = p\n}\nschedule predict; repeat 16 { solve }\noutput mesh pos\n"
+def sail(tag, mx, yc, w, h, ytop, ybot, hw)
+  s{tag}_g = poly.grid@1(width={w}, height={h}, columns=12, rows=9)
+  s{tag}_r = xform.rotate@1(s{tag}_g, angles=[0, 90, 0])
+  s{tag}_a = xform.move@1(s{tag}_r, by=[{mx}, {yc}, 0])
+  s{tag}_p = sim.program@1(s{tag}_a, rate=60, values="top=${ytop}; bot=${ybot}; hw=${hw}", source="${sail_src}")
+  s{tag}_m = solid.material@1(s{tag}_p, color=[0.9, 0.85, 0.72], roughness=0.9)
+  output sail_{tag} = s{tag}_m
+end
+sail("1a", 1.25, 14.2, 9.6, 6.2, 17.3, 11.1, 4.8)
+sail("1b", 1.25, 8.0, 11.6, 5.6, 10.8, 5.2, 5.8)
+sail("2a", 5.85, 11.6, 7.6, 4.8, 14.0, 9.2, 3.8)
+sail("2b", 5.85, 7.0, 8.6, 4.2, 9.2, 4.9, 4.3)
+sail("3a", -4.95, 8.6, 6.0, 3.8, 10.5, 6.7, 3.0)
+sail("3b", -4.95, 4.9, 7.0, 3.0, 6.2, 3.7, 3.5)
+
+# buoyancy: the hull's centre is lifted where it sits below the SAME waves the sea shows (three sines, same coefficients)
+buoy = sim.program@1(size=0.03, rate=60, source="sim buoyancy\nparam spring = 7.0\nparam damp = 3.2\nparam gravity = 9.8\ninput bone hull\nstate probe: vec3[1]\nstate push: vec3[1]\nstate last: vec3[1]\nkernel feel each i in probe {\n  let c = bone_point(hull, vec3(0.0, 0.0, 0.0))\n  let h = 2.0 + 0.9 * sin(0.21 * c.x + 0.13 * c.z - 0.9 * t) + 0.5 * sin(-0.11 * c.x + 0.27 * c.z - 1.3 * t + 1.7) + 0.22 * sin(0.43 * c.x + 0.37 * c.z - 2.1 * t + 0.6)\n  let vy = clamp((c.y - last[i].y) / dt, -12.0, 12.0)\n  let err = clamp(h - c.y, -2.5, 2.5)\n  probe[i] = c\n  last[i] = c\n  push[i] = vec3(0.0, clamp((gravity + spring * err - damp * vy) * dt, -0.2, 0.3), 0.0)\n}\nschedule feel\noutput particles probe\noutput push hull push\n")
+buoy_m = solid.material@1(buoy, color=[1, 1, 0.2], roughness=0.5)
+output hull_probe = buoy_m
+
+# a lantern at the stern and a pennant on each ship, both riding the hull
+lan_s = solid.sphere@1(radius=0.35, segments=12)
+lan_a = xform.move@1(lan_s, by=[-7.8, 3.4, 0])
+lan_m = solid.material@1(lan_a, color=[1, 0.8, 0.5], roughness=0.3, emissive=[6, 3.8, 1.6], emits_light=true)
+lan_p = anim.parent@1(lan_m, parent="hull")
+output stern_lantern = lan_p
+
+kind_ship = game.kind@1(name="galleon", size=9, part="hull", tags=["ship"])
+ship1 = game.spawn@1(kind="galleon", at=[64, 2, 22], heading=20)
+ship2 = game.spawn@1(kind="galleon", at=[82, 2, -16], heading=-15)
+ship3 = game.spawn@1(kind="galleon", at=[34, 2, -64], heading=60)
+rules = game.collect@1(kind_ship, ship1, ship2, ship3, name="armada")
+output rules = rules
+
+# ---------- the carcass gate: whale ribs, each a tapered capsule bent into an arch by field warps, placed in two facing rows ----------
+rib_c = field.capsule@1(radius=0.95, half_length=13)
+rib_t = field.taper@1(rib_c, axis="y", from=-13, to=13, scale_start=1.0, scale_end=0.35)
+rib_b = field.bend@1(rib_t, axis="y", toward="x", from=-13, to=13, angle=150)
+rib_s = field.to_solid@1(rib_b, min=[-2, -14.5, -2], max=[21, -1, 2], edge_length=0.2)
+rib_m = solid.material@1(rib_s, color=[0.86, 0.82, 0.72], roughness=0.6)
+rib_f = solid.finish@1(rib_m, relief=0.4, relief_scale=10, subsurface=0.2)
+rib_l = inst.place@1(rib_f, at=[[96, 14.5, -40], [96, 14.5, -30], [96, 14.5, -20], [96, 14.5, -10], [96, 14.5, 0], [96, 14.5, 10], [96, 14.5, 20], [96, 14.5, 30]], yaw_scale=[[0, 1.0], [0, 0.96], [0, 0.9], [0, 0.84], [0, 0.8], [0, 0.84], [0, 0.92], [0, 1.0]])
+output ribs_left = rib_l
+rib_r = inst.place@1(rib_f, at=[[114.5, 14.5, -40], [114.5, 14.5, -30], [114.5, 14.5, -20], [114.5, 14.5, -10], [114.5, 14.5, 0], [114.5, 14.5, 10], [114.5, 14.5, 20], [114.5, 14.5, 30]], yaw_scale=[[180, 1.0], [180, 0.96], [180, 0.9], [180, 0.84], [180, 0.8], [180, 0.84], [180, 0.92], [180, 1.0]])
+output ribs_right = rib_r
+
+# ---------- two sea stacks and a rope bridge between them (the library bridge: 41 planks, cut it with sim.set_param cut) ----------
+def stack(tag, cx, cz)
+  k{tag}_a = field.ellipsoid@1(radii=[6.5, 17, 6.0])
+  k{tag}_b = field.ellipsoid@1(radii=[4.0, 12, 4.5])
+  k{tag}_bm = field.move@1(k{tag}_b, by=[2.5, 4, 1.5])
+  k{tag}_u = field.smooth_union@1(k{tag}_a, k{tag}_bm, radius=2.0)
+  k{tag}_n = field.noise@1(k{tag}_u, amplitude=0.7, scale=3.0, seed=4)
+  k{tag}_top = field.box@1(half=[12, 6, 12], rounding=0)
+  k{tag}_topm = field.move@1(k{tag}_top, by=[0, 20, 0])
+  k{tag}_cut = field.subtract@1(k{tag}_n, k{tag}_topm)
+  k{tag}_s = field.to_solid@1(k{tag}_cut, min=[-10, -18, -10], max=[12, 14.5, 10], edge_length=0.4)
+  k{tag}_a2 = xform.move@1(k{tag}_s, by=[{cx}, 2, {cz}])
+  k{tag}_m = solid.material@1(k{tag}_a2, color=[0.34, 0.31, 0.3], roughness=0.9)
+  k{tag}_f = solid.finish@1(k{tag}_m, relief=0.8, relief_scale=6)
+  output stack_{tag} = k{tag}_f
+end
+stack("w", -82, -40)
+stack("e", -56, -40)
+bridge = sim.program@1(library="bridge", size=0.35, rate=60, values="span=25.4; height=16; spacing=0.62")
+bridge_a = xform.move@1(bridge, by=[-69, 0, -40])
+bridge_m = solid.material@1(bridge_a, color=[0.42, 0.26, 0.12], roughness=0.85)
+output rope_bridge = bridge_m
+
+# ---------- starlings: 1500 birds by three local rules (neighbors, spatial hash) circling the carcass gate and the island ----------
+flock = sim.program@1(size=0.55, seed=11, rate=30, source="sim murmuration\nparam radius = 9.0\nparam max_speed = 14.0\nparam cohesion = 0.8\nparam separation = 5.0\nparam align = 3.0\nparam roost = 4.0\nstate pos: vec3[1500]\nstate vel: vec3[1500]\nkernel init each i in pos {\n  pos[i] = vec3(rand(i, 1.0), rand(i, 2.0), rand(i, 3.0)) * 40.0 - 20.0 + vec3(60.0, 38.0, 0.0)\n  vel[i] = normalize(vec3(rand(i, 4.0), rand(i, 5.0), rand(i, 6.0)) - 0.5) * 9.0\n}\nkernel flock each i in pos {\n  let p = pos[i]\n  let v = vel[i]\n  let centre = vec3(0.0)\n  let heading = vec3(0.0)\n  let push = vec3(0.0)\n  let seen = 0.0\n  for j in neighbors(pos, p, radius) cap 14 {\n    if j != i {\n      centre += pos[j]\n      heading += vel[j]\n      let d = p - pos[j]\n      push += d / max(dot(d, d), 0.05)\n      seen += 1.0\n    }\n  }\n  let acc = vec3(0.0)\n  if seen > 0.0 {\n    acc = (centre / seen - p) * cohesion + (heading / seen - v) * align + push * separation\n  }\n  let target = vec3(cos(t * 0.11) * 75.0, 34.0 + sin(t * 0.23) * 8.0, sin(t * 0.11) * 60.0)\n  acc += normalize(target - p) * roost\n  if p.y < 22.0 {\n    acc += vec3(0.0, (22.0 - p.y) * 3.0, 0.0)\n  }\n  let nv = v + acc * dt\n  let sp = length(nv)\n  nv = nv * min(1.0, max_speed / max(sp, 0.001))\n  nv = nv * max(1.0, 7.0 / max(sp, 0.001))\n  vel[i] = nv\n}\nkernel move each i in pos { pos[i] += vel[i] * dt }\nschedule flock; move\noutput particles pos\n")
+flock_m = solid.material@1(flock, color=[0.02, 0.02, 0.03], roughness=0.8)
+output starlings = flock_m
+
+# ---------- the raft: four piles carry a deck above the waves; a glass tank on it holds a dam-break of liquid (fluid.sim, APIC) ----------
+def pile(tag, px, pz)
+  p{tag}_s = solid.cylinder@1(radius=0.3, height=9, segments=10)
+  p{tag}_a = xform.move@1(p{tag}_s, by=[{px}, 0.4, {pz}])
+  p{tag}_m = solid.material@1(p{tag}_a, color=[0.2, 0.14, 0.09], roughness=0.9)
+  output pile_{tag} = p{tag}_m
+end
+pile("a", -66, 32)
+pile("b", -52, 32)
+pile("c", -66, 48)
+pile("d", -52, 48)
+deck_s = solid.box@1(size=[16, 0.5, 18])
+deck_a = xform.move@1(deck_s, by=[-59, 4.75, 40])
+deck_m = solid.material@1(deck_a, color=[0.4, 0.27, 0.14], roughness=0.8, recipe="planks")
+output deck = deck_m
+def glass(tag, sx, sy, sz, px, py, pz)
+  g{tag}_s = solid.box@1(size=[{sx}, {sy}, {sz}])
+  g{tag}_a = xform.move@1(g{tag}_s, by=[{px}, {py}, {pz}])
+  g{tag}_m = solid.material@1(g{tag}_a, color=[0.6, 0.85, 0.95], roughness=0.05, opacity=0.18)
+  output glass_{tag} = g{tag}_m
+end
+glass("l", 0.08, 3.4, 2.4, -63.0, 6.7, 40)
+glass("r", 0.08, 3.4, 2.4, -55.0, 6.7, 40)
+glass("f", 8.16, 3.4, 0.08, -59.0, 6.7, 41.2)
+glass("b", 8.16, 3.4, 0.08, -59.0, 6.7, 38.8)
+water = fluid.sim@1(method="apic", min=[-62.9, 5.05, 38.9], max=[-60.9, 7.2, 41.1], spacing=0.1, bounds_min=[-62.95, 5.0, 38.85], bounds_max=[-55.05, 8.4, 41.15], viscosity=0.005, iterations=4, substeps=3, cell=0.13, level=0.5, max_triangles=12000)
+water_m = solid.material@1(water, color=[0.2, 0.55, 0.85], roughness=0.08, opacity=0.85)
+output tank_water = water_m
+shack_s = solid.box@1(size=[4, 2.8, 3.2])
+shack_a = xform.move@1(shack_s, by=[-59, 6.4, 33.4])
+shack_m = solid.material@1(shack_a, color=[0.24, 0.3, 0.34], roughness=0.6, metallic=0.5)
+output shack = shack_m
+shack_p = detail.panels@1(shack_a, face="+z", cols=5, rows=3, gap=0.05, depth=0.06, raised=0.3, vents=0.2, seed=3)
+shack_pm = solid.material@1(shack_p, color=[0.36, 0.42, 0.48], roughness=0.5, metallic=0.6)
+output shack_plates = shack_pm
+neon = sign.text@1(text="ARMADA", height=0.7, depth=0.08, color=[0.1, 0.9, 1.0], glow=6)
+neon_a = xform.move@1(neon, by=[-59, 8.0, 35.05])
+output neon = neon_a
+neon_light = light.point@1(position=[-59, 8.4, 37], color=[0.2, 0.9, 1.0], intensity=300, range=24)
+
+# ---------- sparks off the lighthouse lamp ----------
+spark_src = solid.sphere@1(radius=0.1, segments=6)
+spark_a = xform.move@1(spark_src, by=[-6, 43.2, -4])
+sparks = fx.emitter@1(spark_a, name="lamp_sparks", rate=40, lifetime=[2, 4], speed=[1.5, 4], direction=[0, 1, 0], cone=1.2, shape="sphere", extent=[0.8, 0.8, 0.8], max_particles=300, size=[0.18, 0.05], colour=[3.0, 2.2, 0.8], colour_end=[1.2, 0.3, 0.05], alpha=[1, 0], glow=8, blend="additive")
+output lamp_sparks = sparks

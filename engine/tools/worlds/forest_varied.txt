@@ -1,0 +1,237 @@
+# A varied forest: several variants of every tree species (scatter.place `mix` and `pick` split one planting between them), an autumn grove, ferns,
+# mushrooms, flower meadows in four colourings, bushes, mossy rocks, logs, stumps and reeds. Metres, y up.
+sky = scene.sky@1(sun_elevation=16, sun_azimuth=-60, sun_intensity=7.0, turbidity=3.4, ground_color=[0.2, 0.2, 0.18], clouds=true, haze=0.1, haze_color=[1.0, 0.78, 0.55], haze_height=70)
+output sky = sky
+env = scene.environment@1(sky_color=[0.75, 0.68, 0.7], ground_color=[0.25, 0.22, 0.18], intensity=1.7, reflection=0.3)
+output env = env
+
+group wildflower
+  stem_c = curve.bezier@1(points=[[0, 0, 0], [0.02, 0.15, 0], [-0.015, 0.3, 0.01], [0, 0.46, 0]], steps=8)
+  stem = curve.tube@1(stem_c, radius=0.007, end_radius=0.005, sides=5)
+  stem_m = solid.material@1(stem, color=[0.22, 0.42, 0.12], roughness=0.8)
+  leaf_s = solid.sphere@1(radius=0.05, segments=8)
+  leaf_f = xform.scale@1(leaf_s, by=[1.8, 0.12, 0.6])
+  leaf_a = xform.rotate@1(leaf_f, angles=[0, 0, 25])
+  leaf_at = xform.move@1(leaf_a, by=[0.05, 0.1, 0])
+  leaves = inst.radial@1(leaf_at, count=2, radius=0)
+  leaves_s = inst.realize@1(leaves)
+  leaves_m = solid.material@1(leaves_s, color=[0.2, 0.4, 0.1], roughness=0.8)
+  petal_s = solid.sphere@1(radius=0.03, segments=8)
+  petal_f = xform.scale@1(petal_s, by=[1.5, 0.25, 0.7])
+  petal_a = xform.rotate@1(petal_f, angles=[0, 0, 12])
+  petal_at = xform.move@1(petal_a, by=[0.04, 0, 0])
+  petals = inst.radial@1(petal_at, count=6, radius=0)
+  petals_s = inst.realize@1(petals)
+  petals_m = solid.material@1(petals_s, color=[0.95, 0.3, 0.5], roughness=0.6)
+  eye_s = solid.sphere@1(radius=0.018, segments=8)
+  eye_f = xform.scale@1(eye_s, by=[1, 0.7, 1])
+  eye_m = solid.material@1(eye_f, color=[0.95, 0.75, 0.1], roughness=0.7)
+  head_u = solid.union@1(petals_m, eye_m)
+  head_t = xform.rotate@1(head_u, angles=[12, 0, 0])
+  head_at = xform.move@1(head_t, by=[0, 0.46, 0])
+  flower = solid.union@1(stem_m, leaves_m, head_at)
+  swaying = solid.foliage@1(flower, alpha_cutoff=0, sway=0.6, flutter=0.3, translucency=0.5)
+  expose petal_color = petals_m.color
+  expose centre_color = eye_m.color
+  expose stem_color = stem_m.color
+  expose petals = petals.count
+  result swaying
+end
+
+group mushroom
+  stem_p = profile.polygon@1(points=[[0, 0], [0.022, 0], [0.018, 0.03], [0.016, 0.065], [0.02, 0.075], [0, 0.075]])
+  stem_f = profile.fillet@1(stem_p, radius=0.004)
+  stem_r = solid.revolve@1(stem_f, segments=16)
+  stem_m = solid.material@1(stem_r, color=[0.9, 0.86, 0.74], roughness=0.8)
+  cap_p = profile.polygon@1(points=[[0, 0.06], [0.03, 0.058], [0.052, 0.068], [0.058, 0.082], [0.05, 0.098], [0.032, 0.112], [0.012, 0.119], [0, 0.12]])
+  cap_r = solid.revolve@1(cap_p, segments=24)
+  cap_m = solid.material@1(cap_r, color=[0.78, 0.12, 0.1], roughness=0.5)
+  spot_s = solid.sphere@1(radius=0.007, segments=8)
+  spots = inst.scatter_on@1(spot_s, cap_r, count=10, seed=2, align=true)
+  spots_s = inst.realize@1(spots)
+  spots_m = solid.material@1(spots_s, color=[0.96, 0.94, 0.88], roughness=0.6)
+  shroom = solid.union@1(stem_m, cap_m, spots_m)
+  expose cap_color = cap_m.color
+  expose stem_color = stem_m.color
+  expose spot_color = spots_m.color
+  expose spots = spots.count
+  result shroom
+end
+
+group fern
+  rachis = curve.bezier@1(points=[[0, 0.08, 0], [0, 0.3, 0.24], [0, 0.4, 0.5], [0, 0.25, 0.78]], steps=14)
+  rib_t = curve.tube@1(rachis, radius=0.006, end_radius=0.002, sides=5)
+  leaflet_s = solid.sphere@1(radius=0.05, segments=5)
+  leaflet_f = xform.scale@1(leaflet_s, by=[0.3, 0.07, 1.0])
+  leaflet_l = xform.move@1(leaflet_f, by=[0, 0, 0.04])
+  leaflet_r = xform.move@1(leaflet_f, by=[0, 0, -0.04])
+  taper = field.expr@1(code="out = mix(1.0, 0.3, clamp(p.z / 0.78, 0.0, 1.0))")
+  pairs_l = inst.along_curve@1(leaflet_l, rachis, count=12, align=true)
+  pairs_r = inst.along_curve@1(leaflet_r, rachis, count=12, align=true)
+  small_l = inst.vary@1(pairs_l, taper)
+  small_r = inst.vary@1(pairs_r, taper)
+  leaves_l = inst.realize@1(small_l)
+  leaves_r = inst.realize@1(small_r)
+  frond_u = solid.union@1(rib_t, leaves_l, leaves_r)
+  frond_m = solid.material@1(frond_u, color=[0.2, 0.44, 0.12], roughness=0.7)
+  frond_f = solid.foliage@1(frond_m, alpha_cutoff=0, sway=0.3, flutter=0.4, translucency=0.5)
+  ring = inst.radial@1(frond_f, count=6, radius=0.03)
+  jittered = inst.jitter@1(ring, seed=3, yaw_jitter=0.3, scale_jitter=0.25)
+  plant = inst.realize@1(jittered)
+  expose color = frond_m.color
+  expose fronds = ring.count
+  expose seed = jittered.seed
+  result plant
+end
+
+group flowering_bush
+  a = field.ellipsoid@1(radii=[0.55, 0.4, 0.5])
+  a_at = field.move@1(a, by=[0, 0.42, 0])
+  b = field.ellipsoid@1(radii=[0.4, 0.3, 0.4])
+  b_at = field.move@1(b, by=[0.35, 0.35, 0.15])
+  c = field.ellipsoid@1(radii=[0.38, 0.3, 0.36])
+  c_at = field.move@1(c, by=[-0.3, 0.33, -0.1])
+  ab = field.smooth_union@1(a_at, b_at, radius=0.2)
+  abc = field.smooth_union@1(ab, c_at, radius=0.2)
+  rough = field.noise@1(abc, amplitude=0.05, scale=0.3, octaves=2, seed=3)
+  blob = field.to_solid@1(rough, min=[-1.1, -0.25, -1.1], max=[1.1, 1.1, 1.1], edge_length=0.065)
+  leaves_m = solid.material@1(blob, color=[0.3, 0.5, 0.2], roughness=0.85)
+  leaves_t = solid.texture@1(leaves_m, program="n = fbm(scale_x=18, scale_y=18, iterations=3); c = colorize(n, gradient=[0:#244a14, 0.5:#3f7a22, 1:#6aa63a]); albedo = c")
+  bloom_s = solid.sphere@1(radius=0.035, segments=6)
+  bloom_f = xform.scale@1(bloom_s, by=[1, 0.6, 1])
+  blooms = inst.scatter_on@1(bloom_f, blob, count=70, seed=5, align=true, scale_jitter=0.3)
+  blooms_s = inst.realize@1(blooms)
+  blooms_m = solid.material@1(blooms_s, color=[0.95, 0.4, 0.6], roughness=0.6)
+  bush = solid.union@1(leaves_t, blooms_m)
+  swaying = solid.foliage@1(bush, alpha_cutoff=0, sway=0.25, flutter=0.15, translucency=0.4)
+  expose flower_color = blooms_m.color
+  expose blooms = blooms.count
+  expose seed = rough.seed
+  result swaying
+end
+
+group rock
+  e = field.ellipsoid@1(radii=[0.5, 0.32, 0.4])
+  e_at = field.move@1(e, by=[0, 0.22, 0])
+  rough = field.noise@1(e_at, amplitude=0.08, scale=0.5, octaves=3, seed=2)
+  stone = field.to_solid@1(rough, min=[-0.9, -0.3, -0.9], max=[0.9, 0.8, 0.9], edge_length=0.04)
+  stone_m = solid.material@1(stone, color=[0.5, 0.5, 0.48], roughness=0.9)
+  stone_t = solid.texture@1(stone_m, program="n = fbm(scale_x=3, scale_y=3, iterations=5); f = fbm(scale_x=26, scale_y=26, iterations=3); ao = surface_ao(strength=0.4); grey = colorize(n, gradient=[0:#6b6a64, 0.5:#8e8c84, 1:#b4b2a8]); dirt = colorize(ao, gradient=[0:#3a382f, 1:#d8d6cc]); a0 = blend(grey, dirt, ao, blend_type=normal, amount=0.5); moss = colorize(f, gradient=[0:#2e4a1c, 1:#6f9a3a]); up = surface_up(power=3); albedo = blend(moss, a0, up, blend_type=normal, amount=0.7)")
+  stone_f = solid.finish@1(stone_t, relief=0.12, relief_scale=22)
+  expose seed = rough.seed
+  result stone_f
+end
+
+group log
+  body = solid.cylinder@1(radius=0.26, height=2.4, segments=16)
+  body_r = xform.rotate@1(body, angles=[0, 0, 90])
+  body_n = xform.noise@1(body_r, amplitude=0.03, scale=0.4, seed=2)
+  body_l = xform.move@1(body_n, by=[0, 0.24, 0])
+  body_m = solid.material@1(body_l, color=[0.5, 0.4, 0.3], roughness=0.9)
+  bark = solid.texture@1(body_m, program="n = fbm(scale_x=8, scale_y=3, iterations=5); f = fbm(scale_x=34, scale_y=34, iterations=3); ao = surface_ao(strength=0.4); wood = colorize(n, gradient=[0:#2c1d10, 0.5:#5e4529, 1:#947552]); dirt = colorize(ao, gradient=[0:#1c1209, 1:#d8c8a8]); a0 = blend(wood, dirt, ao, blend_type=normal, amount=0.5); moss = colorize(f, gradient=[0:#2e4a1c, 1:#6f9a3a]); up = surface_up(power=2); a1 = blend(moss, a0, up, blend_type=normal, amount=0.75); albedo = a1")
+  fin = solid.finish@1(bark, relief=0.12, relief_scale=24)
+  expose seed = body_n.seed
+  expose length = body.height
+  expose radius = body.radius
+  result fin
+end
+
+group stump
+  prof = profile.polygon@1(points=[[0, 0], [0.4, 0], [0.34, 0.07], [0.29, 0.18], [0.27, 0.4], [0.26, 0.44], [0, 0.44]])
+  prof_f = profile.fillet@1(prof, radius=0.015)
+  body = solid.revolve@1(prof_f, segments=18)
+  body_n = xform.noise@1(body, amplitude=0.025, scale=0.35, seed=4)
+  body_m = solid.material@1(body_n, color=[0.5, 0.4, 0.3], roughness=0.9)
+  bark = solid.texture@1(body_m, program="n = fbm(scale_x=8, scale_y=3, iterations=5); f = fbm(scale_x=34, scale_y=34, iterations=3); wood = colorize(n, gradient=[0:#2c1d10, 0.5:#5e4529, 1:#947552]); top = colorize(f, gradient=[0:#b8946a, 1:#dcc190]); moss = colorize(f, gradient=[0:#2e4a1c, 1:#6f9a3a]); up = surface_up(power=6); a0 = blend(top, wood, up, blend_type=normal, amount=0.95); side = surface_cavity(gain=2); albedo = blend(moss, a0, side, blend_type=normal, amount=0.25)")
+  fin = solid.finish@1(bark, relief=0.12, relief_scale=24)
+  expose seed = body_n.seed
+  result fin
+end
+
+# ---------- the ground: hills painted by height and slope, sorted into forest, meadow and rock ----------
+land = terrain.tile@1(size=[128, 128], cell=1, seed=14, height=22, scale=95, octaves=4, roughness=0.5)
+land_p = terrain.flatten@1(land, at=[64, 74], radius=11, blend=16, to="height", height=1.6)
+land_b = terrain.biomes@1(land_p, seed=3)
+pond = water.fill@1(land_p, at=[64, 74], level=2.6, shore=3, shallow=[0.2, 0.45, 0.42], deep=[0.03, 0.14, 0.2], clarity=2.5, ripple=0.6, foam=0.4, opacity=0.9, sim=true, sim_resolution=160, rain=0.2)
+output pond = pond
+ground = terrain.material@1(land_b, grass=[0.2, 0.32, 0.12], rock=[0.4, 0.37, 0.33], rock_slope=36, sand_line=0.5)
+output ground = ground
+
+# ---------- trees: variants of each species share one planting through mix and pick (same radius, density and seed) ----------
+oak_a = flora.tree@1(kind="oak", height=9, seed=3, lod=2)
+oak_b = flora.tree@1(kind="oak", height=11, seed=5, lod=2, leaves=[0.17, 0.4, 0.1])
+oak_c = flora.tree@1(kind="oak", height=8, seed=8, lod=2, leaves=[0.26, 0.44, 0.13])
+oaks_a = scatter.place@1(oak_a, land_b, radius=13, density=0.7, seed=2, max_slope=28, layer="biome_forest", mix="0.45, 0.35, 0.2", pick=0, scale=[0.85, 1.2])
+oaks_b = scatter.place@1(oak_b, land_b, radius=13, density=0.7, seed=2, max_slope=28, layer="biome_forest", mix="0.45, 0.35, 0.2", pick=1, scale=[0.85, 1.2])
+oaks_c = scatter.place@1(oak_c, land_b, radius=13, density=0.7, seed=2, max_slope=28, layer="biome_forest", mix="0.45, 0.35, 0.2", pick=2, scale=[0.85, 1.2])
+output oaks_a = oaks_a
+output oaks_b = oaks_b
+output oaks_c = oaks_c
+grove = field.expr@1(code="out = smoothstep(0.1, 0.4, perlin(p * 0.018, 21.0))")
+oak_fall = flora.tree@1(kind="oak", height=9, seed=12, lod=2, season="autumn")
+oaks_fall = scatter.place@1(oak_fall, land_b, grove, radius=10, density=0.8, seed=31, max_slope=28, layer="biome_forest", scale=[0.85, 1.2])
+output oaks_autumn = oaks_fall
+birch_a = flora.tree@1(kind="birch", height=8, seed=7, lod=2)
+birch_b = flora.tree@1(kind="birch", height=9.5, seed=19, lod=2, leaves=[0.28, 0.5, 0.14])
+birches_a = scatter.place@1(birch_a, land_b, radius=9, density=0.5, seed=6, max_slope=26, layer="biome_meadow", mix="1, 1", pick=0)
+birches_b = scatter.place@1(birch_b, land_b, radius=9, density=0.5, seed=6, max_slope=26, layer="biome_meadow", mix="1, 1", pick=1)
+output birches_a = birches_a
+output birches_b = birches_b
+pine_a = flora.tree@1(kind="pine", height=11, seed=5, lod=2)
+pine_b = flora.tree@1(kind="pine", height=9, seed=17, lod=2, leaves=[0.08, 0.22, 0.13])
+pines_a = scatter.place@1(pine_a, land_b, radius=10, density=0.6, seed=9, min_height=9, max_slope=32, mix="3, 2", pick=0)
+pines_b = scatter.place@1(pine_b, land_b, radius=10, density=0.6, seed=9, min_height=9, max_slope=32, mix="3, 2", pick=1)
+output pines_a = pines_a
+output pines_b = pines_b
+
+# ---------- undergrowth: each plant in several colourings, each colouring its own pick ----------
+fern1 = fern()
+ferns = scatter.place@1(fern1, land_b, radius=7, density=0.6, seed=11, max_slope=28, layer="biome_forest", scale=[0.8, 1.3])
+output ferns = ferns
+mush_red = mushroom()
+mush_brown = mushroom(cap_color=[0.55, 0.38, 0.2], spot_color=[0.55, 0.38, 0.2], stem_color=[0.85, 0.8, 0.68])
+mush_gold = mushroom(cap_color=[0.92, 0.8, 0.3], spot_color=[0.92, 0.8, 0.3])
+mush_a = scatter.place@1(mush_red, land_b, radius=3.4, density=0.5, seed=15, max_slope=25, layer="biome_forest", mix="2, 2, 1", pick=0, scale=[0.8, 1.6])
+mush_b = scatter.place@1(mush_brown, land_b, radius=3.4, density=0.5, seed=15, max_slope=25, layer="biome_forest", mix="2, 2, 1", pick=1, scale=[0.8, 1.6])
+mush_c = scatter.place@1(mush_gold, land_b, radius=3.4, density=0.5, seed=15, max_slope=25, layer="biome_forest", mix="2, 2, 1", pick=2, scale=[0.8, 1.6])
+output mushrooms_red = mush_a
+output mushrooms_brown = mush_b
+output mushrooms_gold = mush_c
+fl_pink = wildflower()
+fl_gold = wildflower(petal_color=[0.98, 0.85, 0.2], centre_color=[0.5, 0.25, 0.1], petals=8)
+fl_violet = wildflower(petal_color=[0.6, 0.45, 0.95], petals=5)
+fl_white = wildflower(petal_color=[0.97, 0.97, 0.95], centre_color=[0.95, 0.8, 0.15], petals=10)
+meadow_a = scatter.place@1(fl_pink, land_b, radius=2.2, density=0.7, seed=21, max_slope=24, layer="biome_meadow", mix="3, 3, 2, 2", pick=0, scale=[0.8, 1.4])
+meadow_b = scatter.place@1(fl_gold, land_b, radius=2.2, density=0.7, seed=21, max_slope=24, layer="biome_meadow", mix="3, 3, 2, 2", pick=1, scale=[0.8, 1.4])
+meadow_c = scatter.place@1(fl_violet, land_b, radius=2.2, density=0.7, seed=21, max_slope=24, layer="biome_meadow", mix="3, 3, 2, 2", pick=2, scale=[0.8, 1.4])
+meadow_d = scatter.place@1(fl_white, land_b, radius=2.2, density=0.7, seed=21, max_slope=24, layer="biome_meadow", mix="3, 3, 2, 2", pick=3, scale=[0.8, 1.4])
+output flowers_pink = meadow_a
+output flowers_gold = meadow_b
+output flowers_violet = meadow_c
+output flowers_white = meadow_d
+bush_pink = flowering_bush()
+bush_gold = flowering_bush(flower_color=[0.98, 0.85, 0.25], seed=4)
+bushes_a = scatter.place@1(bush_pink, land_b, radius=9, density=0.6, seed=25, max_slope=26, mix="1, 1", pick=0, scale=[0.8, 1.5])
+bushes_b = scatter.place@1(bush_gold, land_b, radius=9, density=0.6, seed=25, max_slope=26, mix="1, 1", pick=1, scale=[0.8, 1.5])
+output bushes_pink = bushes_a
+output bushes_gold = bushes_b
+rock_a = rock()
+rock_b = rock(seed=9)
+rocks_a = scatter.place@1(rock_a, land_b, radius=11, density=0.5, seed=33, max_slope=50, sink=0.12, align=0.5, mix="1, 1", pick=0, scale=[0.6, 2.2])
+rocks_b = scatter.place@1(rock_b, land_b, radius=11, density=0.5, seed=33, max_slope=50, sink=0.12, align=0.5, mix="1, 1", pick=1, scale=[0.6, 2.2])
+output rocks_a = rocks_a
+output rocks_b = rocks_b
+log1 = log()
+logs = scatter.place@1(log1, land_b, radius=16, density=0.5, seed=41, max_slope=18, layer="biome_forest")
+output logs = logs
+stump1 = stump()
+stumps = scatter.place@1(stump1, land_b, radius=14, density=0.5, seed=43, max_slope=20, layer="biome_forest")
+output stumps = stumps
+
+# ---------- life: leaves drifting down through the canopy (SimL, each leaf on its own sway), and a flock of birds circling above (boids, spatial hash) ----------
+leaves_fall = sim.program@1(size=0.09, seed=4, rate=30, source="sim leaves\nstate pos: vec3[500]\nkernel init each i in pos {\n  pos[i] = vec3(14.0 + rand(i, 1.0) * 100.0, 4.0 + rand(i, 2.0) * 26.0, 14.0 + rand(i, 3.0) * 100.0)\n}\nkernel fall each i in pos {\n  let k = t * (0.7 + 0.5 * rand(i, 4.0)) + i * 1.7\n  let d = vec3(sin(k) * 0.9 + 0.35, -0.65 - 0.25 * rand(i, 5.0), cos(k * 0.8) * 0.9) * dt\n  let p = pos[i] + d\n  if p.y < 3.0 {\n    p = vec3(14.0 + rand(i, t + 6.0) * 100.0, 30.0, 14.0 + rand(i, t + 7.0) * 100.0)\n  }\n  pos[i] = p\n}\nschedule fall\noutput particles pos\n")
+leaves_m = solid.material@1(leaves_fall, color=[0.82, 0.42, 0.1], roughness=0.8)
+output falling_leaves = leaves_m
+birds = sim.program@1(size=0.35, seed=8, rate=30, source="sim birds\nparam radius = 8.0\nparam max_speed = 12.0\nstate pos: vec3[140]\nstate vel: vec3[140]\nkernel init each i in pos {\n  pos[i] = vec3(40.0 + rand(i, 1.0) * 30.0, 48.0 + rand(i, 2.0) * 10.0, 40.0 + rand(i, 3.0) * 30.0)\n  vel[i] = normalize(vec3(rand(i, 4.0), rand(i, 5.0) * 0.2, rand(i, 6.0)) - vec3(0.5, 0.1, 0.5)) * 8.0\n}\nkernel flock each i in pos {\n  let p = pos[i]\n  let v = vel[i]\n  let centre = vec3(0.0)\n  let heading = vec3(0.0)\n  let push = vec3(0.0)\n  let seen = 0.0\n  for j in neighbors(pos, p, radius) cap 12 {\n    if j != i {\n      centre += pos[j]\n      heading += vel[j]\n      let d = p - pos[j]\n      push += d / max(dot(d, d), 0.05)\n      seen += 1.0\n    }\n  }\n  let acc = vec3(0.0)\n  if seen > 0.0 {\n    acc = (centre / seen - p) * 0.7 + (heading / seen - v) * 2.5 + push * 4.0\n  }\n  let target = vec3(64.0 + cos(t * 0.12) * 45.0, 50.0 + sin(t * 0.3) * 6.0, 64.0 + sin(t * 0.12) * 45.0)\n  acc += normalize(target - p) * 3.0\n  let nv = v + acc * dt\n  let sp = length(nv)\n  nv = nv * min(1.0, max_speed / max(sp, 0.001))\n  nv = nv * max(1.0, 6.0 / max(sp, 0.001))\n  vel[i] = nv\n}\nkernel move each i in pos { pos[i] += vel[i] * dt }\nschedule flock; move\noutput particles pos\n")
+birds_m = solid.material@1(birds, color=[0.05, 0.05, 0.06], roughness=0.8)
+output birds = birds_m

@@ -1,0 +1,32 @@
+group wildflower
+  stem_c = curve.bezier@1(points=[[0, 0, 0], [0.02, 0.15, 0], [-0.015, 0.3, 0.01], [0, 0.46, 0]], steps=8)
+  stem = curve.tube@1(stem_c, radius=0.007, end_radius=0.005, sides=5)
+  stem_m = solid.material@1(stem, color=[0.22, 0.42, 0.12], roughness=0.8)
+  leaf_s = solid.sphere@1(radius=0.05, segments=8)
+  leaf_f = xform.scale@1(leaf_s, by=[1.8, 0.12, 0.6])
+  leaf_a = xform.rotate@1(leaf_f, angles=[0, 0, 25])
+  leaf_at = xform.move@1(leaf_a, by=[0.05, 0.1, 0])
+  leaves = inst.radial@1(leaf_at, count=2, radius=0)
+  leaves_s = inst.realize@1(leaves)
+  leaves_m = solid.material@1(leaves_s, color=[0.2, 0.4, 0.1], roughness=0.8)
+  petal_s = solid.sphere@1(radius=0.03, segments=8)
+  petal_f = xform.scale@1(petal_s, by=[1.5, 0.25, 0.7])
+  petal_a = xform.rotate@1(petal_f, angles=[0, 0, 12])
+  petal_at = xform.move@1(petal_a, by=[0.04, 0, 0])
+  petals = inst.radial@1(petal_at, count=6, radius=0)
+  petals_s = inst.realize@1(petals)
+  petals_m = solid.material@1(petals_s, color=[0.95, 0.3, 0.5], roughness=0.6)
+  eye_s = solid.sphere@1(radius=0.018, segments=8)
+  eye_f = xform.scale@1(eye_s, by=[1, 0.7, 1])
+  eye_m = solid.material@1(eye_f, color=[0.95, 0.75, 0.1], roughness=0.7)
+  head_u = solid.union@1(petals_m, eye_m)
+  head_t = xform.rotate@1(head_u, angles=[12, 0, 0])
+  head_at = xform.move@1(head_t, by=[0, 0.46, 0])
+  flower = solid.union@1(stem_m, leaves_m, head_at)
+  swaying = solid.foliage@1(flower, alpha_cutoff=0, sway=0.6, flutter=0.3, translucency=0.5)
+  expose petal_color = petals_m.color
+  expose centre_color = eye_m.color
+  expose stem_color = stem_m.color
+  expose petals = petals.count
+  result swaying
+end

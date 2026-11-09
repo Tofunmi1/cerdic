@@ -3,6 +3,7 @@ fn advance(
     physics: &mut Physics,
     parts: &mut Query<(Entity, &Body, &mut Transform)>,
     rig: &mut ViewerRig,
+    prototypes: &Prototypes,
 ) {
     physics.entities = parts.iter().count();
     physics.movable = parts
@@ -10,6 +11,7 @@ fn advance(
         .filter(|(_, body, _)| body.0.is_movable())
         .count();
     if !behaviors.is_playing() {
+        clear_pushes();
         if physics.world.take().is_some() {
             for live in std::mem::take(&mut physics.bodies) {
                 for entity in live.entities {
@@ -21,6 +23,8 @@ fn advance(
             physics.steps = 0;
             physics.marks.clear();
             physics.touching.clear();
+            physics.ragdolls.clear();
+            physics.ragdoll_poses.clear();
         }
         if physics.walker.take().is_some() {
             rig.set_walking(false);
@@ -39,6 +43,7 @@ fn advance(
         physics.world = Some(world);
         physics.bodies = bodies;
     }
+    sync_bodies(physics, parts, prototypes);
     let Physics {
         world,
         bodies,
@@ -46,6 +51,8 @@ fn advance(
         marks,
         touching,
         walker,
+        ragdolls,
+        ragdoll_poses,
         ..
     } = physics;
     let Some(world) = world.as_mut() else {
@@ -70,7 +77,14 @@ fn advance(
                 hand.is_some(),
                 world,
             );
+            if live.kind == BodyKind::Kinematic
+                && !live.held
+                && let Some((_, _, transform)) = live.entities.first().and_then(|entity| parts.get(*entity).ok())
+            {
+                follow_part(live, *transform, world);
+            }
         }
+        apply_pushes(world, bodies);
         world.step();
         *steps += 1;
         // Every simulated second, note where everything is (the first few only), so a test can compare two plays at the
@@ -96,6 +110,7 @@ fn advance(
         }
         *touching = now;
     }
+    update_ragdolls(world, ragdolls, ragdoll_poses);
     if let Some(walking) = walker.as_ref() {
         rig.set_walking(true);
         if let Some(state) = walking.state {
@@ -120,6 +135,7 @@ fn advance(
             }
         }
     }
+    publish_poses(bodies, parts);
 }
 
 thread_local! {
@@ -149,6 +165,8 @@ fn state(physics: &Physics) -> String {
                 .collect()
         })
         .unwrap_or_default();
-    serde_json::json!({"active": physics.world.is_some(), "steps": physics.steps, "entities": physics.entities, "movable": physics.movable, "refused": physics.refused, "marks": physics.marks, "bodies": bodies,
+    let mut limp: Vec<&String> = physics.ragdolls.keys().collect();
+    limp.sort();
+    serde_json::json!({"active": physics.world.is_some(), "steps": physics.steps, "entities": physics.entities, "movable": physics.movable, "ragdolls": physics.rigs, "limp": limp, "refused": physics.refused, "marks": physics.marks, "bodies": bodies,
         "walker": physics.walker.as_ref().and_then(|w| w.state).map(|s| serde_json::json!({"position": s.position, "grounded": s.grounded}))}).to_string()
 }

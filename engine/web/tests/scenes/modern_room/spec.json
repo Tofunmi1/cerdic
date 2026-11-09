@@ -1,0 +1,12 @@
+{
+  "scene": "modern_room",
+  "units": "metres",
+  "targets": [
+    { "id": "room-width", "part": "floor", "axis": "x", "min": 9.9, "max": 10.1, "hint": "floor_src.size.x" },
+    { "id": "room-depth", "part": "floor", "axis": "z", "min": 7.9, "max": 8.1, "hint": "floor_src.size.z" },
+    { "id": "picture-window-width", "part": "picture_glass", "axis": "z", "min": 6.3, "max": 6.5, "hint": "glass_src.size.x after the 90 degree wall turn" },
+    { "id": "sofa-width", "part": "sofa_seats", "axis": "x", "min": 3.0, "max": 3.2, "hint": "seat spacing and seat_src.size.x" },
+    { "id": "named-outputs", "min": 60, "hint": "preserve separate named furniture and architectural outputs" },
+    { "id": "mesh-detail", "min": 40000, "hint": "retain rounded upholstery, foliage and detailed prop meshes" }
+  ]
+}

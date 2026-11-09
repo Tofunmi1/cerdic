@@ -1,0 +1,78 @@
+# HEAD STUDY (stage 1, primary and secondary forms). A LOFT of cross-section rings, subdivided twice, then anatomical landmarks pushed in by vertex
+# programs. EVERY landmark height and size is a named value in the table below; engine/tools/audit-human.ts measures the evaluated mesh against the
+# proportion rules (eye line at half the head, five eye-widths across, nose base halfway eye to chin, ...) and says which value to change.
+# Metres, +y up, facing +z, true height (orbit up to the face).
+# kind: world
+sky = scene.sky@1(sun_elevation=38, sun_azimuth=-35, sun_intensity=3.4, turbidity=3, ground_color=[0.32, 0.3, 0.28], clouds=false, haze=0.08)
+env = scene.environment@1(sky_color=[0.75, 0.82, 0.95], ground_color=[0.42, 0.38, 0.34], intensity=0.9, reflection=0.35, bounce=0.6)
+output sky = sky
+output env = env
+
+# ---------------- PARAMETER TABLE ----------------
+# the skull: crown and chin set the head height (0.23 m is 7.5 heads for a 1.72 m body); the eye line is halfway between them
+let crown = "1.745"
+let chin = "1.525"
+let eye_y = "1.635"
+# eyes: centre of each eye from the midline (pupillary distance is twice this, about 61 mm), half width and half height of the opening
+let eye_x = "0.0305"
+let eye_a = "0.0145"
+let eye_b = "0.0068"
+# nose: base (subnasale) height, how far the bridge, tip and wings stand out (m)
+let nose_base = "1.583"
+let nose_bridge = "0.0105"
+let nose_tip = "0.0165"
+let nose_wing = "0.0055"
+# mouth: the mouth line height and how much each lip stands out
+let mouth_y = "1.5545"
+let lip_up = "0.0075"
+let lip_down = "0.0088"
+let chin_out = "0.0065"
+# the brow ridge, cheekbone, eye socket, lid margin and ear flap (m)
+let brow_out = "0.0062"
+let cheek_out = "0.0058"
+let socket_in = "0.0055"
+let lid_out = "0.0035"
+let ear_out = "0.0165"
+# --------------------------------------------------
+
+# rings: [fraction of head height above the chin, half width, front z, back z, squareness]; Catmull-Rom between them; 40 points round, front at point 0
+let loft = "const C = ${chin}, T = ${crown}, H = T - C; const R = [[-0.42,.058,.052,-.055,2],[-.252,.054,.056,-.05,2],[-.126,.051,.06,-.047,2],[-.021,.048,.078,-.05,2.1],[.063,.055,.094,-.06,2.3],[.189,.064,.098,-.078,2.4],[.315,.07,.098,-.082,2.4],[.441,.0735,.092,-.089,2.4],[.588,.076,.092,-.092,2.4],[.735,.074,.087,-.091,2.4],[.861,.066,.076,-.082,2.4],[.945,.048,.054,-.066,2.3],[1.0,.022,.026,-.034,2.1]]; const m = new Mesh(); const M = 40, K = 34; const cr = (a, b, c, d, t) => 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t); const rows = []; for (let k = 0; k < K; k++) { const f = -0.42 + 1.42 * k / (K - 1); const y = C + f * H; let s = 0; while (s < R.length - 2 && f > R[s + 1][0]) s++; const t = (f - R[s][0]) / (R[s + 1][0] - R[s][0]); const g = (i) => R[Math.min(R.length - 1, Math.max(0, i))]; const v = []; for (let q = 1; q < 5; q++) v.push(cr(g(s - 1)[q], g(s)[q], g(s + 1)[q], g(s + 2)[q], t)); const a = v[0], zf = v[1], zb = v[2], n = v[3], e = 2 / n, zc = (zf + zb) / 2; const row = []; for (let j = 0; j < M; j++) { const th = 2 * Math.PI * j / M, si = Math.sin(th), co = Math.cos(th); const x = a * Math.sign(si) * Math.pow(Math.abs(si), e); const z = co >= 0 ? zc + (zf - zc) * Math.pow(co, e) : zc + (zc - zb) * Math.sign(co) * Math.pow(-co, e); row.push(m.vertex(x, y, z)); } rows.push(row); } for (let k = 0; k < K - 1; k++) for (let j = 0; j < M; j++) { const j2 = (j + 1) % M; m.face(rows[k][j], rows[k][j2], rows[k + 1][j2], rows[k + 1][j]); } const top = m.vertex(0, T + 0.005, -0.004); for (let j = 0; j < M; j++) m.face(rows[K - 1][j], rows[K - 1][(j + 1) % M], top); m"
+base = poly.script@1(code="${loft}", budget=4000)
+smooth = poly.subdivide@1(base, levels=2)
+
+# nose: bridge, tip, wings, nostrils
+nose = poly.program@1(smooth, mode="offset", code="x = abs(p.x); y = p.y; nb = ${nose_base}; ey = ${eye_y}; fm = smoothstep(0.02, 0.07, p.z); bridge = exp(-(x * x) / 0.000056) * smoothstep(nb - 0.0025, nb + 0.0425, y) * (1.0 - smoothstep(ey + 0.018, ey + 0.053, y)); tip = exp(-(x * x + (y - nb - 0.0085) * (y - nb - 0.0085)) / 0.00011); wing = exp(-((x - 0.0105) * (x - 0.0105) + (y - nb - 0.007) * (y - nb - 0.007)) / 0.000056); nostril = exp(-((x - 0.009) * (x - 0.009) + (y - nb - 0.001) * (y - nb - 0.001)) / 0.000016); out = vec3(0.0, 0.0, fm * (${nose_bridge} * bridge + ${nose_tip} * tip + ${nose_wing} * wing - 0.003 * nostril))")
+
+# eyes: the opening is dented deep (the eyeball shows through), a lid margin rings it, a brow ridge above, a cheekbone below
+eyes = poly.program@1(nose, mode="offset", code="x = abs(p.x); y = p.y; ey = ${eye_y}; fm = smoothstep(0.02, 0.07, p.z); dx = x - ${eye_x}; dy = y - ey; e = dx * dx / (${eye_a} * ${eye_a}) + dy * dy / (${eye_b} * ${eye_b}); opening = 1.0 - smoothstep(0.55, 1.0, e); lid = exp(-(sqrt(e) - 1.32) * (sqrt(e) - 1.32) / 0.07); orbit = exp(-(dx * dx / 0.0004 + dy * dy / 0.00025)); brow = exp(-(dx * dx / 0.00048 + (y - ey - 0.034) * (y - ey - 0.034) / 0.000056)); cheek = exp(-((x - 0.057) * (x - 0.057) + (y - ey + 0.035) * (y - ey + 0.035)) / 0.0002); crease = exp(-(dx * dx / 0.00035 + (y - ey - 0.014) * (y - ey - 0.014) / 0.000012)); out = n * fm * (${brow_out} * brow + ${cheek_out} * cheek + ${lid_out} * lid - ${socket_in} * orbit - 0.0032 * crease) + vec3(0.0, 0.0, -0.0125 * opening * fm)")
+
+# mouth: upper and lower lip, mouth line, mentolabial groove, chin, nasolabial folds, philtrum
+mouth = poly.program@1(eyes, mode="offset", code="x = abs(p.x); y = p.y; my = ${mouth_y}; nb = ${nose_base}; fm = smoothstep(0.03, 0.075, p.z); mx = 1.0 - smoothstep(0.015, 0.031, x); upper = exp(-(y - my - 0.0075) * (y - my - 0.0075) / 0.000025) * mx; lower = exp(-(y - my + 0.0075) * (y - my + 0.0075) / 0.000032) * (1.0 - smoothstep(0.012, 0.029, x)); line = exp(-(y - my) * (y - my) / 0.0000026) * (1.0 - smoothstep(0.02, 0.032, x)); groove = exp(-(y - my + 0.0185) * (y - my + 0.0185) / 0.000012) * (1.0 - smoothstep(0.01, 0.025, x)); chin = exp(-(x * x / 0.0004 + (y - my + 0.0275) * (y - my + 0.0275) / 0.00012)); fold = exp(-((x - 0.027) * (x - 0.027) / 0.000016 + (y - nb + 0.004) * (y - nb + 0.004) / 0.00012)); phil = exp(-(x * x) / 0.000006) * smoothstep(my + 0.004, my + 0.012, y) * (1.0 - smoothstep(nb - 0.004, nb, y)); out = vec3(0.0, 0.0, fm * (${lip_up} * upper + ${lip_down} * lower - 0.0036 * line - 0.0032 * groove + ${chin_out} * chin - 0.0032 * fold - 0.0016 * phil))")
+
+# ears: a flap standing off the skull with a helix rim and a hollow, between the brow line and the nose base
+ears = poly.program@1(mouth, mode="offset", code="x = abs(p.x); y = p.y; ey = ${eye_y}; dz = p.z + 0.008; s = sign(p.x); side = smoothstep(0.066, 0.074, x); flap = exp(-((y - ey + 0.001) * (y - ey + 0.001) / 0.0007 + dz * dz / 0.00028)); hollow = exp(-((y - ey + 0.003) * (y - ey + 0.003) / 0.00012 + (dz - 0.002) * (dz - 0.002) / 0.00008)); out = vec3(s * side * (${ear_out} * flap - 0.0065 * hollow), 0.0, 0.0)")
+
+skin = solid.material@1(ears, color=[0.84, 0.64, 0.52], roughness=0.5)
+skin_f = solid.finish@1(skin, subsurface=0.5, clearcoat=0.1, clearcoat_roughness=0.45)
+output head = skin_f
+
+# eyeballs: white sphere, iris disc, pupil, glassy cornea; sunk behind the lid plane in the openings (centre y = eye_y, x = eye_x)
+eye_w = solid.sphere@1(radius=0.0125, segments=32)
+eye_w_m = solid.material@1(eye_w, color=[0.93, 0.92, 0.9], roughness=0.3)
+iris_s = solid.sphere@1(radius=0.0128, segments=32)
+iris_c = solid.cylinder@1(radius=0.0063, height=0.03, segments=28)
+iris_cr = xform.rotate@1(iris_c, angles=[90, 0, 0])
+iris_i = solid.intersect@1(iris_s, iris_cr)
+iris_m = solid.material@1(iris_i, color=[0.28, 0.42, 0.3], roughness=0.35)
+pupil_s = solid.sphere@1(radius=0.0131, segments=32)
+pupil_c = solid.cylinder@1(radius=0.0029, height=0.03, segments=24)
+pupil_cr = xform.rotate@1(pupil_c, angles=[90, 0, 0])
+pupil_i = solid.intersect@1(pupil_s, pupil_cr)
+pupil_m = solid.material@1(pupil_i, color=[0.02, 0.02, 0.02], roughness=0.2)
+eye_u = solid.union@1(eye_w_m, iris_m)
+eye_u2 = solid.union@1(eye_u, pupil_m)
+eye_f = solid.finish@1(eye_u2, clearcoat=1.0, clearcoat_roughness=0.02)
+eye_at_l = xform.move@1(eye_f, by=[0.0305, 1.635, 0.0745])
+eye_at_r = xform.move@1(eye_f, by=[-0.0305, 1.635, 0.0745])
+output eye_l = eye_at_l
+output eye_r = eye_at_r

@@ -1,0 +1,123 @@
+# A top-down arena shooter: the hero (game.controller top_down) holds Space or the mouse button to fire an auto-aiming blaster at the nearest
+# turret; the turrets spit back every few seconds. Health bars and ammo come from entity props (hero.health), the blaster reloads with R, and
+# the flow is title, play, pause, win and game over. Kill all four turrets to win; lose when the hero's health reaches zero.
+sky = scene.sky@1(sun_elevation=55, sun_azimuth=30, ground_color=[0.18, 0.18, 0.2])
+ambient = scene.environment@1(sky_color=[0.55, 0.62, 0.75], ground_color=[0.25, 0.24, 0.26], intensity=0.7)
+
+floor_box = solid.box@1(size=[26, 0.4, 22])
+floor_at = xform.move@1(floor_box, by=[0, -0.2, 0])
+floor = solid.material@1(floor_at, color=[0.3, 0.31, 0.34], roughness=0.9, recipe="concrete")
+output floor = floor
+
+hero_body = solid.cylinder@1(radius=0.28, height=0.6, segments=24)
+hero_up = xform.move@1(hero_body, by=[0, 0.3, 0])
+hero_head = solid.sphere@1(radius=0.2, segments=20)
+hero_hup = xform.move@1(hero_head, by=[0, 0.75, 0])
+hero_gun = solid.box@1(size=[0.1, 0.1, 0.45])
+hero_gup = xform.move@1(hero_gun, by=[0.22, 0.45, 0.3])
+hero_u1 = solid.union@1(hero_up, hero_hup)
+hero_u2 = solid.union@1(hero_u1, hero_gup)
+hero_m = solid.material@1(hero_u2, color=[0.3, 0.6, 0.9], roughness=0.45)
+output hero = hero_m
+
+turret_base = solid.cylinder@1(radius=0.45, height=0.5, segments=24)
+turret_bup = xform.move@1(turret_base, by=[0, 0.25, 0])
+turret_head = solid.sphere@1(radius=0.38, segments=24)
+turret_hup = xform.move@1(turret_head, by=[0, 0.85, 0])
+turret_u = solid.union@1(turret_bup, turret_hup)
+turret_m = solid.material@1(turret_u, color=[0.8, 0.28, 0.25], roughness=0.5, metallic=0.4)
+output turret = turret_m
+
+wall_h = solid.box@1(size=[26, 1.6, 0.6])
+wall_hm = solid.material@1(wall_h, color=[0.5, 0.48, 0.46], roughness=0.85, recipe="brick")
+output wall_h = wall_hm
+wall_v = solid.box@1(size=[0.6, 1.6, 22])
+wall_vm = solid.material@1(wall_v, color=[0.5, 0.48, 0.46], roughness=0.85, recipe="brick")
+output wall_v = wall_vm
+block = solid.box@1(size=[2, 1.6, 2])
+block_m = solid.material@1(block, color=[0.42, 0.42, 0.45], roughness=0.8, recipe="concrete")
+output block = block_m
+
+bolt = solid.sphere@1(radius=0.1, segments=12)
+bolt_up = xform.move@1(bolt, by=[0, 0, 0])
+bolt_m = solid.material@1(bolt_up, color=[0.5, 0.9, 1.0], roughness=0.2, metallic=0.1)
+output bolt = bolt_m
+spit = solid.sphere@1(radius=0.14, segments=12)
+spit_m = solid.material@1(spit, color=[1.0, 0.45, 0.2], roughness=0.3)
+output spit = spit_m
+
+k_hero = game.kind@1(name="player", size=0.3, speed=5, tags=["hero"], part="hero")
+k_turret = game.kind@1(name="turret", size=0.45, tags=["enemy"], part="turret")
+k_wh = game.kind@1(name="wall_h", size=1, solid=[26, 1.6, 0.6], part="wall_h")
+k_wv = game.kind@1(name="wall_v", size=1, solid=[0.6, 1.6, 22], part="wall_v")
+k_block = game.kind@1(name="block", size=1, solid=[2, 1.6, 2], part="block")
+k_bolt = game.kind@1(name="bolt", size=0.1, tags=["shot"], part="bolt")
+k_spit = game.kind@1(name="spit", size=0.14, tags=["shot"], part="spit")
+
+hp_hero = game.health@1(kind="player", hp=100, iframes=0.5, knock=0)
+hp_turret = game.health@1(kind="turret", hp=30, height=1.2)
+sh_bolt = game.projectile@1(kind="bolt", speed=26, life=1.5, damage=10)
+sh_spit = game.projectile@1(kind="spit", speed=9, life=4, damage=12)
+w_blaster = game.weapon@1(name="blaster", mode="projectile", shot="bolt", input="fire", reload_input="reload", owner="tag:hero", ammo=16, reload=1.2, cooldown=0.2, spread=1.5, aim="tag:enemy", muzzle=0.5, auto=true)
+w_spit = game.weapon@1(name="spit", mode="projectile", shot="spit", owner="kind:turret", cooldown=0.5, aim="tag:hero", muzzle=0.9)
+
+s_hero = game.spawn@1(kind="player", at=[0, 0, -7])
+t1 = game.spawn@1(kind="turret", at=[-8, 0, 6])
+t2 = game.spawn@1(kind="turret", at=[8, 0, 6])
+t3 = game.spawn@1(kind="turret", at=[-8, 0, -2])
+t4 = game.spawn@1(kind="turret", at=[8, 0, -2])
+w_n = game.spawn@1(kind="wall_h", at=[0, 0.8, 11])
+w_s = game.spawn@1(kind="wall_h", at=[0, 0.8, -11])
+w_e = game.spawn@1(kind="wall_v", at=[13, 0.8, 0])
+w_w = game.spawn@1(kind="wall_v", at=[-13, 0.8, 0])
+b1 = game.spawn@1(kind="block", at=[0, 0.8, 2])
+
+kills = game.var@1(name="kills", value=0)
+ground = game.ground@1(y=0)
+
+st_title = game.state@1(name="title", frozen=true)
+st_play = game.state@1(name="playing")
+st_pause = game.state@1(name="paused", frozen=true)
+st_over = game.state@1(name="game_over", frozen=true)
+st_win = game.state@1(name="win", frozen=true)
+pause = game.input@1(name="pause", key="press", target="tag:hero", keys="Escape,KeyP", pad="button9", label="Pause")
+r_pause = game.rule@1(on="input:pause", state="playing", do="go:paused")
+r_resume = game.rule@1(on="input:pause", state="paused", do="go:playing")
+
+move = game.input@1(name="move", axis="x,z", target="tag:hero", keys="KeyD,KeyA,KeyW,KeyS", pad="stick:left", label="Move")
+fire = game.input@1(name="fire", key="press", target="tag:hero", keys="Space,Mouse0", pad="button7", label="Fire")
+reload = game.input@1(name="reload", key="press", target="tag:hero", keys="KeyR", pad="button2", label="Reload")
+ctl = game.controller@1(kind="player", mode="top_down", speed=5, accel=45, decel=60, relative="camera", turn=900)
+cam = game.camera@1(name="above", mode="top_down", distance=20, smoothing=0.12, collide=false)
+
+# V (or Y on a pad) cycles the view: top down, behind the hero, through its eyes; the blaster aims itself at the nearest turret in any of them
+cam_third = game.camera@1(name="behind", mode="third", distance=6, height=1.6, shoulder=0.5, smoothing=0.08)
+cam_first = game.camera@1(name="eyes", mode="first", height=0.9)
+view = game.input@1(name="view", key="press", target="tag:hero", keys="KeyV", pad="button3", label="View")
+r_view = game.rule@1(on="input:view", do="effect:camera:next:0.4")
+r_spit = game.rule@1(on="tick", every=2.5, do="fire:spit")
+r_kill = game.rule@1(on="killed", a="tag:enemy", do="add:kills:1")
+r_hurt = game.rule@1(on="hurt", a="tag:hero", do="effect:camera_shake:hit@a")
+r_dead = game.rule@1(on="killed", a="tag:hero", do="lose")
+won = game.goal@1(outcome="win", when="kills>=4")
+
+t_menu = game.ui@1(name="t_menu", type="stack", anchor="c", align="center", gap=0.03, pad=0.05, fill="rgba(8,12,20,0.78)", show="title")
+t_name = game.ui@1(name="t_name", type="text", parent="t_menu", text="ARENA", letter=0.09, color="#ff8a5c")
+t_play = game.ui@1(name="t_play", type="button", parent="t_menu", text="Fight", size="0.3,0.075", do="go:playing", tip="Destroy all four turrets")
+t_help = game.ui@1(name="t_help", type="text", parent="t_menu", text="{key:move} to move   {key:fire} to fire (hold)   {key:reload} to reload   {key:view} changes the view", letter=0.024)
+h_hp = game.ui@1(name="h_hp", type="bar", anchor="tl", size="0.3,0.035", value="hero.health", max_var="hero.max_health", color="#e8505b", label="health", show="playing")
+h_ammo = game.ui@1(name="h_ammo", type="text", anchor="bl", text="Ammo {hero.ammo_blaster} / 16", letter=0.04, plate="true", show="playing")
+h_kills = game.ui@1(name="h_kills", type="text", anchor="tr", text="Turrets down {kills} / 4", letter=0.04, plate="true", show="playing")
+p_menu = game.ui@1(name="p_menu", type="stack", anchor="c", align="center", gap=0.025, pad=0.04, fill="rgba(8,12,20,0.82)", show="paused")
+p_name = game.ui@1(name="p_name", type="text", parent="p_menu", text="Paused", letter=0.06)
+p_resume = game.ui@1(name="p_resume", type="button", parent="p_menu", text="Resume", size="0.3,0.07", do="go:playing")
+p_quit = game.ui@1(name="p_quit", type="button", parent="p_menu", text="Quit to title", size="0.3,0.07", do="restart:title")
+o_menu = game.ui@1(name="o_menu", type="stack", anchor="c", align="center", gap=0.025, pad=0.05, fill="rgba(30,8,12,0.85)", show="game_over")
+o_name = game.ui@1(name="o_name", type="text", parent="o_menu", text="You were destroyed", letter=0.07, color="#e8505b")
+o_again = game.ui@1(name="o_again", type="button", parent="o_menu", text="Try again", size="0.3,0.07", do="restart:playing")
+w_menu = game.ui@1(name="w_menu", type="stack", anchor="c", align="center", gap=0.025, pad=0.05, fill="rgba(8,24,14,0.85)", show="win")
+w_name = game.ui@1(name="w_name", type="text", parent="w_menu", text="Arena cleared", letter=0.07, color="#7ee08a")
+w_again = game.ui@1(name="w_again", type="button", parent="w_menu", text="Play again", size="0.3,0.07", do="restart:playing")
+
+all = game.collect@1(k_hero, k_turret, k_wh, k_wv, k_block, k_bolt, k_spit, hp_hero, hp_turret, sh_bolt, sh_spit, w_blaster, w_spit, s_hero, t1, t2, t3, t4, w_n, w_s, w_e, w_w, b1, kills, ground, st_title, st_play, st_pause, st_over, st_win, pause, r_pause, r_resume, move, fire, reload, ctl, cam, cam_third, cam_first, view, r_view, r_spit, r_kill, r_hurt, r_dead, won, t_menu, t_name, t_play, t_help, h_hp, h_ammo, h_kills, p_menu, p_name, p_resume, p_quit, o_menu, o_name, o_again, w_menu, w_name, w_again, name="arena")
+output rules = all

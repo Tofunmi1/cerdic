@@ -63,6 +63,7 @@
     import { bindMemory } from "./wasi_snapshot_preview1.js";
     import { watchBenchSession } from "./bench.js";
     import { createDocApi } from "./document-api.js";
+    import { createSaves } from "./savegame.js";
 
     const params = new URLSearchParams(location.search);
     const began = performance.now();
@@ -105,6 +106,20 @@
         });
         state.doc = bridge.doc;
         state.evaluation = bridge.evaluation;
+        state.gameAudio = bridge.gameAudio;
+        state.scripts = bridge.scripts;
+        state.liveTextures = bridge.liveTextures;
+        state.tool = bridge.tool;
+        // Save games of the running game, stored in the browser per document: state.saves.save("slot"), state.saves.load("slot"), .list().
+        state.saves = createSaves(runtimeApi, { name: params.get("docname") ?? "default" });
+        // ?world=<url of a program in the text language> loads it as the document once the evaluator is ready (for showing a built world).
+        const worldUrl = params.get("world");
+        if (worldUrl) {
+          fetch(worldUrl).then((r) => r.text()).then(async (text) => {
+            while (bridge.evaluation.state.worker !== "idle") await new Promise((r) => setTimeout(r, 100));
+            await state.doc.sendText(text, "world");
+          });
+        }
         // Play mode (ADR 0027): the button appears when the scene has a part that reacts to being clicked or
         // approached; while playing, clicks use the scene instead of selecting, and Stop puts everything back.
         const playButton = document.getElementById("play-mode");
@@ -122,7 +137,8 @@
         setInterval(() => {
           const now = JSON.parse(runtimeApi.viewer_behaviors());
           // Something to play: a part that reacts, or a physics prop that can fall and be thrown (ADR 0035).
-          const playable = now.parts.length > 0 || JSON.parse(runtimeApi.viewer_physics()).movable > 0;
+          const physics = JSON.parse(runtimeApi.viewer_physics());
+          const playable = now.parts.length > 0 || physics.movable > 0 || physics.ragdolls > 0;
           playButton.hidden = !playable;
           if (!playable && now.play) runtimeApi.viewer_play_mode(false);
           // The engine applies a request on its next frame; do not repaint from stale state meanwhile.
@@ -170,10 +186,10 @@
         state.doc.open(params.get("docname") ?? "default");
       }
       const demo = params.get("model");
-      if (["viaduct", "physics", "physics_big", "physics_joints", "physics_walk", "animation", "scenery", "village", "village_hd", "beach_arch", "mannequin", "toon_gallery", "weathered_stone", "style_gallery", "outdoor_sky", "materials_grid", "lit_room"].includes(demo) && state.doc.state().nodes === 0) {
+      if (["viaduct", "physics", "physics_big", "physics_joints", "physics_walk", "animation", "scenery", "village", "village_hd", "beach_arch", "mannequin", "toon_gallery", "weathered_stone", "style_gallery", "outdoor_sky", "materials_grid", "lit_room", "modern_room", "pegasus_studio", "angel_studio", "building_asset", "architecture_gallery", "church_sanctuary", "main_street", "model_y", "anime_girl", "eiffel_tower", "cinder_votary", "riftback_brute", "iron_regent"].includes(demo) && state.doc.state().nodes === 0) {
         const response = await fetch(`./models/${demo}.txt`, { cache: "no-store" });
         if (!response.ok) throw new Error(`could not load the ${demo} model (${response.status})`);
-        const result = state.doc.sendText(await response.text(), `Load ${demo}`);
+        const result = await state.doc.sendText(await response.text(), `Load ${demo}`);
         if (!result?.committed && !result?.pending?.committed) {
           throw new Error(`could not stage the ${demo} model: ${JSON.stringify(result)}`);
         }
@@ -190,6 +206,9 @@
           set_grading, set_grading_preset, grading_status, audio_sfx, audio_music, fx_explode, fx_live_particles, viewer_pose,
           viewer_zoom: runtimeApi.viewer_zoom, viewer_orbit: runtimeApi.viewer_orbit, viewer_frame: runtimeApi.viewer_frame,
           viewer_look_at: runtimeApi.viewer_look_at,
+          viewer_animation: runtimeApi.viewer_animation,
+          animation_set_float: runtimeApi.animation_set_float, animation_set_bool: runtimeApi.animation_set_bool,
+          animation_trigger: runtimeApi.animation_trigger,
           viewer_gizmo: runtimeApi.viewer_gizmo, gizmo_begin: runtimeApi.gizmo_begin,
           viewer_gizmo_at: runtimeApi.viewer_gizmo_at,
           viewer_project: runtimeApi.viewer_project, gizmo_begin_profile: runtimeApi.gizmo_begin_profile,
@@ -307,6 +326,103 @@
         if (params.get("toolbar") === "off") {
           document.getElementById("viewer-gizmo-controls")?.style.setProperty("display", "none", "important");
         }
+      }
+
+      // A world or demo URL can frame its model and start its animation as soon as the evaluation
+      // has bounds. This is opt in (?frame=1), or automatic for a custom world and the model demos.
+      const wantsDemoFrame = params.get("frame") === "1" || params.has("world")
+        || ["pegasus_studio", "angel_studio", "building_asset", "architecture_gallery", "church_sanctuary", "main_street", "model_y", "anime_girl", "eiffel_tower", "riftback_brute", "iron_regent"].includes(params.get("model"));
+      if (wantsDemoFrame) {
+        let attempts = 0;
+        const frameLoadedDocument = () => {
+          attempts += 1;
+          const bounds = state.evaluation?.bounds;
+          const nodes = state.doc.state().nodes;
+          if ((!bounds || !nodes) && attempts < 200) {
+            setTimeout(frameLoadedDocument, 150);
+            return;
+          }
+          if (!bounds) return;
+          const pegasusDemo = params.get("model") === "pegasus_studio"
+            || String(params.get("world")).includes("pegasus");
+          const angelDemo = params.get("model") === "angel_studio"
+            || String(params.get("world")).includes("angel");
+          const galleryDemo = params.get("model") === "architecture_gallery";
+          const buildingDemo = params.get("model") === "building_asset";
+          const churchDemo = params.get("model") === "church_sanctuary"
+            || String(params.get("world")).includes("church");
+          const mainStreetDemo = params.get("model") === "main_street";
+          const modelYDemo = params.get("model") === "model_y";
+          const animeGirlDemo = params.get("model") === "anime_girl";
+          const eiffelTowerDemo = params.get("model") === "eiffel_tower";
+          runtimeApi.viewer_frame(...bounds.min, ...bounds.max);
+          if (angelDemo) {
+            // The framing request is consumed on the next viewer frame; ask for the review pose after
+            // it so the pose is not immediately overwritten by the frame.
+            setTimeout(
+              () => runtimeApi.viewer_look_at(-0.70, 1.40, 3.85, 0, 1.15, 0),
+              250,
+            );
+          } else if (galleryDemo) {
+            // A three-quarter survey view of the whole street study, with the road crossing the front.
+            setTimeout(
+              () => runtimeApi.viewer_look_at(126, 58, 118, 0, 10, 18),
+              250,
+            );
+          } else if (buildingDemo) {
+            // A close three-quarter view of the hero asset's entrance and one detailed side.
+            setTimeout(
+              () => runtimeApi.viewer_look_at(34, 19, -38, 0, 14, 0),
+              250,
+            );
+          } else if (churchDemo) {
+            // Low three-quarter view from the processional path, framed by the garden oaks.
+            setTimeout(
+              () => runtimeApi.viewer_look_at(20, 9, 30, 0, 4.2, 0),
+              250,
+            );
+          } else if (mainStreetDemo) {
+            // A three-quarter survey of the whole block, with the green verge and parked car.
+            setTimeout(
+              () => runtimeApi.viewer_look_at(50, 20, -64, 5, 8, 2),
+              250,
+            );
+          } else if (modelYDemo) {
+            // A low three-quarter studio view of the crossover, front and flank.
+            setTimeout(
+              () => runtimeApi.viewer_look_at(4.6, 1.38, 4.9, 0, 0.78, 0),
+              250,
+            );
+          } else if (animeGirlDemo) {
+            // A full-figure three-quarter studio portrait, from slightly above the waist.
+            setTimeout(
+              () => runtimeApi.viewer_look_at(1.15, 1.20, 1.95, 0, 0.94, 0),
+              250,
+            );
+          } else if (eiffelTowerDemo) {
+            // A three-quarter view that takes in the whole lattice, feet to antenna.
+            setTimeout(
+              () => runtimeApi.viewer_look_at(3.20, 1.90, 3.50, 0, 1.35, 0),
+              250,
+            );
+          } else {
+            runtimeApi.viewer_zoom(pegasusDemo ? -220 : -160);
+            if (pegasusDemo) runtimeApi.viewer_orbit(-102, -30);
+          }
+          runtimeApi.viewer_animation(true, -1);
+          if (params.get("model") === "pegasus_studio" || String(params.get("world")).includes("pegasus")) {
+            document.title = "Pegasus Studio — Engine";
+          }
+          if (angelDemo) document.title = "Angel Studio — Engine";
+          if (galleryDemo) document.title = "Architecture Gallery — Engine";
+          if (buildingDemo) document.title = "Art Deco Building — Engine";
+          if (churchDemo) document.title = "Church Sanctuary — Engine";
+          if (mainStreetDemo) document.title = "Main Street — Engine";
+          if (modelYDemo) document.title = "Model Y Studio — Engine";
+          if (animeGirlDemo) document.title = "Anime Girl Studio — Engine";
+          if (eiffelTowerDemo) document.title = "Eiffel Tower Studio — Engine";
+        };
+        setTimeout(frameLoadedDocument, 200);
       }
       const poll = setInterval(() => {
         if (state.read().frames > 0) {

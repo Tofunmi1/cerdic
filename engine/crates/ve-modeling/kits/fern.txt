@@ -1,0 +1,25 @@
+group fern
+  rachis = curve.bezier@1(points=[[0, 0.08, 0], [0, 0.3, 0.24], [0, 0.4, 0.5], [0, 0.25, 0.78]], steps=14)
+  rib_t = curve.tube@1(rachis, radius=0.006, end_radius=0.002, sides=5)
+  leaflet_s = solid.sphere@1(radius=0.05, segments=5)
+  leaflet_f = xform.scale@1(leaflet_s, by=[0.3, 0.07, 1.0])
+  leaflet_l = xform.move@1(leaflet_f, by=[0, 0, 0.04])
+  leaflet_r = xform.move@1(leaflet_f, by=[0, 0, -0.04])
+  taper = field.expr@1(code="out = mix(1.0, 0.3, clamp(p.z / 0.78, 0.0, 1.0))")
+  pairs_l = inst.along_curve@1(leaflet_l, rachis, count=12, align=true)
+  pairs_r = inst.along_curve@1(leaflet_r, rachis, count=12, align=true)
+  small_l = inst.vary@1(pairs_l, taper)
+  small_r = inst.vary@1(pairs_r, taper)
+  leaves_l = inst.realize@1(small_l)
+  leaves_r = inst.realize@1(small_r)
+  frond_u = solid.union@1(rib_t, leaves_l, leaves_r)
+  frond_m = solid.material@1(frond_u, color=[0.2, 0.44, 0.12], roughness=0.7)
+  frond_f = solid.foliage@1(frond_m, alpha_cutoff=0, sway=0.3, flutter=0.4, translucency=0.5)
+  ring = inst.radial@1(frond_f, count=6, radius=0.03)
+  jittered = inst.jitter@1(ring, seed=3, yaw_jitter=0.3, scale_jitter=0.25)
+  plant = inst.realize@1(jittered)
+  expose color = frond_m.color
+  expose fronds = ring.count
+  expose seed = jittered.seed
+  result plant
+end

@@ -1,0 +1,184 @@
+# THE IRON REGENT — a character workflow study based on the supplied horned-king reference.
+# Human anatomy and face -> sculpted beard -> layered hard-surface armor -> cloth, trim and PBR breakup.
+# All geometry is authored in the Spatial Lab language. +Y is up; the face points toward +Z.
+
+sky = scene.sky@1(sun_elevation=31, sun_azimuth=-32, sun_intensity=1.45, turbidity=3.1, ground_color=[0.19, 0.18, 0.17], clouds=false, haze=0.025)
+env = scene.environment@1(sky_color=[0.36, 0.39, 0.44], ground_color=[0.24, 0.22, 0.20], intensity=0.48, reflection=0.32, bounce=0.38)
+output sky = sky
+output env = env
+
+# Grounded studio floor, kept neutral so the armor's material separation reads.
+floor_src = solid.box@1(size=[5.5, 0.12, 5.5])
+floor_at = xform.move@1(floor_src, by=[0, -0.10, 0])
+floor_mat = solid.material@1(floor_at, color=[0.20, 0.195, 0.19], roughness=0.9)
+output floor = floor_mat
+
+# The foundation is the CC0 anthropometric human, not a pile of limb primitives.
+regent = body.human@1(gender=0.0, age=0.94, height=0.68, weight=0.78, muscle=0.9, proportions=0.40, face="browDownLeft=0.14; browDownRight=0.14; mouthFrownLeft=0.06; mouthFrownRight=0.08; eyeSquintLeft=0.04; eyeSquintRight=0.04")
+skin_base = solid.material@1(regent, color=[0.70, 0.57, 0.47], roughness=0.66)
+skin_tex = solid.texture@1(skin_base, program="ao = surface_ao(strength=0.22); n = fbm(scale_x=48, scale_y=52, iterations=3); tone = colorize(n, gradient=[0:#b58772, 0.5:#d6b39b, 1:#e8cbb2]); cavity_tone = colorize(ao, gradient=[0:#a87866, 1:#ead0ba]); albedo = blend(tone, cavity_tone, ao, blend_type=normal, amount=0.24); roughness = colorize(n, gradient=[0:#bdbdbd, 1:#e3e3e3]); height = colorize(n, gradient=[0:#898989, 1:#999999])", size="512")
+skin_finish = solid.finish@1(skin_tex, subsurface=0.11, sheen=0.08, clearcoat=0.04)
+output face_and_body = skin_finish
+
+# Eyes retain the body's real socket positions and gaze; the glow is a restrained amber catchlight.
+eyes = body.eye@1(regent, iris_color=[0.30, 0.13, 0.045], sclera_color=[0.66, 0.57, 0.47], gaze=[0, 0, 1])
+eyes_mat = solid.material@1(eyes, color=[0.76, 0.46, 0.18], roughness=0.29, emissive=[0.035, 0.012, 0.002])
+output eyes = eyes_mat
+
+# Artist-authored CC0 garment meshes provide the fitted base layer under the custom plates.
+travel_clothes = body.outfit@1(regent, asset="female_casualsuit01", standoff=0.012)
+travel_clothes_mat = solid.material@1(travel_clothes, color=[0.12, 0.11, 0.10], roughness=0.9)
+output tailored_underlayers = travel_clothes_mat
+travel_shoes = body.outfit@1(regent, asset="shoes02", standoff=0.008)
+travel_shoes_mat = solid.material@1(travel_shoes, color=[0.20, 0.13, 0.08], roughness=0.82)
+output fitted_boots = travel_shoes_mat
+
+# Silver hair falls behind the crown and ears; it is generated from the human scalp, not a helmet-shaped cap.
+hair_src = body.outfit@1(regent, asset="short02", standoff=0.006)
+hair_mat = solid.material@1(hair_src, color=[0.63, 0.62, 0.59], roughness=0.78)
+output silver_hair = hair_mat
+
+# The cuirass: a shaped, beveled shell with a raised sternum and tailored pectoral plates.
+chest_profile = profile.polygon@1(points=[[-0.25, 0.20], [-0.29, 0.31], [-0.25, 0.40], [-0.16, 0.445], [-0.075, 0.425], [0, 0.39], [0.075, 0.425], [0.16, 0.445], [0.25, 0.40], [0.29, 0.31], [0.25, 0.19], [0.17, 0.06], [0.08, -0.075], [0, -0.12], [-0.08, -0.075], [-0.17, 0.06]])
+chest_ex = solid.extrude@1(chest_profile, height=0.105)
+chest_face = xform.rotate@1(chest_ex, angles=[90, 0, 0])
+chest_round = solid.round@1(chest_face, radius=0.024, segments=8)
+chest_at = xform.move@1(chest_round, by=[0, 1.205, 0.155])
+chest_mesh = poly.from_solid@1(chest_at)
+chest_edges = poly.select@1(chest_mesh, element="edge", by="all")
+chest_refined = poly.subdivide_edges@1(chest_mesh, chest_edges, cuts=2)
+chest_sculpt = poly.sculpt@1(chest_refined, symmetry="x", strokes="draw 0 1.47 0.247 0.105 0.008; draw 0.13 1.43 0.25 0.09 0.006; draw -0.13 1.43 0.25 0.09 0.006; smooth 0 1.39 0.25 0.16 0.16")
+chest_solid = poly.to_solid@1(chest_sculpt)
+steel_base = solid.material@1(chest_solid, color=[0.34, 0.39, 0.43], metallic=0.82, roughness=0.37)
+steel_finish = solid.finish@1(steel_base, clearcoat=0.18, clearcoat_roughness=0.34)
+output sculpted_cuirass = steel_finish
+
+# Raised brass gorget, sternum rib and lion-like solar crest: readable geometry rather than a flat colour mark.
+gorget_src = solid.torus@1(major=0.205, minor=0.024, segments=64, tube_segments=12)
+gorget_turn = xform.rotate@1(gorget_src, angles=[90, 0, 0])
+gorget_at = xform.move@1(gorget_turn, by=[0, 1.565, 0.075])
+gorget_mat = solid.material@1(gorget_at, color=[0.46, 0.32, 0.16], metallic=0.77, roughness=0.32)
+output engraved_gorget = gorget_mat
+
+# Paired articulated shoulder shells with a broad, readable plate silhouette.
+pauldron_src = solid.box@1(size=[0.40, 0.21, 0.31])
+pauldron_round = solid.round@1(pauldron_src, radius=0.055, segments=7)
+pauldron_l = xform.move@1(pauldron_round, by=[0.34, 1.49, 0.035])
+pauldron_r = xform.move@1(pauldron_round, by=[-0.34, 1.49, 0.035])
+pauldron_pair = solid.union@1(pauldron_l, pauldron_r)
+pauldron_m = solid.material@1(pauldron_pair, color=[0.28, 0.34, 0.38], metallic=0.8, roughness=0.39)
+output paired_pauldra = pauldron_m
+
+# Rivets and small crest studs scale detail to the armor instead of relying on surface noise alone.
+rivet_src = solid.sphere@1(radius=0.014, segments=16)
+rivet_a = xform.move@1(rivet_src, by=[0.19, 1.50, 0.133])
+rivet_b = xform.move@1(rivet_src, by=[0.45, 1.50, 0.105])
+rivet_c = xform.move@1(rivet_src, by=[-0.19, 1.50, 0.133])
+rivet_d = xform.move@1(rivet_src, by=[-0.45, 1.50, 0.105])
+rivets = solid.union@1(rivet_a, rivet_b, rivet_c, rivet_d)
+rivets_mat = solid.material@1(rivets, color=[0.76, 0.55, 0.28], metallic=0.85, roughness=0.24)
+output shoulder_rivets = rivets_mat
+
+# Waist harness and overlapping abdominal lames leave visible joint gaps for a game-ready read.
+belt_src = solid.torus@1(major=0.205, minor=0.026, segments=64, tube_segments=10)
+belt_scale = xform.scale@1(belt_src, by=[1.0, 1.0, 0.68])
+belt_at = xform.move@1(belt_scale, by=[0, 1.015, 0])
+belt_mat = solid.material@1(belt_at, color=[0.24, 0.12, 0.065], roughness=0.78)
+belt_tex = solid.texture@1(belt_mat, tile=0.22, program="g = fbm(scale_x=16, scale_y=9, iterations=3); albedo = colorize(g, gradient=[0:#24140d, 1:#69452a]); roughness = colorize(g, gradient=[0:#c6c6c6, 1:#e6e6e6])", size="256")
+output leather_belt = belt_tex
+
+lame_src = solid.box@1(size=[0.31, 0.075, 0.12])
+lame_top = xform.move@1(lame_src, by=[0, 0.94, 0.105])
+lame_mid = xform.move@1(lame_src, by=[0, 0.855, 0.095])
+lames = solid.union@1(lame_top, lame_mid)
+lames_round = solid.round@1(lames, radius=0.022, segments=6)
+lames_mat = solid.material@1(lames_round, color=[0.30, 0.35, 0.37], metallic=0.77, roughness=0.4)
+output abdominal_lames = lames_mat
+
+buckle_src = solid.box@1(size=[0.115, 0.095, 0.035])
+buckle_round = solid.round@1(buckle_src, radius=0.016, segments=6)
+buckle_at = xform.move@1(buckle_round, by=[0, 1.015, 0.18])
+buckle_mat = solid.material@1(buckle_at, color=[0.73, 0.51, 0.22], metallic=0.82, roughness=0.27)
+output oath_buckle = buckle_mat
+
+# Hanging red mantle has a shaped, split hem and two physical side panels.
+mantle_profile = profile.polygon@1(points=[[-0.26, 0.02], [-0.30, -0.36], [-0.38, -0.77], [-0.33, -1.16], [-0.20, -1.06], [-0.08, -1.20], [0.02, -0.95], [0.16, -1.15], [0.30, -0.82], [0.35, -0.42], [0.24, -0.08], [0.18, 0.02]])
+mantle_ex = solid.extrude@1(mantle_profile, height=0.025)
+mantle_face = xform.rotate@1(mantle_ex, angles=[90, 0, 0])
+mantle_at = xform.move@1(mantle_face, by=[0, 1.12, -0.20])
+mantle_mat = solid.material@1(mantle_at, color=[0.28, 0.035, 0.045], roughness=0.92)
+mantle_tex = solid.texture@1(mantle_mat, tile=0.7, program="g = fbm(scale_x=8, scale_y=28, iterations=4); f = fbm(scale_x=54, scale_y=9, iterations=3); albedo = colorize(g, gradient=[0:#24090d, 0.48:#58151c, 1:#8a3430]); roughness = colorize(f, gradient=[0:#d2d2d2, 1:#eeeeee]); height = colorize(f, gradient=[0:#888888, 1:#969696])", size="512")
+output crimson_mantle = mantle_tex
+
+# A segmented fauld and side tassets bridge the cuirass to the greaves.
+fauld_profile = profile.polygon@1(points=[[-0.19, 0.07], [-0.22, -0.08], [-0.17, -0.34], [-0.07, -0.30], [0, -0.39], [0.08, -0.30], [0.18, -0.34], [0.23, -0.08], [0.19, 0.07]])
+fauld_ex = solid.extrude@1(fauld_profile, height=0.06)
+fauld_face = xform.rotate@1(fauld_ex, angles=[90, 0, 0])
+fauld_at = xform.move@1(fauld_face, by=[0, 0.80, 0.135])
+fauld_round = solid.round@1(fauld_at, radius=0.018, segments=6)
+fauld_mat = solid.material@1(fauld_round, color=[0.27, 0.33, 0.37], metallic=0.78, roughness=0.4)
+output fauld = fauld_mat
+
+# Curved horn pair, grown from the crown and ridged at the base with a steel circlet.
+horn_path_l = curve.spline@1(points=[[0.085, 1.82, -0.015], [0.12, 1.98, -0.015], [0.105, 2.15, 0.005], [0.045, 2.28, 0.035]], steps=18)
+horn_path_r = curve.spline@1(points=[[-0.085, 1.82, -0.015], [-0.13, 1.97, -0.02], [-0.115, 2.13, 0.005], [-0.065, 2.25, 0.035]], steps=18)
+horn_ring = profile.circle@1(radius=0.041, segments=20)
+horn_l = solid.sweep@1(horn_path_l, horn_ring, scale_end=0.07)
+horn_r = solid.sweep@1(horn_path_r, horn_ring, scale_end=0.07)
+horn_pair = solid.union@1(horn_l, horn_r)
+horn_mat = solid.material@1(horn_pair, color=[0.62, 0.56, 0.43], roughness=0.76)
+horn_tex = solid.texture@1(horn_mat, tile=0.16, program="g = fbm(scale_x=5, scale_y=34, iterations=4); albedo = colorize(g, gradient=[0:#393831, 0.5:#847c68, 1:#d1c6a8]); roughness = colorize(g, gradient=[0:#c4c4c4, 1:#eeeeee])", size="512")
+output crown_horns = horn_tex
+
+helm_band_src = solid.torus@1(major=0.13, minor=0.018, segments=48, tube_segments=10)
+helm_band_scale = xform.scale@1(helm_band_src, by=[1.18, 1.0, 0.56])
+helm_band_at = xform.move@1(helm_band_scale, by=[0, 1.78, 0.025])
+helm_band_mat = solid.material@1(helm_band_at, color=[0.56, 0.40, 0.20], metallic=0.82, roughness=0.31)
+output crown_band = helm_band_mat
+
+# Forearm guards, knee cops, greaves and sabatons use softened hard-surface forms.
+vam_src = solid.box@1(size=[0.19, 0.30, 0.15])
+vam_round = solid.round@1(vam_src, radius=0.04, segments=7)
+vam_l = xform.move@1(vam_round, by=[0.34, 0.99, 0.08])
+vam_r = xform.move@1(vam_round, by=[-0.34, 0.99, 0.08])
+vams = solid.union@1(vam_l, vam_r)
+vam_mat = solid.material@1(vams, color=[0.31, 0.37, 0.40], metallic=0.79, roughness=0.4)
+output vambraces = vam_mat
+
+knee_src = solid.sphere@1(radius=1, segments=28)
+knee_scale = xform.scale@1(knee_src, by=[0.135, 0.12, 0.08])
+knee_l = xform.move@1(knee_scale, by=[0.12, 0.56, 0.09])
+knee_r = xform.move@1(knee_scale, by=[-0.12, 0.56, 0.09])
+knees = solid.union@1(knee_l, knee_r)
+knee_mat = solid.material@1(knees, color=[0.47, 0.36, 0.21], metallic=0.76, roughness=0.33)
+output gilded_knees = knee_mat
+
+greave_src = solid.box@1(size=[0.19, 0.38, 0.12])
+greave_round = solid.round@1(greave_src, radius=0.045, segments=7)
+greave_l = xform.move@1(greave_round, by=[0.12, 0.31, 0.075])
+greave_r = xform.move@1(greave_round, by=[-0.12, 0.31, 0.075])
+greaves = solid.union@1(greave_l, greave_r)
+greave_mat = solid.material@1(greaves, color=[0.29, 0.35, 0.38], metallic=0.82, roughness=0.42)
+output greaves = greave_mat
+
+boot_src = solid.box@1(size=[0.23, 0.13, 0.31])
+boot_round = solid.round@1(boot_src, radius=0.035, segments=6)
+boot_l = xform.move@1(boot_round, by=[0.12, 0.09, 0.07])
+boot_r = xform.move@1(boot_round, by=[-0.12, 0.09, 0.07])
+boots = solid.union@1(boot_l, boot_r)
+boot_mat = solid.material@1(boots, color=[0.18, 0.11, 0.075], roughness=0.84)
+output leather_sabatons = boot_mat
+
+# Fine gold edge beads, hand-placed around the chest silhouette and hem.
+bead_src = solid.sphere@1(radius=0.012, segments=12)
+bead_a = xform.move@1(bead_src, by=[-0.22, 1.48, 0.225])
+bead_b = xform.move@1(bead_src, by=[-0.27, 1.38, 0.22])
+bead_c = xform.move@1(bead_src, by=[-0.22, 1.25, 0.235])
+bead_d = xform.move@1(bead_src, by=[0.22, 1.48, 0.225])
+bead_e = xform.move@1(bead_src, by=[0.27, 1.38, 0.22])
+bead_f = xform.move@1(bead_src, by=[0.22, 1.25, 0.235])
+beads = solid.union@1(bead_a, bead_b, bead_c, bead_d, bead_e, bead_f)
+bead_mat = solid.material@1(beads, color=[0.78, 0.56, 0.27], metallic=0.83, roughness=0.25)
+output cuirass_beads = bead_mat
+
+# A poised, still character study. The model is ready for the rig/pose pass after the silhouette review.

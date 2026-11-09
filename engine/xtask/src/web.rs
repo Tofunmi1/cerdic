@@ -104,12 +104,32 @@ pub(crate) fn build(profile: Profile) -> Result<(), Failure> {
         "outdoor_sky",
         "materials_grid",
         "lit_room",
+        "modern_room",
+        "pegasus_studio",
+        "angel_studio",
+        "building_asset",
+        "architecture_gallery",
+        "church_sanctuary",
+        "main_street",
+        "model_y",
+        "anime_girl",
+        "eiffel_tower",
+        "cinder_votary",
+        "riftback_brute",
+        "iron_regent",
     ] {
         fs::copy(
             format!("web/demos/{demo}.txt"),
             format!("{DIST}/models/{demo}.txt"),
         )?;
     }
+    fs::create_dir_all(format!("{DIST}/outfits"))?;
+    // Human bodies and outfit textures are runtime assets for `body.human` and imported hair.
+    fs::copy("assets/human/human.pack", format!("{DIST}/human.pack"))?;
+    fs::copy(
+        "assets/outfits/long01_diffuse.png",
+        format!("{DIST}/outfits/long01_diffuse.png"),
+    )?;
     for page_file in [
         "index.html",
         "bench.js",

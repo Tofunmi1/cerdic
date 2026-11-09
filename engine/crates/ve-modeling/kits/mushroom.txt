@@ -1,0 +1,19 @@
+group mushroom
+  stem_p = profile.polygon@1(points=[[0, 0], [0.022, 0], [0.018, 0.03], [0.016, 0.065], [0.02, 0.075], [0, 0.075]])
+  stem_f = profile.fillet@1(stem_p, radius=0.004)
+  stem_r = solid.revolve@1(stem_f, segments=16)
+  stem_m = solid.material@1(stem_r, color=[0.9, 0.86, 0.74], roughness=0.8)
+  cap_p = profile.polygon@1(points=[[0, 0.06], [0.03, 0.058], [0.052, 0.068], [0.058, 0.082], [0.05, 0.098], [0.032, 0.112], [0.012, 0.119], [0, 0.12]])
+  cap_r = solid.revolve@1(cap_p, segments=24)
+  cap_m = solid.material@1(cap_r, color=[0.78, 0.12, 0.1], roughness=0.5)
+  spot_s = solid.sphere@1(radius=0.007, segments=8)
+  spots = inst.scatter_on@1(spot_s, cap_r, count=10, seed=2, align=true)
+  spots_s = inst.realize@1(spots)
+  spots_m = solid.material@1(spots_s, color=[0.96, 0.94, 0.88], roughness=0.6)
+  shroom = solid.union@1(stem_m, cap_m, spots_m)
+  expose cap_color = cap_m.color
+  expose stem_color = stem_m.color
+  expose spot_color = spots_m.color
+  expose spots = spots.count
+  result shroom
+end

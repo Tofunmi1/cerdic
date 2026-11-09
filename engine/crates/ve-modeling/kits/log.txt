@@ -1,0 +1,13 @@
+group log
+  body = solid.cylinder@1(radius=0.26, height=2.4, segments=16)
+  body_r = xform.rotate@1(body, angles=[0, 0, 90])
+  body_n = xform.noise@1(body_r, amplitude=0.03, scale=0.4, seed=2)
+  body_l = xform.move@1(body_n, by=[0, 0.24, 0])
+  body_m = solid.material@1(body_l, color=[0.5, 0.4, 0.3], roughness=0.9)
+  bark = solid.texture@1(body_m, program="n = fbm(scale_x=8, scale_y=3, iterations=5); f = fbm(scale_x=34, scale_y=34, iterations=3); ao = surface_ao(strength=0.4); wood = colorize(n, gradient=[0:#2c1d10, 0.5:#5e4529, 1:#947552]); dirt = colorize(ao, gradient=[0:#1c1209, 1:#d8c8a8]); a0 = blend(wood, dirt, ao, blend_type=normal, amount=0.5); moss = colorize(f, gradient=[0:#2e4a1c, 1:#6f9a3a]); up = surface_up(power=2); a1 = blend(moss, a0, up, blend_type=normal, amount=0.75); albedo = a1")
+  fin = solid.finish@1(bark, relief=0.12, relief_scale=24)
+  expose seed = body_n.seed
+  expose length = body.height
+  expose radius = body.radius
+  result fin
+end
