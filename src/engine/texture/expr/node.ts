@@ -17,7 +17,7 @@ export const EXPR_NODE: NodeDef = {
   shader_model: {
     name: EXPR_TYPE,
     shortdesc: 'Shader expression',
-    longdesc: 'A few lines of the shader expression language (p, q, t, vec2-vec4, sin, mix, fbm, snoise, hsv, ... and for i in 0..N loops) that draw the texture; the last line is out = a float, vec3 or vec4.',
+    longdesc: 'A few lines of the shader expression language (p, q, t, vec2-vec4, sin, mix, fbm, snoise, voronoi, stretch, warp, hsv, ... and for i in 0..N loops) that draw the texture; the last line is out = a float, vec3 or vec4.',
     inputs: [],
     outputs: [{ type: 'rgba', rgba: '' }],
     parameters: [{ name: 'code', type: 'string', label: 'Code', default: 'out = vec3(p, 0)' }],
@@ -56,7 +56,8 @@ export function expandExpressions(library: Library, graph: TexGraph): { library:
           'vec4 $(name)_expr(vec2 uv) {',
           '  vec2 p = uv;',
           '  vec2 q = (uv - 0.5) * 2.0;',
-          '  float t = 0.0;',
+          // The clock only when the expression reads it: a node that does not stays still, so its program is baked once rather than drawn live.
+          /\bt\b/.test(body) ? '  float t = uTime;' : '  float t = 0.0;',
           body,
           '  return result;',
           '}',

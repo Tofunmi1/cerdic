@@ -1,0 +1,297 @@
+# THE DROWNED CATHEDRAL. A ruined gothic nave flooded to knee height, a leviathan's skeleton lying through it, rain falling through the broken roof.
+# Metres, y up, the nave runs along z from -15 to +15 with its apse at +z; the floor is y = 0 and the water stands at y = 0.5.
+let ring_pts = "[-2.95, 0], [-2.917, 0.595], [-2.82, 1.183], [-2.659, 1.757], [-2.436, 2.31], [-2.154, 2.835], [-1.817, 3.327], [-1.428, 3.778], [-0.992, 4.185], [-0.514, 4.541], [0, 4.843], [0.514, 4.541], [0.992, 4.185], [1.428, 3.778], [1.817, 3.327], [2.154, 2.835], [2.436, 2.31], [2.659, 1.757], [2.82, 1.183], [2.917, 0.595], [2.95, 0], [2.5, 0], [2.473, 0.523], [2.391, 1.04], [2.255, 1.545], [2.068, 2.034], [1.83, 2.5], [1.545, 2.939], [1.216, 3.346], [0.846, 3.716], [0.439, 4.045], [0, 4.33], [-0.439, 4.045], [-0.846, 3.716], [-1.216, 3.346], [-1.545, 2.939], [-1.83, 2.5], [-2.068, 2.034], [-2.255, 1.545], [-2.391, 1.04], [-2.473, 0.523], [-2.5, 0]"
+let open_pts = "[-2.5, -0.1], [-2.5, 0], [-2.481, 0.436], [-2.424, 0.868], [-2.33, 1.294], [-2.198, 1.71], [-2.032, 2.113], [-1.83, 2.5], [-1.596, 2.868], [-1.33, 3.214], [-1.036, 3.536], [-0.714, 3.83], [-0.368, 4.096], [0, 4.33], [0.368, 4.096], [0.714, 3.83], [1.036, 3.536], [1.33, 3.214], [1.596, 2.868], [1.83, 2.5], [2.032, 2.113], [2.198, 1.71], [2.33, 1.294], [2.424, 0.868], [2.481, 0.436], [2.5, 0], [2.5, -0.1]"
+let clere_pts = "[-0.75, 0], [-0.75, 0.9], [-0.742, 1.057], [-0.717, 1.212], [-0.677, 1.364], [-0.62, 1.51], [-0.549, 1.65], [-0.464, 1.782], [-0.365, 1.904], [-0.254, 2.015], [-0.132, 2.114], [0, 2.199], [0.132, 2.114], [0.254, 2.015], [0.365, 1.904], [0.464, 1.782], [0.549, 1.65], [0.62, 1.51], [0.677, 1.364], [0.717, 1.212], [0.742, 1.057], [0.75, 0.9], [0.75, 0]"
+let aisle_pts = "[-1, 0], [-1, 3], [-0.989, 3.209], [-0.956, 3.416], [-0.902, 3.618], [-0.827, 3.813], [-0.732, 4], [-0.618, 4.176], [-0.486, 4.338], [-0.338, 4.486], [-0.176, 4.618], [0, 4.732], [0.176, 4.618], [0.338, 4.486], [0.486, 4.338], [0.618, 4.176], [0.732, 4], [0.827, 3.813], [0.902, 3.618], [0.956, 3.416], [0.989, 3.209], [1, 3], [1, 0]"
+let apse_pts = "[-1.7, 0], [-1.7, 5], [-1.681, 5.355], [-1.626, 5.707], [-1.534, 6.051], [-1.406, 6.383], [-1.244, 6.7], [-1.051, 6.998], [-0.827, 7.275], [-0.575, 7.527], [-0.298, 7.751], [0, 7.944], [0.298, 7.751], [0.575, 7.527], [0.827, 7.275], [1.051, 6.998], [1.244, 6.7], [1.406, 6.383], [1.534, 6.051], [1.626, 5.707], [1.681, 5.355], [1.7, 5], [1.7, 0]"
+
+sky = scene.sky@1(sun_elevation=16, sun_azimuth=-100, sun_intensity=9.0, turbidity=4.5, ground_color=[0.08, 0.08, 0.1], clouds=true, haze=0.16, haze_color=[0.9, 0.62, 0.45], haze_height=30)
+output sky = sky
+env = scene.environment@1(sky_color=[0.55, 0.5, 0.58], ground_color=[0.12, 0.12, 0.14], intensity=3.2, reflection=0.5)
+output env = env
+
+# stone: one weathered preset for every block, so the whole ruin reads as one material
+def stone(tag, src)
+  {tag}_sm = solid.material@1(${src}, color=[0.7, 0.66, 0.58], roughness=0.88)
+  {tag}_stx = solid.texture@1(${tag}_sm, program="n = fbm(scale_x=4, scale_y=4, iterations=5); f = fbm(scale_x=34, scale_y=34, iterations=3); ao = surface_ao(strength=0.3); stone = colorize(n, gradient=[0:#a89c86, 0.5:#c6baa2, 1:#e4dac2]); dirt = colorize(ao, gradient=[0:#5e5446, 1:#f0e6ce]); a0 = blend(stone, dirt, ao, blend_type=normal, amount=0.55); moss = colorize(f, gradient=[0:#2e4a1c, 1:#6f9a3a]); wear = colorize(f, gradient=[0:#d6cbb2, 1:#f6eedb]); up = surface_up(power=3); edge = surface_convex(gain=7); a1 = blend(moss, a0, up, blend_type=normal, amount=0.3); albedo = blend(wear, a1, edge, blend_type=normal, amount=0.6); roughness = colorize(f, gradient=[0:#808080, 1:#c0c0c0])")
+  {tag}_st = solid.finish@1(${tag}_stx, relief=0.12, relief_scale=24, wetness=0.04)
+end
+
+# ---------- the floor and the flood ----------
+floor_s = solid.box@1(size=[16.6, 0.2, 32])
+floor_a = xform.move@1(floor_s, by=[0, -0.08, 0])
+floor_m = material.preset@1(floor_a, name="cobblestone", tile=1.2, wear=0.25, dirt=0.2, moss=0.1, wet=0.15)
+output floor = floor_m
+flood = water.surface@1(size=[14.8, 30.2], level=0.5, depth=0.5, color=[0.06, 0.2, 0.24], opacity=0.78, ripple=0.7, wave_height=0.025, wave_length=1.4, resolution=192, sim=true, sim_resolution=192, sim_damping=0.45, sim_depth=0.5, rain=1, seed=3)
+output flood = flood
+
+# ---------- the piers: a moulded base, a shaft, a flared capital (profile with rounded corners, spun), four colonnettes round the shaft ----------
+pier_p = profile.polygon@1(points=[[0, 0], [0.66, 0], [0.66, 0.14], [0.58, 0.26], [0.5, 0.38], [0.47, 0.6], [0.47, 6.55], [0.52, 6.68], [0.6, 6.85], [0.72, 7.05], [0.74, 7.25], [0, 7.25]])
+pier_f = profile.fillet@1(pier_p, radius=0.03)
+pier_r = solid.revolve@1(pier_f, segments=48)
+def colonnette(tag, cx, cz)
+  c{tag}_s = solid.cylinder@1(radius=0.11, height=6.6, segments=20)
+  c{tag}_a = xform.move@1(c{tag}_s, by=[{cx}, 3.7, {cz}])
+end
+colonnette("a", 0.5, 0)
+colonnette("b", -0.5, 0)
+colonnette("c", 0, 0.5)
+colonnette("d", 0, -0.5)
+pier_u = solid.union@1(pier_r, ca_a, cb_a, cc_a, cd_a)
+stone("pier", "pier_u")
+pier_r_at = xform.move@1(pier_st, by=[4, 0, -15])
+piers_r = inst.array@1(pier_r_at, count_z=7, spacing=[0, 0, 5])
+output piers_east = piers_r
+pier_l_at = xform.move@1(pier_st, by=[-4, 0, -15])
+piers_l = inst.array@1(pier_l_at, count_z=7, spacing=[0, 0, 5])
+output piers_west = piers_l
+
+# ---------- a bay of the arcade: the pointed arch ring, and the wall above it with a lancet window; repeated six times each side ----------
+ring_p = profile.polygon@1(points=[${ring_pts}])
+ring_x = solid.extrude@1(ring_p, height=0.8)
+ring_up = xform.rotate@1(ring_x, angles=[-90, 0, 0])
+ring_rot = xform.rotate@1(ring_up, angles=[0, 90, 0])
+stone("ring", "ring_rot")
+arch_r = xform.move@1(ring_st, by=[4.4, 7.25, -12.5])
+arches_r = inst.array@1(arch_r, count_z=6, spacing=[0, 0, 5])
+output arches_east = arches_r
+arch_l = xform.move@1(ring_st, by=[-3.6, 7.25, -12.5])
+arches_l = inst.array@1(arch_l, count_z=6, spacing=[0, 0, 5])
+output arches_west = arches_l
+
+wall_b = solid.box@1(size=[0.8, 8.6, 5.0])
+open_p = profile.polygon@1(points=[${open_pts}])
+open_x = solid.extrude@1(open_p, height=1.4)
+open_up = xform.rotate@1(open_x, angles=[-90, 0, 0])
+open_rot = xform.rotate@1(open_up, angles=[0, 90, 0])
+clere_p = profile.polygon@1(points=[${clere_pts}])
+clere_x = solid.extrude@1(clere_p, height=1.4)
+clere_up = xform.rotate@1(clere_x, angles=[-90, 0, 0])
+clere_rot = xform.rotate@1(clere_up, angles=[0, 90, 0])
+wall_a = xform.move@1(wall_b, by=[0, 11.55, 0])
+open_a = xform.move@1(open_rot, by=[0.7, 7.25, 0])
+clere_a = xform.move@1(clere_rot, by=[0.7, 12.35, 0])
+bay_cut = solid.difference@1(wall_a, open_a, clere_a)
+stone("bay", "bay_cut")
+bay_r = xform.move@1(bay_st, by=[4, 0, -12.5])
+bays_r = inst.array@1(bay_r, count_z=6, spacing=[0, 0, 5])
+output clerestory_east = bays_r
+bay_l = xform.move@1(bay_st, by=[-4, 0, -12.5])
+bays_l = inst.array@1(bay_l, count_z=6, spacing=[0, 0, 5])
+output clerestory_west = bays_l
+
+# ---------- the aisle walls with tall lancet windows, and their stained glass (a colour ramp up the pane, lit from within) ----------
+awall_b = solid.box@1(size=[0.7, 13.0, 5.0])
+aisle_p = profile.polygon@1(points=[${aisle_pts}])
+aisle_x = solid.extrude@1(aisle_p, height=1.4)
+aisle_up = xform.rotate@1(aisle_x, angles=[-90, 0, 0])
+aisle_rot = xform.rotate@1(aisle_up, angles=[0, 90, 0])
+awall_a = xform.move@1(awall_b, by=[0, 6.5, 0])
+aisle_a = xform.move@1(aisle_rot, by=[0.7, 3.2, 0])
+awall_cut = solid.difference@1(awall_a, aisle_a)
+stone("awall", "awall_cut")
+awall_r = xform.move@1(awall_st, by=[7.35, 0, -12.5])
+awalls_r = inst.array@1(awall_r, count_z=6, spacing=[0, 0, 5])
+output aisle_wall_east = awalls_r
+awall_l = xform.move@1(awall_st, by=[-7.35, 0, -12.5])
+awalls_l = inst.array@1(awall_l, count_z=6, spacing=[0, 0, 5])
+output aisle_wall_west = awalls_l
+glass_p = profile.polygon@1(points=[${aisle_pts}])
+glass_x = solid.extrude@1(glass_p, height=0.08)
+glass_up = xform.rotate@1(glass_x, angles=[-90, 0, 0])
+glass_rot = xform.rotate@1(glass_up, angles=[0, 90, 0])
+glass_m = solid.material@1(glass_rot, color=[0.5, 0.5, 0.5], roughness=0.15, emissive=[1.6, 1.6, 1.6])
+glass_t = solid.texture@1(glass_m, program="g = surface_height(low=0.0, high=4.7); c = colorize(g, gradient=[0:#7d1424, 0.22:#d18a1c, 0.45:#1f60a8, 0.7:#2f8f5c, 1:#c25c9c]); albedo = c; emissive = c")
+glass_r = xform.move@1(glass_t, by=[7.35, 3.2, -12.5])
+glasses_r = inst.array@1(glass_r, count_z=6, spacing=[0, 0, 5])
+output glass_east = glasses_r
+glass_l = xform.move@1(glass_t, by=[-7.35, 3.2, -12.5])
+glasses_l = inst.array@1(glass_l, count_z=6, spacing=[0, 0, 5])
+output glass_west = glasses_l
+
+# ---------- the apse wall with its great window ----------
+apse_b = solid.box@1(size=[16.0, 17.0, 0.9])
+apse_a = xform.move@1(apse_b, by=[0, 8.5, 15.45])
+apse_p = profile.polygon@1(points=[${apse_pts}])
+apse_x0 = solid.extrude@1(apse_p, height=1.6)
+apse_x = xform.rotate@1(apse_x0, angles=[-90, 0, 0])
+apse_at = xform.move@1(apse_x, by=[0, 3.0, 16.2])
+apse_cut = solid.difference@1(apse_a, apse_at)
+stone("apse", "apse_cut")
+output apse = apse_st
+apse_gl0 = solid.extrude@1(apse_p, height=0.1)
+apse_gl = xform.rotate@1(apse_gl0, angles=[-90, 0, 0])
+apse_gm = solid.material@1(apse_gl, color=[0.5, 0.5, 0.5], roughness=0.15, emissive=[2.0, 2.0, 2.0])
+apse_gt = solid.texture@1(apse_gm, program="g = surface_height(low=0.0, high=7.9); c = colorize(g, gradient=[0:#7d1424, 0.2:#e09a22, 0.4:#2a74c4, 0.6:#2f9f68, 0.8:#c25c9c, 1:#f0d070]); albedo = c; emissive = c")
+apse_ga = xform.move@1(apse_gt, by=[0, 3.0, 15.3])
+output apse_glass = apse_ga
+
+# ---------- light: a low gold sun through the glass, spots on the water ----------
+beam_a = light.spot@1(position=[-9.5, 6.5, -5], direction=[1, -0.45, 0.15], color=[1.0, 0.72, 0.4], intensity=4500, range=40, inner_angle=14, outer_angle=34)
+beam_b = light.spot@1(position=[9.5, 6.5, 5], direction=[-1, -0.45, -0.15], color=[0.5, 0.7, 1.0], intensity=3500, range=40, inner_angle=14, outer_angle=34)
+beam_c = light.spot@1(position=[0, 9, 15.5], direction=[0, -0.35, -1], color=[1.0, 0.6, 0.9], intensity=5000, range=44, inner_angle=18, outer_angle=44)
+
+# ================= the leviathan =================
+def bone(tag, src)
+  {tag}_bm = solid.material@1(${src}, color=[0.95, 0.92, 0.84], roughness=0.5)
+  {tag}_btx = solid.texture@1(${tag}_bm, program="n = fbm(scale_x=3, scale_y=3, iterations=4); f = fbm(scale_x=26, scale_y=26, iterations=4); s = fbm(scale_x=2, scale_y=15, iterations=4); ivory = colorize(n, gradient=[0:#b9ad92, 0.5:#d8cfb8, 1:#efe8d6]); streak = colorize(s, gradient=[0:#6a5436, 1:#ece3cf]); a0 = blend(ivory, streak, n, blend_type=normal, amount=0.55); moss = colorize(f, gradient=[0:#2e4a1c, 1:#6f9a3a]); up = surface_up(power=4); albedo = blend(moss, a0, up, blend_type=normal, amount=0.25); roughness = colorize(f, gradient=[0:#606060, 1:#a8a8a8])")
+  {tag}_bt = solid.finish@1(${tag}_btx, subsurface=0.25, wetness=0.3, relief=0.1, relief_scale=30)
+end
+
+# vertebrae: a rounded disc, a neural spine, two transverse processes; 36 of them along a spline, growing toward the skull
+v_cyl = solid.cylinder@1(radius=0.3, height=0.34, segments=40)
+v_cyl_r = xform.rotate@1(v_cyl, angles=[0, 0, 90])
+v_body = solid.round@1(v_cyl_r, radius=0.05)
+v_neural = solid.box@1(size=[0.1, 0.7, 0.12])
+v_neural_a = xform.move@1(v_neural, by=[0, 0.5, 0])
+v_trans = solid.box@1(size=[0.14, 0.07, 1.1])
+v_trans_a = xform.move@1(v_trans, by=[0, 0.1, 0])
+v_u = solid.union@1(v_body, v_neural_a, v_trans_a)
+bone("vert", "v_u")
+spine = curve.spline@1(points=[[0.1, 0.95, 13], [0.5, 1.0, 8], [-0.3, 0.95, 3], [0.3, 1.0, -2], [0, 1.05, -7.5]], steps=12)
+verts = inst.along_curve@1(vert_bt, spine, count=36, align=true)
+vs = field.expr@1(code="out = mix(0.45, 1.05, 1.0 - smoothstep(-8.0, 13.0, p.z))")
+verts_v = inst.vary@1(verts, vs)
+output spine = verts_v
+
+# ribs: a tapered capsule bent into an arch by field warps, then a cage of them down both sides
+rib_c = field.capsule@1(radius=0.13, half_length=2.7)
+rib_t = field.taper@1(rib_c, axis="y", from=-2.7, to=2.7, scale_start=1.0, scale_end=0.3)
+rib_b = field.bend@1(rib_t, axis="y", toward="x", from=-2.7, to=2.7, angle=112)
+rib_s = field.to_solid@1(rib_b, min=[-0.6, -3.2, -0.3], max=[4.4, 0.8, 0.3], edge_length=0.03)
+bone("rib", "rib_s")
+ribs_r = inst.place@1(rib_bt, at=[[0.15, 2.49, -4.5], [0.15, 2.89, -3.55], [0.15, 3.3, -2.6], [0.15, 3.62, -1.65], [0.15, 3.84, -0.7], [0.15, 3.97, 0.25], [0.15, 3.97, 1.2], [0.15, 3.84, 2.15], [0.15, 3.62, 3.1], [0.15, 3.3, 4.05], [0.15, 2.89, 5.0]], yaw_scale=[[0, 0.55], [0, 0.7], [0, 0.85], [0, 0.97], [0, 1.05], [0, 1.1], [0, 1.1], [0, 1.05], [0, 0.97], [0, 0.85], [0, 0.7]])
+output ribs_east = ribs_r
+ribs_l = inst.place@1(rib_bt, at=[[-0.15, 2.49, -4.5], [-0.15, 2.89, -3.55], [-0.15, 3.3, -2.6], [-0.15, 3.62, -1.65], [-0.15, 3.84, -0.7], [-0.15, 3.97, 0.25], [-0.15, 3.97, 1.2], [-0.15, 3.84, 2.15], [-0.15, 3.62, 3.1], [-0.15, 3.3, 4.05], [-0.15, 2.89, 5.0]], yaw_scale=[[180, 0.55], [180, 0.7], [180, 0.85], [180, 0.97], [180, 1.05], [180, 1.1], [180, 1.1], [180, 1.05], [180, 0.97], [180, 0.85], [180, 0.7]])
+output ribs_west = ribs_l
+
+# the skull: cranium, brow, snout and a separate jaw, smooth-united; eye sockets and nostrils cut out
+sk_cr = field.ellipsoid@1(radii=[1.25, 1.15, 1.9])
+sk_cr_a = field.move@1(sk_cr, by=[0, 2.0, -10.6])
+sk_sn = field.ellipsoid@1(radii=[0.72, 0.58, 1.9])
+sk_sn_a = field.move@1(sk_sn, by=[0, 1.55, -12.9])
+sk_br = field.ellipsoid@1(radii=[1.0, 0.5, 1.0])
+sk_br_a = field.move@1(sk_br, by=[0, 2.9, -10.0])
+sk_u1 = field.smooth_union@1(sk_cr_a, sk_sn_a, radius=0.5)
+sk_u2 = field.smooth_union@1(sk_u1, sk_br_a, radius=0.4)
+sk_jaw = field.ellipsoid@1(radii=[0.7, 0.26, 2.1])
+sk_jaw_a = field.move@1(sk_jaw, by=[0, 0.5, -12.4])
+sk_eye = field.sphere@1(radius=0.5)
+sk_eye_l = field.move@1(sk_eye, by=[1.05, 2.3, -11.9])
+sk_eye_r = field.move@1(sk_eye, by=[-1.05, 2.3, -11.9])
+sk_nose = field.ellipsoid@1(radii=[0.2, 0.2, 0.55])
+sk_nose_l = field.move@1(sk_nose, by=[0.3, 1.8, -14.5])
+sk_nose_r = field.move@1(sk_nose, by=[-0.3, 1.8, -14.5])
+sk_h1 = field.union@1(sk_u2, sk_jaw_a)
+sk_h2 = field.subtract@1(sk_h1, sk_eye_l)
+sk_h3 = field.subtract@1(sk_h2, sk_eye_r)
+sk_h4 = field.subtract@1(sk_h3, sk_nose_l)
+sk_h5 = field.subtract@1(sk_h4, sk_nose_r)
+sk_s = field.to_solid@1(sk_h5, min=[-1.8, 0.1, -15.0], max=[1.8, 3.6, -8.4], edge_length=0.07)
+bone("skull", "sk_s")
+output skull = skull_bt
+tooth = solid.cone@1(radius=0.09, height=0.45, segments=12)
+tooth_dn = xform.rotate@1(tooth, angles=[180, 0, 0])
+bone("tu", "tooth_dn")
+bone("tl", "tooth")
+let teeth_up = "count_z=10, spacing=[0, 0, -0.26]"
+t_ur_a = xform.move@1(tu_bt, by=[0.42, 0.88, -11.9])
+t_ur = inst.array@1(t_ur_a, ${teeth_up})
+output teeth_ur = t_ur
+t_ul_a = xform.move@1(tu_bt, by=[-0.42, 0.88, -11.9])
+t_ul = inst.array@1(t_ul_a, ${teeth_up})
+output teeth_ul = t_ul
+t_lr_a = xform.move@1(tl_bt, by=[0.38, 0.84, -11.7])
+t_lr = inst.array@1(t_lr_a, ${teeth_up})
+output teeth_lr = t_lr
+t_ll_a = xform.move@1(tl_bt, by=[-0.38, 0.84, -11.7])
+t_ll = inst.array@1(t_ll_a, ${teeth_up})
+output teeth_ll = t_ll
+
+# ================= the sims =================
+# tattered banners: cloth written in SimL (springs from the mesh edges, pull, a draft with gusts), the top row fixed
+let banner_src = "sim banner\nparam wind = vec3(0.0, 0.0, 1.5)\nparam gust = 1.0\nparam damping = 0.986\nparam top = 0.0\ninput mesh flag\nstate pos: vec3[flag]\nstate prev: vec3[flag]\nkernel init each i in pos {\n  pos[i] = rest(flag, i)\n  prev[i] = rest(flag, i)\n}\nkernel predict each i in pos {\n  let r = rest(flag, i)\n  if r.y > top - 0.05 {\n    pos[i] = r\n    prev[i] = r\n  } else {\n    let v = (pos[i] - prev[i]) * damping\n    prev[i] = pos[i]\n    let puff = wind * (0.4 + gust * (0.5 + 0.5 * sin(t * 0.9 + r.y * 0.8 + r.z * 1.3 + r.x * 0.7)))\n    pos[i] += v + (vec3(0.0, -9.8, 0.0) + puff * (6.0 - r.y * 0.4)) * dt * dt\n  }\n}\nkernel solve each i in pos {\n  let r = rest(flag, i)\n  let p = pos[i]\n  if r.y <= top - 0.05 {\n    let corr = vec3(0.0)\n    let count = 0.0\n    for j, len in adjacent(flag, i) {\n      let share = select(rest(flag, j).y > top - 0.05, 1.0, 0.5)\n      corr += pull(p, pos[j], len) * share\n      count += 1.0\n    }\n    if count > 0.0 {\n      p += corr * (1.3 / count)\n    }\n  }\n  pos[i] = p\n}\nschedule predict; repeat 24 { solve }\noutput mesh pos\n"
+def banner(tag, bx, bz)
+  b{tag}_g = poly.grid@1(width=1.5, height=4.4, columns=24, rows=60)
+  b{tag}_r = xform.rotate@1(b{tag}_g, angles=[0, 90, 0])
+  b{tag}_a = xform.move@1(b{tag}_r, by=[{bx}, 8.4, {bz}])
+  b{tag}_p = sim.program@1(b{tag}_a, rate=60, values="top=10.6", source="${banner_src}")
+  b{tag}_m = solid.material@1(b{tag}_p, color=[0.55, 0.1, 0.16], roughness=0.85)
+  b{tag}_t = solid.texture@1(b{tag}_m, program="h = surface_height(low=6.0, high=10.8); c = colorize(h, gradient=[0:#2a070d, 0.5:#6b1220, 1:#a82a3a]); albedo = c")
+  b{tag}_f = solid.finish@1(b{tag}_t, sheen=0.5, translucency=0.2)
+  output banner_{tag} = b{tag}_f
+end
+banner("a", 3.45, -7.5)
+banner("b", -3.45, -2.5)
+banner("c", 3.45, 2.5)
+banner("d", -3.45, 7.5)
+
+# a bat colony wheeling in the open vault: boids by three local rules (spatial hash), kept between y 11 and 17.5
+bats = sim.program@1(size=0.2, seed=5, rate=30, source="sim bats\nparam radius = 3.0\nparam max_speed = 8.0\nparam cohesion = 0.6\nparam separation = 4.0\nparam align = 2.5\nstate pos: vec3[220]\nstate vel: vec3[220]\nkernel init each i in pos {\n  pos[i] = vec3(rand(i, 1.0) * 10.0 - 5.0, 12.0 + rand(i, 2.0) * 4.0, rand(i, 3.0) * 24.0 - 12.0)\n  vel[i] = normalize(vec3(rand(i, 4.0), rand(i, 5.0), rand(i, 6.0)) - 0.5) * 5.0\n}\nkernel flock each i in pos {\n  let p = pos[i]\n  let v = vel[i]\n  let centre = vec3(0.0)\n  let heading = vec3(0.0)\n  let push = vec3(0.0)\n  let seen = 0.0\n  for j in neighbors(pos, p, radius) cap 12 {\n    if j != i {\n      centre += pos[j]\n      heading += vel[j]\n      let d = p - pos[j]\n      push += d / max(dot(d, d), 0.05)\n      seen += 1.0\n    }\n  }\n  let acc = vec3(0.0)\n  if seen > 0.0 {\n    acc = (centre / seen - p) * cohesion + (heading / seen - v) * align + push * separation\n  }\n  let target = vec3(sin(t * 0.3) * 3.0, 14.0 + sin(t * 0.5) * 1.5, cos(t * 0.17) * 10.0)\n  acc += normalize(target - p) * 3.0\n  if p.y < 11.0 {\n    acc += vec3(0.0, (11.0 - p.y) * 4.0, 0.0)\n  }\n  if p.y > 17.5 {\n    acc += vec3(0.0, (17.5 - p.y) * 4.0, 0.0)\n  }\n  if abs(p.x) > 6.0 {\n    acc += vec3((6.0 - abs(p.x)) * sign(p.x) * 4.0, 0.0, 0.0)\n  }\n  let nv = v + acc * dt\n  let sp = length(nv)\n  nv = nv * min(1.0, max_speed / max(sp, 0.001))\n  nv = nv * max(1.0, 3.5 / max(sp, 0.001))\n  vel[i] = nv\n}\nkernel move each i in pos { pos[i] += vel[i] * dt }\nschedule flock; move\noutput particles pos\n")
+bats_m = solid.material@1(bats, color=[0.02, 0.02, 0.025], roughness=0.8)
+output bats = bats_m
+
+# dust and pollen drifting in the beams: 700 motes on a small random walk with a faint updraft, lit from within
+dust = sim.program@1(size=0.03, seed=2, rate=30, source="sim dust\nstate pos: vec3[700]\nkernel init each i in pos {\n  pos[i] = vec3(rand(i, 1.0) * 12.0 - 6.0, 0.8 + rand(i, 2.0) * 9.0, rand(i, 3.0) * 26.0 - 13.0)\n}\nkernel drift each i in pos {\n  let k = t * 1.7 + i\n  let d = vec3(sin(k * 1.3 + i), sin(k * 0.9 + i * 2.0) * 0.6 + 0.35, sin(k * 1.1 + i * 3.0)) * 0.012\n  let p = pos[i] + d\n  if p.y > 10.0 {\n    p = vec3(p.x, 0.8, p.z)\n  }\n  pos[i] = p\n}\nschedule drift\noutput particles pos\n")
+dust_m = solid.material@1(dust, color=[1, 0.9, 0.7], roughness=0.5, emissive=[3.0, 2.4, 1.5])
+output dust = dust_m
+
+# rain falling through the broken roof (the ripples where it lands are the water's own rain)
+rain_src = solid.box@1(size=[0.2, 0.1, 0.2])
+rain_a = xform.move@1(rain_src, by=[0, 18, 0])
+rain = fx.emitter@1(rain_a, name="rain", rate=420, lifetime=[1.2, 1.5], speed=[12, 16], direction=[0, -1, 0], cone=0.05, shape="box", extent=[12, 0.1, 26], max_particles=700, size=[0.05, 0.05], colour=[0.7, 0.8, 0.95], colour_end=[0.6, 0.7, 0.85], alpha=[0.45, 0.15], glow=0.6, blend="additive")
+output rain = rain
+
+# the altar and its candles
+altar_s = solid.box@1(size=[3.2, 1.1, 1.2])
+altar_a = xform.move@1(altar_s, by=[0, 0.55, 13.4])
+stone("altar", "altar_a")
+output altar = altar_st
+cand_s = solid.cylinder@1(radius=0.05, height=0.4, segments=12)
+let candles = "by=[0, 1.3, 13.4]"
+cand_a = xform.move@1(cand_s, by=[-1.2, 1.3, 13.4])
+cand_row = inst.array@1(cand_a, count_x=5, spacing=[0.6, 0, 0])
+cand_m = solid.material@1(cand_row, color=[0.9, 0.86, 0.7], roughness=0.6)
+output candles = cand_m
+flame_src = solid.sphere@1(radius=0.03, segments=6)
+flame_a = xform.move@1(flame_src, by=[0, 1.55, 13.4])
+flames = fx.emitter@1(flame_a, name="candle_flames", rate=90, lifetime=[0.3, 0.6], speed=[0.2, 0.5], direction=[0, 1, 0], cone=0.15, shape="box", extent=[2.4, 0.02, 0.05], max_particles=300, size=[0.1, 0.01], colour=[3.0, 1.6, 0.45], colour_end=[1.2, 0.2, 0.05], alpha=[1, 0], glow=9, blend="additive")
+output flames = flames
+altar_light = light.point@1(position=[0, 2.2, 12.6], color=[1.0, 0.65, 0.3], intensity=220, range=14)
+
+# floating lanterns: each is a dynamic body (hull and glass), each copy with its own program that holds it on the water and drifts it along
+lh_p = profile.polygon@1(points=[[0, 0], [0.32, 0], [0.36, 0.05], [0.4, 0.12], [0.38, 0.18], [0.3, 0.2], [0, 0.2]])
+lh_f = profile.fillet@1(lh_p, radius=0.02)
+lh_hull = solid.revolve@1(lh_f, segments=36)
+lh_hull_m = solid.material@1(lh_hull, color=[0.3, 0.18, 0.1], roughness=0.7)
+lh_body = phys.body@1(lh_hull_m, kind="dynamic", density=0.3, linear_damping=0.6, angular_damping=1.0)
+output lantern = lh_body
+float_p = sim.program@1(size=0.02, rate=60, source="sim float\nparam spring = 9.0\nparam damp = 3.5\nparam gravity = 9.8\ninput bone lantern\nstate probe: vec3[1]\nstate push: vec3[1]\nstate last: vec3[1]\nkernel feel each i in probe {\n  let c = bone_point(lantern, vec3(0.0, 0.1, 0.0))\n  let h = 0.5 + 0.02 * sin(t * 1.4 + c.x * 2.0 + c.z * 1.5)\n  let vy = clamp((c.y - last[i].y) / dt, -8.0, 8.0)\n  let err = clamp(h - c.y, -1.0, 1.0)\n  probe[i] = c\n  last[i] = c\n  push[i] = vec3(0.004 * sin(t * 0.3 + c.z), clamp((gravity + spring * err - damp * vy) * dt, -0.15, 0.2), 0.006 * sin(t * 0.21 + c.x))\n}\nschedule feel\noutput particles probe\noutput push lantern push\n")
+float_m = solid.material@1(float_p, color=[1, 1, 0.5], roughness=0.5)
+output lantern_probe = float_m
+lg_s = solid.cylinder@1(radius=0.14, height=0.3, segments=16)
+lg_a = xform.move@1(lg_s, by=[0, 0.35, 0])
+lg_m = solid.material@1(lg_a, color=[1, 0.85, 0.5], roughness=0.3, emissive=[5, 3.2, 1.4], emits_light=true)
+lg_p = anim.parent@1(lg_m, parent="lantern")
+output lantern_glass = lg_p
+lk = game.kind@1(name="lantern", size=0.6, part="lantern", tags=["lantern"])
+l1 = game.spawn@1(kind="lantern", at=[-2.2, 0.5, -9], heading=20)
+l2 = game.spawn@1(kind="lantern", at=[1.8, 0.5, -5.5], heading=-40)
+l3 = game.spawn@1(kind="lantern", at=[-1.0, 0.5, -0.5], heading=80)
+l4 = game.spawn@1(kind="lantern", at=[2.4, 0.5, 3.0], heading=-10)
+l5 = game.spawn@1(kind="lantern", at=[-2.4, 0.5, 6.5], heading=55)
+l6 = game.spawn@1(kind="lantern", at=[0.4, 0.5, 9.5], heading=-70)
+fleet = game.collect@1(lk, l1, l2, l3, l4, l5, l6, name="lanterns")
+output rules = fleet
+
+# a rope walkway slung across the nave high up (the library bridge; sim.set_param cut=<link> snaps it)
+walk = sim.program@1(library="bridge", size=0.28, rate=60, values="span=7.2; height=9.6; spacing=0.18")
+walk_a = xform.move@1(walk, by=[0, 0, -11.2])
+walk_m = solid.material@1(walk_a, color=[0.4, 0.26, 0.14], roughness=0.85)
+output walkway = walk_m
+
+# an oak that has grown up through the broken roof
+oak = flora.tree@1(kind="oak", height=10, seed=11, leaves=[0.22, 0.36, 0.1], lod=1, sway=0.4)
+oak_p = inst.place@1(oak, at=[[-5.6, 0.2, -1.5]])
+output oak = oak_p

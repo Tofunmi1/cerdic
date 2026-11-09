@@ -1,0 +1,7 @@
+{
+  "views": [
+    { "name": "front-wide", "position": [0, 3.7, 10.5], "target": [0, 1.3, -0.6], "fov": 45 },
+    { "name": "interior-three-quarter", "position": [0, 2.8, 9.5], "target": [0, 1.25, -0.8], "fov": 48 },
+    { "name": "window-and-seating", "position": [0, 2.2, -2.1], "target": [0, 1.1, 0.2], "fov": 50 }
+  ]
+}

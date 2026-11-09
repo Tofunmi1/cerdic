@@ -1,0 +1,11 @@
+group stump
+  prof = profile.polygon@1(points=[[0, 0], [0.4, 0], [0.34, 0.07], [0.29, 0.18], [0.27, 0.4], [0.26, 0.44], [0, 0.44]])
+  prof_f = profile.fillet@1(prof, radius=0.015)
+  body = solid.revolve@1(prof_f, segments=18)
+  body_n = xform.noise@1(body, amplitude=0.025, scale=0.35, seed=4)
+  body_m = solid.material@1(body_n, color=[0.5, 0.4, 0.3], roughness=0.9)
+  bark = solid.texture@1(body_m, program="n = fbm(scale_x=8, scale_y=3, iterations=5); f = fbm(scale_x=34, scale_y=34, iterations=3); wood = colorize(n, gradient=[0:#2c1d10, 0.5:#5e4529, 1:#947552]); top = colorize(f, gradient=[0:#b8946a, 1:#dcc190]); moss = colorize(f, gradient=[0:#2e4a1c, 1:#6f9a3a]); up = surface_up(power=6); a0 = blend(top, wood, up, blend_type=normal, amount=0.95); side = surface_cavity(gain=2); albedo = blend(moss, a0, side, blend_type=normal, amount=0.25)")
+  fin = solid.finish@1(bark, relief=0.12, relief_scale=24)
+  expose seed = body_n.seed
+  result fin
+end

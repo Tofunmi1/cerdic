@@ -1,0 +1,317 @@
+# CESSNA 185 SKYWAGON ON FLOATS. BRIEF: a high-wing, six-seat utility aircraft on a pair of EDO 3430 floats:
+# fuselage 7.85 m nose to rudder, wingspan 10.92 m, wing area 16.2 m2, 2.08 m two-blade prop, fin top 3.71 m above
+# the waterline, floats 6.4 m long and 0.81 m wide on a 2.24 m track, 0.25 m static draft. White airframe with a red
+# cheat line, dark glass, bare-aluminium floats and chrome spinner. engine/tools/audit-cessna.ts measures the evaluated
+# mesh against those figures and says which value to change.
+# Metres, +y up, the aircraft faces +z, the waterline is y = 0, the spinner tip is at z = 4.00.
+# It is animated: the fuselage flies a slow banked circle of 5.5 m radius at 2.6 m above the studio floor, its nose
+# turning with the path, and every other part follows it (anim.parent); a gentle heave, roll wobble and pitch wobble
+# ride on top, and the propeller spins about its hub.
+# kind: world
+sky = scene.sky@1(sun_elevation=34, sun_azimuth=-38, sun_intensity=3.5, turbidity=3, ground_color=[0.09, 0.16, 0.2], clouds=true, haze=0.08)
+env = scene.environment@1(sky_color=[0.7, 0.8, 0.95], ground_color=[0.06, 0.12, 0.16], intensity=1.0, reflection=0.6, bounce=0.5)
+output sky = sky
+output env = env
+
+# ---------------- PARAMETER TABLE ----------------
+let span = "10.92"
+let fuse_len = "7.85"
+let prop_d = "2.08"
+let fin_top = "3.71"
+let float_len = "6.40"
+let float_w = "0.81"
+let float_half_track = "1.12"
+# (the track is 2 x float_half_track = 2.24 m)
+# --------------------------------------------------
+
+# shared helpers: piecewise-linear lookup, a ring mirrored from its right half, and a NACA thickness ordinate
+let jsh = "const pl = (k, z) => { if (z <= k[0][0]) return k[0][1]; for (let i = 1; i < k.length; i++) { if (z <= k[i][0]) { const t = (z - k[i - 1][0]) / (k[i][0] - k[i - 1][0]); return k[i - 1][1] + (k[i][1] - k[i - 1][1]) * t; } } return k[k.length - 1][1]; }; const ring = (rh) => { const r = rh.slice(); for (let i = rh.length - 2; i >= 1; i--) r.push([-rh[i][0], rh[i][1]]); return r; }; const naca = (xc, t) => { const s = Math.sqrt(Math.max(xc, 0)); return 5 * t * (0.2969 * s - 0.126 * xc - 0.3516 * xc * xc + 0.2843 * xc * xc * xc - 0.1015 * xc * xc * xc * xc); };"
+
+# ---- FUSELAGE: one loft of rounded-box sections from the tail cone to the firewall. Widths, heights and the rising
+# centre line are tables, so the cabin is deep and the tail cone sweeps up without a seam; the last stations drop the
+# roof to the cowl so the cockpit sits behind a raked windscreen instead of a flat van front.
+let fuse_code = "${jsh} const m = new Mesh(); const ZT = 4.0 - ${fuse_len}; const zs = []; const N = 56; for (let i = 0; i <= N; i++) zs.push(ZT + (3.45 - ZT) * i / N); const wK = [[ZT, 0.055], [-3.2, 0.09], [-2.8, 0.14], [-2.3, 0.22], [-1.6, 0.40], [-1.15, 0.46], [-0.6, 0.50], [0.4, 0.515], [1.4, 0.515], [2.0, 0.50], [2.4, 0.50], [2.6, 0.52], [3.0, 0.50], [3.45, 0.47]]; const hK = [[ZT, 0.09], [-3.2, 0.13], [-2.8, 0.18], [-2.3, 0.26], [-1.6, 0.40], [-1.15, 0.50], [-0.6, 0.565], [0.4, 0.575], [1.4, 0.575], [2.0, 0.56], [2.4, 0.55], [2.6, 0.34], [3.0, 0.30], [3.45, 0.30]]; const cK = [[ZT, 2.30], [-3.2, 2.22], [-2.8, 2.12], [-2.3, 2.02], [-1.6, 1.90], [-1.15, 1.84], [-0.6, 1.79], [0.4, 1.78], [1.4, 1.78], [2.0, 1.80], [2.4, 1.79], [2.6, 1.70], [3.0, 1.73], [3.45, 1.77]]; const fn = (z) => { const w = pl(wK, z), h = pl(hK, z), c = pl(cK, z); const yb = c - h, yt = c + h; return [[0, yb], [w * 0.38, yb + 0.012], [w * 0.78, yb + 0.06], [w * 0.97, yb + 0.18], [w, c - 0.05], [w * 0.86, yt - 0.10], [w * 0.55, yt - 0.02], [0, yt]]; }; const rows = zs.map((z) => ring(fn(z)).map((q) => m.vertex(q[0], q[1], z))); const n = rows[0].length; for (let k = 0; k < rows.length - 1; k++) for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(rows[k][j], rows[k][j2], rows[k + 1][j2]); m.face(rows[k][j], rows[k + 1][j2], rows[k + 1][j]); } const rb = fn(ZT), rf = fn(3.45); const cb = m.vertex(0, (rb[0][1] + rb[7][1]) / 2, ZT), cf = m.vertex(0, (rf[0][1] + rf[7][1]) / 2, 3.45); for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(cb, rows[0][j2], rows[0][j]); m.face(cf, rows[rows.length - 1][j], rows[rows.length - 1][j2]); } m"
+fuse_s = poly.script@1(code="${fuse_code}", budget=8000)
+fuse_solid = poly.to_solid@1(fuse_s)
+# Cut the cabin open: the inner volume, the side-window band through the skin, and the front deck behind the screen.
+cabin_b = solid.box@1(size=[0.92, 1.16, 2.00])
+cabin_c = xform.move@1(cabin_b, by=[0, 1.99, 1.41])
+win_b = solid.box@1(size=[1.14, 0.42, 1.50])
+win_c = xform.move@1(win_b, by=[0, 2.09, 1.40])
+screen_b = solid.box@1(size=[0.97, 0.64, 0.44])
+screen_c = xform.move@1(screen_b, by=[0, 2.30, 2.54])
+fuse_cut = solid.difference@1(fuse_solid, cabin_c, win_c, screen_c)
+fuse_m = solid.material@1(fuse_cut, color=[0.93, 0.93, 0.90], metallic=0.10, roughness=0.34)
+# The whole aircraft flies a slow banked circle: the fuselage is the anchor, every other part parents to it.
+# The heading track turns the nose a full lap in 18 s; two quarter-phase position waves then orbit the model,
+# x = 5.5 sin and z = 5.5 cos, at 2.6 m above the floor. The heave, roll and pitch wobbles ride on top.
+fuse_bob = anim.wave@1(fuse_m, property="position", amplitude=[0, 0.08, 0], period=4.2)
+fuse_roll = anim.wave@1(fuse_bob, property="rotation", amplitude=[0, 0, 1.2], base=[0, 0, -14], period=5.6, phase=0.15, pivot=[0, 1.8, 0])
+fuse_pitch = anim.wave@1(fuse_roll, property="rotation", amplitude=[0.9, 0, 0], period=7.3, phase=0.4, pivot=[0, 1.8, 0])
+fuse_heading = anim.track@1(fuse_pitch, property="rotation", keys="0:0,90,0; 18:0,450,0", interpolation="linear", loop=true, pivot=[0, 1.8, 0])
+fuse_orbit_x = anim.wave@1(fuse_heading, property="position", amplitude=[5.5, 0, 0], period=18, phase=0)
+fuse_orbit_z = anim.wave@1(fuse_orbit_x, property="position", amplitude=[0, 0, 5.5], base=[0, 2.6, 0], period=18, phase=0.25)
+output fuselage = fuse_orbit_z
+
+# ---- WING: a symmetric NACA section swept through 27 stations, tapering and rising 0.16 m to the tip.
+let wing_code = "${jsh} const m = new Mesh(); const S = ${span} / 2; const xs = []; for (let i = 0; i <= 26; i++) xs.push(-S + 2 * S * i / 26); const section = (x) => { const u = Math.abs(x) / S; const c = 1.90 - 0.84 * u; const le = 2.05 - 0.10 * u; const yc = 2.40 + 0.16 * u; const th = (0.19 - 0.07 * u) / c; const camber = 0.02 * c; const N = 10; const up = [], lo = []; for (let i = N; i >= 0; i--) { const xc = 0.5 * (1 - Math.cos(Math.PI * i / N)); up.push([le - xc * c, yc + camber * 4 * xc * (1 - xc) + naca(xc, th)]); } for (let i = 1; i <= N; i++) { const xc = 0.5 * (1 - Math.cos(Math.PI * i / N)); lo.push([le - xc * c, yc + camber * 4 * xc * (1 - xc) - naca(xc, th)]); } return up.concat(lo); }; const rows = xs.map((x) => section(x).map((q) => m.vertex(x, q[1], q[0]))); const n = rows[0].length; for (let k = 0; k < rows.length - 1; k++) for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(rows[k][j], rows[k][j2], rows[k + 1][j2]); m.face(rows[k][j], rows[k + 1][j2], rows[k + 1][j]); } const cc0 = m.vertex(-S, 2.56, 1.00), cc1 = m.vertex(S, 2.56, 1.32); for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(cc0, rows[0][j2], rows[0][j]); m.face(cc1, rows[rows.length - 1][j], rows[rows.length - 1][j2]); } m"
+wing_s = poly.script@1(code="${wing_code}", budget=8000)
+wing_solid = poly.to_solid@1(wing_s)
+wing_m = solid.material@1(wing_solid, color=[0.93, 0.93, 0.90], metallic=0.10, roughness=0.34)
+wing_m_p = anim.parent@1(wing_m, parent="fuselage")
+output wings = wing_m_p
+
+# ---- TAIL: the fin is a vertical loft, the stabiliser a small wing; both use the same NACA section.
+let fin_code = "${jsh} const m = new Mesh(); const ys = []; for (let i = 0; i <= 12; i++) ys.push(2.14 + (${fin_top} - 2.14) * (0.5 - 0.5 * Math.cos(Math.PI * i / 12))); const section = (y) => { const u = (y - 2.14) / (${fin_top} - 2.14); const c = 1.30 - 0.52 * u; const le = -2.35 - 0.65 * u; const th = (0.10 - 0.04 * u) / c; const N = 8; const up = [], lo = []; for (let i = N; i >= 0; i--) { const xc = 0.5 * (1 - Math.cos(Math.PI * i / N)); up.push([le - xc * c, naca(xc, th)]); } for (let i = 1; i <= N; i++) { const xc = 0.5 * (1 - Math.cos(Math.PI * i / N)); lo.push([le - xc * c, -naca(xc, th)]); } return up.concat(lo); }; const rows = ys.map((y) => section(y).map((q) => m.vertex(q[1], y, q[0]))); const n = rows[0].length; for (let k = 0; k < rows.length - 1; k++) for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(rows[k][j], rows[k][j2], rows[k + 1][j2]); m.face(rows[k][j], rows[k + 1][j2], rows[k + 1][j]); } const cc0 = m.vertex(0, 2.14, -3.0), cc1 = m.vertex(0, ${fin_top}, -3.39); for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(cc0, rows[0][j2], rows[0][j]); m.face(cc1, rows[rows.length - 1][j], rows[rows.length - 1][j2]); } m"
+fin_s = poly.script@1(code="${fin_code}", budget=6000)
+fin_solid = poly.to_solid@1(fin_s)
+
+let stab_code = "${jsh} const m = new Mesh(); const S = 1.95; const xs = []; for (let i = 0; i <= 16; i++) xs.push(-S + 2 * S * i / 16); const section = (x) => { const u = Math.abs(x) / S; const c = 0.95 - 0.40 * u; const le = -2.70 - 0.20 * u; const yc = 2.16; const th = (0.10 - 0.03 * u) / c; const N = 8; const up = [], lo = []; for (let i = N; i >= 0; i--) { const xc = 0.5 * (1 - Math.cos(Math.PI * i / N)); up.push([le - xc * c, yc + naca(xc, th)]); } for (let i = 1; i <= N; i++) { const xc = 0.5 * (1 - Math.cos(Math.PI * i / N)); lo.push([le - xc * c, yc - naca(xc, th)]); } return up.concat(lo); }; const rows = xs.map((x) => section(x).map((q) => m.vertex(x, q[1], q[0]))); const n = rows[0].length; for (let k = 0; k < rows.length - 1; k++) for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(rows[k][j], rows[k][j2], rows[k + 1][j2]); m.face(rows[k][j], rows[k + 1][j2], rows[k + 1][j]); } const cc0 = m.vertex(-S, 2.16, -3.175), cc1 = m.vertex(S, 2.16, -3.175); for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(cc0, rows[0][j2], rows[0][j]); m.face(cc1, rows[rows.length - 1][j], rows[rows.length - 1][j2]); } m"
+stab_s = poly.script@1(code="${stab_code}", budget=5000)
+stab_solid = poly.to_solid@1(stab_s)
+tail_u = solid.union@1(fin_solid, stab_solid)
+tail_m = solid.material@1(tail_u, color=[0.93, 0.93, 0.90], metallic=0.10, roughness=0.34)
+tail_m_p = anim.parent@1(tail_m, parent="fuselage")
+output tail = tail_m_p
+
+# ---- FLOATS: a planing hull with a V-bottom, a flat deck, a sharp bow and a step. The right half is mirrored; SIGN
+# places the two floats. Deck fittings and water rudders come later.
+let float_body = "${jsh} const m = new Mesh(); const S = SIGN; const HW = ${float_w} / 2; const zs = []; const N = 56; for (let i = 0; i <= N; i++) zs.push(-3.45 + ${float_len} * i / N); const wK = [[-3.45, 0.28], [-3.1, 0.37], [-2.4, HW], [-1.2, HW], [-0.4, HW], [0.4, 0.40], [1.2, 0.37], [2.0, 0.28], [2.6, 0.16], [3.0, 0.02]]; const dK = [[-3.45, 0.55], [-2.5, 0.55], [-0.5, 0.55], [1.2, 0.56], [2.2, 0.62], [3.0, 0.68]]; const kK = [[-3.45, -0.05], [-2.6, -0.12], [-1.6, -0.14], [-0.6, -0.14], [0.14, -0.14], [0.22, -0.25], [0.9, -0.25], [1.8, -0.20], [2.5, 0.02], [3.0, 0.28]]; const fn = (z) => { const w = pl(wK, z), d = pl(dK, z), k = pl(kK, z); return [[0, k], [w * 0.42, k + 0.02], [w * 0.80, k + 0.10], [w, k + 0.26], [w * 0.97, d - 0.18], [w * 0.82, d - 0.02], [w * 0.42, d], [0, d]]; }; const rows = zs.map((z) => ring(fn(z)).map((q) => m.vertex(S * q[0], q[1], z))); const n = rows[0].length; for (let k = 0; k < rows.length - 1; k++) for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(rows[k][j], rows[k][j2], rows[k + 1][j2]); m.face(rows[k][j], rows[k + 1][j2], rows[k + 1][j]); } const rb = fn(-3.45), rf = fn(3.0); const cb = m.vertex(0, (rb[0][1] + rb[7][1]) / 2, -3.45), cf = m.vertex(0, (rf[0][1] + rf[7][1]) / 2, 3.0); for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(cb, rows[0][j2], rows[0][j]); m.face(cf, rows[rows.length - 1][j], rows[rows.length - 1][j2]); } m"
+let fl_code = "const SIGN = 1; ${float_body}"
+let fr_code = "const SIGN = -1; ${float_body}"
+fl_s = poly.script@1(code="${fl_code}", budget=7000)
+fl_solid = poly.to_solid@1(fl_s)
+fl_place = xform.move@1(fl_solid, by=[${float_half_track}, 0, 0])
+fl_m = solid.material@1(fl_place, color=[0.80, 0.81, 0.82], metallic=0.85, roughness=0.28, recipe="brushed_metal", texture_scale=2)
+fl_m_p = anim.parent@1(fl_m, parent="fuselage")
+output float_left = fl_m_p
+fr_s = poly.script@1(code="${fr_code}", budget=7000)
+fr_solid = poly.to_solid@1(fr_s)
+fr_place = xform.move@1(fr_solid, by=[-${float_half_track}, 0, 0])
+fr_m = solid.material@1(fr_place, color=[0.80, 0.81, 0.82], metallic=0.85, roughness=0.28, recipe="brushed_metal", texture_scale=2)
+fr_m_p = anim.parent@1(fr_m, parent="fuselage")
+output float_right = fr_m_p
+
+# ---- COCKPIT: the cabin is cut open (see the fuselage), capped by a canopy roof and framed by white pillars. Dark
+# tinted glass closes the windscreen and the side-window band, and inside are a floor, seats, panel, yokes and a pilot.
+roof_b = solid.box@1(size=[1.06, 0.05, 2.06])
+roof = xform.move@1(roof_b, by=[0, 2.35, 1.38])
+ws_hdr_p = curve.spline@1(points=[[-0.48, 2.35, 2.42], [0.48, 2.35, 2.42]], steps=1)
+ws_hdr = curve.tube@1(ws_hdr_p, radius=0.026, end_radius=0.026, sides=6)
+ws_pl_p = curve.spline@1(points=[[0.48, 2.35, 2.42], [0.47, 2.02, 2.78]], steps=1)
+ws_pl = curve.tube@1(ws_pl_p, radius=0.026, end_radius=0.026, sides=6)
+ws_pr_p = curve.spline@1(points=[[-0.48, 2.35, 2.42], [-0.47, 2.02, 2.78]], steps=1)
+ws_pr = curve.tube@1(ws_pr_p, radius=0.026, end_radius=0.026, sides=6)
+ws_sill_p = curve.spline@1(points=[[-0.48, 2.02, 2.78], [0.48, 2.02, 2.78]], steps=1)
+ws_sill = curve.tube@1(ws_sill_p, radius=0.022, end_radius=0.022, sides=6)
+canopy_u = solid.union@1(roof, ws_hdr, ws_pl, ws_pr, ws_sill)
+canopy_m = solid.material@1(canopy_u, color=[0.93, 0.93, 0.90], metallic=0.10, roughness=0.34)
+canopy_p = anim.parent@1(canopy_m, parent="fuselage")
+output canopy = canopy_p
+
+wsg_b = solid.box@1(size=[0.96, 0.50, 0.020])
+wsg_r = xform.rotate@1(wsg_b, angles=[-48, 0, 0])
+wsg = xform.move@1(wsg_r, by=[0, 2.18, 2.60])
+win_g_b = solid.box@1(size=[0.016, 0.40, 1.46])
+win_g_l = xform.move@1(win_g_b, by=[0.500, 2.09, 1.40])
+win_g_r = xform.move@1(win_g_b, by=[-0.500, 2.09, 1.40])
+glass_u = solid.union@1(wsg, win_g_l, win_g_r)
+glass_m = solid.material@1(glass_u, color=[0.10, 0.16, 0.20], metallic=0.30, roughness=0.05, opacity=0.32)
+glass_p = anim.parent@1(glass_m, parent="fuselage")
+output glass = glass_p
+
+int_floor_b = solid.box@1(size=[0.84, 0.04, 1.86])
+int_floor = xform.move@1(int_floor_b, by=[0, 1.455, 1.38])
+int_panel_b = solid.box@1(size=[0.82, 0.20, 0.05])
+int_panel = xform.move@1(int_panel_b, by=[0, 1.88, 2.36])
+seat_b = solid.box@1(size=[0.36, 0.10, 0.36])
+seat_l = xform.move@1(seat_b, by=[0.24, 1.60, 1.30])
+seat_r = xform.move@1(seat_b, by=[-0.24, 1.60, 1.30])
+sback_b = solid.box@1(size=[0.36, 0.44, 0.10])
+sback_r = xform.rotate@1(sback_b, angles=[-12, 0, 0])
+sback_l = xform.move@1(sback_r, by=[0.24, 1.82, 1.10])
+sback_rr = xform.move@1(sback_r, by=[-0.24, 1.82, 1.10])
+bench_b = solid.box@1(size=[0.84, 0.10, 0.34])
+bench = xform.move@1(bench_b, by=[0, 1.60, 0.72])
+bback_b = solid.box@1(size=[0.84, 0.42, 0.10])
+bback_r = xform.rotate@1(bback_b, angles=[-10, 0, 0])
+bback = xform.move@1(bback_r, by=[0, 1.81, 0.52])
+yk_col_l_p = curve.spline@1(points=[[0.24, 1.55, 2.10], [0.24, 1.82, 2.14]], steps=1)
+yk_col_l = curve.tube@1(yk_col_l_p, radius=0.024, end_radius=0.020, sides=6)
+yk_bar_l_p = curve.spline@1(points=[[0.15, 1.85, 2.12], [0.33, 1.85, 2.12]], steps=1)
+yk_bar_l = curve.tube@1(yk_bar_l_p, radius=0.022, end_radius=0.022, sides=6)
+yk_col_r_p = curve.spline@1(points=[[-0.24, 1.55, 2.10], [-0.24, 1.82, 2.14]], steps=1)
+yk_col_r = curve.tube@1(yk_col_r_p, radius=0.024, end_radius=0.020, sides=6)
+yk_bar_r_p = curve.spline@1(points=[[-0.33, 1.85, 2.12], [-0.15, 1.85, 2.12]], steps=1)
+yk_bar_r = curve.tube@1(yk_bar_r_p, radius=0.022, end_radius=0.022, sides=6)
+interior_u = solid.union@1(int_floor, int_panel, seat_l, seat_r, sback_l, sback_rr, bench, bback, yk_col_l, yk_bar_l, yk_col_r, yk_bar_r)
+interior_m = solid.material@1(interior_u, color=[0.13, 0.12, 0.12], metallic=0.05, roughness=0.72)
+interior_p = anim.parent@1(interior_m, parent="fuselage")
+output interior = interior_p
+
+pilot_torso_b = solid.box@1(size=[0.32, 0.44, 0.24])
+pilot_torso = xform.move@1(pilot_torso_b, by=[0.24, 1.87, 1.24])
+arm_l_p = curve.spline@1(points=[[0.40, 2.01, 1.28], [0.33, 1.88, 2.06]], steps=1)
+arm_l = curve.tube@1(arm_l_p, radius=0.050, end_radius=0.042, sides=6)
+arm_r_p = curve.spline@1(points=[[0.08, 2.01, 1.28], [0.15, 1.88, 2.06]], steps=1)
+arm_r = curve.tube@1(arm_r_p, radius=0.050, end_radius=0.042, sides=6)
+pilot_u = solid.union@1(pilot_torso, arm_l, arm_r)
+pilot_m = solid.material@1(pilot_u, color=[0.16, 0.21, 0.30], metallic=0.02, roughness=0.68)
+pilot_p = anim.parent@1(pilot_m, parent="fuselage")
+output pilot = pilot_p
+
+face_neck_s = solid.cylinder@1(radius=0.052, height=0.10, segments=12)
+face_neck = xform.move@1(face_neck_s, by=[0.24, 2.10, 1.26])
+face_head_s = solid.sphere@1(radius=0.115, segments=16)
+face_head = xform.move@1(face_head_s, by=[0.24, 2.19, 1.27])
+face_u = solid.union@1(face_neck, face_head)
+face_m = solid.material@1(face_u, color=[0.70, 0.52, 0.40], metallic=0.0, roughness=0.62)
+face_p = anim.parent@1(face_m, parent="fuselage")
+output pilot_face = face_p
+
+cap_s = solid.cylinder@1(radius=0.120, height=0.055, segments=16)
+cap = xform.move@1(cap_s, by=[0.24, 2.275, 1.27])
+brim_b = solid.box@1(size=[0.16, 0.018, 0.09])
+brim = xform.move@1(brim_b, by=[0.24, 2.255, 1.36])
+ear_s = solid.sphere@1(radius=0.034, segments=8)
+ear_l = xform.move@1(ear_s, by=[0.13, 2.19, 1.27])
+ear_r = xform.move@1(ear_s, by=[0.35, 2.19, 1.27])
+band_p = curve.spline@1(points=[[0.13, 2.21, 1.27], [0.24, 2.30, 1.27], [0.35, 2.21, 1.27]], steps=1)
+band = curve.tube@1(band_p, radius=0.011, end_radius=0.011, sides=5)
+gear_u = solid.union@1(cap, brim, ear_l, ear_r, band)
+gear_m = solid.material@1(gear_u, color=[0.07, 0.08, 0.10], metallic=0.10, roughness=0.50)
+gear_p = anim.parent@1(gear_m, parent="fuselage")
+output pilot_gear = gear_p
+
+# ---- WING AND FLOAT STRUTS: two lift struts a side with a jury strut, three float struts a float, two spreader bars
+# and four bracing wires.
+str_wf_l_p = curve.spline@1(points=[[0.52, 1.38, 1.60], [2.45, 2.40, 1.55]], steps=1)
+str_wf_l = curve.tube@1(str_wf_l_p, radius=0.036, end_radius=0.030, sides=6)
+str_wr_l_p = curve.spline@1(points=[[0.52, 1.38, 0.55], [2.45, 2.43, 1.12]], steps=1)
+str_wr_l = curve.tube@1(str_wr_l_p, radius=0.036, end_radius=0.030, sides=6)
+str_j_l_p = curve.spline@1(points=[[1.62, 1.86, 1.58], [1.62, 2.38, 1.34]], steps=1)
+str_j_l = curve.tube@1(str_j_l_p, radius=0.018, end_radius=0.015, sides=5)
+str_wf_r_p = curve.spline@1(points=[[-0.52, 1.38, 1.60], [-2.45, 2.40, 1.55]], steps=1)
+str_wf_r = curve.tube@1(str_wf_r_p, radius=0.036, end_radius=0.030, sides=6)
+str_wr_r_p = curve.spline@1(points=[[-0.52, 1.38, 0.55], [-2.45, 2.43, 1.12]], steps=1)
+str_wr_r = curve.tube@1(str_wr_r_p, radius=0.036, end_radius=0.030, sides=6)
+str_j_r_p = curve.spline@1(points=[[-1.62, 1.86, 1.58], [-1.62, 2.38, 1.34]], steps=1)
+str_j_r = curve.tube@1(str_j_r_p, radius=0.018, end_radius=0.015, sides=5)
+# float struts: front, rear and a diagonal per side
+fs_fl_p = curve.spline@1(points=[[0.46, 1.26, 1.30], [1.10, 0.58, 0.95]], steps=1)
+fs_fl = curve.tube@1(fs_fl_p, radius=0.038, end_radius=0.032, sides=6)
+fs_rl_p = curve.spline@1(points=[[0.46, 1.26, -0.95], [1.10, 0.58, -0.75]], steps=1)
+fs_rl = curve.tube@1(fs_rl_p, radius=0.038, end_radius=0.032, sides=6)
+fs_dl_p = curve.spline@1(points=[[0.20, 1.30, 1.05], [1.08, 0.58, -0.55]], steps=1)
+fs_dl = curve.tube@1(fs_dl_p, radius=0.030, end_radius=0.026, sides=6)
+fs_fr_p = curve.spline@1(points=[[-0.46, 1.26, 1.30], [-1.10, 0.58, 0.95]], steps=1)
+fs_fr = curve.tube@1(fs_fr_p, radius=0.038, end_radius=0.032, sides=6)
+fs_rr_p = curve.spline@1(points=[[-0.46, 1.26, -0.95], [-1.10, 0.58, -0.75]], steps=1)
+fs_rr = curve.tube@1(fs_rr_p, radius=0.038, end_radius=0.032, sides=6)
+fs_dr_p = curve.spline@1(points=[[-0.20, 1.30, 1.05], [-1.08, 0.58, -0.55]], steps=1)
+fs_dr = curve.tube@1(fs_dr_p, radius=0.030, end_radius=0.026, sides=6)
+# spreader bars between the floats
+sp_f_p = curve.spline@1(points=[[1.10, 0.62, 0.90], [-1.10, 0.62, 0.90]], steps=1)
+sp_f = curve.tube@1(sp_f_p, radius=0.034, end_radius=0.034, sides=6)
+sp_r_p = curve.spline@1(points=[[1.10, 0.62, -0.80], [-1.10, 0.62, -0.80]], steps=1)
+sp_r = curve.tube@1(sp_r_p, radius=0.034, end_radius=0.034, sides=6)
+# bracing wires
+wire_1_p = curve.spline@1(points=[[0.72, 1.20, 1.62], [1.06, 0.60, -0.60]], steps=1)
+wire_1 = curve.tube@1(wire_1_p, radius=0.011, end_radius=0.011, sides=4)
+wire_2_p = curve.spline@1(points=[[-0.72, 1.20, 1.62], [-1.06, 0.60, -0.60]], steps=1)
+wire_2 = curve.tube@1(wire_2_p, radius=0.011, end_radius=0.011, sides=4)
+struts_u = solid.union@1(str_wf_l, str_wr_l, str_j_l, str_wf_r, str_wr_r, str_j_r, fs_fl, fs_rl, fs_dl, fs_fr, fs_rr, fs_dr, sp_f, sp_r, wire_1, wire_2)
+struts_m = solid.material@1(struts_u, color=[0.55, 0.57, 0.60], metallic=0.80, roughness=0.42)
+struts_m_p = anim.parent@1(struts_m, parent="fuselage")
+output struts = struts_m_p
+
+# ---- PROPELLER: one twisted two-sided blade, repeated at 180 degrees, with yellow tips and a chrome spinner.
+let blade_code = "const m = new Mesh(); const r0 = 0.10, r1 = ${prop_d} / 2; const rs = []; for (let i = 0; i <= 12; i++) rs.push(r0 + (r1 - r0) * i / 12); const section = (r) => { const u = (r - r0) / (r1 - r0); const c = 0.21 - 0.10 * u; const th = (0.036 - 0.016 * u) / c; const pitch = (30 - 17 * u) * Math.PI / 180; const N = 8; const pts = []; const put = (zc, xc) => { pts.push([zc * Math.cos(pitch) - xc * Math.sin(pitch), zc * Math.sin(pitch) + xc * Math.cos(pitch)]); }; put(c / 2, 0); for (let i = N; i >= 0; i--) { const xc = 0.5 * (1 - Math.cos(Math.PI * i / N)); put(-xc * c, naca(xc, th)); } put(-c / 2, 0); for (let i = 1; i <= N; i++) { const xc = 0.5 * (1 - Math.cos(Math.PI * i / N)); put(-xc * c, -naca(xc, th)); } return pts; }; const rows = rs.map((r) => section(r).map((q) => m.vertex(q[1], r, q[0]))); const n = rows[0].length; for (let k = 0; k < rows.length - 1; k++) for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(rows[k][j], rows[k][j2], rows[k + 1][j2]); m.face(rows[k][j], rows[k + 1][j2], rows[k + 1][j]); } const cc0 = m.vertex(0, r0, 0), cc1 = m.vertex(0, r1, 0); for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(cc0, rows[0][j2], rows[0][j]); m.face(cc1, rows[rows.length - 1][j], rows[rows.length - 1][j2]); } m"
+blade_s = poly.script@1(code="${jsh} ${blade_code}", budget=6000)
+blade_solid = poly.to_solid@1(blade_s)
+blade_a = xform.move@1(blade_solid, by=[0, 1.85, 3.68])
+blade_b = xform.rotate@1(blade_solid, angles=[0, 0, 180])
+blade_c = xform.move@1(blade_b, by=[0, 1.85, 3.68])
+prop_u = solid.union@1(blade_a, blade_c)
+prop_m = solid.material@1(prop_u, color=[0.05, 0.05, 0.055], metallic=0.35, roughness=0.48)
+prop_spin = anim.track@1(prop_m, property="rotation", keys="0:0,0,0; 0.4:0,0,360", interpolation="linear", loop=true, pivot=[0, 1.85, 3.68])
+prop_p = anim.parent@1(prop_spin, parent="fuselage")
+output propeller = prop_p
+tip_b = solid.box@1(size=[0.030, 0.10, 0.115])
+tip_a = xform.rotate@1(tip_b, angles=[0, 12, 0])
+tip_l = xform.move@1(tip_a, by=[0.0, 2.84, 3.68])
+tip_r = xform.rotate@1(tip_l, angles=[0, 0, 180])
+tip_at = xform.move@1(tip_r, by=[0, 3.70, 0])
+tips_u = solid.union@1(tip_l, tip_at)
+tips_m = solid.material@1(tips_u, color=[0.95, 0.75, 0.10], metallic=0.20, roughness=0.45)
+tips_p = anim.parent@1(tips_m, parent="propeller")
+output prop_tips = tips_p
+spin_p = profile.polygon@1(points=[[0, 0], [0.30, 0], [0.285, 0.10], [0.225, 0.24], [0.115, 0.37], [0, 0.45]])
+spin_r = solid.revolve@1(spin_p, angle=360deg, segments=32)
+spin_x = xform.rotate@1(spin_r, angles=[90, 0, 0])
+spin = xform.move@1(spin_x, by=[0, 1.85, 3.55])
+spin_m = solid.material@1(spin, color=[0.86, 0.87, 0.89], metallic=1.0, roughness=0.12)
+spin_m_p = anim.parent@1(spin_m, parent="fuselage")
+output spinner = spin_m_p
+
+# ---- DETAILS: cowl inlets, exhaust, door seams, the red cheat line, antennas and the pitot.
+in_l_b = solid.box@1(size=[0.20, 0.16, 0.05])
+in_l = xform.move@1(in_l_b, by=[0.30, 1.96, 3.46])
+in_r = xform.move@1(in_l_b, by=[-0.30, 1.96, 3.46])
+ex_l_p = curve.spline@1(points=[[0.40, 1.58, 3.20], [0.46, 1.50, 2.78]], steps=1)
+ex_l = curve.tube@1(ex_l_p, radius=0.030, end_radius=0.026, sides=6)
+ex_r_p = curve.spline@1(points=[[-0.40, 1.58, 3.20], [-0.46, 1.50, 2.78]], steps=1)
+ex_r = curve.tube@1(ex_r_p, radius=0.030, end_radius=0.026, sides=6)
+seam_1_b = solid.box@1(size=[0.012, 0.34, 0.016])
+seam_1_l = xform.move@1(seam_1_b, by=[0.512, 1.62, 1.95])
+seam_1_r = xform.move@1(seam_1_b, by=[-0.512, 1.62, 1.95])
+seam_2_l = xform.move@1(seam_1_b, by=[0.512, 1.62, 0.55])
+seam_2_r = xform.move@1(seam_1_b, by=[-0.512, 1.62, 0.55])
+seam_3_b = solid.box@1(size=[0.012, 0.014, 1.40])
+seam_3_l = xform.move@1(seam_3_b, by=[0.500, 1.84, 1.25])
+seam_3_r = xform.move@1(seam_3_b, by=[-0.500, 1.84, 1.25])
+ant_b = solid.box@1(size=[0.020, 0.30, 0.10])
+ant_1 = xform.move@1(ant_b, by=[0, 2.45, -0.62])
+ant_2 = xform.move@1(ant_b, by=[0, 1.52, -1.90])
+pitot_p = curve.spline@1(points=[[-3.20, 2.42, 1.98], [-3.20, 2.42, 2.22]], steps=1)
+pitot = curve.tube@1(pitot_p, radius=0.012, end_radius=0.010, sides=5)
+detail_u = solid.union@1(in_l, in_r, ex_l, ex_r, seam_1_l, seam_1_r, seam_2_l, seam_2_r, seam_3_l, seam_3_r, ant_1, ant_2, pitot)
+detail_m = solid.material@1(detail_u, color=[0.045, 0.045, 0.050], metallic=0.40, roughness=0.55)
+detail_m_p = anim.parent@1(detail_m, parent="fuselage")
+output details = detail_m_p
+
+# the red cheat line, kept on the parallel-sided cabin where it can sit flush
+cheat_b = solid.box@1(size=[0.012, 0.09, 3.05])
+cheat_l = xform.move@1(cheat_b, by=[0.514, 1.70, 0.45])
+cheat_r = xform.move@1(cheat_b, by=[-0.514, 1.70, 0.45])
+cheat_u = solid.union@1(cheat_l, cheat_r)
+cheat_m = solid.material@1(cheat_u, color=[0.62, 0.05, 0.04], metallic=0.15, roughness=0.40)
+cheat_m_p = anim.parent@1(cheat_m, parent="fuselage")
+output trim = cheat_m_p
+
+# ---- LIGHTS: port red, starboard green, tail white.
+nav_r_s = solid.sphere@1(radius=0.035, segments=12)
+nav_red = xform.move@1(nav_r_s, by=[-5.44, 2.57, 2.0])
+nav_green = xform.move@1(nav_r_s, by=[5.44, 2.57, 2.0])
+tail_l = xform.move@1(nav_r_s, by=[0, 2.22, -3.84])
+# instrument faces on the panel, lit so the cockpit reads from the front
+gauge_s = solid.sphere@1(radius=0.022, segments=8)
+gauge_1 = xform.move@1(gauge_s, by=[0.24, 1.90, 2.33])
+gauge_2 = xform.move@1(gauge_s, by=[0.08, 1.90, 2.33])
+gauge_3 = xform.move@1(gauge_s, by=[-0.08, 1.90, 2.33])
+gauge_4 = xform.move@1(gauge_s, by=[-0.24, 1.90, 2.33])
+lights_u = solid.union@1(nav_red, nav_green, tail_l, gauge_1, gauge_2, gauge_3, gauge_4)
+lights_m = solid.material@1(lights_u, color=[0.95, 0.95, 0.95], emissive=[1.0, 0.9, 0.7], roughness=0.25)
+lights_m_p = anim.parent@1(lights_m, parent="fuselage")
+output lights = lights_m_p
+
+# ---- REGISTRATION on both sides of the fin.
+reg_s = sign.text@1(text="N185", height=0.20, depth=0.012, color=[0.62, 0.05, 0.04], glow=0)
+reg_l_r = xform.rotate@1(reg_s, angles=[0, 90, 0])
+reg_l = xform.move@1(reg_l_r, by=[0.045, 2.72, -3.15])
+reg_r_r = xform.rotate@1(reg_s, angles=[0, -90, 0])
+reg_r = xform.move@1(reg_r_r, by=[-0.045, 2.72, -3.15])
+regs_u = solid.union@1(reg_l, reg_r)
+regs_m = solid.material@1(regs_u, color=[0.62, 0.05, 0.04], roughness=0.45)
+regs_m_p = anim.parent@1(regs_m, parent="fuselage")
+output registration = regs_m_p

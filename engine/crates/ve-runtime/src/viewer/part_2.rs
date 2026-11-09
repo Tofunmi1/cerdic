@@ -4,6 +4,12 @@ fn jump_to_pose(rig: &mut ViewerRig, input: &Input) {
     if let Some((position, yaw, pitch)) = input.pose {
         (rig.position, rig.yaw, rig.pitch) = (position, yaw, pitch);
     }
+    if rig.driven.is_some() {
+        // a game camera owns the view: the wheel and orbit drags adjust that camera (zoom, turn, tilt) instead of moving the free viewer
+        let (zoom, orbit) = viewer_nav::take_adjustments();
+        rig.adjust_game_camera(zoom, orbit);
+        return;
+    }
     viewer_nav::apply(
         &mut rig.position,
         &mut rig.yaw,
@@ -14,6 +20,9 @@ fn jump_to_pose(rig: &mut ViewerRig, input: &Input) {
 
 /// Turns the viewer by the mouse movement and moves it by the wanted motion, for `dt` seconds.
 fn step(rig: &mut ViewerRig, input: &Input, dt: f32) {
+    if rig.driven == Some(false) {
+        return; // a fixed-angle game camera holds the view: no mouse look, no flying
+    }
     rig.yaw -= input.look.x * SENSITIVITY;
     rig.pitch = (rig.pitch - input.look.y * SENSITIVITY).clamp(-FRAC_PI_2 + 0.01, FRAC_PI_2 - 0.01);
     if rig.walking {

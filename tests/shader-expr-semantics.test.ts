@@ -129,6 +129,42 @@ describe('GLSL output', () => {
     expect(body).toContain('float u_b = float(j);');
   });
 
+  test('voronoi gives the nearest and second nearest cell distance, F1 <= F2, and it tiles', () => {
+    for (const p of [[0.3, 0.7], [4.2, 9.9], [-3.1, 2.5]] as [number, number][]) {
+      const [f1, f2] = run('v = voronoi(p * 8); out = vec3(v.x, v.y, 0)', p);
+      expect(f1).toBeGreaterThanOrEqual(0);
+      expect(f1).toBeLessThanOrEqual(f2);
+      expect(f1).toBeLessThan(1.5);
+    }
+    // a lattice point is at distance below one cell from its own cell point, so a pore centre reads near zero somewhere in each cell
+    let low = 1;
+    for (let i = 0; i < 40; i++) low = Math.min(low, run('out = voronoi(p * 8).x', [i / 40, 0.31])[0]);
+    expect(low).toBeLessThan(0.25);
+  });
+
+  test('stretch turns by -angle and widens along it', () => {
+    const [x, y] = run('out = vec3(stretch(vec2(2, 0), 0, 4), 0)');
+    expect(x).toBeCloseTo(0.5, 12);
+    expect(y).toBeCloseTo(0, 12);
+    const [u, v] = run('out = vec3(stretch(vec2(0, 1), PI / 2, 2), 0)');
+    expect(u).toBeCloseTo(0.5, 12);
+    expect(v).toBeCloseTo(0, 12);
+  });
+
+  test('warp moves the point by at most the amount on each axis and leaves it with amount 0', () => {
+    const [a, b] = run('out = vec3(warp(vec2(1.5, 2.5), 0), 0)');
+    expect([a, b]).toEqual([1.5, 2.5]);
+    const [c, d] = run('out = vec3(warp(vec2(1.5, 2.5), 0.3), 0)');
+    expect(Math.abs(c - 1.5)).toBeLessThanOrEqual(0.3);
+    expect(Math.abs(d - 2.5)).toBeLessThanOrEqual(0.3);
+  });
+
+  test('the new functions are emitted as helpers', () => {
+    const { body, functions } = emitted('out = voronoi(warp(stretch(p * 9, 0.4, 5), 0.2)).x');
+    expect(body).toContain('ex_voronoi(ex_warp(ex_stretch(');
+    for (const name of ['ex_voronoi', 'ex_stretch', 'ex_warp']) expect(functions).toContain(`vec2 ${name}(`);
+  });
+
   test('% becomes mod and the helper source defines no GLSL built-in', () => {
     const { functions, body } = emitted('out = p.x % 0.3');
     expect(body).toContain('mod((p).x, 0.3)');

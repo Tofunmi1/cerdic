@@ -1,0 +1,303 @@
+# CINDER VOTARY — an original dark-fantasy action-RPG character study.
+# Design flow: silhouette masses -> sculpted under-form -> fitted armor shells -> cloth planes -> readable weapon -> material wear.
+# Front faces +Z. Everything is authored geometry; no imported character or image assets.
+
+sky = scene.sky@1(sun_elevation=18, sun_azimuth=-28, sun_intensity=1.15, turbidity=4, ground_color=[0.14, 0.12, 0.11], clouds=false, haze=0.08, haze_color=[0.22, 0.16, 0.12])
+output sky = sky
+env = scene.environment@1(sky_color=[0.18, 0.20, 0.23], ground_color=[0.10, 0.09, 0.085], intensity=0.42, reflection=0.22, bounce=0.2, bounce_color=[0.33, 0.22, 0.15])
+output env = env
+
+# Restrained presentation plinth and ground: dark values leave the silhouette and metal edges legible.
+ground_src = solid.box@1(size=[5.4, 0.16, 5.4])
+ground_at = xform.move@1(ground_src, by=[0, -0.12, 0])
+ground_mat = solid.material@1(ground_at, color=[0.105, 0.095, 0.085], roughness=0.88)
+output ground = ground_mat
+plinth_src = solid.cylinder@1(radius=0.72, height=0.16, segments=64)
+plinth_at = xform.move@1(plinth_src, by=[0, 0.015, 0])
+plinth_mat = solid.material@1(plinth_at, color=[0.17, 0.145, 0.12], metallic=0.28, roughness=0.62)
+output plinth = plinth_mat
+plinth_rim_src = solid.cylinder@1(radius=0.735, height=0.024, segments=64)
+plinth_rim_at = xform.move@1(plinth_rim_src, by=[0, 0.09, 0])
+plinth_rim_mat = solid.material@1(plinth_rim_at, color=[0.34, 0.22, 0.13], metallic=0.58, roughness=0.38)
+output plinth_rim = plinth_rim_mat
+
+# Anatomy pass: a generated, rig-aware human form gives the face and joints their real structure.
+# The armor is then authored around this body as separate, silhouette-defining pieces.
+votary_body = body.human@1(gender=0.32, age=0.78, height=0.56, weight=0.56, muscle=0.68, proportions=0.46, at=[0, 0.015, 0], face="browDownLeft=0.12; browDownRight=0.08; mouthFrownLeft=0.10; mouthFrownRight=0.08")
+votary_eyes = body.eye@1(votary_body, iris_color=[0.28, 0.095, 0.035], sclera_color=[0.48, 0.39, 0.31], gaze=[0, 0, 1])
+eyes_mat = solid.material@1(votary_eyes, color=[0.68, 0.39, 0.18], roughness=0.34, emissive=[0.035, 0.009, 0.002])
+output eyes = eyes_mat
+head_joint = body.bone@1(votary_body, bone="head")
+output head = head_joint
+neck_joint = body.bone@1(votary_body, bone="neck03")
+output neck03 = neck_joint
+skin_mat = solid.material@1(votary_body, color=[0.39, 0.27, 0.21], roughness=0.74)
+skin_finish = solid.finish@1(skin_mat, subsurface=0.12, sheen=0.08)
+output anatomy = skin_finish
+hair_src = body.outfit@1(votary_body, asset="long01", standoff=0.006, bones="head; neck03")
+hair_mat = solid.material@1(hair_src, color=[0.23, 0.105, 0.055], roughness=0.76)
+hair_tex = solid.texture@1(hair_mat, program="image(albedo=\"long01_diffuse\")", size="1024")
+hair_finish = solid.finish@1(hair_tex, sheen=0.18, anisotropy=0.28)
+hair_cut = solid.foliage@1(hair_finish, alpha_cutoff=0.35)
+output hair = hair_cut
+
+# A close-fitting charcoal under-tunic closes the seams between anatomical skin and the fitted armor shells.
+tunic_chest_f = field.ellipsoid@1(radii=[0.30, 0.31, 0.19])
+tunic_chest = field.move@1(tunic_chest_f, by=[0, 1.29, 0])
+tunic_abd_f = field.ellipsoid@1(radii=[0.23, 0.25, 0.16])
+tunic_abd = field.move@1(tunic_abd_f, by=[0, 1.02, 0])
+tunic_pelvis_f = field.ellipsoid@1(radii=[0.245, 0.17, 0.17])
+tunic_pelvis = field.move@1(tunic_pelvis_f, by=[0, 0.81, 0])
+tunic_neck = field.tube@1(points=[[0, 1.42, 0], [0, 1.61, 0]], radius=0.10, end_radius=0.08)
+tunic_a = field.smooth_union@1(tunic_chest, tunic_abd, radius=0.12)
+tunic_b = field.smooth_union@1(tunic_a, tunic_pelvis, radius=0.10)
+tunic_c = field.smooth_union@1(tunic_b, tunic_neck, radius=0.07)
+tunic_noise = field.noise@1(tunic_c, amplitude=0.003, scale=0.05, octaves=2, mode="ridged")
+tunic_s = field.to_solid@1(tunic_noise, min=[-0.40, 0.60, -0.25], max=[0.40, 1.72, 0.25], edge_length=0.016)
+tunic_mat = solid.material@1(tunic_s, color=[0.12, 0.105, 0.09], roughness=0.94)
+tunic_tex = solid.texture@1(tunic_mat, tile=0.8, program="g = fbm(scale_x=8, scale_y=24); f = fbm(scale_x=48, scale_y=65); albedo = colorize(g, gradient=[0:#111212, 0.5:#201d1a, 1:#34302a]); roughness = colorize(f, gradient=[0:#dedede, 1:#f0f0f0]); height = colorize(f, gradient=[0:#888888, 1:#aaaaaa])", size="512")
+output under_tunic = tunic_tex
+
+# Digitigrade-looking wrapped legs: tapered sweeps, offset knee masses, articulated-looking greaves and broad split-toe boots.
+leg_l_path = curve.spline@1(points=[[0.125, 0.86, 0], [0.15, 0.60, 0.015], [0.13, 0.23, 0.01]], steps=12)
+leg_r_path = curve.spline@1(points=[[-0.125, 0.86, 0], [-0.145, 0.59, 0.025], [-0.13, 0.23, 0.01]], steps=12)
+leg_ring = profile.circle@1(radius=0.094, segments=20)
+leg_l_s = solid.sweep@1(leg_l_path, leg_ring, scale_end=0.58)
+leg_r_s = solid.sweep@1(leg_r_path, leg_ring, scale_end=0.58)
+legs_u = solid.union@1(leg_l_s, leg_r_s)
+legs_m = solid.material@1(legs_u, color=[0.19, 0.17, 0.15], roughness=0.9)
+legs_t = solid.texture@1(legs_m, tile=0.55, program="g = fbm(scale_x=8, scale_y=18); albedo = colorize(g, gradient=[0:#171817, 1:#38302a]); roughness = colorize(g, gradient=[0:#e4e4e4, 1:#f0f0f0])", size="256")
+output legs = legs_t
+
+# Boot shells, copper welt, shin plates and layered knee cops.
+boot_src = solid.box@1(size=[0.32, 0.18, 0.40])
+boot_l_at = xform.move@1(boot_src, by=[0.125, 0.15, 0.095])
+boot_r_at = xform.move@1(boot_src, by=[-0.125, 0.15, 0.095])
+boots = solid.union@1(boot_l_at, boot_r_at)
+boots_round = solid.round@1(boots, radius=0.045, segments=6)
+boots_mat = solid.material@1(boots_round, color=[0.22, 0.12, 0.085], metallic=0.16, roughness=0.7)
+boots_tex = solid.texture@1(boots_mat, tile=0.5, program="g = fbm(scale_x=10, scale_y=10); albedo = colorize(g, gradient=[0:#21140e, 1:#49301e]); roughness = colorize(g, gradient=[0:#d8d8d8, 1:#e8e8e8])", size="256")
+output boots = boots_tex
+
+greave_src = solid.box@1(size=[0.21, 0.47, 0.15])
+greave_l_at = xform.move@1(greave_src, by=[0.13, 0.43, 0.112])
+greave_r_at = xform.move@1(greave_src, by=[-0.13, 0.43, 0.112])
+greave_pair = solid.union@1(greave_l_at, greave_r_at)
+greave_round = solid.round@1(greave_pair, radius=0.045, segments=6)
+greave_mat = solid.material@1(greave_round, color=[0.29, 0.30, 0.29], metallic=0.72, roughness=0.38)
+greave_wear = solid.texture@1(greave_mat, tile=0.32, program="g = fbm(scale_x=12, scale_y=22); p = bricks(rows=5, columns=2, mortar=0.035, bevel=0.18, round=0.05); albedo = colorize(g, gradient=[0:#242827, 0.55:#464744, 1:#777064]); roughness = colorize(g, gradient=[0:#b0b0b0, 1:#e0e0e0]); height = p", size="512")
+output greaves = greave_wear
+
+knee_src = solid.sphere@1(radius=1, segments=24)
+knee_scale = xform.scale@1(knee_src, by=[0.135, 0.13, 0.10])
+knee_l_at = xform.move@1(knee_scale, by=[0.13, 0.68, 0.105])
+knee_r_at = xform.move@1(knee_scale, by=[-0.13, 0.68, 0.105])
+knees = solid.union@1(knee_l_at, knee_r_at)
+knee_mat = solid.material@1(knees, color=[0.40, 0.25, 0.14], metallic=0.66, roughness=0.34)
+output knees = knee_mat
+
+# Armature under the plates. Sweeps read as wrapped joints; a single overscaled reliquary pauldron creates the signature asymmetry.
+arm_l_path = curve.spline@1(points=[[0.28, 1.43, 0], [0.40, 1.21, 0.015], [0.39, 0.95, 0.06], [0.34, 0.78, 0.08]], steps=14)
+arm_r_path = curve.spline@1(points=[[-0.28, 1.43, 0], [-0.38, 1.20, 0.02], [-0.36, 0.94, 0.06], [-0.31, 0.78, 0.08]], steps=14)
+arm_ring = profile.circle@1(radius=0.105, segments=20)
+arm_l_s = solid.sweep@1(arm_l_path, arm_ring, scale_end=0.72)
+arm_r_s = solid.sweep@1(arm_r_path, arm_ring, scale_end=0.72)
+arms = solid.union@1(arm_l_s, arm_r_s)
+arms_mat = solid.material@1(arms, color=[0.20, 0.18, 0.16], roughness=0.91)
+output arms = arms_mat
+
+pauldron_profile = profile.polygon@1(points=[[-0.28, 0.05], [-0.30, 0.21], [-0.22, 0.34], [-0.07, 0.39], [0.12, 0.32], [0.27, 0.17], [0.23, 0.08], [0.0, 0.0]])
+pauldron_ex = solid.extrude@1(pauldron_profile, height=0.20)
+pauldron_face = xform.rotate@1(pauldron_ex, angles=[90, 0, 0])
+pauldron_at = xform.move@1(pauldron_face, by=[-0.42, 1.28, 0.0])
+pauldron_round = solid.round@1(pauldron_at, radius=0.035, segments=6)
+pauldron_mat = solid.material@1(pauldron_round, color=[0.28, 0.29, 0.28], metallic=0.78, roughness=0.34)
+pauldron_finish = solid.finish@1(pauldron_mat, clearcoat=0.22, clearcoat_roughness=0.28)
+output reliquary_pauldron = pauldron_finish
+
+pauldron_lip_prof = profile.polygon@1(points=[[-0.24, 0.06], [-0.25, 0.18], [-0.18, 0.27], [-0.06, 0.31], [0.10, 0.25], [0.22, 0.14], [0.18, 0.08], [0, 0.025]])
+pauldron_lip_ex = solid.extrude@1(pauldron_lip_prof, height=0.025)
+pauldron_lip_face = xform.rotate@1(pauldron_lip_ex, angles=[90, 0, 0])
+pauldron_lip_at = xform.move@1(pauldron_lip_face, by=[-0.42, 1.32, 0.19])
+pauldron_lip_mat = solid.material@1(pauldron_lip_at, color=[0.48, 0.29, 0.16], metallic=0.7, roughness=0.34)
+output pauldron_lip = pauldron_lip_mat
+
+# The breastplate is a custom silhouette shell with a raised central ridge, not a scaled primitive.
+breast_profile = profile.polygon@1(points=[[-0.22, 0.20], [-0.28, 0.31], [-0.22, 0.39], [-0.10, 0.43], [0, 0.39], [0.10, 0.43], [0.22, 0.39], [0.28, 0.31], [0.22, 0.18], [0.15, 0.03], [0.08, -0.09], [0, -0.12], [-0.08, -0.09], [-0.15, 0.03]])
+breast_ex = solid.extrude@1(breast_profile, height=0.13)
+breast_face = xform.rotate@1(breast_ex, angles=[90, 0, 0])
+breast_round = solid.round@1(breast_face, radius=0.026, segments=6)
+breast_at = xform.move@1(breast_round, by=[0, 1.18, 0.11])
+breast_mat = solid.material@1(breast_at, color=[0.25, 0.27, 0.27], metallic=0.82, roughness=0.31)
+breast_finish = solid.finish@1(breast_mat, clearcoat=0.3, clearcoat_roughness=0.24)
+output breastplate = breast_finish
+
+ridge_src = solid.box@1(size=[0.036, 0.44, 0.036])
+ridge_at = xform.move@1(ridge_src, by=[0, 1.22, 0.252])
+ridge_mat = solid.material@1(ridge_at, color=[0.55, 0.34, 0.19], metallic=0.76, roughness=0.3)
+output breast_ridge = ridge_mat
+
+# Eight individually raised rivets, a buckle and two articulated abdominal lames.
+rivet_src = solid.sphere@1(radius=0.022, segments=14)
+rivet_mat = solid.material@1(rivet_src, color=[0.63, 0.39, 0.20], metallic=0.78, roughness=0.28)
+rivet_a = xform.move@1(rivet_mat, by=[-0.21, 1.46, 0.245])
+rivet_b = xform.move@1(rivet_mat, by=[0.21, 1.46, 0.245])
+rivet_c = xform.move@1(rivet_mat, by=[-0.23, 1.38, 0.244])
+rivet_d = xform.move@1(rivet_mat, by=[0.23, 1.38, 0.244])
+rivet_e = xform.move@1(rivet_mat, by=[-0.17, 1.25, 0.246])
+rivet_f = xform.move@1(rivet_mat, by=[0.17, 1.25, 0.246])
+rivet_g = xform.move@1(rivet_mat, by=[-0.11, 1.12, 0.244])
+rivet_h = xform.move@1(rivet_mat, by=[0.11, 1.12, 0.244])
+rivet_pair_a = solid.union@1(rivet_a, rivet_b, rivet_c, rivet_d)
+rivet_pair_b = solid.union@1(rivet_e, rivet_f, rivet_g, rivet_h)
+rivet_set = solid.union@1(rivet_pair_a, rivet_pair_b)
+output rivets = rivet_set
+
+ab_lame_src = solid.box@1(size=[0.30, 0.075, 0.12])
+ab_lame_top = xform.move@1(ab_lame_src, by=[0, 1.015, 0.105])
+ab_lame_low = xform.move@1(ab_lame_src, by=[0, 0.925, 0.095])
+ab_lames = solid.union@1(ab_lame_top, ab_lame_low)
+ab_lames_round = solid.round@1(ab_lames, radius=0.022, segments=6)
+ab_lames_mat = solid.material@1(ab_lames_round, color=[0.31, 0.30, 0.27], metallic=0.73, roughness=0.4)
+output abdominal_lames = ab_lames_mat
+
+# Split, wind-pulled mantle: long polygon drapes with deliberately torn hems, each held off the back of the body.
+mantle_a_prof = profile.polygon@1(points=[[-0.20, 0.02], [-0.26, -0.36], [-0.38, -0.72], [-0.34, -1.06], [-0.20, -0.98], [-0.08, -1.14], [0.0, -0.88], [0.13, -1.10], [0.26, -0.85], [0.34, -0.48], [0.23, -0.08], [0.18, 0.02]])
+mantle_a_ex = solid.extrude@1(mantle_a_prof, height=0.035)
+mantle_a_face = xform.rotate@1(mantle_a_ex, angles=[90, 0, 0])
+mantle_a_at = xform.move@1(mantle_a_face, by=[-0.02, 1.13, -0.24])
+mantle_a_mat = solid.material@1(mantle_a_at, color=[0.105, 0.095, 0.09], roughness=0.96)
+mantle_a_tex = solid.texture@1(mantle_a_mat, tile=0.6, program="g = fbm(scale_x=6, scale_y=19); f = fbm(scale_x=32, scale_y=70); albedo = colorize(g, gradient=[0:#100f10, 0.55:#201b1b, 1:#382622]); roughness = colorize(f, gradient=[0:#d0d0d0, 1:#eeeeee]); height = colorize(f, gradient=[0:#858585, 1:#b5b5b5])", size="512")
+output mantle = mantle_a_tex
+
+mantle_side_prof = profile.polygon@1(points=[[-0.13, 0.0], [-0.19, -0.44], [-0.23, -0.85], [-0.12, -1.18], [-0.03, -0.92], [0.08, -1.12], [0.16, -0.72], [0.15, -0.18], [0.10, 0.0]])
+mantle_side_ex = solid.extrude@1(mantle_side_prof, height=0.03)
+mantle_side_face = xform.rotate@1(mantle_side_ex, angles=[90, 0, 0])
+mantle_l = xform.move@1(mantle_side_face, by=[0.28, 1.08, -0.17])
+mantle_r = xform.move@1(mantle_side_face, by=[-0.30, 1.08, -0.17])
+mantle_sides = solid.union@1(mantle_l, mantle_r)
+mantle_edge_mat = solid.material@1(mantle_sides, color=[0.23, 0.105, 0.065], metallic=0.12, roughness=0.79)
+output mantle_side_panels = mantle_edge_mat
+
+# Split skirt lames, leather straps and forearm guards establish smaller-scale rhythm.
+skirt_prof = profile.polygon@1(points=[[-0.20, 0.08], [-0.25, -0.12], [-0.20, -0.38], [-0.09, -0.31], [0.0, -0.43], [0.10, -0.31], [0.21, -0.38], [0.25, -0.12], [0.20, 0.08]])
+skirt_ex = solid.extrude@1(skirt_prof, height=0.045)
+skirt_face = xform.rotate@1(skirt_ex, angles=[90, 0, 0])
+skirt_at = xform.move@1(skirt_face, by=[0, 0.79, 0.16])
+skirt_mat = solid.material@1(skirt_at, color=[0.20, 0.16, 0.13], metallic=0.25, roughness=0.83)
+output front_tasset = skirt_mat
+
+strap_src = solid.box@1(size=[0.08, 0.48, 0.035])
+strap_at = xform.move@1(strap_src, by=[0, 1.20, 0.232])
+strap_mat = solid.material@1(strap_at, color=[0.30, 0.15, 0.075], roughness=0.79)
+strap_buckle_src = solid.box@1(size=[0.12, 0.09, 0.035])
+strap_buckle_at = xform.move@1(strap_buckle_src, by=[0, 1.00, 0.262])
+strap_buckle_mat = solid.material@1(strap_buckle_at, color=[0.62, 0.39, 0.19], metallic=0.76, roughness=0.31)
+output harness = strap_mat
+output harness_buckle = strap_buckle_mat
+
+vambrace_src = solid.box@1(size=[0.20, 0.27, 0.13])
+vambrace_l_at = xform.move@1(vambrace_src, by=[0.36, 0.93, 0.10])
+vambrace_r_at = xform.move@1(vambrace_src, by=[-0.34, 0.93, 0.10])
+vambraces = solid.union@1(vambrace_l_at, vambrace_r_at)
+vambraces_round = solid.round@1(vambraces, radius=0.035, segments=6)
+vambraces_mat = solid.material@1(vambraces_round, color=[0.25, 0.27, 0.27], metallic=0.8, roughness=0.36)
+output vambraces = vambraces_mat
+
+# Open-face visor: an angular lower-face mask protects the jaw but keeps the generated expression and eyes visible.
+mask_profile = profile.polygon@1(points=[[-0.13, 0.00], [-0.15, 0.12], [-0.105, 0.20], [-0.045, 0.23], [0, 0.18], [0.045, 0.23], [0.105, 0.20], [0.15, 0.12], [0.13, 0.00], [0, -0.075]])
+mask_ex = solid.extrude@1(mask_profile, height=0.055)
+mask_face = xform.rotate@1(mask_ex, angles=[90, 0, 0])
+mask_at = xform.move@1(mask_face, by=[0, 1.47, 0.14])
+mask_mat = solid.material@1(mask_at, color=[0.31, 0.31, 0.29], metallic=0.78, roughness=0.36)
+mask_finish = solid.finish@1(mask_mat, clearcoat=0.2, clearcoat_roughness=0.3)
+output oath_mask = mask_finish
+
+temple_src = solid.box@1(size=[0.055, 0.22, 0.09])
+temple_l_at = xform.move@1(temple_src, by=[0.15, 1.68, 0.075])
+temple_r_at = xform.move@1(temple_src, by=[-0.15, 1.68, 0.075])
+temples = solid.union@1(temple_l_at, temple_r_at)
+temples_round = solid.round@1(temples, radius=0.018, segments=6)
+temples_mat = solid.material@1(temples_round, color=[0.31, 0.31, 0.29], metallic=0.78, roughness=0.36)
+output temple_guards = temples_mat
+
+brow_src = solid.box@1(size=[0.31, 0.045, 0.055])
+brow_at = xform.move@1(brow_src, by=[0, 1.82, 0.115])
+brow_mat = solid.material@1(brow_at, color=[0.42, 0.27, 0.16], metallic=0.72, roughness=0.34)
+output brow_circlet = brow_mat
+
+horn_path_l = curve.spline@1(points=[[0.13, 1.88, -0.01], [0.23, 2.03, -0.01], [0.30, 2.17, 0.005], [0.27, 2.28, 0.025]], steps=14)
+horn_path_r = curve.spline@1(points=[[-0.13, 1.88, -0.01], [-0.24, 2.02, 0.0], [-0.28, 2.13, 0.025], [-0.22, 2.21, 0.04]], steps=14)
+horn_ring = profile.circle@1(radius=0.038, segments=16)
+horn_l = solid.sweep@1(horn_path_l, horn_ring, scale_end=0.052)
+horn_r = solid.sweep@1(horn_path_r, horn_ring, scale_end=0.052)
+horns = solid.union@1(horn_l, horn_r)
+horn_mat = solid.material@1(horns, color=[0.43, 0.35, 0.25], metallic=0.16, roughness=0.72)
+output broken_horns = horn_mat
+
+crest_src = solid.box@1(size=[0.07, 0.23, 0.045])
+crest_turn = xform.rotate@1(crest_src, angles=[-18, 0, 0])
+crest_at = xform.move@1(crest_turn, by=[0, 1.95, -0.045])
+crest_mat = solid.material@1(crest_at, color=[0.42, 0.28, 0.16], metallic=0.65, roughness=0.38)
+output helm_crest = crest_mat
+
+# Weapon: a long, forward-readable executioner's blade with a swept point, deep fuller and wrapped handle.
+blade_prof = profile.polygon@1(points=[[-0.10, 0.0], [0.10, 0.0], [0.13, -0.16], [0.095, -0.54], [0.15, -0.70], [0.035, -0.88], [-0.07, -0.77], [-0.12, -0.48], [-0.09, -0.14]])
+blade_ex = solid.extrude@1(blade_prof, height=0.065)
+blade_face = xform.rotate@1(blade_ex, angles=[90, 0, 0])
+blade_round = solid.round@1(blade_face, radius=0.016, segments=6)
+blade_turn = xform.rotate@1(blade_round, angles=[0, 0, -9])
+blade_at = xform.move@1(blade_turn, by=[0.55, 0.98, 0.20])
+blade_mat = solid.material@1(blade_at, color=[0.39, 0.43, 0.42], metallic=0.88, roughness=0.29)
+blade_tex = solid.texture@1(blade_mat, tile=0.24, program="g = fbm(scale_x=14, scale_y=40); albedo = colorize(g, gradient=[0:#292f30, 0.45:#555b59, 1:#919084]); roughness = colorize(g, gradient=[0:#9c9c9c, 1:#d0d0d0])", size="512")
+output execution_blade = blade_tex
+
+fuller_src = solid.box@1(size=[0.035, 0.78, 0.014])
+fuller_at = xform.move@1(fuller_src, by=[0.55, 0.55, 0.272])
+fuller_mat = solid.material@1(fuller_at, color=[0.22, 0.24, 0.23], metallic=0.91, roughness=0.27)
+output blade_fuller = fuller_mat
+
+grip_src = solid.cylinder@1(radius=0.047, height=0.43, segments=16)
+grip_at = xform.move@1(grip_src, by=[0.55, 0.77, 0.22])
+grip_mat = solid.material@1(grip_at, color=[0.20, 0.105, 0.06], roughness=0.86)
+output grip = grip_mat
+
+guard_src = solid.box@1(size=[0.44, 0.075, 0.10])
+guard_turn = xform.rotate@1(guard_src, angles=[0, 0, -9])
+guard_at = xform.move@1(guard_turn, by=[0.55, 0.98, 0.20])
+guard_mat = solid.material@1(guard_at, color=[0.42, 0.25, 0.13], metallic=0.75, roughness=0.33)
+output guard = guard_mat
+
+# A bell-cage reliquary hangs from the overbuilt left shoulder. Its restrained heated core echoes the visor.
+bell_ring_src = solid.torus@1(major=0.14, minor=0.025, segments=32, tube_segments=10)
+bell_ring_turn = xform.rotate@1(bell_ring_src, angles=[90, 0, 0])
+bell_ring_at = xform.move@1(bell_ring_turn, by=[-0.46, 1.00, 0.20])
+bell_ring_mat = solid.material@1(bell_ring_at, color=[0.53, 0.34, 0.17], metallic=0.76, roughness=0.34)
+output reliquary_ring = bell_ring_mat
+
+bell_core_src = solid.sphere@1(radius=0.075, segments=24)
+bell_core_at = xform.move@1(bell_core_src, by=[-0.46, 1.00, 0.20])
+bell_core_mat = solid.material@1(bell_core_at, color=[0.43, 0.16, 0.035], roughness=0.36, emissive=[0.24, 0.045, 0.006])
+output reliquary_core = bell_core_mat
+
+bell_bar_src = solid.cylinder@1(radius=0.018, height=0.31, segments=12)
+bell_bar_turn = xform.rotate@1(bell_bar_src, angles=[0, 0, 90])
+bell_bar_at = xform.move@1(bell_bar_turn, by=[-0.46, 1.00, 0.18])
+bell_bar_mat = solid.material@1(bell_bar_at, color=[0.51, 0.35, 0.20], metallic=0.81, roughness=0.32)
+output reliquary_cage = bell_bar_mat
+
+# Small surface marks: layered shoulder rivets, cloak clasps and one dangling oath-tag.
+clasp_src = solid.sphere@1(radius=0.042, segments=16)
+clasp_at = xform.move@1(clasp_src, by=[0, 1.50, 0.22])
+clasp_mat = solid.material@1(clasp_at, color=[0.64, 0.39, 0.19], metallic=0.78, roughness=0.28)
+output mantle_clasp = clasp_mat
+
+tag_prof = profile.polygon@1(points=[[-0.07, 0.12], [0.07, 0.12], [0.055, -0.09], [0, -0.16], [-0.055, -0.09]])
+tag_ex = solid.extrude@1(tag_prof, height=0.025)
+tag_face = xform.rotate@1(tag_ex, angles=[90, 0, 0])
+tag_at = xform.move@1(tag_face, by=[0.29, 0.84, 0.22])
+tag_mat = solid.material@1(tag_at, color=[0.46, 0.25, 0.11], metallic=0.30, roughness=0.68)
+output oath_tag = tag_mat
+
+# Quiet breathing motion on the torso silhouette. Details remain stable and readable in the portrait.
+

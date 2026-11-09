@@ -1,0 +1,493 @@
+# Modern living room study: a warm oak / limestone palette, generous glazing,
+# low sculptural furniture and layered practical lighting. Front remains open for viewing.
+sky = scene.sky@1(sun_elevation=43, sun_azimuth=145, sun_intensity=0.28, turbidity=3.4, ground_color=[0.31, 0.30, 0.27], clouds=false, seed=27)
+output sky = sky
+fill = scene.environment@1(sky_color=[0.62, 0.56, 0.48], ground_color=[0.28, 0.23, 0.18], intensity=0.42, reflection=0.28, bounce=0.24, bounce_color=[0.72, 0.56, 0.39])
+output fill = fill
+
+# Room envelope, with a wide picture window and a deep feature wall.
+floor_src = solid.box@1(size=[10, 0.18, 8])
+floor_at = xform.move@1(floor_src, by=[0, -0.09, -0.4])
+floor_pbr = solid.material@1(floor_at, color=[0.16, 0.09, 0.055], roughness=0.82)
+output floor = floor_pbr
+floorboard_src = solid.box@1(size=[0.98, 0.018, 0.38])
+floorboard_round = solid.round@1(floorboard_src, radius=0.006, segments=6)
+floorboard_start = xform.move@1(floorboard_round, by=[-4.5, 0.011, -4.2])
+floorboard_grid = inst.array@1(floorboard_start, count_x=10, count_z=20, spacing=[1.0, 0, 0.4])
+floorboards = inst.realize@1(floorboard_grid)
+floorboards_mat = solid.material@1(floorboards, color=[0.22, 0.12, 0.075], roughness=0.78)
+floorboards_finish = solid.finish@1(floorboards_mat, anisotropy=0.18, relief=0.025, relief_scale=65)
+output oak_floorboards = floorboards_finish
+back_src = solid.box@1(size=[10, 3.8, 0.22])
+back_at = xform.move@1(back_src, by=[0, 1.9, -4.3])
+back_pbr = solid.material@1(back_at, color=[0.48, 0.43, 0.36], roughness=0.92)
+back_finish = solid.finish@1(back_pbr, relief=0.012, relief_scale=18)
+output back_wall = back_finish
+left_src = solid.box@1(size=[0.22, 3.8, 7.8])
+left_at = xform.move@1(left_src, by=[-4.9, 1.9, -0.4])
+left_mat = solid.material@1(left_at, color=[0.50, 0.46, 0.39], roughness=0.92)
+output left_wall = left_mat
+right_at = xform.move@1(left_src, by=[4.9, 1.9, -0.4])
+side_window_cut_src = solid.box@1(size=[0.5, 2.76, 6.62])
+side_window_cut_at = xform.move@1(side_window_cut_src, by=[4.9, 2.0, -0.4])
+right_opening = solid.difference@1(right_at, side_window_cut_at)
+right_mat = solid.material@1(right_opening, color=[0.46, 0.43, 0.38], roughness=0.92)
+output right_wall = right_mat
+ceiling_src = solid.box@1(size=[10, 0.16, 8])
+ceiling_at = xform.move@1(ceiling_src, by=[0, 3.85, -0.4])
+ceiling_open_src = solid.box@1(size=[8.4, 0.32, 6.1])
+ceiling_open_at = xform.move@1(ceiling_open_src, by=[0, 3.85, -0.4])
+ceiling_ring = solid.difference@1(ceiling_at, ceiling_open_at)
+ceiling_mat = solid.material@1(ceiling_ring, color=[0.86, 0.84, 0.79], roughness=0.91)
+output ceiling = ceiling_mat
+baseboard_src = solid.box@1(size=[9.82, 0.14, 0.075])
+baseboard_back = xform.move@1(baseboard_src, by=[0, 0.07, -4.14])
+baseboard_side_src = solid.box@1(size=[0.075, 0.14, 7.48])
+baseboard_left = xform.move@1(baseboard_side_src, by=[-4.78, 0.07, -0.4])
+baseboard_right = xform.move@1(baseboard_side_src, by=[4.78, 0.07, -0.4])
+baseboard_set = solid.union@1(baseboard_back, baseboard_left, baseboard_right)
+baseboard_mat = solid.material@1(baseboard_set, color=[0.36, 0.24, 0.15], roughness=0.48, recipe="wood", texture_scale=0.8)
+output oak_baseboards = baseboard_mat
+ceiling_cove_back_src = solid.box@1(size=[9.65, 0.06, 0.09])
+ceiling_cove_back = xform.move@1(ceiling_cove_back_src, by=[0, 3.68, -4.13])
+ceiling_cove_left_src = solid.box@1(size=[0.09, 0.06, 7.5])
+ceiling_cove_left = xform.move@1(ceiling_cove_left_src, by=[-4.78, 3.68, -0.4])
+ceiling_cove_right = xform.move@1(ceiling_cove_left_src, by=[4.78, 3.68, -0.4])
+ceiling_cove = solid.union@1(ceiling_cove_back, ceiling_cove_left, ceiling_cove_right)
+cove_mat = solid.material@1(ceiling_cove, color=[0.92, 0.84, 0.70], emissive=[0.10, 0.07, 0.04])
+output ceiling_cove_glow = cove_mat
+
+# Window glazing, dark metal frame, and full-height curtain panels.
+glass_src = solid.box@1(size=[6.4, 2.55, 0.045])
+glass_local_at = xform.move@1(glass_src, by=[0, 2.0, 0])
+glass_turn = xform.rotate@1(glass_local_at, angles=[0, -90, 0])
+glass_at = xform.move@1(glass_turn, by=[4.78, 0, -0.4])
+glass_mat = solid.material@1(glass_at, color=[0.24, 0.38, 0.42], metallic=0.28, roughness=0.12, opacity=0.15, emissive=[0.035, 0.06, 0.07])
+output picture_glass = glass_mat
+frame_h = solid.box@1(size=[6.6, 0.075, 0.11])
+frame_top = xform.move@1(frame_h, by=[0, 3.32, 0])
+frame_bottom = xform.move@1(frame_h, by=[0, 0.68, 0])
+frame_v = solid.box@1(size=[0.055, 2.7, 0.11])
+frame_v_start = xform.move@1(frame_v, by=[-1.63, 2.0, 0])
+frame_mullion_array = inst.array@1(frame_v_start, count_x=3, spacing=[1.63, 0, 0])
+frame_mullions = inst.realize@1(frame_mullion_array)
+frame_local = solid.union@1(frame_top, frame_bottom, frame_mullions)
+frame_turn = xform.rotate@1(frame_local, angles=[0, -90, 0])
+frame_at = xform.move@1(frame_turn, by=[4.78, 0, -0.4])
+frame_mat = solid.material@1(frame_at, color=[0.075, 0.09, 0.10], metallic=0.72, roughness=0.28)
+output window_frame = frame_mat
+window_sill_src = solid.box@1(size=[6.75, 0.10, 0.26])
+window_sill_local = xform.move@1(window_sill_src, by=[0, 0.62, 0])
+window_sill_round = solid.round@1(window_sill_local, radius=0.035, segments=7)
+window_sill_turn = xform.rotate@1(window_sill_round, angles=[0, -90, 0])
+window_sill_at = xform.move@1(window_sill_turn, by=[4.78, 0, -0.4])
+window_sill_mat = solid.material@1(window_sill_at, color=[0.44, 0.29, 0.17], roughness=0.42, recipe="wood", texture_scale=0.85)
+output window_sill = window_sill_mat
+curtain_rod_src = solid.cylinder@1(radius=0.025, height=7.9, segments=24)
+curtain_rod_turn_z = xform.rotate@1(curtain_rod_src, angles=[0, 0, 90])
+curtain_rod_turn_y = xform.rotate@1(curtain_rod_turn_z, angles=[0, -90, 0])
+curtain_rod_at = xform.move@1(curtain_rod_turn_y, by=[4.78, 3.52, -0.4])
+curtain_rod_mat = solid.material@1(curtain_rod_at, color=[0.12, 0.13, 0.13], metallic=0.82, roughness=0.2)
+output curtain_rod = curtain_rod_mat
+curtain_src = solid.box@1(size=[0.64, 2.9, 0.12])
+curtain_l = xform.move@1(curtain_src, by=[-3.72, 2.05, 0])
+curtain_r = xform.move@1(curtain_src, by=[3.72, 2.05, 0])
+curtains_local = solid.union@1(curtain_l, curtain_r)
+curtains_turn = xform.rotate@1(curtains_local, angles=[0, -90, 0])
+curtains_src = xform.move@1(curtains_turn, by=[4.78, 0, -0.4])
+curtain_mat = solid.material@1(curtains_src, color=[0.58, 0.54, 0.47], roughness=0.96, recipe="fabric")
+curtain_finish = solid.finish@1(curtain_mat, sheen=0.18, translucency=0.22, thickness=0.18, relief=0.12, relief_scale=85, relief_style="ridged")
+output curtains = curtain_finish
+curtain_fold = solid.box@1(size=[0.025, 2.82, 0.14])
+curtain_fold_l = xform.move@1(curtain_fold, by=[-3.96, 2.05, 0])
+curtain_fold_l_repeat = inst.repeat@1(curtain_fold_l, count=14, step=[0.09, 0, 0])
+curtain_fold_r = xform.move@1(curtain_fold, by=[2.88, 2.05, 0])
+curtain_fold_r_repeat = inst.repeat@1(curtain_fold_r, count=14, step=[0.09, 0, 0])
+curtain_fold_l_solid = inst.realize@1(curtain_fold_l_repeat)
+curtain_fold_r_solid = inst.realize@1(curtain_fold_r_repeat)
+curtain_folds_local = solid.union@1(curtain_fold_l_solid, curtain_fold_r_solid)
+curtain_folds_turn = xform.rotate@1(curtain_folds_local, angles=[0, -90, 0])
+curtain_folds = xform.move@1(curtain_folds_turn, by=[4.78, 0, -0.4])
+curtain_fold_mat = solid.material@1(curtain_folds, color=[0.63, 0.58, 0.50], roughness=0.96, recipe="fabric", texture_scale=1.2)
+output curtain_pleats = curtain_fold_mat
+
+# Slatted oak media feature, low floating console, large dark display.
+slat_src = solid.box@1(size=[0.055, 2.8, 0.12])
+slat_at = xform.move@1(slat_src, by=[-2.04, 1.8, -4.02])
+slat_array = inst.array@1(slat_at, count_x=18, spacing=[0.24, 0, 0])
+slats = inst.realize@1(slat_array)
+slats_mat = solid.material@1(slats, color=[0.39, 0.25, 0.16], roughness=0.51, recipe="wood", texture_scale=1.2)
+slats_finish = solid.finish@1(slats_mat, clearcoat=0.13, clearcoat_roughness=0.38, anisotropy=0.12)
+output oak_slats = slats_finish
+console_src = solid.box@1(size=[3.2, 0.42, 0.48])
+console_at = xform.move@1(console_src, by=[0, 0.38, -3.55])
+console_round = solid.round@1(console_at, radius=0.045, segments=6)
+console_mat = solid.material@1(console_round, color=[0.30, 0.19, 0.12], roughness=0.43, recipe="wood", texture_scale=1.1)
+console_finish = solid.finish@1(console_mat, clearcoat=0.28, clearcoat_roughness=0.27, anisotropy=0.12)
+output media_console = console_finish
+console_panels_src = detail.panels@1(console_round, face="+z", cols=4, rows=1, gap=0.025, depth=0.018, raised=0.12, vents=0.25, seed=38)
+console_panels = solid.material@1(console_panels_src, color=[0.19, 0.15, 0.11], metallic=0.48, roughness=0.34)
+output console_front_panels = console_panels
+console_handle_src = solid.cylinder@1(radius=0.012, height=0.095, segments=20)
+console_handle_turn = xform.rotate@1(console_handle_src, angles=[90, 0, 0])
+console_handle_a = xform.move@1(console_handle_turn, by=[-1.2, 0.38, -3.27])
+console_handle_b = xform.move@1(console_handle_turn, by=[-0.4, 0.38, -3.27])
+console_handle_c = xform.move@1(console_handle_turn, by=[0.4, 0.38, -3.27])
+console_handle_d = xform.move@1(console_handle_turn, by=[1.2, 0.38, -3.27])
+console_handles_src = solid.union@1(console_handle_a, console_handle_b, console_handle_c, console_handle_d)
+console_handles = solid.material@1(console_handles_src, color=[0.55, 0.39, 0.22], metallic=0.82, roughness=0.22)
+output console_hardware = console_handles
+screen_src = solid.box@1(size=[2.5, 1.38, 0.075])
+screen_at = xform.move@1(screen_src, by=[0, 2.45, -3.76])
+screen_mat = solid.material@1(screen_at, color=[0.018, 0.025, 0.03], metallic=0.22, roughness=0.12)
+output display = screen_mat
+screen_halo_src = solid.box@1(size=[2.64, 1.52, 0.018])
+screen_halo_at = xform.move@1(screen_halo_src, by=[0, 2.45, -3.91])
+screen_halo = solid.material@1(screen_halo_at, color=[0.11, 0.20, 0.22], emissive=[0.07, 0.10, 0.09])
+output display_halo = screen_halo
+soundbar_src = solid.box@1(size=[1.5, 0.075, 0.11])
+soundbar_at = xform.move@1(soundbar_src, by=[0, 1.62, -3.68])
+soundbar_round = solid.round@1(soundbar_at, radius=0.025, segments=6)
+soundbar_mat = solid.material@1(soundbar_round, color=[0.045, 0.05, 0.05], metallic=0.32, roughness=0.34)
+output soundbar = soundbar_mat
+
+# Modular contemporary sofa: upholstered plinth, rounded seat/back cushions and arms.
+sofa_base = solid.box@1(size=[3.3, 0.3, 1.15])
+sofa_base_at = xform.move@1(sofa_base, by=[0, 0.34, 0.35])
+sofa_base_round = solid.round@1(sofa_base_at, radius=0.11, segments=6)
+sofa_base_mat = solid.material@1(sofa_base_round, color=[0.19, 0.23, 0.22], roughness=0.94, recipe="fabric", texture_scale=1.1)
+sofa_base_finish = solid.finish@1(sofa_base_mat, sheen=0.24, relief=0.055, relief_scale=100)
+output sofa_base = sofa_base_finish
+seat_src = solid.box@1(size=[1.02, 0.28, 0.92])
+seat_l = xform.move@1(seat_src, by=[-1.05, 0.62, 0.32])
+seat_c = xform.move@1(seat_src, by=[0, 0.62, 0.32])
+seat_r = xform.move@1(seat_src, by=[1.05, 0.62, 0.32])
+seat_joined = solid.union@1(seat_l, seat_c, seat_r)
+seat_all = solid.round@1(seat_joined, radius=0.12, segments=6)
+seat_mat = solid.material@1(seat_all, color=[0.31, 0.37, 0.35], roughness=0.95, recipe="fabric", texture_scale=1.05)
+seat_finish = solid.finish@1(seat_mat, sheen=0.28, relief=0.065, relief_scale=112)
+output sofa_seats = seat_finish
+seat_seam_src = solid.box@1(size=[0.012, 0.012, 0.76])
+seat_seam_a = xform.move@1(seat_seam_src, by=[-0.525, 0.762, 0.32])
+seat_seam_b = xform.move@1(seat_seam_src, by=[0.525, 0.762, 0.32])
+seat_seams_src = solid.union@1(seat_seam_a, seat_seam_b)
+seat_seams = solid.material@1(seat_seams_src, color=[0.20, 0.25, 0.24], roughness=0.9, recipe="fabric")
+output sofa_seat_seams = seat_seams
+sofa_back_src = solid.box@1(size=[1.02, 0.92, 0.28])
+back_l = xform.move@1(sofa_back_src, by=[-1.05, 1.12, 0.73])
+back_c = xform.move@1(sofa_back_src, by=[0, 1.12, 0.73])
+back_r = xform.move@1(sofa_back_src, by=[1.05, 1.12, 0.73])
+back_joined = solid.union@1(back_l, back_c, back_r)
+back_all = solid.round@1(back_joined, radius=0.13, segments=6)
+sofa_back_mat = solid.material@1(back_all, color=[0.36, 0.42, 0.40], roughness=0.95, recipe="fabric", texture_scale=1.05)
+sofa_back_finish = solid.finish@1(sofa_back_mat, sheen=0.28, relief=0.065, relief_scale=112)
+output sofa_back = sofa_back_finish
+sofa_back_seam_src = solid.cylinder@1(radius=0.008, height=0.78, segments=12)
+sofa_back_seam_a = xform.move@1(sofa_back_seam_src, by=[-0.525, 1.12, 0.882])
+sofa_back_seam_b = xform.move@1(sofa_back_seam_src, by=[0.525, 1.12, 0.882])
+sofa_back_seams_src = solid.union@1(sofa_back_seam_a, sofa_back_seam_b)
+sofa_back_seams = solid.material@1(sofa_back_seams_src, color=[0.24, 0.29, 0.28], roughness=0.88, recipe="fabric")
+output sofa_back_stitching = sofa_back_seams
+arm_src = solid.box@1(size=[0.32, 0.64, 1.0])
+arm_l = xform.move@1(arm_src, by=[-1.68, 0.68, 0.38])
+arm_r = xform.move@1(arm_src, by=[1.68, 0.68, 0.38])
+arms_joined = solid.union@1(arm_l, arm_r)
+arm_all = solid.round@1(arms_joined, radius=0.13, segments=6)
+arm_mat = solid.material@1(arm_all, color=[0.26, 0.32, 0.30], roughness=0.95, recipe="fabric", texture_scale=1.05)
+arm_finish = solid.finish@1(arm_mat, sheen=0.26, relief=0.06, relief_scale=104)
+output sofa_arms = arm_finish
+
+# Two contrasting lumbar pillows and a folded throw give the sofa a softer silhouette.
+pillow_src = solid.box@1(size=[0.58, 0.48, 0.19])
+pillow_round = solid.round@1(pillow_src, radius=0.085, segments=8)
+pillow_l_turn = xform.rotate@1(pillow_round, angles=[-8, 0, -12])
+pillow_l = xform.move@1(pillow_l_turn, by=[-1.05, 1.07, 0.48])
+pillow_r_turn = xform.rotate@1(pillow_round, angles=[6, 0, 13])
+pillow_r = xform.move@1(pillow_r_turn, by=[1.05, 1.08, 0.48])
+pillows_src = solid.union@1(pillow_l, pillow_r)
+pillow_mat = solid.material@1(pillows_src, color=[0.68, 0.44, 0.30], roughness=0.72, recipe="leather", texture_scale=0.9)
+pillow_finish = solid.finish@1(pillow_mat, sheen=0.18, relief=0.08, relief_scale=62)
+output leather_lumbar_pillows = pillow_finish
+throw_src = solid.box@1(size=[0.72, 0.11, 0.82])
+throw_at = xform.move@1(throw_src, by=[1.18, 0.78, 0.39])
+throw_round = solid.round@1(throw_at, radius=0.045, segments=7)
+throw_mat = solid.material@1(throw_round, color=[0.76, 0.68, 0.53], roughness=0.95, recipe="fabric", texture_scale=1.0)
+throw_finish = solid.finish@1(throw_mat, sheen=0.30, relief=0.07, relief_scale=105)
+output folded_throw = throw_finish
+
+# Layered coffee table: thin stone top, inset dark base, and brushed metal legs.
+table_src = solid.box@1(size=[1.65, 0.12, 0.9])
+table_at = xform.move@1(table_src, by=[0, 0.48, -0.72])
+table_round = solid.round@1(table_at, radius=0.05, segments=8)
+table_mat = solid.material@1(table_round, color=[0.72, 0.69, 0.63], roughness=0.26, recipe="marble", texture_scale=1.1)
+table_finish = solid.finish@1(table_mat, clearcoat=0.38, clearcoat_roughness=0.22)
+output coffee_table_stone = table_finish
+base_src = solid.box@1(size=[1.28, 0.12, 0.58])
+base_at = xform.move@1(base_src, by=[0, 0.24, -0.72])
+base_mat = solid.material@1(base_at, color=[0.075, 0.085, 0.085], metallic=0.67, roughness=0.31)
+output coffee_table_base = base_mat
+leg_src = solid.cylinder@1(radius=0.028, height=0.36, segments=24)
+leg_1 = xform.move@1(leg_src, by=[-0.53, 0.25, -0.92])
+leg_2 = xform.move@1(leg_src, by=[0.53, 0.25, -0.92])
+leg_3 = xform.move@1(leg_src, by=[-0.53, 0.25, -0.52])
+leg_4 = xform.move@1(leg_src, by=[0.53, 0.25, -0.52])
+table_legs_src = solid.union@1(leg_1, leg_2, leg_3, leg_4)
+table_legs = solid.material@1(table_legs_src, color=[0.22, 0.24, 0.24], metallic=0.8, roughness=0.25)
+output coffee_table_legs = table_legs
+tray_src = solid.box@1(size=[0.72, 0.035, 0.42])
+tray_at = xform.move@1(tray_src, by=[0.42, 0.57, -0.72])
+tray_round = solid.round@1(tray_at, radius=0.016, segments=8)
+tray_mat = solid.material@1(tray_round, color=[0.15, 0.18, 0.18], metallic=0.52, roughness=0.24)
+output coffee_tray = tray_mat
+tray_lip_src = solid.box@1(size=[0.72, 0.035, 0.025])
+tray_lip_front = xform.move@1(tray_lip_src, by=[0.42, 0.60, -0.51])
+tray_lip_back = xform.move@1(tray_lip_src, by=[0.42, 0.60, -0.93])
+tray_lips = solid.union@1(tray_lip_front, tray_lip_back)
+tray_lip_mat = solid.material@1(tray_lips, color=[0.22, 0.24, 0.23], metallic=0.62, roughness=0.22)
+output coffee_tray_rim = tray_lip_mat
+book_src = solid.box@1(size=[0.31, 0.035, 0.22])
+book_at = xform.move@1(book_src, by=[-0.63, 0.57, -0.74])
+book_row = inst.array@1(book_at, count_x=3, spacing=[0.34, 0, 0])
+book_jitter = inst.jitter@1(book_row, shift=[0.008, 0.002, 0.012], yaw_jitter=2deg, scale_jitter=0.035, seed=91)
+books = inst.realize@1(book_jitter)
+books_mat = solid.material@1(books, color=[0.43, 0.28, 0.19], roughness=0.62, recipe="leather", texture_scale=0.7)
+output design_books = books_mat
+book_stack_src = solid.box@1(size=[0.38, 0.035, 0.25])
+book_stack_at = xform.move@1(book_stack_src, by=[-0.37, 0.61, -0.74])
+book_stack_mat = solid.material@1(book_stack_at, color=[0.66, 0.43, 0.25], roughness=0.64, recipe="leather")
+output stacked_book = book_stack_mat
+remote_src = solid.box@1(size=[0.22, 0.028, 0.075])
+remote_at = xform.move@1(remote_src, by=[0.62, 0.59, -0.55])
+remote_round = solid.round@1(remote_at, radius=0.012, segments=6)
+remote_mat = solid.material@1(remote_round, color=[0.04, 0.047, 0.05], roughness=0.42)
+output remote_control = remote_mat
+bowl_profile = profile.polygon@1(points=[[0, 0], [0.08, 0], [0.14, 0.035], [0.19, 0.12], [0.20, 0.18], [0.17, 0.18], [0.15, 0.12], [0.11, 0.055], [0, 0.055]])
+bowl_revolve = solid.revolve@1(bowl_profile, angle=360deg, segments=64)
+bowl_at = xform.move@1(bowl_revolve, by=[0.38, 0.60, -0.72])
+bowl_mat = solid.material@1(bowl_at, color=[0.79, 0.76, 0.70], roughness=0.2, metallic=0.05)
+bowl_finish = solid.finish@1(bowl_mat, clearcoat=0.55, clearcoat_roughness=0.16)
+output sculptural_bowl = bowl_finish
+
+# Textured rug anchors the seating group; low side tables and restrained decor.
+rug_src = solid.box@1(size=[4.9, 0.035, 3.25])
+rug_at = xform.move@1(rug_src, by=[0, 0.015, -0.35])
+rug_mat = solid.texture@1(rug_at, tile=1.6, size="512", program="g = fbm(scale_x=30, scale_y=30, iterations=4); weave = bricks(rows=36, columns=24, mortar=0.16, bevel=0.04, round=0.08, row_offset=0.5); albedo = colorize(g, gradient=[0:#655b4e, 0.5:#968876, 1:#c6b79e]); roughness = brightness_contrast(g, brightness=0.40, contrast=0.12); height = weave")
+rug_finish = solid.finish@1(rug_mat, sheen=0.16, relief=0.025, relief_scale=80)
+output rug = rug_finish
+side_src = solid.cylinder@1(radius=0.39, height=0.42, segments=48)
+side_l = xform.move@1(side_src, by=[-2.65, 0.22, 0.12])
+side_r = xform.move@1(side_src, by=[2.65, 0.22, 0.12])
+side_joined = solid.union@1(side_l, side_r)
+side_mat = solid.material@1(side_joined, color=[0.49, 0.32, 0.20], roughness=0.46, recipe="wood")
+output side_tables = side_mat
+vase_profile = profile.polygon@1(points=[[0, 0], [0.11, 0], [0.17, 0.08], [0.21, 0.27], [0.19, 0.39], [0.13, 0.46], [0.14, 0.55], [0.10, 0.55], [0.09, 0.46], [0.14, 0.38], [0.16, 0.27], [0.12, 0.09], [0, 0.09]])
+vase_revolve = solid.revolve@1(vase_profile, angle=360deg, segments=72)
+vase_at = xform.move@1(vase_revolve, by=[-2.65, 0.43, 0.12])
+vase_mat = solid.material@1(vase_at, color=[0.34, 0.48, 0.45], roughness=0.19, metallic=0.12)
+vase_finish = solid.finish@1(vase_mat, clearcoat=0.48, clearcoat_roughness=0.18, relief=0.035, relief_scale=90)
+output ceramic_vase = vase_finish
+
+# Sculptural floor lamp and warm pool of light beside the sofa.
+lamp_base = solid.cylinder@1(radius=0.25, height=0.07, segments=40)
+lamp_base_at = xform.move@1(lamp_base, by=[2.85, 0.035, 1.65])
+lamp_base_mat = solid.material@1(lamp_base_at, color=[0.14, 0.16, 0.16], metallic=0.78, roughness=0.23, recipe="brushed_metal")
+output floor_lamp_base = lamp_base_mat
+lamp_curve = curve.bezier@1(points=[[2.85, 0.08, 1.65], [3.35, 2.35, 1.65], [2.05, 2.85, 0.35], [0.95, 2.28, 0.08]], steps=48)
+lamp_arch = curve.tube@1(lamp_curve, radius=0.035, end_radius=0.018, sides=24, caps=true)
+lamp_arch_mat = solid.material@1(lamp_arch, color=[0.13, 0.15, 0.15], metallic=0.82, roughness=0.22, recipe="brushed_metal")
+output arc_lamp_arm = lamp_arch_mat
+lamp_shade_src = solid.cone@1(height=0.26, radius=0.24, top_radius=0.045, segments=64)
+lamp_shade_at = xform.move@1(lamp_shade_src, by=[0.95, 2.23, 0.08])
+lamp_shade_mat = solid.material@1(lamp_shade_at, color=[0.78, 0.72, 0.60], metallic=0.38, roughness=0.3)
+lamp_shade_finish = solid.finish@1(lamp_shade_mat, clearcoat=0.35, clearcoat_roughness=0.2)
+output arc_lamp_shade = lamp_shade_finish
+lamp_inner_src = solid.cylinder@1(radius=0.16, height=0.018, segments=48)
+lamp_inner_at = xform.move@1(lamp_inner_src, by=[0.95, 2.103, 0.08])
+lamp_inner_mat = solid.material@1(lamp_inner_at, color=[1.0, 0.82, 0.61], emissive=[0.12, 0.075, 0.03])
+output lamp_diffuser = lamp_inner_mat
+lamp_light = light.point@1(position=[0.95, 2.05, 0.08], color=[1.0, 0.73, 0.48], intensity=0.65, range=5)
+output lamp_glow = lamp_light
+
+# Dining vignette, woven-look chairs, greenery, and framed abstract art.
+dining_top = solid.box@1(size=[2.0, 0.12, 1.0])
+dining_at = xform.move@1(dining_top, by=[-2.85, 0.78, -1.35])
+dining_round = solid.round@1(dining_at, radius=0.055, segments=6)
+dining_mat = solid.material@1(dining_round, color=[0.46, 0.31, 0.19], roughness=0.44, recipe="wood", texture_scale=0.9)
+dining_finish = solid.finish@1(dining_mat, clearcoat=0.22, clearcoat_roughness=0.32, anisotropy=0.14)
+output dining_table = dining_finish
+chair_seat_src = solid.box@1(size=[0.52, 0.12, 0.52])
+chair_seat_round = solid.round@1(chair_seat_src, radius=0.045, segments=7)
+chair_seat_a = xform.move@1(chair_seat_round, by=[-3.48, 0.48, -0.55])
+chair_seat_b = xform.move@1(chair_seat_round, by=[-2.22, 0.48, -0.55])
+chair_seat_c = xform.move@1(chair_seat_round, by=[-3.48, 0.48, -2.15])
+chair_seat_d = xform.move@1(chair_seat_round, by=[-2.22, 0.48, -2.15])
+chair_seats_src = solid.union@1(chair_seat_a, chair_seat_b, chair_seat_c, chair_seat_d)
+chair_seats = solid.material@1(chair_seats_src, color=[0.25, 0.31, 0.29], roughness=0.94, recipe="fabric", texture_scale=0.85)
+output dining_chair_seats = chair_seats
+chair_back_src = solid.box@1(size=[0.52, 0.58, 0.10])
+chair_back_round = solid.round@1(chair_back_src, radius=0.045, segments=7)
+chair_back_a = xform.move@1(chair_back_round, by=[-3.48, 0.79, -0.29])
+chair_back_b = xform.move@1(chair_back_round, by=[-2.22, 0.79, -0.29])
+chair_back_c = xform.move@1(chair_back_round, by=[-3.48, 0.79, -2.41])
+chair_back_d = xform.move@1(chair_back_round, by=[-2.22, 0.79, -2.41])
+chair_backs_src = solid.union@1(chair_back_a, chair_back_b, chair_back_c, chair_back_d)
+chair_backs = solid.material@1(chair_backs_src, color=[0.25, 0.31, 0.29], roughness=0.94, recipe="fabric", texture_scale=0.85)
+output dining_chair_backs = chair_backs
+chair_leg_src = solid.cylinder@1(radius=0.024, height=0.42, segments=18)
+chair_leg_a = xform.move@1(chair_leg_src, by=[-3.68, 0.23, -0.73])
+chair_leg_b = xform.move@1(chair_leg_src, by=[-3.28, 0.23, -0.73])
+chair_leg_c = xform.move@1(chair_leg_src, by=[-2.42, 0.23, -0.73])
+chair_leg_d = xform.move@1(chair_leg_src, by=[-2.02, 0.23, -0.73])
+chair_leg_e = xform.move@1(chair_leg_src, by=[-3.68, 0.23, -1.97])
+chair_leg_f = xform.move@1(chair_leg_src, by=[-3.28, 0.23, -1.97])
+chair_leg_g = xform.move@1(chair_leg_src, by=[-2.42, 0.23, -1.97])
+chair_leg_h = xform.move@1(chair_leg_src, by=[-2.02, 0.23, -1.97])
+chair_legs_src = solid.union@1(chair_leg_a, chair_leg_b, chair_leg_c, chair_leg_d, chair_leg_e, chair_leg_f, chair_leg_g, chair_leg_h)
+chair_legs = solid.material@1(chair_legs_src, color=[0.12, 0.14, 0.14], metallic=0.46, roughness=0.35)
+output dining_chair_frames = chair_legs
+
+# Compact reading chair beside the sofa: rounded upholstered shell, wood arm caps, metal legs.
+accent_seat_src = solid.box@1(size=[0.78, 0.19, 0.76])
+accent_seat_round = solid.round@1(accent_seat_src, radius=0.085, segments=8)
+accent_seat_at = xform.move@1(accent_seat_round, by=[2.63, 0.54, 0.27])
+accent_seat_mat = solid.material@1(accent_seat_at, color=[0.49, 0.34, 0.23], roughness=0.74, recipe="leather", texture_scale=0.85)
+accent_seat_finish = solid.finish@1(accent_seat_mat, sheen=0.18, relief=0.075, relief_scale=72)
+output reading_chair_seat = accent_seat_finish
+accent_back_src = solid.box@1(size=[0.78, 0.78, 0.20])
+accent_back_round = solid.round@1(accent_back_src, radius=0.085, segments=8)
+accent_back_at = xform.move@1(accent_back_round, by=[2.63, 0.99, -0.02])
+accent_back_mat = solid.material@1(accent_back_at, color=[0.49, 0.34, 0.23], roughness=0.74, recipe="leather", texture_scale=0.85)
+accent_back_finish = solid.finish@1(accent_back_mat, sheen=0.18, relief=0.075, relief_scale=72)
+output reading_chair_back = accent_back_finish
+accent_arm_src = solid.box@1(size=[0.10, 0.33, 0.58])
+accent_arm_round = solid.round@1(accent_arm_src, radius=0.035, segments=6)
+accent_arm_l = xform.move@1(accent_arm_round, by=[2.21, 0.72, 0.28])
+accent_arm_r = xform.move@1(accent_arm_round, by=[3.05, 0.72, 0.28])
+accent_arms_src = solid.union@1(accent_arm_l, accent_arm_r)
+accent_arms_mat = solid.material@1(accent_arms_src, color=[0.40, 0.27, 0.16], roughness=0.42, recipe="wood", texture_scale=0.85)
+accent_arms_finish = solid.finish@1(accent_arms_mat, clearcoat=0.25, clearcoat_roughness=0.28)
+output reading_chair_arms = accent_arms_finish
+accent_leg_src = solid.cylinder@1(radius=0.022, height=0.42, segments=24)
+accent_leg_a = xform.move@1(accent_leg_src, by=[2.31, 0.22, -0.02])
+accent_leg_b = xform.move@1(accent_leg_src, by=[2.95, 0.22, -0.02])
+accent_leg_c = xform.move@1(accent_leg_src, by=[2.31, 0.22, 0.56])
+accent_leg_d = xform.move@1(accent_leg_src, by=[2.95, 0.22, 0.56])
+accent_legs_src = solid.union@1(accent_leg_a, accent_leg_b, accent_leg_c, accent_leg_d)
+accent_legs = solid.material@1(accent_legs_src, color=[0.15, 0.17, 0.17], metallic=0.8, roughness=0.24, recipe="brushed_metal")
+output reading_chair_frame = accent_legs
+
+# A built-in reading shelf with repeated shelves and a seeded, slightly irregular book collection.
+bookcase_back_src = solid.box@1(size=[0.055, 2.45, 1.58])
+bookcase_back_at = xform.move@1(bookcase_back_src, by=[-4.67, 1.25, 0.42])
+bookcase_side_src = solid.box@1(size=[0.48, 2.38, 0.055])
+bookcase_side_l = xform.move@1(bookcase_side_src, by=[-4.40, 1.23, -0.37])
+bookcase_side_r = xform.move@1(bookcase_side_src, by=[-4.40, 1.23, 1.21])
+bookcase_board_src = solid.box@1(size=[0.48, 0.055, 1.58])
+bookcase_board_at = xform.move@1(bookcase_board_src, by=[-4.40, 0.42, 0.42])
+bookcase_boards_inst = inst.array@1(bookcase_board_at, count_y=5, spacing=[0, 0.46, 0])
+bookcase_boards = inst.realize@1(bookcase_boards_inst)
+bookcase_wood_src = solid.union@1(bookcase_back_at, bookcase_side_l, bookcase_side_r, bookcase_boards)
+bookcase_wood = solid.material@1(bookcase_wood_src, color=[0.39, 0.25, 0.15], roughness=0.47, recipe="wood", texture_scale=0.8)
+bookcase_finish = solid.finish@1(bookcase_wood, clearcoat=0.28, clearcoat_roughness=0.29, anisotropy=0.16)
+output built_in_bookcase = bookcase_finish
+bookshelf_book_src = solid.box@1(size=[0.13, 0.31, 0.075])
+bookshelf_book_at = xform.move@1(bookshelf_book_src, by=[-4.39, 0.61, -0.24])
+bookshelf_book_row = inst.array@1(bookshelf_book_at, count_z=12, spacing=[0, 0, 0.12])
+bookshelf_book_levels = inst.array@1(bookshelf_book_row, count_y=4, spacing=[0, 0.46, 0])
+bookshelf_book_jitter = inst.jitter@1(bookshelf_book_levels, shift=[0.006, 0.002, 0.008], yaw_jitter=2deg, scale_jitter=0.04, seed=114)
+bookshelf_books = inst.realize@1(bookshelf_book_jitter)
+bookshelf_book_mat = solid.material@1(bookshelf_books, color=[0.48, 0.26, 0.19], roughness=0.66, recipe="leather", texture_scale=0.75)
+output bookshelf_books = bookshelf_book_mat
+
+# Architectural planter with layered leaf forms gives the window edge scale.
+planter_src = solid.box@1(size=[0.7, 0.42, 0.7])
+planter_round = solid.round@1(planter_src, radius=0.065, segments=7)
+planter_at = xform.move@1(planter_round, by=[4.0, 0.21, -2.95])
+planter_mat = solid.material@1(planter_at, color=[0.28, 0.31, 0.28], roughness=0.84, recipe="concrete")
+output planter = planter_mat
+leaf_src = solid.sphere@1(radius=0.16, segments=32)
+leaf_scale = xform.scale@1(leaf_src, by=[0.62, 1.5, 0.62])
+leaf_a_turn = xform.rotate@1(leaf_scale, angles=[0, 0, -38])
+leaf_a = xform.move@1(leaf_a_turn, by=[3.76, 1.23, -2.92])
+leaf_b_turn = xform.rotate@1(leaf_scale, angles=[0, 0, 32])
+leaf_b = xform.move@1(leaf_b_turn, by=[4.21, 1.25, -2.94])
+leaf_c_turn = xform.rotate@1(leaf_scale, angles=[18, 0, -20])
+leaf_c = xform.move@1(leaf_c_turn, by=[3.84, 1.48, -3.08])
+leaf_d_turn = xform.rotate@1(leaf_scale, angles=[-17, 0, 25])
+leaf_d = xform.move@1(leaf_d_turn, by=[4.14, 1.52, -3.08])
+leaf_e_turn = xform.rotate@1(leaf_scale, angles=[-15, 0, -28])
+leaf_e = xform.move@1(leaf_e_turn, by=[3.9, 1.7, -2.88])
+leaf_f_turn = xform.rotate@1(leaf_scale, angles=[14, 0, 28])
+leaf_f = xform.move@1(leaf_f_turn, by=[4.13, 1.72, -2.88])
+leaf_g_turn = xform.rotate@1(leaf_scale, angles=[24, 0, 0])
+leaf_g = xform.move@1(leaf_g_turn, by=[4.0, 1.92, -3.0])
+leaf_h_turn = xform.rotate@1(leaf_scale, angles=[-22, 0, 8])
+leaf_h = xform.move@1(leaf_h_turn, by=[4.0, 1.33, -3.2])
+foliage_src = solid.union@1(leaf_a, leaf_b, leaf_c, leaf_d, leaf_e, leaf_f, leaf_g, leaf_h)
+foliage = solid.material@1(foliage_src, color=[0.17, 0.34, 0.19], roughness=0.9, recipe="fabric")
+output fiddle_leaf_fig = foliage
+
+art_src = solid.box@1(size=[1.05, 1.25, 0.075])
+art_at = xform.move@1(art_src, by=[2.95, 2.45, -4.11])
+art_mat = solid.material@1(art_at, color=[0.16, 0.34, 0.36], roughness=0.72)
+output abstract_art = art_mat
+art_gold = solid.box@1(size=[0.045, 1.36, 0.035])
+art_frame_l = xform.move@1(art_gold, by=[2.39, 2.45, -4.06])
+art_frame_r = xform.move@1(art_gold, by=[3.51, 2.45, -4.06])
+art_frame = solid.union@1(art_frame_l, art_frame_r)
+art_trim = solid.material@1(art_frame, color=[0.70, 0.52, 0.29], metallic=0.54, roughness=0.37)
+output art_frame = art_trim
+
+sun_lamp = light.spot@1(position=[-0.7, 3.2, -0.4], direction=[0.1, -1, -0.2], color=[1.0, 0.86, 0.69], intensity=0.35, range=8, inner_angle=0.48, outer_angle=0.82)
+output ceiling_wash = sun_lamp
+
+# Recessed ceiling trim and four downward pools of warm practical light.
+downlight_can_src = solid.cylinder@1(radius=0.105, height=0.055, segments=40)
+downlight_can_at = xform.move@1(downlight_can_src, by=[-2.55, 3.72, -0.8])
+downlight_cans_inst = inst.array@1(downlight_can_at, count_x=2, count_z=2, spacing=[5.1, 0, -2.7])
+downlight_cans = inst.realize@1(downlight_cans_inst)
+downlight_can_mat = solid.material@1(downlight_cans, color=[0.08, 0.09, 0.09], metallic=0.68, roughness=0.25)
+output recessed_downlight_trim = downlight_can_mat
+downlight_diffuser_src = solid.cylinder@1(radius=0.073, height=0.012, segments=40)
+downlight_diffuser_at = xform.move@1(downlight_diffuser_src, by=[-2.55, 3.687, -0.8])
+downlight_diffusers_inst = inst.array@1(downlight_diffuser_at, count_x=2, count_z=2, spacing=[5.1, 0, -2.7])
+downlight_diffusers = inst.realize@1(downlight_diffusers_inst)
+downlight_diffuser_mat = solid.material@1(downlight_diffusers, color=[1.0, 0.84, 0.66], emissive=[0.045, 0.032, 0.02])
+output recessed_downlight_diffusers = downlight_diffuser_mat
+can_light_a = light.spot@1(position=[-2.55, 3.64, -0.8], direction=[0, -1, 0], color=[1.0, 0.82, 0.65], intensity=0.16, range=5, inner_angle=0.42, outer_angle=0.72)
+output ceiling_spot_left = can_light_a
+can_light_b = light.spot@1(position=[2.55, 3.64, -0.8], direction=[0, -1, 0], color=[1.0, 0.86, 0.72], intensity=0.15, range=5, inner_angle=0.42, outer_angle=0.72)
+output ceiling_spot_right = can_light_b
+can_light_c = light.spot@1(position=[-2.55, 3.64, -3.0], direction=[0, -1, 0], color=[1.0, 0.82, 0.66], intensity=0.14, range=4.5, inner_angle=0.4, outer_angle=0.68)
+output ceiling_spot_rear_left = can_light_c
+can_light_d = light.spot@1(position=[2.55, 3.64, -3.0], direction=[0, -1, 0], color=[1.0, 0.86, 0.73], intensity=0.12, range=4.5, inner_angle=0.4, outer_angle=0.68)
+output ceiling_spot_rear_right = can_light_d
+
+# Dimensional wall artwork: layered canvas, sculptural enamel pieces and a bronze ring.
+art_ring_src = solid.torus@1(major=0.31, minor=0.022, segments=72, tube_segments=16)
+art_ring_wall = xform.rotate@1(art_ring_src, angles=[90, 0, 0])
+art_ring_at = xform.move@1(art_ring_wall, by=[2.95, 2.52, -4.015])
+art_ring_mat = solid.material@1(art_ring_at, color=[0.67, 0.43, 0.23], metallic=0.86, roughness=0.24)
+output abstract_art_bronze_ring = art_ring_mat
+art_blade_src = solid.box@1(size=[0.11, 0.7, 0.04])
+art_blade_l_turn = xform.rotate@1(art_blade_src, angles=[0, 0, 32])
+art_blade_l = xform.move@1(art_blade_l_turn, by=[2.70, 2.45, -4.035])
+art_blade_r_turn = xform.rotate@1(art_blade_src, angles=[0, 0, -24])
+art_blade_r = xform.move@1(art_blade_r_turn, by=[3.17, 2.45, -4.035])
+art_blades_src = solid.union@1(art_blade_l, art_blade_r)
+art_blades_mat = solid.material@1(art_blades_src, color=[0.82, 0.66, 0.42], metallic=0.27, roughness=0.35)
+output abstract_art_blades = art_blades_mat
+
+# Window latch, sill-channel and two curtain tiebacks finish the side glazing assembly.
+window_latch_src = solid.box@1(size=[0.055, 0.16, 0.035])
+window_latch_turn = xform.rotate@1(window_latch_src, angles=[0, -90, 0])
+window_latch_at = xform.move@1(window_latch_turn, by=[4.73, 1.9, -0.4])
+window_latch_mat = solid.material@1(window_latch_at, color=[0.42, 0.45, 0.43], metallic=0.82, roughness=0.21)
+output window_latch = window_latch_mat
+tieback_src = solid.torus@1(major=0.12, minor=0.014, segments=32, tube_segments=12)
+tieback_turn = xform.rotate@1(tieback_src, angles=[90, 0, 0])
+tieback_l = xform.move@1(tieback_turn, by=[4.64, 1.45, -3.72])
+tieback_r = xform.move@1(tieback_turn, by=[4.64, 1.45, 2.92])
+tieback_all = solid.union@1(tieback_l, tieback_r)
+tieback_mat = solid.material@1(tieback_all, color=[0.54, 0.38, 0.21], metallic=0.68, roughness=0.29)
+output curtain_tiebacks = tieback_mat

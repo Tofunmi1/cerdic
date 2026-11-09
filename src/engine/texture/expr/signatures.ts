@@ -86,6 +86,13 @@ export const FUNCTIONS: Record<string, Rule> = {
   noise: exact([2], 1),
   snoise: exact([2], 1),
   fbm: exact([2], 1),
+  // voronoi(p): vec2(distance to the nearest cell point, distance to the second nearest), cells one unit wide with a jittered point each.
+  // F1 is a pore or a scale; F2 - F1 is the thin wall between cells.
+  voronoi: exact([2], 2),
+  // stretch(p, angle, ratio): p turned by -angle and widened by ratio along it, so noise of the result runs in streaks along `angle`.
+  stretch: exact([2, 1, 1], 2),
+  // warp(p, amount): p pushed by two offset simplex noises, which bends straight patterns into organic ones.
+  warp: exact([2, 1], 2),
   hsv: exact([1, 1, 1], 3),
   rot: exact([2, 1], 2),
   vec2: constructor(2),

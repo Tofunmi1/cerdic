@@ -54,6 +54,39 @@ function fbm(x: number, y: number): number {
   return sum / 0.96875;
 }
 
+/** Cellular noise over the 3 by 3 neighbouring cells: [nearest, second nearest] distance to a jittered point per cell. */
+function voronoi(x: number, y: number): Value {
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  let first = 8;
+  let second = 8;
+  for (let j = -1; j <= 1; j++) {
+    for (let i = -1; i <= 1; i++) {
+      const cx = ix + i;
+      const cy = iy + j;
+      const dx = cx + hash(cx, cy) - x;
+      const dy = cy + hash(cx + 37.1, cy + 17.3) - y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < first) {
+        second = first;
+        first = d;
+      } else if (d < second) second = d;
+    }
+  }
+  return [first, second];
+}
+
+/** The coordinate turned by -angle, then widened by ratio along the first axis. */
+function stretch(x: number, y: number, angle: number, ratio: number): Value {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return [(c * x + s * y) / ratio, -s * x + c * y];
+}
+
+function warp(x: number, y: number, amount: number): Value {
+  return [x + amount * clamp(simplex(x + 5.2, y + 1.3), -1, 1), y + amount * clamp(simplex(x + 9.7, y + 8.1), -1, 1)];
+}
+
 function hsv(h: number, s: number, v: number): Value {
   return [5, 3, 1].map((offset) => {
     const k = mod(offset + h * 6, 6);
@@ -108,6 +141,9 @@ function call(name: string, a: Value[]): Value {
     case 'noise': return [noise(x[0], x[1])];
     case 'snoise': return [clamp(simplex(x[0], x[1]), -1, 1)];
     case 'fbm': return [fbm(x[0], x[1])];
+    case 'voronoi': return voronoi(x[0], x[1]);
+    case 'stretch': return stretch(x[0], x[1], y[0], z[0]);
+    case 'warp': return warp(x[0], x[1], y[0]);
     case 'hsv': return hsv(x[0], y[0], z[0]);
     case 'rot': return [Math.cos(y[0]) * x[0] - Math.sin(y[0]) * x[1], Math.sin(y[0]) * x[0] + Math.cos(y[0]) * x[1]];
     default: throw new Error(`unknown function ${name}`);

@@ -1,0 +1,276 @@
+# SALTMARSH QUAY AT DUSK. One world that uses the whole simulation substrate and the modelling work done with it. Metres, y up; the sea is at +z,
+# the quay front faces it. Read the section comments; each one names what it exercises.
+#   sim.program (SimL):  boats' buoyancy with output push (per copy), rope bridge (library) cut at run time, capes (library cloth, per copy),
+#                        a flag written inline with `adjacent`/`pull`/`t`, a murmuration of starlings (neighbors + spatial hash)
+#   physics:             dynamic boats and crates, kinematic dockhands carried by keyframed tracks, a hinge-swung neon sign, per-copy bodies
+#   game kinds:          three boats and three dockhands, each copy with its own body and program instance
+#   modelling:           rooms.plan customs house, detail.panels warehouse, sign.text neon, poly.round_edges crates,
+#                        field.taper + field.twist lighthouse, field.bend crane arm, flora.tree at three levels of detail
+#   older sims:          cloth.sim flag and fluid.sim (APIC) fountain, next to the new programs
+#   effects:             chimney smoke, lamps, a lighthouse lamp, dusk sky and haze
+
+sky = scene.sky@1(sun_elevation=4, sun_azimuth=150, sun_intensity=2.2, turbidity=4, ground_color=[0.06, 0.06, 0.07], clouds=true, haze=0.05, haze_color=[1.0, 0.55, 0.35], haze_height=40)
+output sky = sky
+env = scene.environment@1(sky_color=[0.55, 0.42, 0.5], ground_color=[0.12, 0.1, 0.1], intensity=0.7, reflection=0.5)
+output env = env
+
+# ---------- ground: sea, seabed, the quay and the two banks with the inlet between them ----------
+sea_s = solid.box@1(size=[120, 0.2, 60])
+sea_a = xform.move@1(sea_s, by=[0, -0.1, 28])
+sea_m = solid.material@1(sea_a, color=[0.06, 0.2, 0.32], roughness=0.12, metallic=0.2)
+output sea = sea_m
+inlet_s = solid.box@1(size=[16, 0.2, 30])
+inlet_a = xform.move@1(inlet_s, by=[0, -0.1, -15])
+inlet_m = solid.material@1(inlet_a, color=[0.06, 0.2, 0.32], roughness=0.12, metallic=0.2)
+output inlet = inlet_m
+bed_s = solid.box@1(size=[120, 0.5, 90])
+bed_a = xform.move@1(bed_s, by=[0, -3.25, 0])
+bed_m = solid.material@1(bed_a, color=[0.2, 0.17, 0.14], roughness=0.95)
+output seabed = bed_m
+bank_l_s = solid.box@1(size=[32, 0.8, 30])
+bank_l_a = xform.move@1(bank_l_s, by=[-24, 0.4, -15])
+bank_l_m = solid.material@1(bank_l_a, color=[0.34, 0.31, 0.27], roughness=0.9)
+output bank_left = bank_l_m
+bank_r_s = solid.box@1(size=[32, 0.8, 30])
+bank_r_a = xform.move@1(bank_r_s, by=[24, 0.4, -15])
+bank_r_m = solid.material@1(bank_r_a, color=[0.34, 0.31, 0.27], roughness=0.9)
+output bank_right = bank_r_m
+hill_s = solid.box@1(size=[120, 6, 12])
+hill_a = xform.move@1(hill_s, by=[0, 2.4, -36])
+hill_m = solid.material@1(hill_a, color=[0.16, 0.24, 0.12], roughness=1.0)
+output hill = hill_m
+# quay edge (stone coping) so the physics bodies have a floor that is a real body
+floor_p = phys.body@1(bank_l_m, kind="static")
+output quay_left = floor_p
+
+# ---------- customs house: rooms.plan (layout + walls + doors), with a panelled warehouse beside it ----------
+customs = rooms.plan@1(rooms="hall:6,6,8,8; office:3,3,4,4; scales:3,3,4,4; store:3,3,5,5", links="0-1; 0-2; 2-3", seed=4, wall_height=3.0, wall=0.2)
+customs_a = xform.move@1(customs, by=[-37, 0.8, -25])
+customs_m = solid.material@1(customs_a, color=[0.62, 0.5, 0.38], roughness=0.85)
+output customs_house = customs_m
+
+wh_s = solid.box@1(size=[12, 5, 8])
+wh_a = xform.move@1(wh_s, by=[22, 3.3, -9])
+wh_m = solid.material@1(wh_a, color=[0.25, 0.3, 0.34], roughness=0.7, metallic=0.4)
+output warehouse = wh_m
+wh_plates = detail.panels@1(wh_a, face="+z", cols=6, rows=3, gap=0.05, depth=0.06, raised=0.3, vents=0.15, seed=7)
+wh_plates_m = solid.material@1(wh_plates, color=[0.38, 0.44, 0.5], roughness=0.5, metallic=0.6)
+output warehouse_plates = wh_plates_m
+wh_roof_s = solid.box@1(size=[12.6, 0.3, 8.6])
+wh_roof_a = xform.move@1(wh_roof_s, by=[22, 5.95, -9])
+wh_roof_m = solid.material@1(wh_roof_a, color=[0.18, 0.2, 0.22], roughness=0.6)
+output warehouse_roof = wh_roof_m
+
+# neon signs (sign.text): over the warehouse door and over the customs house
+sign_q = sign.text@1(text="QUAY 9", height=0.9, depth=0.08, color=[0.1, 0.9, 1.0], glow=5)
+sign_q_a = xform.move@1(sign_q, by=[22, 5.9, -4.95])
+output neon_quay = sign_q_a
+sign_h = sign.text@1(text="CUSTOMS", height=0.55, depth=0.06, color=[1.0, 0.25, 0.55], glow=4)
+sign_h_a = xform.move@1(sign_h, by=[-30, 3.9, -12.6])
+output neon_customs = sign_h_a
+neon_l1 = light.point@1(position=[22, 5.2, -3.5], color=[0.2, 0.9, 1.0], intensity=70, range=12)
+neon_l2 = light.point@1(position=[-30, 3.6, -11.5], color=[1.0, 0.3, 0.6], intensity=50, range=10)
+
+# a swinging tavern sign: a plate and neon text on a hinge (phys.joint), authored swung 35 degrees out so it falls into a pendulum
+pl_s = solid.box@1(size=[2.4, 0.9, 0.12])
+pl_a = xform.move@1(pl_s, by=[0, -0.75, 0])
+pl_m = solid.material@1(pl_a, color=[0.12, 0.1, 0.1], roughness=0.5)
+tv = sign.text@1(text="TAVERN", height=0.5, depth=0.05, color=[1.0, 0.8, 0.2], glow=4)
+tv_a = xform.move@1(tv, by=[0, -1.05, 0.06])
+tv_u = solid.union@1(pl_m, tv_a)
+tv_r = xform.rotate@1(tv_u, angles=[0, 0, 35])
+tv_at = xform.move@1(tv_r, by=[10.5, 3.6, -3.4])
+tv_b = phys.body@1(tv_at, kind="dynamic", density=1, angular_damping=0.05)
+tv_j = phys.joint@1(tv_b, kind="hinge", to="", anchor=[10.5, 3.6, -3.4], axis=[0, 0, 1])
+output swinging_sign = tv_j
+arm_s = solid.box@1(size=[0.15, 0.15, 1.0])
+arm_a = xform.move@1(arm_s, by=[10.5, 3.6, -3.9])
+arm_m = solid.material@1(arm_a, color=[0.1, 0.1, 0.1], roughness=0.6)
+output sign_arm = arm_m
+
+# ---------- lighthouse: a rounded square tower tapered and twisted (field.taper, field.twist) ----------
+lh_box = field.box@1(half=[1.4, 7, 1.4], rounding=0.15)
+lh_cap = field.sphere@1(radius=1.15)
+lh_cap_a = field.move@1(lh_cap, by=[0, 7.3, 0])
+lh_t = field.taper@1(lh_box, axis="y", from=-7, to=7, scale_start=1, scale_end=0.55)
+lh_w = field.twist@1(lh_t, axis="y", from=-7, to=7, angle=70)
+lh_f = field.union@1(lh_w, lh_cap_a)
+lh_s = field.to_solid@1(lh_f, min=[-1.8, -7.2, -1.8], max=[1.8, 8.6, 1.8], edge_length=0.12)
+lh_a = xform.move@1(lh_s, by=[31, 7.8, -4])
+lh_m = solid.material@1(lh_a, color=[0.9, 0.88, 0.82], roughness=0.7)
+output lighthouse = lh_m
+lh_lamp = light.point@1(position=[31, 16.6, -4], color=[1.0, 0.85, 0.5], intensity=900, range=60)
+lh_bulb_s = solid.sphere@1(radius=0.5, segments=16)
+lh_bulb_a = xform.move@1(lh_bulb_s, by=[31, 16.4, -4])
+lh_bulb_m = solid.material@1(lh_bulb_a, color=[1, 0.9, 0.6], roughness=0.3, emissive=[8, 6, 3])
+output lighthouse_lamp = lh_bulb_m
+
+# ---------- crane: a capsule arm bent over the water (field.bend), turning slowly on its mast ----------
+cr_cap = field.capsule@1(radius=0.28, half_length=4)
+cr_b = field.bend@1(cr_cap, axis="y", toward="x", from=-4, to=4, angle=75)
+cr_s = field.to_solid@1(cr_b, min=[-0.8, -4.6, -0.8], max=[6.2, 5.2, 0.8], edge_length=0.1)
+cr_a = xform.move@1(cr_s, by=[-12.5, 5.2, -2.0])
+cr_m = solid.material@1(cr_a, color=[0.8, 0.45, 0.08], roughness=0.55, metallic=0.3)
+cr_turn = anim.track@1(cr_m, property="rotation", keys="0:0,0,0; 12:0,90,0; 24:0,0,0", interpolation="smooth", loop=true, pivot=[-12.5, 0, -2.0])
+output crane = cr_turn
+mast_s = solid.cylinder@1(radius=0.3, height=5.2)
+mast_a = xform.move@1(mast_s, by=[-12.5, 3.4, -2.0])
+mast_m = solid.material@1(mast_a, color=[0.5, 0.3, 0.06], roughness=0.6)
+output crane_mast = mast_m
+
+# ---------- crates: rounded (poly.round_edges), dynamic bodies stacked on the quay; a dockhand will shove them ----------
+crate_s = solid.box@1(size=[0.8, 0.8, 0.8])
+crate_p = poly.from_solid@1(crate_s)
+crate_r = poly.round_edges@1(crate_p, width=0.05, segments=2)
+crate_o = poly.to_solid@1(crate_r)
+crate_m = solid.material@1(crate_o, color=[0.55, 0.37, 0.16], roughness=0.8)
+c1_a = xform.move@1(crate_m, by=[15, 1.2, -3])
+c1_b = phys.body@1(c1_a, kind="dynamic", density=0.6, friction=0.7)
+output crate_1 = c1_b
+c2_a = xform.move@1(crate_m, by=[16.2, 1.2, -3])
+c2_b = phys.body@1(c2_a, kind="dynamic", density=0.6, friction=0.7)
+output crate_2 = c2_b
+c3_a = xform.move@1(crate_m, by=[15.6, 2.03, -3])
+c3_b = phys.body@1(c3_a, kind="dynamic", density=0.6, friction=0.7)
+output crate_3 = c3_b
+
+# ---------- trees at three levels of detail (flora.tree lod 0, 1, 2), the far ones simpler ----------
+tree0 = flora.tree@1(kind="oak", height=7, seed=3, lod=0)
+tree0_a = inst.place@1(tree0, at=[[-8, 0.8, -26]])
+output tree_near = tree0_a
+tree1 = flora.tree@1(kind="pine", height=9, seed=5, lod=1)
+tree1_a = inst.place@1(tree1, at=[[6, 0.8, -29]])
+output tree_mid = tree1_a
+tree2 = flora.tree@1(kind="birch", height=8, seed=9, lod=2)
+tree2_a = inst.place@1(tree2, at=[[34, 0.8, -26]])
+output tree_far = tree2_a
+
+# ---------- bridge over the inlet: the library rope bridge, 41 planks pinned to two posts; cut it with sim.set_param cut ----------
+post_l_s = solid.box@1(size=[0.4, 2.4, 0.4])
+post_l_a = xform.move@1(post_l_s, by=[-8.3, 2.0, -12])
+post_l_m = solid.material@1(post_l_a, color=[0.3, 0.2, 0.1], roughness=0.8)
+output post_left = post_l_m
+post_r_s = solid.box@1(size=[0.4, 2.4, 0.4])
+post_r_a = xform.move@1(post_r_s, by=[8.3, 2.0, -12])
+post_r_m = solid.material@1(post_r_a, color=[0.3, 0.2, 0.1], roughness=0.8)
+output post_right = post_r_m
+bridge = sim.program@1(library="bridge", size=0.32, rate=60, values="span=16.4; height=3.2; spacing=0.42")
+bridge_a = xform.move@1(bridge, by=[0, 0, -12])
+bridge_m = solid.material@1(bridge_a, color=[0.45, 0.28, 0.12], roughness=0.8)
+output rope_bridge = bridge_m
+
+# ---------- flags: a new-substrate flag written inline (adjacent, pull, t) and the older cloth.sim flag beside it ----------
+fp_s = solid.cylinder@1(radius=0.06, height=6)
+fp_a = xform.move@1(fp_s, by=[-3, 3.8, -1.5])
+fp_m = solid.material@1(fp_a, color=[0.7, 0.7, 0.7], roughness=0.4, metallic=0.8)
+output flagpole_new = fp_m
+fl_g = poly.grid@1(width=1.6, height=1.0, columns=14, rows=9)
+fl_a = xform.move@1(fl_g, by=[-2.2, 6.2, -1.5])
+fl_p = sim.program@1(fl_a, values="pole=-2.95", source="sim flag\nparam wind = vec3(2.5, 0.0, 1.5)\nparam gust = 0.8\nparam damping = 0.985\nparam pole = 0.0\ninput mesh flag\nstate pos: vec3[flag]\nstate prev: vec3[flag]\nkernel init each i in pos {\n  pos[i] = rest(flag, i)\n  prev[i] = rest(flag, i)\n}\nkernel predict each i in pos {\n  let r = rest(flag, i)\n  if r.x < pole {\n    pos[i] = r\n    prev[i] = r\n  } else {\n    let v = (pos[i] - prev[i]) * damping\n    prev[i] = pos[i]\n    let puff = wind * (1.0 + gust * sin(t * 2.3 + r.x * 3.0 + r.y * 2.0))\n    pos[i] += v + (vec3(0.0, -9.8, 0.0) + puff * 4.0) * dt * dt\n  }\n}\nkernel solve each i in pos {\n  let r = rest(flag, i)\n  let p = pos[i]\n  if r.x >= pole {\n    let corr = vec3(0.0)\n    let count = 0.0\n    for j, len in adjacent(flag, i) {\n      let share = select(rest(flag, j).x < pole, 1.0, 0.5)\n      corr += pull(p, pos[j], len) * share\n      count += 1.0\n    }\n    if count > 0.0 {\n      p += corr * (1.3 / count)\n    }\n  }\n  pos[i] = p\n}\nschedule predict; repeat 12 { solve }\noutput mesh pos\n")
+fl_m = solid.material@1(fl_p, color=[0.85, 0.12, 0.1], roughness=0.8)
+output flag_new = fl_m
+fp2_s = solid.cylinder@1(radius=0.06, height=6)
+fp2_a = xform.move@1(fp2_s, by=[3, 3.8, -1.5])
+fp2_m = solid.material@1(fp2_a, color=[0.7, 0.7, 0.7], roughness=0.4, metallic=0.8)
+output flagpole_old = fp2_m
+fo_g = poly.grid@1(width=1.6, height=1.0, columns=10, rows=7)
+fo_a = xform.move@1(fo_g, by=[3.8, 6.2, -1.5])
+fo_top = poly.select@1(fo_a, element="vertex", by="box", box_min=[2.9, 5, -2], box_max=[3.05, 7.5, -1])
+fo_c = cloth.sim@1(fo_a, fo_top, bend=0.1, density=0.2, damping=0.8, wind=[2.5, 0, 1.5], drag=1.0)
+fo_m = solid.material@1(fo_c, color=[0.1, 0.3, 0.8], roughness=0.8)
+output flag_old = fo_m
+
+# ---------- starlings: 300 birds by three local rules over the harbour (neighbors with the spatial hash) ----------
+flock = sim.program@1(size=0.38, seed=11, rate=30, source="sim murmuration\nparam radius = 7.0\nparam max_speed = 11.0\nparam cohesion = 0.9\nparam separation = 4.0\nparam align = 3.5\nparam roost = 5.0\nstate pos: vec3[300]\nstate vel: vec3[300]\nkernel init each i in pos {\n  pos[i] = vec3(rand(i, 1.0), rand(i, 2.0), rand(i, 3.0)) * 16.0 - 8.0 + vec3(0.0, 22.0, 12.0)\n  vel[i] = normalize(vec3(rand(i, 4.0), rand(i, 5.0), rand(i, 6.0)) - 0.5) * 8.0\n}\nkernel flock each i in pos {\n  let p = pos[i]\n  let v = vel[i]\n  let centre = vec3(0.0)\n  let heading = vec3(0.0)\n  let push = vec3(0.0)\n  let seen = 0.0\n  for j in neighbors(pos, p, radius) cap 16 {\n    if j != i {\n      centre += pos[j]\n      heading += vel[j]\n      let d = p - pos[j]\n      push += d / max(dot(d, d), 0.05)\n      seen += 1.0\n    }\n  }\n  let acc = vec3(0.0)\n  if seen > 0.0 {\n    acc = (centre / seen - p) * cohesion + (heading / seen - v) * align + push * separation\n  }\n  let target = vec3(sin(t * 0.21) * 30.0, 18.0 + sin(t * 0.37) * 5.0, 14.0 + cos(t * 0.17) * 18.0)\n  acc += normalize(target - p) * roost\n  if p.y < 9.0 {\n    acc += vec3(0.0, (9.0 - p.y) * 3.0, 0.0)\n  }\n  let nv = v + acc * dt\n  let sp = length(nv)\n  nv = nv * min(1.0, max_speed / max(sp, 0.001))\n  nv = nv * max(1.0, 6.0 / max(sp, 0.001))\n  vel[i] = nv\n}\nkernel move each i in pos { pos[i] += vel[i] * dt }\nschedule flock; move\noutput particles pos\n")
+flock_m = solid.material@1(flock, color=[0.03, 0.03, 0.04], roughness=0.8)
+output starlings = flock_m
+
+# ---------- fountain: the APIC liquid solver (fluid.sim) in a stone basin on the plaza ----------
+basin_s = solid.box@1(size=[1.5, 0.5, 1.5])
+basin_a = xform.move@1(basin_s, by=[14.2, 1.05, -8.5])
+basin_m = solid.material@1(basin_a, color=[0.5, 0.5, 0.48], roughness=0.8)
+output basin = basin_m
+fountain = fluid.sim@1(method="apic", min=[13.7, 1.35, -9.0], max=[14.5, 1.75, -8.2], spacing=0.07, bounds_min=[13.5, 1.3, -9.2], bounds_max=[14.9, 3.0, -7.8], viscosity=0.01, iterations=4, substeps=3, cell=0.09, level=0.5, max_triangles=6000)
+fountain_m = solid.material@1(fountain, color=[0.4, 0.6, 0.8], roughness=0.1, opacity=0.8)
+output fountain_water = fountain_m
+
+# ---------- smoke from the customs house chimney, and lamps along the quay ----------
+chim_s = solid.box@1(size=[0.6, 1.6, 0.6])
+chim_a = xform.move@1(chim_s, by=[-30, 4.4, -16])
+chim_m = solid.material@1(chim_a, color=[0.3, 0.2, 0.18], roughness=0.9)
+output chimney = chim_m
+smoke_src = solid.sphere@1(radius=0.1, segments=8)
+smoke_a = xform.move@1(smoke_src, by=[-30, 5.3, -16])
+smoke = fx.emitter@1(smoke_a, name="chimney_smoke", rate=18, lifetime=[4, 7], speed=[0.6, 1.2], direction=[0.2, 1, 0.1], cone=0.3, shape="sphere", extent=[0.2, 0.2, 0.2], max_particles=400, size=[0.4, 2.2], colour=[0.25, 0.22, 0.2], colour_end=[0.4, 0.37, 0.36], alpha=[0.6, 0], blend="alpha")
+output chimney_smoke = smoke
+lamp_post_s = solid.cylinder@1(radius=0.07, height=3)
+lamp_head_s = solid.sphere@1(radius=0.22, segments=12)
+lp1 = xform.move@1(lamp_post_s, by=[-20, 2.3, -0.8])
+lp1_m = solid.material@1(lp1, color=[0.1, 0.1, 0.1], roughness=0.5)
+output lamp_post_1 = lp1_m
+lh1 = xform.move@1(lamp_head_s, by=[-20, 3.9, -0.8])
+lh1_m = solid.material@1(lh1, color=[1, 0.8, 0.5], roughness=0.3, emissive=[4, 2.6, 1.2])
+output lamp_head_1 = lh1_m
+lg1 = light.point@1(position=[-20, 3.8, -0.8], color=[1, 0.7, 0.4], intensity=110, range=14)
+lp2 = xform.move@1(lamp_post_s, by=[20, 2.3, -0.8])
+lp2_m = solid.material@1(lp2, color=[0.1, 0.1, 0.1], roughness=0.5)
+output lamp_post_2 = lp2_m
+lh2 = xform.move@1(lamp_head_s, by=[20, 3.9, -0.8])
+lh2_m = solid.material@1(lh2, color=[1, 0.8, 0.5], roughness=0.3, emissive=[4, 2.6, 1.2])
+output lamp_head_2 = lh2_m
+lg2 = light.point@1(position=[20, 3.8, -0.8], color=[1, 0.7, 0.4], intensity=110, range=14)
+lg3 = light.point@1(position=[0, 3.8, 6], color=[1, 0.75, 0.5], intensity=60, range=18)
+
+# ---------- a boat: one solid (hull, cabin, mast) that is a dynamic body; a SimL program lifts it where it sits below the water line ----------
+hull_s = solid.box@1(size=[2.4, 0.5, 1.0])
+hull_a = xform.move@1(hull_s, by=[0, 0.9, 0])
+cabin_s = solid.box@1(size=[0.9, 0.5, 0.8])
+cabin_a = xform.move@1(cabin_s, by=[-0.4, 1.4, 0])
+mast_b_s = solid.cylinder@1(radius=0.05, height=1.8)
+mast_b_a = xform.move@1(mast_b_s, by=[0.5, 1.9, 0])
+boat_u = solid.union@1(hull_a, cabin_a, mast_b_a)
+boat_m = solid.material@1(boat_u, color=[0.75, 0.2, 0.15], roughness=0.6)
+boat_p = phys.body@1(boat_m, kind="dynamic", density=1, linear_damping=1.2, angular_damping=1.0)
+output hull = boat_p
+buoy = sim.program@1(size=0.1, rate=60, source="sim buoyancy\nparam level = 0.0\nparam lift = 20.0\nparam half = 0.25\ninput bone hull\nstate probe: vec3[1]\nstate push: vec3[1]\nkernel feel each i in probe {\n  let c = bone_point(hull, vec3(0.0, 0.9, 0.0))\n  let under = clamp((level - c.y) / (2.0 * half) + 0.5, 0.0, 1.0)\n  probe[i] = c\n  push[i] = vec3(0.0, lift * under * dt, 0.0)\n}\nschedule feel\noutput particles probe\noutput push hull push\n")
+buoy_m = solid.material@1(buoy, color=[1, 1, 0.2], roughness=0.5)
+output boat_probe = buoy_m
+kb = game.kind@1(name="boat", size=1.2, part="hull", tags=["boat"])
+b1 = game.spawn@1(kind="boat", at=[-14, -0.6, 9])
+b2 = game.spawn@1(kind="boat", at=[2, -0.6, 12])
+b3 = game.spawn@1(kind="boat", at=[16, -0.6, 7])
+
+# ---------- a dockhand: a kinematic body carried by a keyframed patrol, with a head and legs parented to it and a cloth cape from the library ----------
+chest_s = solid.box@1(size=[0.5, 0.8, 0.32])
+chest_a = xform.move@1(chest_s, by=[0, 1.35, 0])
+chest_m = solid.material@1(chest_a, color=[0.2, 0.3, 0.5], roughness=0.8)
+chest_p = phys.body@1(chest_m, kind="kinematic")
+chest_t = anim.track@1(chest_p, property="position", keys="0:0,0,0; 7:11,0,0; 14:0,0,0", interpolation="smooth", loop=true)
+output anchor = chest_t
+torso_s = solid.cylinder@1(radius=0.22, height=0.9)
+torso_a = xform.move@1(torso_s, by=[0, 1.35, 0])
+torso_m = solid.material@1(torso_a, color=[0.2, 0.3, 0.5], roughness=0.8)
+torso_p = anim.parent@1(torso_m, parent="anchor")
+output body = torso_p
+head_s = solid.sphere@1(radius=0.17, segments=16)
+head_a = xform.move@1(head_s, by=[0, 1.95, 0])
+head_m = solid.material@1(head_a, color=[0.8, 0.62, 0.5], roughness=0.7)
+head_p = anim.parent@1(head_m, parent="anchor")
+output head = head_p
+legs_s = solid.box@1(size=[0.4, 0.75, 0.22])
+legs_a = xform.move@1(legs_s, by=[0, 0.58, 0])
+legs_m = solid.material@1(legs_a, color=[0.15, 0.12, 0.1], roughness=0.8)
+legs_p = anim.parent@1(legs_m, parent="anchor")
+output legs = legs_p
+cape_g = poly.grid@1(width=0.5, height=0.95, columns=8, rows=14)
+cape_h = xform.move@1(cape_g, by=[0, 1.245, -0.2])
+cape_c = sim.program@1(cape_h, library="cloth", rate=60, values="pin_height=1.68; collider_radius=0.21; collider_top=0,1.7,0; collider_bottom=0,0.95,0")
+cape_m = solid.material@1(cape_c, color=[0.7, 0.1, 0.1], roughness=0.8)
+output cape = cape_m
+kd = game.kind@1(name="dockhand", size=0.5, part="anchor", tags=["worker"])
+d1 = game.spawn@1(kind="dockhand", at=[-16, 0.8, -3])
+d2 = game.spawn@1(kind="dockhand", at=[-2, 0.8, -4.5])
+d3 = game.spawn@1(kind="dockhand", at=[7, 0.8, -3])
+
+all = game.collect@1(kb, b1, b2, b3, kd, d1, d2, d3, name="quay")
+output rules = all

@@ -1,0 +1,25 @@
+group flowering_bush
+  a = field.ellipsoid@1(radii=[0.55, 0.4, 0.5])
+  a_at = field.move@1(a, by=[0, 0.42, 0])
+  b = field.ellipsoid@1(radii=[0.4, 0.3, 0.4])
+  b_at = field.move@1(b, by=[0.35, 0.35, 0.15])
+  c = field.ellipsoid@1(radii=[0.38, 0.3, 0.36])
+  c_at = field.move@1(c, by=[-0.3, 0.33, -0.1])
+  ab = field.smooth_union@1(a_at, b_at, radius=0.2)
+  abc = field.smooth_union@1(ab, c_at, radius=0.2)
+  rough = field.noise@1(abc, amplitude=0.05, scale=0.3, octaves=2, seed=3)
+  blob = field.to_solid@1(rough, min=[-1.1, -0.25, -1.1], max=[1.1, 1.1, 1.1], edge_length=0.065)
+  leaves_m = solid.material@1(blob, color=[0.3, 0.5, 0.2], roughness=0.85)
+  leaves_t = solid.texture@1(leaves_m, program="n = fbm(scale_x=18, scale_y=18, iterations=3); c = colorize(n, gradient=[0:#244a14, 0.5:#3f7a22, 1:#6aa63a]); albedo = c")
+  bloom_s = solid.sphere@1(radius=0.035, segments=6)
+  bloom_f = xform.scale@1(bloom_s, by=[1, 0.6, 1])
+  blooms = inst.scatter_on@1(bloom_f, blob, count=70, seed=5, align=true, scale_jitter=0.3)
+  blooms_s = inst.realize@1(blooms)
+  blooms_m = solid.material@1(blooms_s, color=[0.95, 0.4, 0.6], roughness=0.6)
+  bush = solid.union@1(leaves_t, blooms_m)
+  swaying = solid.foliage@1(bush, alpha_cutoff=0, sway=0.25, flutter=0.15, translucency=0.4)
+  expose flower_color = blooms_m.color
+  expose blooms = blooms.count
+  expose seed = rough.seed
+  result swaying
+end

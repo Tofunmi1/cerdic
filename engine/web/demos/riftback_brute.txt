@@ -1,0 +1,253 @@
+# RIFTBACK BRUTE — an original towering reptilian demon, authored for the engine's real-time character viewport.
+# Build order: anatomical field sculpture -> expressive head -> swept limbs/tail -> keratin plates and talons -> layered hide shader.
+# The creature faces +Z; its plated tail arcs behind it into -Z.
+
+sky = scene.sky@1(sun_elevation=16, sun_azimuth=-35, sun_intensity=1.25, turbidity=4.5, ground_color=[0.11, 0.105, 0.10], clouds=false, haze=0.06, haze_color=[0.24, 0.22, 0.20])
+output sky = sky
+env = scene.environment@1(sky_color=[0.20, 0.21, 0.22], ground_color=[0.09, 0.09, 0.085], intensity=0.42, reflection=0.20, bounce=0.18, bounce_color=[0.30, 0.28, 0.25])
+output env = env
+
+floor_src = solid.box@1(size=[8, 0.18, 9])
+floor_at = xform.move@1(floor_src, by=[0, -0.11, -0.9])
+floor_mat = solid.material@1(floor_at, color=[0.11, 0.105, 0.10], roughness=0.92)
+floor_tex = solid.texture@1(floor_mat, tile=3, program="g = fbm(scale_x=10, scale_y=10); albedo = colorize(g, gradient=[0:#151514, 1:#2b2926]); roughness = colorize(g, gradient=[0:#e0e0e0, 1:#f0f0f0])", size="256")
+output floor = floor_tex
+
+# Organic trunk: overlapping anatomical masses are fused before remeshing, so the torso reads as one sculpted creature.
+chest_f = field.ellipsoid@1(radii=[0.65, 0.53, 0.39])
+chest = field.move@1(chest_f, by=[0, 1.92, 0])
+abd_f = field.ellipsoid@1(radii=[0.43, 0.49, 0.30])
+abd = field.move@1(abd_f, by=[0, 1.43, 0.025])
+pelvis_f = field.ellipsoid@1(radii=[0.48, 0.34, 0.33])
+pelvis = field.move@1(pelvis_f, by=[0, 0.98, -0.015])
+neck_f = field.tube@1(points=[[0, 2.23, 0.03], [0, 2.54, 0.085]], radius=0.265, end_radius=0.205)
+shoulder_l_f = field.ellipsoid@1(radii=[0.36, 0.37, 0.35])
+shoulder_l = field.move@1(shoulder_l_f, by=[0.59, 2.12, 0])
+shoulder_r_f = field.ellipsoid@1(radii=[0.36, 0.37, 0.35])
+shoulder_r = field.move@1(shoulder_r_f, by=[-0.59, 2.12, 0])
+lat_l_f = field.ellipsoid@1(radii=[0.34, 0.43, 0.27])
+lat_l = field.move@1(lat_l_f, by=[0.43, 1.80, -0.12])
+lat_r_f = field.ellipsoid@1(radii=[0.34, 0.43, 0.27])
+lat_r = field.move@1(lat_r_f, by=[-0.43, 1.80, -0.12])
+torso_a = field.smooth_union@1(chest, abd, radius=0.19)
+torso_b = field.smooth_union@1(torso_a, pelvis, radius=0.15)
+torso_c = field.smooth_union@1(torso_b, neck_f, radius=0.15)
+torso_d = field.smooth_union@1(torso_c, shoulder_l, radius=0.17)
+torso_e = field.smooth_union@1(torso_d, shoulder_r, radius=0.17)
+torso_f = field.smooth_union@1(torso_e, lat_l, radius=0.12)
+torso_g = field.smooth_union@1(torso_f, lat_r, radius=0.12)
+torso_skin_f = field.noise@1(torso_g, amplitude=0.012, scale=0.07, octaves=3, mode="ridged", seed=19)
+torso_mesh = field.to_solid@1(torso_skin_f, min=[-1.05, 0.58, -0.54], max=[1.05, 2.82, 0.58], edge_length=0.020)
+
+# Skull, muzzle, jaw, brow and cheek planes: a long reptilian face, not a human head wearing a monster mask.
+skull_f = field.ellipsoid@1(radii=[0.32, 0.37, 0.29])
+skull = field.move@1(skull_f, by=[0, 2.72, 0.03])
+muzzle_f = field.ellipsoid@1(radii=[0.265, 0.18, 0.38])
+muzzle = field.move@1(muzzle_f, by=[0, 2.57, 0.29])
+jaw_f = field.ellipsoid@1(radii=[0.25, 0.14, 0.31])
+jaw = field.move@1(jaw_f, by=[0, 2.43, 0.23])
+brow_f = field.ellipsoid@1(radii=[0.36, 0.13, 0.26])
+brow = field.move@1(brow_f, by=[0, 2.83, 0.15])
+cheek_l_f = field.ellipsoid@1(radii=[0.20, 0.19, 0.22])
+cheek_l = field.move@1(cheek_l_f, by=[0.22, 2.60, 0.13])
+cheek_r_f = field.ellipsoid@1(radii=[0.20, 0.19, 0.22])
+cheek_r = field.move@1(cheek_r_f, by=[-0.22, 2.60, 0.13])
+head_a = field.smooth_union@1(skull, muzzle, radius=0.13)
+head_b = field.smooth_union@1(head_a, jaw, radius=0.09)
+head_c = field.smooth_union@1(head_b, brow, radius=0.08)
+head_d = field.smooth_union@1(head_c, cheek_l, radius=0.07)
+head_e = field.smooth_union@1(head_d, cheek_r, radius=0.07)
+socket_l_f = field.ellipsoid@1(radii=[0.105, 0.075, 0.07])
+socket_l = field.move@1(socket_l_f, by=[0.155, 2.73, 0.345])
+socket_r_f = field.ellipsoid@1(radii=[0.105, 0.075, 0.07])
+socket_r = field.move@1(socket_r_f, by=[-0.155, 2.73, 0.345])
+head_hollow_l = field.subtract@1(head_e, socket_l)
+head_hollow = field.subtract@1(head_hollow_l, socket_r)
+head_skin_f = field.noise@1(head_hollow, amplitude=0.007, scale=0.045, octaves=3, mode="ridged", seed=27)
+head_mesh = field.to_solid@1(head_skin_f, min=[-0.48, 2.22, -0.35], max=[0.48, 3.14, 0.78], edge_length=0.011)
+
+# Hide recipe: layered mineral-gray scales, broad wrinkles, fine pores and a roughness breakup.
+let hide_program = "b = fbm(scale_x=7, scale_y=16, iterations=4); w = fbm(scale_x=18, scale_y=13, iterations=3); p = fbm(scale_x=72, scale_y=64, iterations=3); tone = colorize(b, gradient=[0:#505252, 0.38:#686a69, 0.72:#858783, 1:#a5a69f]); wrinkle = colorize(w, gradient=[0:#535554, 1:#92938d]); albedo = blend(wrinkle, tone, p, blend_type=normal, amount=0.18); roughness = colorize(p, gradient=[0:#d0d0d0, 1:#eeeeee]); height = colorize(w, gradient=[0:#858585, 0.5:#8d8d8d, 1:#969696])"
+hide_mat = solid.material@1(torso_mesh, color=[0.74, 0.75, 0.73], roughness=0.91)
+hide_tex = solid.texture@1(hide_mat, tile=0.9, program="${hide_program}", size="512")
+hide_finish = solid.finish@1(hide_tex, subsurface=0.045)
+output sculpted_hide = hide_finish
+head_mat = solid.material@1(head_mesh, color=[0.72, 0.73, 0.71], roughness=0.93)
+head_tex = solid.texture@1(head_mat, tile=0.85, program="${hide_program}", size="512")
+output head = head_tex
+
+# Deep, warm eyes set back into the sockets; the restrained glow is only a focal point in the face.
+eye_src = solid.sphere@1(radius=1, segments=32)
+eye_scale = xform.scale@1(eye_src, by=[0.068, 0.043, 0.036])
+eye_l_at = xform.move@1(eye_scale, by=[0.155, 2.73, 0.34])
+eye_r_at = xform.move@1(eye_scale, by=[-0.155, 2.73, 0.34])
+eye_pair = solid.union@1(eye_l_at, eye_r_at)
+eye_mat = solid.material@1(eye_pair, color=[0.77, 0.29, 0.055], roughness=0.27, emissive=[0.12, 0.022, 0.002])
+output ember_eyes = eye_mat
+
+# Nostrils and a dark mouth seam give the long muzzle readable planes at game-camera distance.
+nostril_src = solid.sphere@1(radius=1, segments=18)
+nostril_scale = xform.scale@1(nostril_src, by=[0.043, 0.027, 0.018])
+nostril_l = xform.move@1(nostril_scale, by=[0.105, 2.585, 0.646])
+nostril_r = xform.move@1(nostril_scale, by=[-0.105, 2.585, 0.646])
+nostrils = solid.union@1(nostril_l, nostril_r)
+nostril_mat = solid.material@1(nostrils, color=[0.07, 0.065, 0.06], roughness=0.96)
+output nostrils = nostril_mat
+mouth_src = solid.box@1(size=[0.39, 0.022, 0.02])
+mouth_at = xform.move@1(mouth_src, by=[0, 2.48, 0.535])
+mouth_mat = solid.material@1(mouth_at, color=[0.08, 0.07, 0.065], roughness=0.98)
+output mouth_seam = mouth_mat
+
+# Long swept horns emerge behind the brow and hook backward; smaller cheek spurs break the head silhouette.
+horn_l_path = curve.spline@1(points=[[0.22, 2.94, -0.04], [0.40, 3.04, -0.12], [0.49, 3.22, -0.23], [0.43, 3.38, -0.33]], steps=16)
+horn_r_path = curve.spline@1(points=[[-0.22, 2.94, -0.04], [-0.40, 3.04, -0.12], [-0.49, 3.22, -0.23], [-0.43, 3.38, -0.33]], steps=16)
+horn_ring = profile.circle@1(radius=0.105, segments=18)
+horn_l = solid.sweep@1(horn_l_path, horn_ring, scale_end=0.22)
+horn_r = solid.sweep@1(horn_r_path, horn_ring, scale_end=0.22)
+horns = solid.union@1(horn_l, horn_r)
+horn_mat = solid.material@1(horns, color=[0.43, 0.41, 0.37], metallic=0.08, roughness=0.76)
+horn_tex = solid.texture@1(horn_mat, tile=0.6, program="g = fbm(scale_x=5, scale_y=24, iterations=3); albedo = colorize(g, gradient=[0:#282927, 0.5:#5c5b55, 1:#aaa392]); roughness = colorize(g, gradient=[0:#d0d0d0, 1:#f0f0f0])", size="256")
+output swept_horns = horn_tex
+
+# Arm musculature tapers into oversized forearms and hangs below the waist.
+arm_l_f = field.tube@1(points=[[0.64, 2.18, 0.0], [0.92, 1.91, 0.04], [1.08, 1.56, 0.10], [1.18, 1.14, 0.17], [1.14, 0.78, 0.23]], radius=0.285, end_radius=0.15)
+arm_l_bicep_f = field.ellipsoid@1(radii=[0.255, 0.36, 0.25])
+arm_l_bicep = field.move@1(arm_l_bicep_f, by=[0.88, 1.91, 0.05])
+arm_l_muscle = field.smooth_union@1(arm_l_f, arm_l_bicep, radius=0.10)
+arm_l_skin = field.noise@1(arm_l_muscle, amplitude=0.01, scale=0.055, octaves=3, mode="ridged", seed=31)
+arm_l_mesh = field.to_solid@1(arm_l_skin, min=[0.28, 0.58, -0.34], max=[1.42, 2.55, 0.55], edge_length=0.020)
+arm_r_f = field.tube@1(points=[[-0.64, 2.18, 0.0], [-0.92, 1.91, 0.04], [-1.08, 1.56, 0.10], [-1.18, 1.14, 0.17], [-1.14, 0.78, 0.23]], radius=0.285, end_radius=0.15)
+arm_r_bicep_f = field.ellipsoid@1(radii=[0.255, 0.36, 0.25])
+arm_r_bicep = field.move@1(arm_r_bicep_f, by=[-0.88, 1.91, 0.05])
+arm_r_muscle = field.smooth_union@1(arm_r_f, arm_r_bicep, radius=0.10)
+arm_r_skin = field.noise@1(arm_r_muscle, amplitude=0.01, scale=0.055, octaves=3, mode="ridged", seed=31)
+arm_r_mesh = field.to_solid@1(arm_r_skin, min=[-1.42, 0.58, -0.34], max=[-0.28, 2.55, 0.55], edge_length=0.020)
+arm_l_mat = solid.material@1(arm_l_mesh, color=[0.74, 0.75, 0.73], roughness=0.91)
+arm_l_tex = solid.texture@1(arm_l_mat, tile=0.9, program="${hide_program}", size="512")
+arm_r_mat = solid.material@1(arm_r_mesh, color=[0.74, 0.75, 0.73], roughness=0.91)
+arm_r_tex = solid.texture@1(arm_r_mat, tile=0.9, program="${hide_program}", size="512")
+output arm_left = arm_l_tex
+output arm_right = arm_r_tex
+
+# Digitigrade legs: heavy haunches, forward knees, reverse-bent hocks, and long metatarsals.
+leg_l_thigh_f = field.ellipsoid@1(radii=[0.32, 0.49, 0.32])
+leg_l_thigh = field.move@1(leg_l_thigh_f, by=[0.34, 0.79, 0.01])
+leg_l_shin_f = field.tube@1(points=[[0.36, 0.68, 0.03], [0.43, 0.40, -0.12], [0.46, 0.22, -0.28], [0.43, 0.14, 0.06]], radius=0.20, end_radius=0.13)
+leg_l_hock_f = field.ellipsoid@1(radii=[0.19, 0.20, 0.21])
+leg_l_hock = field.move@1(leg_l_hock_f, by=[0.45, 0.31, -0.20])
+leg_l_upper = field.smooth_union@1(leg_l_thigh, leg_l_shin_f, radius=0.11)
+leg_l_form = field.smooth_union@1(leg_l_upper, leg_l_hock, radius=0.08)
+leg_l_skin = field.noise@1(leg_l_form, amplitude=0.008, scale=0.055, octaves=3, mode="ridged", seed=47)
+leg_l_mesh = field.to_solid@1(leg_l_skin, min=[-0.10, 0.0, -0.62], max=[0.82, 1.34, 0.48], edge_length=0.018)
+leg_r_thigh_f = field.ellipsoid@1(radii=[0.32, 0.49, 0.32])
+leg_r_thigh = field.move@1(leg_r_thigh_f, by=[-0.34, 0.79, 0.01])
+leg_r_shin_f = field.tube@1(points=[[-0.36, 0.68, 0.03], [-0.43, 0.40, -0.12], [-0.46, 0.22, -0.28], [-0.43, 0.14, 0.06]], radius=0.20, end_radius=0.13)
+leg_r_hock_f = field.ellipsoid@1(radii=[0.19, 0.20, 0.21])
+leg_r_hock = field.move@1(leg_r_hock_f, by=[-0.45, 0.31, -0.20])
+leg_r_upper = field.smooth_union@1(leg_r_thigh, leg_r_shin_f, radius=0.11)
+leg_r_form = field.smooth_union@1(leg_r_upper, leg_r_hock, radius=0.08)
+leg_r_skin = field.noise@1(leg_r_form, amplitude=0.008, scale=0.055, octaves=3, mode="ridged", seed=47)
+leg_r_mesh = field.to_solid@1(leg_r_skin, min=[-0.82, 0.0, -0.62], max=[0.10, 1.34, 0.48], edge_length=0.018)
+leg_l_mat = solid.material@1(leg_l_mesh, color=[0.74, 0.75, 0.73], roughness=0.91)
+leg_l_tex = solid.texture@1(leg_l_mat, tile=0.9, program="${hide_program}", size="512")
+leg_r_mat = solid.material@1(leg_r_mesh, color=[0.74, 0.75, 0.73], roughness=0.91)
+leg_r_tex = solid.texture@1(leg_r_mat, tile=0.9, program="${hide_program}", size="512")
+output digitigrade_left = leg_l_tex
+output digitigrade_right = leg_r_tex
+
+# Tail: a thick, muscular root sweeps behind the body and curls back upward to a narrow hooked tip.
+tail_f = field.tube@1(points=[[0, 1.07, -0.28], [0.18, 0.77, -0.72], [0.48, 0.48, -1.35], [0.72, 0.52, -2.05], [0.65, 0.82, -2.67], [0.30, 1.17, -3.14], [-0.16, 1.37, -3.38]], radius=0.275, end_radius=0.045)
+tail_skin_f = field.noise@1(tail_f, amplitude=0.012, scale=0.07, octaves=3, mode="ridged", seed=61)
+tail_mesh = field.to_solid@1(tail_skin_f, min=[-0.58, 0.12, -3.68], max=[1.12, 1.75, 0.12], edge_length=0.019)
+tail_mat = solid.material@1(tail_mesh, color=[0.72, 0.73, 0.71], roughness=0.92)
+tail_tex = solid.texture@1(tail_mat, tile=0.9, program="${hide_program}", size="512")
+output curling_tail = tail_tex
+
+# Broad clawed hands. Palms merge visually into the wrists; long fingers and curved black keratin tips stay separate/readable.
+hand_src = solid.sphere@1(radius=1, segments=32)
+hand_scale = xform.scale@1(hand_src, by=[0.22, 0.20, 0.17])
+hand_l_at = xform.move@1(hand_scale, by=[1.15, 0.66, 0.24])
+hand_r_at = xform.move@1(hand_scale, by=[-1.15, 0.66, 0.24])
+hands = solid.union@1(hand_l_at, hand_r_at)
+hands_mat = solid.material@1(hands, color=[0.74, 0.75, 0.73], roughness=0.91)
+hands_tex = solid.texture@1(hands_mat, tile=0.8, program="${hide_program}", size="512")
+output clawed_palms = hands_tex
+
+def digit(tag, x0, y0, z0, dx, length)
+  d{tag}_p = curve.spline@1(points=[[{x0}, {y0}, {z0}], [{x0 + dx * 0.42}, {y0 - length * 0.42}, {z0 + 0.025}], [{x0 + dx}, {y0 - length}, {z0 + 0.055}], [{x0 + dx * 1.08}, {y0 - length - 0.055}, {z0 + 0.095}]], steps=10)
+  d{tag}_r = profile.circle@1(radius=0.067, segments=14)
+  d{tag}_s = solid.sweep@1(d{tag}_p, d{tag}_r, scale_end=0.62)
+  d{tag}_m = solid.material@1(d{tag}_s, color=[0.74, 0.75, 0.73], roughness=0.91)
+  d{tag}_t = solid.texture@1(d{tag}_m, tile=0.8, program="${hide_program}", size="256")
+  d{tag}_c = curve.spline@1(points=[[{x0 + dx * 1.08}, {y0 - length - 0.055}, {z0 + 0.095}], [{x0 + dx * 1.12}, {y0 - length - 0.14}, {z0 + 0.15}], [{x0 + dx * 1.03}, {y0 - length - 0.21}, {z0 + 0.20}]], steps=8)
+  d{tag}_cr = profile.circle@1(radius=0.050, segments=12)
+  d{tag}_cs = solid.sweep@1(d{tag}_c, d{tag}_cr, scale_end=0.08)
+  d{tag}_cm = solid.material@1(d{tag}_cs, color=[0.12, 0.115, 0.105], metallic=0.12, roughness=0.47)
+  output digit_{tag} = d{tag}_t
+  output talon_{tag} = d{tag}_cm
+end
+
+digit("l0", 0.99, 0.61, 0.31, -0.08, 0.36)
+digit("l1", 1.09, 0.58, 0.34, -0.02, 0.43)
+digit("l2", 1.20, 0.59, 0.34, 0.04, 0.42)
+digit("l3", 1.30, 0.63, 0.29, 0.10, 0.34)
+digit("r0", -0.99, 0.61, 0.31, 0.08, 0.36)
+digit("r1", -1.09, 0.58, 0.34, 0.02, 0.43)
+digit("r2", -1.20, 0.59, 0.34, -0.04, 0.42)
+digit("r3", -1.30, 0.63, 0.29, -0.10, 0.34)
+
+# Three heavy toes per foot end in dark hooked claws.
+def toe(tag, x0, spread)
+  t{tag}_p = curve.spline@1(points=[[{x0}, 0.18, 0.12], [{x0 + spread * 0.45}, 0.13, 0.26], [{x0 + spread}, 0.105, 0.37]], steps=8)
+  t{tag}_r = profile.circle@1(radius=0.085, segments=14)
+  t{tag}_s = solid.sweep@1(t{tag}_p, t{tag}_r, scale_end=0.65)
+  t{tag}_m = solid.material@1(t{tag}_s, color=[0.74, 0.75, 0.73], roughness=0.91)
+  t{tag}_c = curve.spline@1(points=[[{x0 + spread}, 0.105, 0.37], [{x0 + spread * 1.08}, 0.08, 0.46], [{x0 + spread * 1.04}, 0.055, 0.53]], steps=7)
+  t{tag}_cr = profile.circle@1(radius=0.057, segments=12)
+  t{tag}_cs = solid.sweep@1(t{tag}_c, t{tag}_cr, scale_end=0.08)
+  t{tag}_cm = solid.material@1(t{tag}_cs, color=[0.12, 0.115, 0.105], metallic=0.12, roughness=0.47)
+  output toe_{tag} = t{tag}_m
+  output hoof_claw_{tag} = t{tag}_cm
+end
+toe("l0", 0.19, -0.16)
+toe("l1", 0.34, 0.0)
+toe("l2", 0.49, 0.15)
+toe("r0", -0.19, 0.16)
+toe("r1", -0.34, 0.0)
+toe("r2", -0.49, -0.15)
+
+# Layered keratin ridges form a broken dorsal crown from the shoulders down to the tail tip.
+def ridge(tag, x, y, z, height, radius)
+  r{tag}_s = solid.cone@1(height={height}, radius={radius}, top_radius={radius * 0.12}, segments=16)
+  r{tag}_a = xform.move@1(r{tag}_s, by=[{x}, {y}, {z}])
+  r{tag}_m = solid.material@1(r{tag}_a, color=[0.29, 0.30, 0.29], metallic=0.08, roughness=0.82)
+  r{tag}_t = solid.texture@1(r{tag}_m, tile=0.5, program="g = fbm(scale_x=9, scale_y=24, iterations=3); albedo = colorize(g, gradient=[0:#222423, 0.5:#444641, 1:#777267]); roughness = colorize(g, gradient=[0:#d0d0d0, 1:#ededed])", size="256")
+  output dorsal_{tag} = r{tag}_t
+end
+ridge("01", 0, 2.53, -0.29, 0.34, 0.16)
+ridge("02", 0, 2.32, -0.37, 0.30, 0.14)
+ridge("03", 0, 2.08, -0.43, 0.26, 0.13)
+ridge("04", 0, 1.82, -0.43, 0.24, 0.12)
+ridge("05", 0, 1.55, -0.38, 0.22, 0.11)
+ridge("06", 0, 1.30, -0.34, 0.20, 0.10)
+ridge("07", 0.22, 0.72, -0.79, 0.20, 0.095)
+ridge("08", 0.46, 0.51, -1.40, 0.18, 0.085)
+ridge("09", 0.67, 0.56, -2.02, 0.16, 0.075)
+ridge("10", 0.62, 0.84, -2.61, 0.14, 0.065)
+ridge("11", 0.29, 1.18, -3.07, 0.12, 0.055)
+
+# Side rib ridges add deliberate anatomy landmarks across the oblique muscles.
+rib_src = solid.sphere@1(radius=1, segments=20)
+rib_scale = xform.scale@1(rib_src, by=[0.23, 0.018, 0.019])
+rib_l1_at = xform.move@1(rib_scale, by=[0.43, 1.62, 0.235])
+rib_l2_at = xform.move@1(rib_scale, by=[0.40, 1.43, 0.225])
+rib_l3_at = xform.move@1(rib_scale, by=[0.35, 1.24, 0.205])
+rib_r1_at = xform.move@1(rib_scale, by=[-0.43, 1.62, 0.235])
+rib_r2_at = xform.move@1(rib_scale, by=[-0.40, 1.43, 0.225])
+rib_r3_at = xform.move@1(rib_scale, by=[-0.35, 1.24, 0.205])
+rib_a = solid.union@1(rib_l1_at, rib_l2_at, rib_l3_at, rib_r1_at)
+rib_b = solid.union@1(rib_r2_at, rib_r3_at)
+ribs = solid.union@1(rib_a, rib_b)
+rib_mat = solid.material@1(ribs, color=[0.70, 0.71, 0.69], roughness=0.89)
+output hide_ridges = rib_mat
+
