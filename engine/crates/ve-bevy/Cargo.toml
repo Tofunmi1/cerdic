@@ -1,0 +1,62 @@
+[package]
+name = "ve-bevy"
+version = "0.0.0"
+description = "Bevy's own renderer (PBR, core pipeline, post process, anti aliasing, lights) as the engine's drawing path, with our data mapped onto it."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+# Bevy's physically based atmosphere in place of the procedural cubemap sky (needs WebGPU compute; the `webgpu` feature turns it on).
+atmosphere = []
+# One backend per build: Bevy picks wgpu's backends at compile time. The page loads the bundle that matches the browser.
+webgl = [
+  "bevy_render/webgl",
+  "bevy_core_pipeline/webgl",
+  "bevy_pbr/webgl",
+  "bevy_post_process/webgl",
+  "bevy_anti_alias/webgl",
+  "bevy_light/webgl",
+]
+webgpu = [
+  "atmosphere",
+  "bevy_render/webgpu",
+  "bevy_core_pipeline/webgpu",
+  "bevy_pbr/webgpu",
+  "bevy_post_process/webgpu",
+  "bevy_anti_alias/webgpu",
+  "bevy_light/webgpu",
+]
+
+[dependencies]
+bevy_anti_alias = { path = "../../lib/bevy/crates/bevy_anti_alias", features = ["smaa_luts"] }
+bevy_app = { path = "../../lib/bevy/crates/bevy_app" }
+bevy_asset = { path = "../../lib/bevy/crates/bevy_asset" }
+bevy_camera = { path = "../../lib/bevy/crates/bevy_camera" }
+bevy_color = { path = "../../lib/bevy/crates/bevy_color" }
+bevy_core_pipeline = { path = "../../lib/bevy/crates/bevy_core_pipeline", features = ["tonemapping_luts"] }
+bevy_ecs = { path = "../../lib/bevy/crates/bevy_ecs" }
+# The tone-mapping and SMAA lookup tables ship as zstd-compressed KTX2.
+bevy_image = { path = "../../lib/bevy/crates/bevy_image", features = ["ktx2", "zstd_rust"] }
+bevy_light = { path = "../../lib/bevy/crates/bevy_light" }
+bevy_material = { path = "../../lib/bevy/crates/bevy_material" }
+bevy_math = { path = "../../lib/bevy/crates/bevy_math" }
+bevy_mesh = { path = "../../lib/bevy/crates/bevy_mesh" }
+bevy_pbr = { path = "../../lib/bevy/crates/bevy_pbr" }
+bevy_post_process = { path = "../../lib/bevy/crates/bevy_post_process" }
+bevy_reflect = { path = "../../lib/bevy/crates/bevy_reflect" }
+bevy_render = { path = "../../lib/bevy/crates/bevy_render", default-features = false }
+bevy_shader = { path = "../../lib/bevy/crates/bevy_shader" }
+bevy_shape = { path = "../../lib/bevy/crates/bevy_shape" }
+bevy_transform = { path = "../../lib/bevy/crates/bevy_transform" }
+bevy_window = { path = "../../lib/bevy/crates/bevy_window" }
+half = "2"
+ve-gi = { path = "../ve-gi" }
+ve-render = { path = "../ve-render" }
+ve-sky = { path = "../ve-sky" }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+naga = { version = "30", default-features = false, features = ["wgsl-in"] }

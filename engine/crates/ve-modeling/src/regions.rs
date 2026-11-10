@@ -114,6 +114,16 @@ pub(crate) fn split(value: &Value) -> Result<Vec<Value>, Fail> {
     if value.regions.len() < 2 {
         return Ok(vec![value.clone()]);
     }
+    if value
+        .morph_targets
+        .iter()
+        .any(|target| target.positions.len() != value.mesh.positions.len())
+    {
+        return Err(fail(
+            "rig.morph_data_invalid",
+            "a shape key no longer matches the mesh point count",
+        ));
+    }
     let triangles = value.mesh.indices.len() / 3;
     let mut pieces = Vec::with_capacity(value.regions.len());
     for (index, region) in value.regions.iter().enumerate() {
@@ -130,7 +140,7 @@ pub(crate) fn split(value: &Value) -> Result<Vec<Value>, Fail> {
                 ),
             ));
         }
-        let (mesh, volume) = sub_mesh(&value.mesh, region.first_triangle, end);
+        let (mesh, volume, sources) = sub_mesh(&value.mesh, region.first_triangle, end);
         let mut piece = Value::solid(mesh, volume);
         piece.uvs = value
             .uvs
@@ -138,6 +148,46 @@ pub(crate) fn split(value: &Value) -> Result<Vec<Value>, Fail> {
             .unwrap_or(&[])
             .to_vec();
         piece.material.clone_from(&region.material);
+        piece.morph_targets = value
+            .morph_targets
+            .iter()
+            .map(|target| crate::MorphTarget {
+                name: target.name.clone(),
+                weight: target.weight,
+                positions: sources
+                    .iter()
+                    .map(|&source| target.positions[source as usize])
+                    .collect(),
+            })
+            .collect();
+        piece.skin = value.skin.as_ref().map(|skin| {
+            let mut skin = skin.clone();
+            if skin.joints.len() == value.mesh.positions.len() {
+                skin.joints = sources
+                    .iter()
+                    .map(|&source| skin.joints[source as usize])
+                    .collect();
+            }
+            if skin.weights.len() == value.mesh.positions.len() {
+                skin.weights = sources
+                    .iter()
+                    .map(|&source| skin.weights[source as usize])
+                    .collect();
+            }
+            skin
+        });
+        if value.colors.len() == value.mesh.positions.len() {
+            piece.colors = sources
+                .iter()
+                .map(|&source| value.colors[source as usize])
+                .collect();
+        }
+        if value.human_source_indices.len() == value.mesh.positions.len() {
+            piece.human_source_indices = sources
+                .iter()
+                .map(|&source| value.human_source_indices[source as usize])
+                .collect();
+        }
         if index == 0 {
             piece.frames.clone_from(&value.frames);
         }
@@ -146,7 +196,7 @@ pub(crate) fn split(value: &Value) -> Result<Vec<Value>, Fail> {
     Ok(pieces)
 }
 
-fn sub_mesh(mesh: &Mesh, first: usize, end: usize) -> (Mesh, f64) {
+fn sub_mesh(mesh: &Mesh, first: usize, end: usize) -> (Mesh, f64, Vec<u32>) {
     let mut remap = BTreeMap::new();
     let mut positions = Vec::new();
     let mut indices = Vec::with_capacity((end - first) * 3);
@@ -167,7 +217,11 @@ fn sub_mesh(mesh: &Mesh, first: usize, end: usize) -> (Mesh, f64) {
             + a[2] * (b[0] * c[1] - b[1] * c[0]))
             / 6.0;
     }
-    (Mesh { positions, indices }, volume)
+    let mut sources = vec![0; positions.len()];
+    for (&source, &target) in &remap {
+        sources[target as usize] = source;
+    }
+    (Mesh { positions, indices }, volume, sources)
 }
 
 #[cfg(test)]
@@ -185,11 +239,14 @@ mod tests {
             recipe: crate::MaterialRecipe::None,
             texture_scale: 1.0,
             texture_tile: 0.0,
+            no_repeat: false,
+            no_repeat_scale: 1.0,
             texture_size: 0,
             toon: None,
             texture_program: None,
             texture_style: None,
             foliage: None,
+            finish: None,
         }
     }
 

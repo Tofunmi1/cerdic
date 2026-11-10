@@ -67,11 +67,14 @@ pub(crate) fn material(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail>
         recipe,
         texture_scale,
         texture_tile: 0.0,
+        no_repeat: false,
+        no_repeat_scale: 1.0,
         texture_size: 0,
         toon: None,
         texture_program: None,
         texture_style: None,
         foliage: None,
+        finish: None,
     };
     // A placement set keeps sharing one prototype; the surface goes on that prototype, so every
     // placement draws with it and the set stays a set.
@@ -102,14 +105,33 @@ pub(crate) fn material(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail>
         light: None,
         environment: None,
         animation: input.animation.clone(),
+        state_machine: input.state_machine.clone(),
+        state_machine_node: input.state_machine_node.clone(),
         behavior: input.behavior.clone(),
         parent: input.parent.clone(),
         bone: input.bone,
         skin: input.skin.clone(),
+        morph_targets: input.morph_targets.clone(),
         ik: input.ik.clone(),
+        fx: input.fx.clone(),
+        ragdoll: input.ragdoll.clone(),
         body: input.body.clone(),
         number: None,
+        pattern: None,
+        game: None,
         baked: input.baked.clone(),
+        human: input.human.clone(),
+        human_source_indices: input.human_source_indices.clone(),
+        poly_human_source_indices: input.poly_human_source_indices.clone(),
+        grid: input.grid.clone(),
+        colors: input.colors.clone(),
+        visible_range: input.visible_range,
+        visible_fade: input.visible_fade,
+        sdf: None,
+        // A surface put on a garment keeps it cloth.
+        cloth: input.cloth.clone(),
+        fluid: input.fluid.clone(),
+        sim: input.sim.clone(),
     })
 }
 
@@ -132,36 +154,66 @@ pub(crate) fn texture(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> 
         },
         _ => 0,
     };
-    let mut value = (**input).clone();
-    value.material = Some(textured_surface(
-        value.material.as_ref(),
-        program,
-        tile,
-        size,
-    ));
-    for region in &mut value.regions {
-        region.material = Some(textured_surface(
-            region.material.as_ref(),
-            program,
-            tile,
-            size,
+    let no_repeat = matches!(node.params.get("no_repeat"), Some(Param::Bool(true)));
+    let no_repeat_scale = scalar(node, "no_repeat_scale").unwrap_or(1.0);
+    if !(0.25..=8.0).contains(&no_repeat_scale) {
+        return Err(fail(
+            "param.range",
+            "no_repeat_scale must be between 0.25 and 8",
         ));
+    }
+    Ok(with_surfaces(input, |existing| {
+        let mut material = textured_surface(existing, program, tile, size);
+        material.no_repeat = no_repeat;
+        material.no_repeat_scale = no_repeat_scale;
+        material
+    }))
+}
+
+/// Applies a named procedural preset through the same textured surface path as `solid.texture`.
+pub(crate) fn preset(node: &Node, inputs: &[Rc<Value>]) -> Result<Value, Fail> {
+    let input = inputs
+        .first()
+        .ok_or_else(|| fail("graph.missing_input", "material.preset needs a solid"))?;
+    let (color, metallic, roughness, program) = crate::material_presets::build(node)?;
+    let tile = scalar(node, "tile").unwrap_or(1.0);
+    if !(0.1..=10.0).contains(&tile) {
+        return Err(fail(
+            "param.range",
+            "material.preset tile must be between 0.1 and 10 metres",
+        ));
+    }
+    let size = match node.params.get("size") {
+        Some(Param::Str(word)) => word
+            .parse::<u32>()
+            .ok()
+            .filter(|n| matches!(n, 256 | 512 | 1024)),
+        None => Some(512),
+        _ => None,
+    }
+    .ok_or_else(|| {
+        fail(
+            "param.range",
+            "material.preset size must be 256, 512 or 1024",
+        )
+    })?;
+    let mut value = (**input).clone();
+    let apply = |existing: Option<&Material>| {
+        let mut material = textured_surface(existing, &program, tile, size);
+        material.color = color;
+        material.metallic = metallic;
+        material.roughness = roughness;
+        material
+    };
+    value.material = Some(apply(value.material.as_ref()));
+    for region in &mut value.regions {
+        region.material = Some(apply(region.material.as_ref()));
     }
     if let Some(set) = &input.instances {
         let mut prototype = (*set.prototype).clone();
-        prototype.material = Some(textured_surface(
-            prototype.material.as_ref(),
-            program,
-            tile,
-            size,
-        ));
+        prototype.material = Some(apply(prototype.material.as_ref()));
         for region in &mut prototype.regions {
-            region.material = Some(textured_surface(
-                region.material.as_ref(),
-                program,
-                tile,
-                size,
-            ));
+            region.material = Some(apply(region.material.as_ref()));
         }
         value.instances = Some(InstanceSet {
             prototype: Rc::new(prototype),
@@ -188,11 +240,14 @@ fn textured_surface(existing: Option<&Material>, program: &str, tile: f32, size:
         recipe: MaterialRecipe::None,
         texture_scale: 1.0,
         texture_tile: 0.0,
+        no_repeat: false,
+        no_repeat_scale: 1.0,
         texture_size: 0,
         toon: None,
         texture_program: None,
         texture_style: None,
         foliage: None,
+        finish: None,
     });
     material.texture_program = Some(program.to_owned());
     material.texture_tile = tile;
@@ -274,10 +329,13 @@ pub(crate) fn textured_surface_default(existing: Option<&Material>) -> Material 
         recipe: MaterialRecipe::None,
         texture_scale: 1.0,
         texture_tile: 0.0,
+        no_repeat: false,
+        no_repeat_scale: 1.0,
         texture_size: 0,
         toon: None,
         texture_program: None,
         texture_style: None,
         foliage: None,
+        finish: None,
     })
 }

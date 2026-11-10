@@ -102,7 +102,7 @@ Implement product-specific graph operators in `ve-graph`/`ve-modeling`, renderer
 | Blender | UX reference, fixture authoring/reference, possible separate-process tool if owner explicitly changes asset policy | Blender source is GPL; ADR 0024 (2026-10-16) removed the exclusion, so porting selected modules is allowed with a feasibility note and `VENDOR.md`, and publishing a build that includes them triggers GPL source obligations. Geometry Nodes fields and workflow concepts can inform independently implemented features. |
 | Houdini, ZBrush, commercial CAD/sculpt tools | Workflow and interaction references | Do not fork their products. Use public behavior/docs as design inspiration; all generated output still follows the owner’s procedural-content policy. |
 
-License is not the only decision criterion, but the accepted policy excludes GPL/AGPL from the engine. Record exact upstream commit, license files, patches, build flags, and notices in `third_party/<name>/VENDOR.md` for vendored code; update `deny.toml` for Rust crates as required by project policy. Upstream library licenses and product asset licenses are separate questions: model assets, brushes, textures, HDRIs, and fonts are not automatically covered by an application’s source license.
+License is not the only decision criterion, but the accepted policy excludes GPL/AGPL from the engine. Record exact upstream commit, license files, patches, build flags, and notices in `lib/<name>/VENDOR.md` for vendored code; update `deny.toml` for Rust crates as required by project policy. Upstream library licenses and product asset licenses are separate questions: model assets, brushes, textures, HDRIs, and fonts are not automatically covered by an application’s source license.
 
 ### 5.4 Forking policy
 
@@ -111,7 +111,7 @@ Fork only when an upstream library is demonstrably the right backend and an adap
 1. Write a short spike report with required operators, test cases, upstream alternatives, license, target platforms and measured baseline.
 2. Confirm the owner’s existing GPL/AGPL exclusion and no-imported-assets policy; identify licenses of the exact source files and transitive dependencies.
 3. Pin upstream to a commit/tag and retain the upstream license/notices.
-4. Keep patches small, documented, and isolated under `third_party`; avoid product logic in the fork.
+4. Keep patches small, documented, and isolated under `lib`; avoid product logic in the fork.
 5. Add differential tests against upstream behavior, engine invariants, native/WASI parity where applicable, and a reproducible update procedure.
 6. Re-evaluate whether to upstream the patch or replace the fork at each upgrade.
 

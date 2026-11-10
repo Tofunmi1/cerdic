@@ -9,7 +9,7 @@ import { loadHelpers, loadLibrary } from '../../../src/engine/texture/library.ts
 // G10: the texture generator. Material Maker's node library (vendored, MIT) is compiled into GLSL by our
 // compiler and run in WebGL2. This checks that (1) a set of graphs bakes to real, non-flat, repeatable
 // images, and (2) how much of the library compiles and links at all, reported as a number.
-const root = new URL('../../third_party/material-maker/', import.meta.url).pathname;
+const root = new URL('../../lib/material-maker/', import.meta.url).pathname;
 const reports = new URL('../../target/reports/g10/', import.meta.url).pathname;
 const library = loadLibrary(root);
 const helpers = loadHelpers(root);

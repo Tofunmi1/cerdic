@@ -1,0 +1,162 @@
+# BLUEWATER: rigged great-white-inspired shark. Built with the creature guide's field-sculpt + skeletal skinning workflow.
+# Metres; shark faces +Z, Y is up. The spine and body taper from nose (+Z) to tail (-Z).
+
+sky = scene.sky@1(sun_elevation=28,sun_azimuth=-35,sun_intensity=1.8,turbidity=3.2,clouds=false,haze=0.08,haze_color=[0.18,0.32,0.40],ground_color=[0.035,0.09,0.12],contact_shadows=true)
+output sky = sky
+env = scene.environment@1(sky_color=[0.12,0.22,0.28],ground_color=[0.035,0.075,0.09],intensity=0.56,reflection=0.20,bounce=0.20,bounce_color=[0.42,0.50,0.53])
+output environment = env
+
+# Seven connected bones. Y-axis waves increase toward the caudal fin to make the whole body undulate.
+let bones = "b0; b1; b2; b3; b4; b5; b6"
+r0_box = solid.box@1(size=[0.015,0.015,0.015])
+r0_at = xform.move@1(r0_box,by=[0,1.42,2.30])
+r0_bone = rig.bone@1(r0_at,head=[0,1.42,2.30],tail=[0,1.42,1.45])
+r0_wave = anim.wave@1(r0_bone,property="rotation",amplitude=[0,0.4,0],period=2.4,pivot_at="head")
+output b0 = r0_wave
+
+def spine(tag,hz,tz,parent,amp,phase)
+  bone_box_{tag} = solid.box@1(size=[0.015,0.015,0.015])
+  bone_at_{tag} = xform.move@1(bone_box_{tag},by=[0,1.42,{hz}])
+  bone_raw_{tag} = rig.bone@1(bone_at_{tag},head=[0,1.42,{hz}],tail=[0,1.42,{tz}])
+  bone_parent_{tag} = anim.parent@1(bone_raw_{tag},parent="${parent}")
+  bone_wave_{tag} = anim.wave@1(bone_parent_{tag},property="rotation",amplitude=[0,{amp},0],period=2.4,phase={phase},pivot_at="head")
+  output {tag} = bone_wave_{tag}
+end
+spine("b1",1.45,0.55,"b0",0.8,0.08)
+spine("b2",0.55,-0.35,"b1",1.8,0.16)
+spine("b3",-0.35,-1.20,"b2",3.8,0.24)
+spine("b4",-1.20,-1.95,"b3",7.0,0.32)
+spine("b5",-1.95,-2.62,"b4",12.0,0.40)
+spine("b6",-2.62,-3.16,"b5",18.0,0.48)
+
+# One continuous signed-distance body: tapered tube sections, then smooth-united anatomy and fins.
+body_nose = field.tube@1(points=[[0,1.42,3.10],[0,1.42,2.20]],radius=0.04,end_radius=0.39)
+body_shoulder = field.tube@1(points=[[0,1.42,2.20],[0,1.42,1.15]],radius=0.39,end_radius=0.68)
+body_chest = field.tube@1(points=[[0,1.42,1.15],[0,1.42,0.10]],radius=0.68,end_radius=0.76)
+body_trunk = field.tube@1(points=[[0,1.42,0.10],[0,1.42,-0.92]],radius=0.76,end_radius=0.67)
+body_rear = field.tube@1(points=[[0,1.42,-0.92],[0,1.42,-1.88]],radius=0.67,end_radius=0.42)
+body_peduncle = field.tube@1(points=[[0,1.42,-1.88],[0,1.42,-2.72],[0,1.42,-3.18]],radius=0.42,end_radius=0.10)
+body_u1 = field.smooth_union@1(body_nose,body_shoulder,radius=0.12)
+body_u2 = field.smooth_union@1(body_u1,body_chest,radius=0.15)
+body_u3 = field.smooth_union@1(body_u2,body_trunk,radius=0.16)
+body_u4 = field.smooth_union@1(body_u3,body_rear,radius=0.13)
+body_u5 = field.smooth_union@1(body_u4,body_peduncle,radius=0.10)
+# Broad first dorsal, small second dorsal, anal and pelvic stabilizers blend into the body.
+dorsal_f = field.ellipsoid@1(radii=[0.11,0.48,0.34])
+dorsal = field.move@1(dorsal_f,by=[0,1.91,-0.12])
+dorsal_blend = field.smooth_union@1(body_u5,dorsal,radius=0.10)
+second_dorsal_f = field.ellipsoid@1(radii=[0.075,0.20,0.16])
+second_dorsal = field.move@1(second_dorsal_f,by=[0,1.56,-1.83])
+body_u6 = field.smooth_union@1(dorsal_blend,second_dorsal,radius=0.065)
+anal_f = field.ellipsoid@1(radii=[0.075,0.25,0.18])
+anal = field.move@1(anal_f,by=[0,1.20,-2.04])
+body_u7 = field.smooth_union@1(body_u6,anal,radius=0.07)
+pelvic_r_f = field.ellipsoid@1(radii=[0.39,0.055,0.22])
+pelvic_r = field.move@1(pelvic_r_f,by=[0.43,1.10,-1.52])
+pelvic_l_f = field.ellipsoid@1(radii=[0.39,0.055,0.22])
+pelvic_l = field.move@1(pelvic_l_f,by=[-0.43,1.10,-1.52])
+body_u8 = field.smooth_union@1(body_u7,pelvic_r,radius=0.10)
+body_u9 = field.smooth_union@1(body_u8,pelvic_l,radius=0.10)
+# Unequal caudal lobes: the upper lobe is longer, as on a white shark.
+caudal_upper_f = field.ellipsoid@1(radii=[0.22,0.70,0.12])
+caudal_upper = field.move@1(caudal_upper_f,by=[0,2.02,-3.14])
+caudal_lower_f = field.ellipsoid@1(radii=[0.18,0.43,0.105])
+caudal_lower = field.move@1(caudal_lower_f,by=[0,1.10,-3.12])
+body_u10 = field.smooth_union@1(body_u9,caudal_upper,radius=0.085)
+body_u11 = field.smooth_union@1(body_u10,caudal_lower,radius=0.075)
+# Ventral jaw opening and paired shallow eye sockets are carved into the sculpt, not painted on.
+mouth_cut_f = field.ellipsoid@1(radii=[0.32,0.095,0.11])
+mouth_cut = field.move@1(mouth_cut_f,by=[0,1.20,2.69])
+body_cut_mouth = field.subtract@1(body_u11,mouth_cut)
+eye_socket_f = field.ellipsoid@1(radii=[0.095,0.085,0.075])
+eye_socket_r = field.move@1(eye_socket_f,by=[0.34,1.57,2.35])
+eye_socket_l = field.move@1(eye_socket_f,by=[-0.34,1.57,2.35])
+body_cut_eye_r = field.subtract@1(body_cut_mouth,eye_socket_r)
+body_cut_eyes = field.subtract@1(body_cut_eye_r,eye_socket_l)
+body_noise = field.noise@1(body_cut_eyes,amplitude=0.009,scale=0.12,octaves=2,mode="ridged",seed=21)
+body_mesh = field.to_solid@1(body_noise,min=[-0.95,0.36,-3.50],max=[0.95,2.86,3.24],edge_length=0.038)
+# Countershading follows surface height; fine relief suggests dermal denticles without changing silhouette.
+body_mat = solid.material@1(body_mesh,color=[0.32,0.40,0.43],roughness=0.72)
+body_tex = solid.texture@1(body_mat,tile=1.0,size="512",program="h = surface_height(low=0.72, high=2.25); albedo = colorize(h, gradient=[0:#e7e5dc, 0.32:#d8d8d0, 0.43:#89989a, 0.62:#65777c, 1:#3d5057]); roughness = colorize(h, gradient=[0:#e5e5e5, 1:#cfcfcf])")
+body_finish = solid.finish@1(body_tex,subsurface=0.12,clearcoat=0.18,clearcoat_roughness=0.38,relief=0.13,relief_scale=90,relief_style="scales",wetness=0.08)
+body_skin = rig.skin@1(body_finish,bones="${bones}",falloff=3,influences=3)
+output shark_body = body_skin
+
+# Swept soft pectorals: each root begins inside the body, and each fin flaps from its shoulder joint.
+pec_r_base_f = field.ellipsoid@1(radii=[0.78,0.075,0.31])
+pec_r_base = field.move@1(pec_r_base_f,by=[0.58,1.27,0.45])
+pec_r_tip_f = field.ellipsoid@1(radii=[0.62,0.045,0.23])
+pec_r_tip = field.move@1(pec_r_tip_f,by=[1.06,1.24,0.04])
+pec_r_field = field.smooth_union@1(pec_r_base,pec_r_tip,radius=0.12)
+pec_r_mesh = field.to_solid@1(pec_r_field,min=[-0.30,1.05,-0.55],max=[1.84,1.48,0.92],edge_length=0.028)
+pec_r_mat = solid.material@1(pec_r_mesh,color=[0.30,0.39,0.42],roughness=0.74)
+pec_r_finish = solid.finish@1(pec_r_mat,clearcoat=0.16,relief=0.08,relief_scale=75,relief_style="scales")
+pec_r_parent = anim.parent@1(pec_r_finish,parent="b2")
+pec_r_wave = anim.wave@1(pec_r_parent,property="rotation",amplitude=[0,0,4.5],period=2.4,phase=0.1,pivot=[0.42,1.27,0.50])
+output pectoral_fin_r = pec_r_wave
+pec_l_base_f = field.ellipsoid@1(radii=[0.78,0.075,0.31])
+pec_l_base = field.move@1(pec_l_base_f,by=[-0.58,1.27,0.45])
+pec_l_tip_f = field.ellipsoid@1(radii=[0.62,0.045,0.23])
+pec_l_tip = field.move@1(pec_l_tip_f,by=[-1.06,1.24,0.04])
+pec_l_field = field.smooth_union@1(pec_l_base,pec_l_tip,radius=0.12)
+pec_l_mesh = field.to_solid@1(pec_l_field,min=[-1.84,1.05,-0.55],max=[0.30,1.48,0.92],edge_length=0.028)
+pec_l_mat = solid.material@1(pec_l_mesh,color=[0.30,0.39,0.42],roughness=0.74)
+pec_l_finish = solid.finish@1(pec_l_mat,clearcoat=0.16,relief=0.08,relief_scale=75,relief_style="scales")
+pec_l_parent = anim.parent@1(pec_l_finish,parent="b2")
+pec_l_wave = anim.wave@1(pec_l_parent,property="rotation",amplitude=[0,0,-4.5],period=2.4,phase=0.1,pivot=[-0.42,1.27,0.50])
+output pectoral_fin_l = pec_l_wave
+
+# Five narrow gill furrows sit between the eye and each pectoral fin.
+gill_section = profile.circle@1(radius=0.015,segments=8)
+def gill(tag,side,z)
+  gill_path_{tag} = curve.bezier@1(points=[[{side*0.50},1.73,{z+0.08}],[{side*0.56},1.53,{z+0.04}],[{side*0.58},1.28,{z-0.04}],[{side*0.50},1.10,{z-0.10}]],steps=12)
+  gill_sweep_{tag} = solid.sweep@1(gill_path_{tag},gill_section)
+  gill_mat_{tag} = solid.material@1(gill_sweep_{tag},color=[0.035,0.055,0.058],roughness=0.72)
+  gill_parent_{tag} = anim.parent@1(gill_mat_{tag},parent="b1")
+  output gill_{tag} = gill_parent_{tag}
+end
+gill("l1",-1,1.52)
+gill("l2",-1,1.32)
+gill("l3",-1,1.12)
+gill("l4",-1,0.92)
+gill("l5",-1,0.72)
+gill("r1",1,1.52)
+gill("r2",1,1.32)
+gill("r3",1,1.12)
+gill("r4",1,0.92)
+gill("r5",1,0.72)
+
+# Small black eyes sit in the carved sockets; nostrils and a slit mouth remain understated.
+eye_src = solid.sphere@1(radius=0.065,segments=24)
+eye_r = xform.move@1(eye_src,by=[0.36,1.57,2.35])
+eye_l = xform.move@1(eye_src,by=[-0.36,1.57,2.35])
+eyes = solid.union@1(eye_r,eye_l)
+eye_mat = solid.material@1(eyes,color=[0.012,0.018,0.020],roughness=0.12)
+eye_finish = solid.finish@1(eye_mat,clearcoat=0.92,clearcoat_roughness=0.05)
+eye_parent = anim.parent@1(eye_finish,parent="b0")
+output eyes = eye_parent
+
+mouth_src = solid.sphere@1(radius=1,segments=24)
+mouth_shape = xform.scale@1(mouth_src,by=[0.30,0.045,0.12])
+mouth_at = xform.move@1(mouth_shape,by=[0,1.19,2.70])
+mouth_mat = solid.material@1(mouth_at,color=[0.035,0.025,0.024],roughness=0.72)
+mouth_parent = anim.parent@1(mouth_mat,parent="b0")
+output mouth = mouth_parent
+nostril_src = solid.sphere@1(radius=0.026,segments=12)
+nostrils = inst.place@1(nostril_src,at=[[-0.14,1.28,2.91],[0.14,1.28,2.91]])
+nostril_mat = solid.material@1(nostrils,color=[0.045,0.06,0.063],roughness=0.7)
+nostril_parent = anim.parent@1(nostril_mat,parent="b0")
+output nostrils = nostril_parent
+
+# A subdued lateral line follows the body; it is a canal, not a glowing stripe.
+line_section = profile.circle@1(radius=0.009,segments=8)
+line_r_path = curve.bezier@1(points=[[0.48,1.42,1.05],[0.69,1.42,0.10],[0.61,1.42,-1.18],[0.24,1.42,-2.60]],steps=36)
+line_r = solid.sweep@1(line_r_path,line_section)
+line_r_mat = solid.material@1(line_r,color=[0.16,0.22,0.23],roughness=0.78)
+line_r_parent = anim.parent@1(line_r_mat,parent="b2")
+output lateral_line_r = line_r_parent
+line_l_path = curve.bezier@1(points=[[-0.48,1.42,1.05],[-0.69,1.42,0.10],[-0.61,1.42,-1.18],[-0.24,1.42,-2.60]],steps=36)
+line_l = solid.sweep@1(line_l_path,line_section)
+line_l_mat = solid.material@1(line_l,color=[0.16,0.22,0.23],roughness=0.78)
+line_l_parent = anim.parent@1(line_l_mat,parent="b2")
+output lateral_line_l = line_l_parent

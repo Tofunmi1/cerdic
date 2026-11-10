@@ -94,7 +94,7 @@ crates/
   engine-wasm/       the C-ABI export crate: Engine facade, _initialize, buffers
 cpp/
   geomproc/          our C++: mesh repair, import cleanup, collider prep, glue
-  third_party/       Manifold, Clipper2, Recast/Detour, meshoptimizer, V-HACD (pinned)
+  lib/               Manifold, Clipper2, Recast/Detour, meshoptimizer, V-HACD (pinned)
 packs/
   <pack-id>/rust/    optional Rust half of a code pack (implements EnginePack)
 ```

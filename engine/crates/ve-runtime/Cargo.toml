@@ -9,31 +9,46 @@ publish.workspace = true
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# Draw with Bevy's own renderer (`ve-bevy`) instead of the engine's forward pass. One backend per bundle.
+bevy-webgl = ["dep:ve-bevy", "ve-bevy/webgl"]
+bevy-webgpu = ["dep:ve-bevy", "ve-bevy/webgpu"]
+# Bevy's physically based atmosphere instead of the cubemap sky (WebGPU only; still being debugged).
+bevy-atmosphere = ["bevy-webgpu", "ve-bevy/atmosphere"]
+
 # Browser-only; on native targets the crate is empty.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-bevy_app = { path = "../../third_party/bevy/crates/bevy_app" }
-bevy_asset = { path = "../../third_party/bevy/crates/bevy_asset" }
-bevy_camera = { path = "../../third_party/bevy/crates/bevy_camera" }
-bevy_color = { path = "../../third_party/bevy/crates/bevy_color" }
-bevy_diagnostic = { path = "../../third_party/bevy/crates/bevy_diagnostic" }
+bevy_app = { path = "../../lib/bevy/crates/bevy_app" }
+bevy_asset = { path = "../../lib/bevy/crates/bevy_asset" }
+bevy_camera = { path = "../../lib/bevy/crates/bevy_camera" }
+bevy_color = { path = "../../lib/bevy/crates/bevy_color" }
+bevy_diagnostic = { path = "../../lib/bevy/crates/bevy_diagnostic" }
 # `debug` keeps system and resource names in panic messages; revisit for size in M12.
-bevy_ecs = { path = "../../third_party/bevy/crates/bevy_ecs", features = ["debug"] }
-bevy_image = { path = "../../third_party/bevy/crates/bevy_image" }
-bevy_input = { path = "../../third_party/bevy/crates/bevy_input" }
-bevy_log = { path = "../../third_party/bevy/crates/bevy_log" }
-bevy_mesh = { path = "../../third_party/bevy/crates/bevy_mesh" }
-bevy_time = { path = "../../third_party/bevy/crates/bevy_time" }
-bevy_transform = { path = "../../third_party/bevy/crates/bevy_transform" }
-bevy_window = { path = "../../third_party/bevy/crates/bevy_window" }
-bevy_render = { path = "../../third_party/bevy/crates/bevy_render", default-features = false, features = ["webgl"] }
-bevy_math = { path = "../../third_party/bevy/crates/bevy_math" }
+bevy_ecs = { path = "../../lib/bevy/crates/bevy_ecs", features = ["debug"] }
+bevy_image = { path = "../../lib/bevy/crates/bevy_image", features = ["jpeg"] }
+bevy_input = { path = "../../lib/bevy/crates/bevy_input" }
+bevy_light = { path = "../../lib/bevy/crates/bevy_light" }
+bevy_log = { path = "../../lib/bevy/crates/bevy_log" }
+bevy_mesh = { path = "../../lib/bevy/crates/bevy_mesh" }
+bevy_time = { path = "../../lib/bevy/crates/bevy_time" }
+bevy_transform = { path = "../../lib/bevy/crates/bevy_transform" }
+bevy_window = { path = "../../lib/bevy/crates/bevy_window" }
+bevy_render = { path = "../../lib/bevy/crates/bevy_render", default-features = false, features = ["webgl"] }
+bevy_math = { path = "../../lib/bevy/crates/bevy_math" }
+bevy_reflect = { path = "../../lib/bevy/crates/bevy_reflect" }
 ve-core = { path = "../ve-core" }
+ve-game = { path = "../ve-game" }
+ve-world = { path = "../ve-world" }
+ve-animstate = { path = "../ve-animstate" }
+ve-chain = { path = "../ve-chain" }
+ve-gait = { path = "../ve-gait" }
 ve-gi = { path = "../ve-gi" }
 ve-graph = { path = "../ve-graph" }
 ve-interact = { path = "../ve-interact" }
 ve-kernel = { path = "../ve-kernel" }
 ve-measure = { path = "../ve-measure" }
 ve-modeling = { path = "../ve-modeling" }
+ve-nav = { path = "../ve-nav" }
 ve-physics = { path = "../ve-physics" }
 ve-xr-math = { path = "../ve-xr-math" }
 ve-xr-web = { path = "../ve-xr-web" }
@@ -41,6 +56,8 @@ ve-platform-web = { path = "../ve-platform-web" }
 ve-particles = { path = "../ve-particles" }
 ve-audio = { path = "../ve-audio" }
 ve-render = { path = "../ve-render" }
+ve-bevy = { path = "../ve-bevy", optional = true }
+serde.workspace = true
 serde_json.workspace = true
 wasm-bindgen.workspace = true
 wasm-bindgen-futures = "0.4"
@@ -48,3 +65,14 @@ web-sys = { workspace = true, features = ["console", "DomException", "Storage", 
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+bevy_time = { path = "../../lib/bevy/crates/bevy_time" }
+bevy_asset = { path = "../../lib/bevy/crates/bevy_asset" }
+bevy_ecs = { path = "../../lib/bevy/crates/bevy_ecs" }
+bevy_mesh = { path = "../../lib/bevy/crates/bevy_mesh" }
+bevy_math = { path = "../../lib/bevy/crates/bevy_math" }
+bevy_transform = { path = "../../lib/bevy/crates/bevy_transform" }
+serde_json.workspace = true
+ve-render = { path = "../ve-render" }
+ve-world = { path = "../ve-world" }

@@ -9,7 +9,7 @@ import { cornerNormals } from '../../../src/engine/normals.ts';
 // out per texel from how the normal changes. Checked on shapes whose curvature is known: a sphere of radius r has curvature 1 / r
 // everywhere, a plane has none, and the inside of a sphere is concave. The signal is 1 at a 5 cm radius, so `gain * 0.05 / r`
 // is the grey a program with `surface_convex(gain)` bakes.
-const root = new URL('../../third_party/material-maker/', import.meta.url).pathname;
+const root = new URL('../../lib/material-maker/', import.meta.url).pathname;
 const library = loadLibrary(root);
 const helpers = loadHelpers(root);
 const compile = (text) => {

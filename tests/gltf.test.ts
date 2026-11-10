@@ -86,6 +86,35 @@ test('closed meshes export generated UV charts without welding across chart seam
   expect(uv.count).toBe(json.accessors[primitive.attributes.POSITION].count);
 });
 
+test('shape keys export named position and normal deltas across split vertices', async () => {
+  const positions = cube().positions;
+  const delta = new Float32Array(positions.length);
+  for (let point = 0; point < positions.length / 3; point++) {
+    if (positions[point * 3 + 1] > 0 && positions[point * 3] > 0) delta[point * 3 + 1] = 0.15;
+  }
+  const glb = buildGlb([part({ morph_targets: [{ name: 'raise', weight: 0.5, positions: delta }] })]);
+  const report = await validator.validateBytes(glb);
+  expect(report.issues.numErrors).toBe(0);
+  const jsonLength = new DataView(glb.buffer, glb.byteOffset).getUint32(12, true);
+  const json = JSON.parse(new TextDecoder().decode(glb.subarray(20, 20 + jsonLength)));
+  const mesh = json.meshes[0];
+  const target = mesh.primitives[0].targets[0];
+  expect(mesh.weights).toEqual([0.5]);
+  expect(mesh.extras.targetNames).toEqual(['raise']);
+  expect(json.accessors[target.POSITION].type).toBe('VEC3');
+  expect(json.accessors[target.NORMAL].type).toBe('VEC3');
+  const chunkStart = 20 + jsonLength + 8;
+  const values = (accessorIndex: number) => {
+    const accessor = json.accessors[accessorIndex];
+    const view = json.bufferViews[accessor.bufferView];
+    const offset = chunkStart + (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
+    const binary = new DataView(glb.buffer, glb.byteOffset);
+    return Array.from({ length: accessor.count * 3 }, (_, i) => binary.getFloat32(offset + i * 4, true));
+  };
+  expect(values(target.POSITION).some(value => Math.abs(value) > 0.01)).toBe(true);
+  expect(values(target.NORMAL).some(value => Math.abs(value) > 0.01)).toBe(true);
+});
+
 test('authored per-corner UVs take precedence over generated charts', () => {
   const authored = new Float32Array(cube().indices.length * 2);
   for (let corner = 0; corner < authored.length / 2; corner++) authored.set([0.25, 0.75], corner * 2);

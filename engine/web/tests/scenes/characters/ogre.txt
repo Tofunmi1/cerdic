@@ -1,0 +1,70 @@
+# THE OGRE GRAMMAR, from a reference: a stylized ogre about four heads tall, with a big head and a heavy underbite jaw, tusks, pointed ears, a round belly, thick arms hanging to the knees, short stout legs,
+# big hands and feet, and a loincloth. The body is poly.skin (a skeleton of named joints and radii skinned into one smooth surface), written ONCE at unit height (every number a fraction of the height); the macro
+# `ogre(tag, px, h, colour)` scales it to any height and places the face parts (ellipsoids and cones given as fractions of h), so a tall brute and a small runt come from the same code. The loincloth is a skin shell over
+# the hips, a hair wider than the body underneath.
+# Skin rules in force: the surface stops at an end joint (so the crown, fists and toes are joints), the shoulders hang off a NARROW hub joint (chest2) with bones longer than its radius, and no joint has two bones in
+# nearly the same direction (hence no jaw joint on the skull: the underbite is a separate mass).
+# Metres, +y up, facing +z.
+# kind: world
+sky = scene.sky@1(sun_elevation=40, sun_azimuth=-35, sun_intensity=3.4, turbidity=3, ground_color=[0.32, 0.3, 0.28], clouds=false, haze=0.08)
+env = scene.environment@1(sky_color=[0.78, 0.82, 0.9], ground_color=[0.45, 0.43, 0.4], intensity=1.0, reflection=0.3, bounce=0.6)
+output sky = sky
+output env = env
+
+# ---- the unit ogre: 24 joints, height 1 ----
+og_s = poly.skin@1(joints="pelvis 0 0.36 0 0.15 0.11 root; belly 0 0.50 0.045 0.215 0.19; chest 0 0.62 0.02 0.17 0.125; chest2 0 0.735 0.01 0.13 0.10; neck 0 0.79 0.035 0.09 0.095; skull 0 0.885 0.055 0.135 0.145; crown 0 0.965 0.05 0.075 0.085; shoulder_l 0.22 0.725 0 0.085 0.09; uarm_l 0.255 0.60 0.005 0.078 0.082; elbow_l 0.262 0.495 0.015 0.068 0.072; farm_l 0.262 0.40 0.03 0.062 0.066; wrist_l 0.255 0.305 0.035 0.048 0.048; fist_l 0.255 0.245 0.04 0.075 0.055; shoulder_r -0.22 0.725 0 0.085 0.09; uarm_r -0.255 0.60 0.005 0.078 0.082; elbow_r -0.262 0.495 0.015 0.068 0.072; farm_r -0.262 0.40 0.03 0.062 0.066; wrist_r -0.255 0.305 0.035 0.048 0.048; fist_r -0.255 0.245 0.04 0.075 0.055; hip_l 0.095 0.345 0 0.10 0.105; knee_l 0.105 0.185 0.015 0.08 0.085; ankle_l 0.105 0.05 0 0.07 0.075; toe_l 0.105 0.02 0.095 0.08 0.05; hip_r -0.095 0.345 0 0.10 0.105; knee_r -0.105 0.185 0.015 0.08 0.085; ankle_r -0.105 0.05 0 0.07 0.075; toe_r -0.105 0.02 0.095 0.08 0.05", bones="pelvis-belly; belly-chest; chest-chest2; chest2-neck; neck-skull; skull-crown; chest2-shoulder_l; shoulder_l-uarm_l; uarm_l-elbow_l; elbow_l-farm_l; farm_l-wrist_l; wrist_l-fist_l; chest2-shoulder_r; shoulder_r-uarm_r; uarm_r-elbow_r; elbow_r-farm_r; farm_r-wrist_r; wrist_r-fist_r; pelvis-hip_l; hip_l-knee_l; knee_l-ankle_l; ankle_l-toe_l; pelvis-hip_r; hip_r-knee_r; knee_r-ankle_r; ankle_r-toe_r", symmetry="x")
+og_d = poly.subdivide@1(og_s, levels=2)
+# the loincloth shell over the hips and thighs
+og_cs = poly.skin@1(joints="pelvis 0 0.36 0 0.165 0.125 root; hip_l 0.095 0.33 0 0.112 0.118; thigh_l 0.10 0.25 0.01 0.098 0.102; hip_r -0.095 0.33 0 0.112 0.118; thigh_r -0.10 0.25 0.01 0.098 0.102", bones="pelvis-hip_l; hip_l-thigh_l; pelvis-hip_r; hip_r-thigh_r", symmetry="x")
+og_cd = poly.subdivide@1(og_cs, levels=2)
+
+def ogre(tag, px, h, cr, cg, cb)
+  og{tag}_sc = xform.scale@1(og_d, by=[{h}, {h}, {h}])
+  og{tag}_p = xform.move@1(og{tag}_sc, by=[{px}, 0, 0])
+  og{tag}_m = solid.material@1(og{tag}_p, color=[{cr}, {cg}, {cb}], roughness=0.6)
+  og{tag}_f = solid.finish@1(og{tag}_m, subsurface=0.25, clearcoat=0.05, clearcoat_roughness=0.6)
+  output {tag}_body = og{tag}_f
+  og{tag}_csc = xform.scale@1(og_cd, by=[{h}, {h}, {h}])
+  og{tag}_cp = xform.move@1(og{tag}_csc, by=[{px}, 0, 0])
+  og{tag}_cm = solid.material@1(og{tag}_cp, color=[0.36, 0.22, 0.12], roughness=0.85)
+  output {tag}_cloth = og{tag}_cm
+
+  # ---- the face: a heavy jaw, a bulbous nose, a brow ridge, small eyes, tusks, big pointed ears ----
+  og{tag}_js = solid.sphere@1(radius=1.0, segments=32)
+  og{tag}_je = xform.scale@1(og{tag}_js, by=[{h * 0.105}, {h * 0.06}, {h * 0.09}])
+  og{tag}_ja = xform.move@1(og{tag}_je, by=[{px}, {h * 0.82}, {h * 0.115}])
+  og{tag}_jm = solid.material@1(og{tag}_ja, color=[{cr}, {cg}, {cb}], roughness=0.6)
+  output {tag}_jaw = og{tag}_jm
+  og{tag}_ns = solid.sphere@1(radius=1.0, segments=24)
+  og{tag}_ne = xform.scale@1(og{tag}_ns, by=[{h * 0.032}, {h * 0.034}, {h * 0.04}])
+  og{tag}_na = xform.move@1(og{tag}_ne, by=[{px}, {h * 0.872}, {h * 0.165}])
+  og{tag}_nm = solid.material@1(og{tag}_na, color=[{cr * 1.12}, {cg * 1.1}, {cb * 1.1}], roughness=0.55)
+  output {tag}_nose = og{tag}_nm
+  og{tag}_bs = solid.sphere@1(radius=1.0, segments=24)
+  og{tag}_be = xform.scale@1(og{tag}_bs, by=[{h * 0.115}, {h * 0.028}, {h * 0.05}])
+  og{tag}_ba = xform.move@1(og{tag}_be, by=[{px}, {h * 0.925}, {h * 0.14}])
+  og{tag}_bm = solid.material@1(og{tag}_ba, color=[{cr * 0.92}, {cg * 0.92}, {cb * 0.92}], roughness=0.6)
+  output {tag}_brow = og{tag}_bm
+  og{tag}_es = solid.sphere@1(radius={h * 0.012}, segments=14)
+  og{tag}_el = xform.move@1(og{tag}_es, by=[{px + h * 0.05}, {h * 0.905}, {h * 0.16}])
+  og{tag}_er = xform.move@1(og{tag}_es, by=[{px - h * 0.05}, {h * 0.905}, {h * 0.16}])
+  og{tag}_eu = solid.union@1(og{tag}_el, og{tag}_er)
+  og{tag}_em = solid.material@1(og{tag}_eu, color=[0.04, 0.035, 0.03], roughness=0.25)
+  output {tag}_eyes = og{tag}_em
+  og{tag}_ts = solid.cone@1(radius={h * 0.013}, height={h * 0.055}, segments=14)
+  og{tag}_tl = xform.move@1(og{tag}_ts, by=[{px + h * 0.05}, {h * 0.80}, {h * 0.17}])
+  og{tag}_tr = xform.move@1(og{tag}_ts, by=[{px - h * 0.05}, {h * 0.80}, {h * 0.17}])
+  og{tag}_tu = solid.union@1(og{tag}_tl, og{tag}_tr)
+  og{tag}_tm = solid.material@1(og{tag}_tu, color=[0.93, 0.9, 0.8], roughness=0.4)
+  output {tag}_tusks = og{tag}_tm
+  og{tag}_cc = solid.cone@1(radius={h * 0.035}, height={h * 0.13}, segments=16)
+  og{tag}_cl0 = xform.rotate@1(og{tag}_cc, angles=[-20, 0, -72])
+  og{tag}_cl = xform.move@1(og{tag}_cl0, by=[{px + h * 0.13}, {h * 0.89}, {h * 0.03}])
+  og{tag}_cr0 = xform.rotate@1(og{tag}_cc, angles=[-20, 0, 72])
+  og{tag}_crr = xform.move@1(og{tag}_cr0, by=[{px - h * 0.13}, {h * 0.89}, {h * 0.03}])
+  og{tag}_ceu = solid.union@1(og{tag}_cl, og{tag}_crr)
+  og{tag}_cem = solid.material@1(og{tag}_ceu, color=[{cr}, {cg}, {cb}], roughness=0.6)
+  output {tag}_ears = og{tag}_cem
+end
+ogre("brute", -1.3, 2.2, 0.43, 0.5, 0.46)
+ogre("runt", 1.3, 1.45, 0.45, 0.52, 0.36)

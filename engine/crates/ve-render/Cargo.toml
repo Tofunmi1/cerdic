@@ -7,25 +7,28 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
-bevy_app = { path = "../../third_party/bevy/crates/bevy_app" }
-bevy_asset = { path = "../../third_party/bevy/crates/bevy_asset" }
-bevy_camera = { path = "../../third_party/bevy/crates/bevy_camera" }
-bevy_color = { path = "../../third_party/bevy/crates/bevy_color" }
-bevy_ecs = { path = "../../third_party/bevy/crates/bevy_ecs" }
-bevy_extract = { path = "../../third_party/bevy/crates/bevy_extract" }
-bevy_log = { path = "../../third_party/bevy/crates/bevy_log" }
-bevy_math = { path = "../../third_party/bevy/crates/bevy_math" }
-bevy_mesh = { path = "../../third_party/bevy/crates/bevy_mesh" }
-bevy_render = { path = "../../third_party/bevy/crates/bevy_render", default-features = false }
-bevy_shader = { path = "../../third_party/bevy/crates/bevy_shader" }
-bevy_transform = { path = "../../third_party/bevy/crates/bevy_transform" }
+bevy_app = { path = "../../lib/bevy/crates/bevy_app" }
+bevy_asset = { path = "../../lib/bevy/crates/bevy_asset" }
+bevy_camera = { path = "../../lib/bevy/crates/bevy_camera" }
+bevy_color = { path = "../../lib/bevy/crates/bevy_color", features = ["serialize"] }
+bevy_ecs = { path = "../../lib/bevy/crates/bevy_ecs" }
+bevy_extract = { path = "../../lib/bevy/crates/bevy_extract" }
+bevy_reflect = { path = "../../lib/bevy/crates/bevy_reflect" }
+bevy_log = { path = "../../lib/bevy/crates/bevy_log" }
+bevy_math = { path = "../../lib/bevy/crates/bevy_math" }
+bevy_mesh = { path = "../../lib/bevy/crates/bevy_mesh" }
+bevy_render = { path = "../../lib/bevy/crates/bevy_render", default-features = false }
+bevy_shader = { path = "../../lib/bevy/crates/bevy_shader" }
+bevy_transform = { path = "../../lib/bevy/crates/bevy_transform" }
+serde = { version = "1", features = ["derive"] }
 bytemuck.workspace = true
 
 # The browser backend: wgpu's WebGL2 (GLES) path. Native builds use the platform backends.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-bevy_render = { path = "../../third_party/bevy/crates/bevy_render", default-features = false, features = ["webgl"] }
+bevy_render = { path = "../../lib/bevy/crates/bevy_render", default-features = false, features = ["webgl"] }
 
 [dev-dependencies]
+serde_json = "1"
 # Parses and validates every shader at test time, so a WGSL mistake fails `cargo test` and not only a browser run, and
 # translates it to GLSL ES 3.00 as the WebGL2 backend does (it cannot express everything WGSL can).
 naga = { version = "30", default-features = false, features = ["wgsl-in", "glsl-out"] }

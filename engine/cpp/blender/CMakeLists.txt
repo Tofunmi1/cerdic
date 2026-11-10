@@ -1,4 +1,4 @@
-# Blender code compiled into the engine (see ../../third_party/blender/VENDOR.md).
+# Blender code compiled into the engine.
 #
 # Blender is built with its own flags: C++20, RTTI on, no exceptions (try/catch/throw are macro-neutralised),
 # unsigned char, and no fused multiply-add, so native and wasm give the same bits. Its sin/cos/tan/asin/
@@ -6,9 +6,9 @@
 # engine keeps the platform libm. Blender's own warnings are not ours to fix, so they are switched off.
 include("${CMAKE_CURRENT_SOURCE_DIR}/sources.cmake")
 
-set(BLENDER "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/blender")
-set(EIGEN "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/eigen")
-set(FMT "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/fmt")
+set(BLENDER "${CMAKE_CURRENT_SOURCE_DIR}/../../lib/bl")
+set(EIGEN "${CMAKE_CURRENT_SOURCE_DIR}/../../lib/eigen")
+set(FMT "${CMAKE_CURRENT_SOURCE_DIR}/../../lib/fmt")
 set(SHIM "${CMAKE_CURRENT_SOURCE_DIR}/shim")
 
 set(VE_BLENDER_INCLUDES
@@ -69,7 +69,7 @@ function(ve_blender_options name)
     "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include array>")
 endfunction()
 
-# A library of Blender sources, named relative to third_party/blender.
+# A library of Blender sources, named relative to lib/bl.
 function(ve_blender_library name)
   set(sources "")
   foreach(source IN LISTS ARGN)
@@ -86,6 +86,13 @@ target_compile_options(ve_blender_math PRIVATE -Wall -Wextra -Wpedantic -Werror 
 ve_blender_library(ve_blender_core ${VE_BLENDER_CORE_SOURCES} extern/wcwidth/wcwidth.c)
 target_sources(ve_blender_core PRIVATE shim/ve_stubs.cc shim/memory_usage.cc)
 ve_blender_library(ve_blender_bmesh ${VE_BLENDER_BMESH_SOURCES})
+# bmesh's convex_hull operator (used by the Skin modifier around every branch) exists only when WITH_BULLET is defined, because upstream computes the hull with Bullet. Here the
+# hull routine it calls is our own (ops/hull3d.cc, API in shim/RBI_hull_api.h), so those two files are built with the define and no Bullet is linked.
+set_source_files_properties(
+  "${BLENDER}/source/blender/bmesh/operators/bmo_hull.cc"
+  "${BLENDER}/source/blender/bmesh/intern/bmesh_opdefines.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/ops/skin.cc"
+  PROPERTIES COMPILE_DEFINITIONS WITH_BULLET)
 ve_blender_library(ve_blender_geometry ${VE_BLENDER_GEOMETRY_SOURCES})
 target_link_libraries(ve_blender_bmesh PUBLIC ve_blender_core ve_blender_math)
 target_link_libraries(ve_blender_geometry PUBLIC ve_blender_core ve_blender_math)
@@ -122,7 +129,7 @@ endif()
 
 # Our operators over Blender's data structures (C ABI in ve_kernel.h). They include Blender headers, so
 # they are built with Blender's flags, not the kernel's.
-add_library(ve_blender_ops STATIC ops/polymesh.cc ops/bevel.cc ops/mesh_ops.cc ops/uv_unwrap.cc ops/easing.cc)
+add_library(ve_blender_ops STATIC ops/polymesh.cc ops/bevel.cc ops/mesh_ops.cc ops/uv_unwrap.cc ops/easing.cc ops/skin.cc ops/hull3d.cc)
 ve_blender_options(ve_blender_ops)
 target_include_directories(ve_blender_ops PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ops"
   "${CMAKE_CURRENT_SOURCE_DIR}/../include")

@@ -1,0 +1,189 @@
+# FARM TRACTOR, 150 hp row-crop class. BRIEF: 5.3 m overall (front weight to the rear hitch), wheelbase 2.80 m, 2.60 m over the rear tyres, 3.05 m to the cab roof, 0.50 m under the axles, rear tyres 1.96 m high and 0.65 m wide
+# (650/85 R38 class), front tyres 1.30 m and 0.54 m (540/65 R28 class), a four-post cab with glass all round, a hood lofted from cross-sections, a cast-iron chassis (transmission, final drives, axles, engine block) as smooth-united
+# fields, a three-point hitch with lift rods and a top link, a PTO stub, a front weight, steps, handrails, mirrors, work lamps, a beacon and an exhaust stack. +z is forward and x across, as in the car, so the vehicles share one convention;
+# the origin is on the ground at the middle of the wheelbase. engine/tools/audit-tractor.ts measures the evaluated mesh against these real figures and names the value to change.
+# kind: world
+sky = scene.sky@1(sun_elevation=42, sun_azimuth=-30, sun_intensity=3.6, turbidity=3, ground_color=[0.32, 0.3, 0.28], clouds=false, haze=0.08)
+env = scene.environment@1(sky_color=[0.75, 0.82, 0.95], ground_color=[0.42, 0.38, 0.34], intensity=0.95, reflection=0.5, bounce=0.6)
+output sky = sky
+output env = env
+
+# the paint programs of the first tractor (shape-aware: dust on top, mud low down, worn edges)
+let paint_flat = "h = surface_height(low=0.0, high=1.1); up = surface_up(power=2); base = colorize(h, gradient=[0:#1a6a2c, 1:#238a38]); dust = colorize(up, gradient=[0:#00000000, 1:#7a6a4e]); a2 = blend(dust, base, up, blend_type=normal, amount=0.12); mudmask = colorize(h, gradient=[0:#ffffff, 1:#000000]); mud = colorize(h, gradient=[0:#3a2c1c, 1:#5a4630]); albedo = blend(mud, a2, mudmask, blend_type=normal, amount=0.5)"
+let iron_program = "h = surface_height(low=0.0, high=1.4); base = colorize(h, gradient=[0:#141416, 1:#2e2f33]); mudmask = colorize(h, gradient=[0:#ffffff, 1:#000000]); mud = colorize(h, gradient=[0:#3a2c1c, 1:#5a4630]); albedo = blend(mud, base, mudmask, blend_type=normal, amount=0.65)"
+
+# ---------------- THE SHARED HELPERS (JavaScript spliced into every script node; each adds faces to the mesh m, wound outward) ----------------
+# V places a vertex; box, cylN (vertical), cylZ and cylX (along z and x), bar (a square or round bar between two points), plate (a thin quad slab, for glass), arcplate (a curved fender), slab and the hood loft
+let jt1 = "let OX=0,OY=0,OZ=0; const V=(x,y,z)=>m.vertex(OX+x,OY+y,OZ+z); const on=(p)=>PART===p; const box=(x0,y0,z0,x1,y1,z1)=>{const v=[V(x0,y0,z0),V(x1,y0,z0),V(x1,y1,z0),V(x0,y1,z0),V(x0,y0,z1),V(x1,y0,z1),V(x1,y1,z1),V(x0,y1,z1)]; m.face(v[0],v[3],v[2],v[1]); m.face(v[4],v[5],v[6],v[7]); m.face(v[0],v[1],v[5],v[4]); m.face(v[3],v[7],v[6],v[2]); m.face(v[0],v[4],v[7],v[3]); m.face(v[1],v[2],v[6],v[5]);}; const cylN=(cx,cz,y0,y1,r0,r1,n)=>{const b=[],t=[]; for(let k=0;k<n;k++){const a=k*6.283185/n,c=Math.cos(a),s=Math.sin(a); b.push(V(cx+c*r0,y0,cz+s*r0)); t.push(V(cx+c*r1,y1,cz+s*r1));} const cb=V(cx,y0,cz),ct=V(cx,y1,cz); for(let k=0;k<n;k++){const j=(k+1)%n; m.face(b[k],t[k],t[j],b[j]); m.face(cb,b[k],b[j]); m.face(ct,t[j],t[k]);}}; const cylZ=(cx,cy,z0,z1,r0,r1,n)=>{const a=[],b=[]; for(let k=0;k<n;k++){const t=k*6.283185/n,c=Math.cos(t),s=Math.sin(t); a.push(V(cx+c*r0,cy+s*r0,z0)); b.push(V(cx+c*r1,cy+s*r1,z1));} const c0=V(cx,cy,z0),c1=V(cx,cy,z1); for(let k=0;k<n;k++){const j=(k+1)%n; m.face(a[k],a[j],b[j],b[k]); m.face(c0,a[j],a[k]); m.face(c1,b[k],b[j]);}}; const cylX=(x0,x1,cy,cz,r0,r1,n)=>{const a=[],b=[]; for(let k=0;k<n;k++){const t=k*6.283185/n,c=Math.cos(t),s=Math.sin(t); a.push(V(x0,cy+s*r0,cz+c*r0)); b.push(V(x1,cy+s*r1,cz+c*r1));} const c0=V(x0,cy,cz),c1=V(x1,cy,cz); for(let k=0;k<n;k++){const j=(k+1)%n; m.face(a[k],b[k],b[j],a[j]); m.face(c0,a[k],a[j]); m.face(c1,b[j],b[k]);}};"
+let jt2 = "const bar=(a,b,r,n)=>{const d=[b[0]-a[0],b[1]-a[1],b[2]-a[2]]; const L=Math.hypot(d[0],d[1],d[2]); const t=[d[0]/L,d[1]/L,d[2]/L]; const up=Math.abs(t[1])>0.9?[1,0,0]:[0,1,0]; let n1=[t[1]*up[2]-t[2]*up[1],t[2]*up[0]-t[0]*up[2],t[0]*up[1]-t[1]*up[0]]; const l1=Math.hypot(n1[0],n1[1],n1[2]); n1=n1.map((v)=>v/l1); const n2=[t[1]*n1[2]-t[2]*n1[1],t[2]*n1[0]-t[0]*n1[2],t[0]*n1[1]-t[1]*n1[0]]; const A=[],B=[]; for(let k=0;k<n;k++){const th=2*Math.PI*k/n+(n===4?Math.PI/4:0),c=Math.cos(th),s=Math.sin(th); const o=[r*(c*n1[0]+s*n2[0]),r*(c*n1[1]+s*n2[1]),r*(c*n1[2]+s*n2[2])]; A.push(V(a[0]+o[0],a[1]+o[1],a[2]+o[2])); B.push(V(b[0]+o[0],b[1]+o[1],b[2]+o[2]));} for(let k=0;k<n;k++){const j=(k+1)%n; m.face(A[k],A[j],B[j],B[k]);} m.face(...A.slice().reverse()); m.face(...B);}; const plate=(p0,p1,p2,p3,th,hint)=>{let u=[p1[0]-p0[0],p1[1]-p0[1],p1[2]-p0[2]],v=[p3[0]-p0[0],p3[1]-p0[1],p3[2]-p0[2]]; let nn=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]]; if(nn[0]*hint[0]+nn[1]*hint[1]+nn[2]*hint[2]<0){ const t=p1; p1=p3; p3=t; u=[p1[0]-p0[0],p1[1]-p0[1],p1[2]-p0[2]]; v=[p3[0]-p0[0],p3[1]-p0[1],p3[2]-p0[2]]; nn=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]]; } const l=Math.hypot(nn[0],nn[1],nn[2]); const n=[nn[0]/l*th,nn[1]/l*th,nn[2]/l*th]; const P=[p0,p1,p2,p3]; const a=P.map((p)=>V(p[0],p[1],p[2])),b=P.map((p)=>V(p[0]+n[0],p[1]+n[1],p[2]+n[2])); m.face(b[0],b[1],b[2],b[3]); m.face(a[0],a[3],a[2],a[1]); m.face(a[0],a[1],b[1],b[0]); m.face(a[1],a[2],b[2],b[1]); m.face(a[2],a[3],b[3],b[2]); m.face(a[3],a[0],b[0],b[3]);};"
+let jt3 = "const arcplate=(cx,cy,cz,R,t0,t1,w,th,n)=>{const OL=[],OR=[],IL=[],IR=[]; for(let i=0;i<=n;i++){const t=t0+(t1-t0)*i/n,s=Math.sin(t),c=Math.cos(t); OL.push(V(cx-w/2,cy+R*s,cz+R*c)); OR.push(V(cx+w/2,cy+R*s,cz+R*c)); IL.push(V(cx-w/2,cy+(R-th)*s,cz+(R-th)*c)); IR.push(V(cx+w/2,cy+(R-th)*s,cz+(R-th)*c));} for(let i=0;i<n;i++){ m.face(OL[i],OR[i],OR[i+1],OL[i+1]); m.face(IL[i],IL[i+1],IR[i+1],IR[i]); m.face(OL[i],OL[i+1],IL[i+1],IL[i]); m.face(OR[i],IR[i],IR[i+1],OR[i+1]); } m.face(OL[0],IL[0],IR[0],OR[0]); m.face(OL[n],OR[n],IR[n],IL[n]);}; const pl=(k,z)=>{ if(z<=k[0][0]) return k[0].slice(1); for(let i=1;i<k.length;i++){ if(z<=k[i][0]){ const t=(z-k[i-1][0])/(k[i][0]-k[i-1][0]); return k[i-1].slice(1).map((v,q)=>v+(k[i][q+1]-v)*t); } } return k[k.length-1].slice(1); }; const slab=(nx,nz,x0,x1,z0,z1,hf,th)=>{const A=[],B=[]; for(let iz=0;iz<=nz;iz++){const ra=[],rb=[]; const z=z0+(z1-z0)*iz/nz; for(let ix=0;ix<=nx;ix++){const x=x0+(x1-x0)*ix/nx; const y=hf(x,z,ix,iz); ra.push(V(x,y,z)); rb.push(V(x,y-th,z));} A.push(ra); B.push(rb);} for(let iz=0;iz<nz;iz++) for(let ix=0;ix<nx;ix++){ m.face(A[iz][ix],A[iz+1][ix],A[iz+1][ix+1],A[iz][ix+1]); m.face(B[iz][ix],B[iz][ix+1],B[iz+1][ix+1],B[iz+1][ix]); } for(let ix=0;ix<nx;ix++){ m.face(A[0][ix],A[0][ix+1],B[0][ix+1],B[0][ix]); m.face(A[nz][ix],B[nz][ix],B[nz][ix+1],A[nz][ix+1]); } for(let iz=0;iz<nz;iz++){ m.face(A[iz][0],B[iz][0],B[iz+1][0],A[iz+1][0]); m.face(A[iz][nx],A[iz+1][nx],B[iz+1][nx],B[iz][nx]); }};"
+# the hood: rings [z, half width, top, bottom] interpolated along z, each ring a rounded rectangle (superellipse); end caps
+let jhood = "const R=[[0.50,0.43,1.98,1.18],[1.15,0.41,1.94,1.10],[1.85,0.38,1.85,1.06],[2.30,0.34,1.74,1.02],[2.42,0.30,1.64,1.04]]; const M=36,K=44,E=2/3.2; const rows=[]; for(let k=0;k<K;k++){ const z=0.5+(2.42-0.5)*k/(K-1); const q=pl(R,z),hw=q[0],yt=q[1],yb=q[2],cy=(yt+yb)/2,hh=(yt-yb)/2; const row=[]; for(let j=0;j<M;j++){ const th=2*Math.PI*j/M,c=Math.cos(th),s=Math.sin(th); row.push(V(hw*Math.sign(c)*Math.pow(Math.abs(c),E),cy+hh*Math.sign(s)*Math.pow(Math.abs(s),E),z)); } rows.push(row); } for(let k=0;k<K-1;k++) for(let j=0;j<M;j++){ const j2=(j+1)%M; m.face(rows[k][j],rows[k][j2],rows[k+1][j2],rows[k+1][j]); } const c0=V(0,(pl(R,0.5)[1]+pl(R,0.5)[2])/2,0.5),c1=V(0,(pl(R,2.42)[1]+pl(R,2.42)[2])/2,2.42); for(let j=0;j<M;j++){ const j2=(j+1)%M; m.face(c0,rows[0][j2],rows[0][j]); m.face(c1,rows[K-1][j],rows[K-1][j2]); }"
+hood_s = poly.script@1(code="const m = new Mesh(); const PART='hood'; ${jt1} ${jt2} ${jt3} ${jhood} m", budget=6000)
+hood_d = poly.subdivide@1(hood_s, levels=1)
+hood_m = solid.material@1(hood_d, color=[0.1, 0.45, 0.17], metallic=0.25, roughness=0.34)
+hood_t = solid.texture@1(hood_m, program="${paint_flat}")
+hood_f = solid.finish@1(hood_t, clearcoat=0.7, clearcoat_roughness=0.08)
+output hood = hood_f
+
+# ---------------- THE CAST-IRON CHASSIS: smooth-united fields (transmission, final drives, axles, bell housing, engine block, sump, frame rails, hitch lugs) ----------------
+ch_trans = field.ellipsoid@1(radii=[0.52, 0.46, 0.80])
+ch_trans_m = field.move@1(ch_trans, by=[0, 0.95, -1.2])
+ch_axle_r = field.tube@1(points=[[-0.95, 0.98, -1.4], [0.95, 0.98, -1.4]], radius=0.1)
+ch_drive = field.ellipsoid@1(radii=[0.22, 0.24, 0.24])
+ch_drive_l = field.move@1(ch_drive, by=[0.74, 0.98, -1.4])
+ch_drive_r = field.move@1(ch_drive, by=[-0.74, 0.98, -1.4])
+ch_bell = field.ellipsoid@1(radii=[0.36, 0.38, 0.32])
+ch_bell_m = field.move@1(ch_bell, by=[0, 0.92, -0.1])
+ch_engine = field.ellipsoid@1(radii=[0.36, 0.30, 0.88])
+ch_engine_m = field.move@1(ch_engine, by=[0, 0.84, 1.3])
+ch_sump = field.ellipsoid@1(radii=[0.28, 0.17, 0.6])
+ch_sump_m = field.move@1(ch_sump, by=[0, 0.56, 1.25])
+ch_faxle = field.tube@1(points=[[-0.88, 0.65, 1.4], [0.88, 0.65, 1.4]], radius=0.085)
+ch_fblock = field.ellipsoid@1(radii=[0.26, 0.2, 0.3])
+ch_fblock_m = field.move@1(ch_fblock, by=[0, 0.72, 1.4])
+ch_fhub = field.ellipsoid@1(radii=[0.16, 0.2, 0.2])
+ch_fhub_l = field.move@1(ch_fhub, by=[0.78, 0.65, 1.4])
+ch_fhub_r = field.move@1(ch_fhub, by=[-0.78, 0.65, 1.4])
+ch_bumper = field.ellipsoid@1(radii=[0.5, 0.2, 0.15])
+ch_bumper_m = field.move@1(ch_bumper, by=[0, 0.78, 2.5])
+ch_rail_l = field.tube@1(points=[[0.3, 0.72, 0.1], [0.3, 0.76, 2.4]], radius=0.05)
+ch_rail_r = field.tube@1(points=[[-0.3, 0.72, 0.1], [-0.3, 0.76, 2.4]], radius=0.05)
+ch_draw = field.tube@1(points=[[0, 0.55, -1.7], [0, 0.5, -2.35]], radius=0.04)
+ch_pto = field.tube@1(points=[[0, 0.88, -1.95], [0, 0.88, -2.3]], radius=0.032)
+ch_u1 = field.smooth_union@1(ch_trans_m, ch_axle_r, radius=0.08)
+ch_u2 = field.smooth_union@1(ch_u1, ch_drive_l, radius=0.06)
+ch_u3 = field.smooth_union@1(ch_u2, ch_drive_r, radius=0.06)
+ch_u4 = field.smooth_union@1(ch_u3, ch_bell_m, radius=0.1)
+ch_u5 = field.smooth_union@1(ch_u4, ch_engine_m, radius=0.1)
+ch_u6 = field.smooth_union@1(ch_u5, ch_sump_m, radius=0.08)
+ch_u7 = field.smooth_union@1(ch_u6, ch_fblock_m, radius=0.08)
+ch_u8 = field.smooth_union@1(ch_u7, ch_faxle, radius=0.05)
+ch_u9 = field.smooth_union@1(ch_u8, ch_fhub_l, radius=0.05)
+ch_u10 = field.smooth_union@1(ch_u9, ch_fhub_r, radius=0.05)
+ch_u11 = field.smooth_union@1(ch_u10, ch_bumper_m, radius=0.06)
+ch_u12 = field.smooth_union@1(ch_u11, ch_rail_l, radius=0.04)
+ch_u13 = field.smooth_union@1(ch_u12, ch_rail_r, radius=0.04)
+ch_u14 = field.smooth_union@1(ch_u13, ch_draw, radius=0.04)
+ch_u15 = field.smooth_union@1(ch_u14, ch_pto, radius=0.03)
+ch_noise = field.noise@1(ch_u15, amplitude=0.004, scale=0.06, octaves=2, seed=3)
+ch_solid = field.to_solid@1(ch_noise, min=[-1.2, 0.3, -2.5], max=[1.2, 1.5, 2.7], edge_length=0.03)
+ch_m = solid.material@1(ch_solid, color=[0.12, 0.12, 0.13], metallic=0.6, roughness=0.55)
+ch_t = solid.texture@1(ch_m, program="${iron_program}")
+output chassis = ch_t
+
+# ---------------- WHEELS: tyre and rim revolved about the axle (built on Y, turned onto X), lugs by inst.radial, bolts, a hub cap; they roll (spin about x, the ground speed is 3 m/s) ----------------
+let spin_rear = "0:0,0,0; 0.513:90,0,0; 1.026:180,0,0; 1.539:270,0,0; 2.052:360,0,0"
+let spin_front = "0:0,0,0; 0.34:90,0,0; 0.68:180,0,0; 1.02:270,0,0; 1.36:360,0,0"
+def rear_wheel(tag, wx, wy, wz, rot)
+  w{tag}_tp = profile.polygon@1(points=[[0.573, -0.308], [0.802, -0.325], [0.94, -0.285], [0.974, -0.205], [0.98, 0], [0.974, 0.205], [0.94, 0.285], [0.802, 0.325], [0.573, 0.308], [0.55, 0]])
+  w{tag}_tps = profile.smooth@1(w{tag}_tp, iterations=2)
+  w{tag}_tire = solid.revolve@1(w{tag}_tps, angle=360deg, segments=80)
+  w{tag}_tm = solid.material@1(w{tag}_tire, color=[0.025, 0.025, 0.027], roughness=0.92)
+  w{tag}_tf = solid.finish@1(w{tag}_tm, relief=0.5, relief_scale=60, relief_style="ridged", sheen=0.2)
+  w{tag}_tr = xform.rotate@1(w{tag}_tf, angles=[0, 0, {rot}])
+  w{tag}_ta = xform.move@1(w{tag}_tr, by=[{wx}, {wy}, {wz}])
+  w{tag}_ts = anim.track@1(w{tag}_ta, property="rotation", keys="${spin_rear}", interpolation="linear", loop=true, pivot=[{wx}, {wy}, {wz}])
+  output w{tag}_tire = w{tag}_ts
+  w{tag}_lug = solid.box@1(size=[0.115, 0.23, 0.08])
+  w{tag}_lua = xform.rotate@1(w{tag}_lug, angles=[24, 0, 0])
+  w{tag}_lub = xform.move@1(w{tag}_lua, by=[0, 0.16, 0])
+  w{tag}_lc = xform.rotate@1(w{tag}_lug, angles=[-24, 0, 0])
+  w{tag}_ld = xform.move@1(w{tag}_lc, by=[0, -0.16, 0])
+  w{tag}_la = inst.radial@1(w{tag}_lub, count=30, radius=0.9)
+  w{tag}_lb = inst.radial@1(w{tag}_ld, count=30, radius=0.9)
+  w{tag}_lar = inst.realize@1(w{tag}_la)
+  w{tag}_lbr = inst.realize@1(w{tag}_lb)
+  w{tag}_ls = solid.union@1(w{tag}_lar, w{tag}_lbr)
+  w{tag}_lm = solid.material@1(w{tag}_ls, color=[0.025, 0.025, 0.027], roughness=0.92)
+  w{tag}_lr = xform.rotate@1(w{tag}_lm, angles=[0, 0, {rot}])
+  w{tag}_lt = xform.move@1(w{tag}_lr, by=[{wx}, {wy}, {wz}])
+  w{tag}_lsn = anim.track@1(w{tag}_lt, property="rotation", keys="${spin_rear}", interpolation="linear", loop=true, pivot=[{wx}, {wy}, {wz}])
+  output w{tag}_lugs = w{tag}_lsn
+  w{tag}_rp = profile.polygon@1(points=[[0.46, -0.24], [0.6, -0.24], [0.6, 0.24], [0.46, 0.24]])
+  w{tag}_rim = solid.revolve@1(w{tag}_rp, angle=360deg, segments=64)
+  w{tag}_disc = solid.cylinder@1(radius=0.53, height=0.05, segments=48)
+  w{tag}_disc_at = xform.move@1(w{tag}_disc, by=[0, 0.14, 0])
+  w{tag}_hub = solid.cylinder@1(radius=0.17, height=0.4, segments=32)
+  w{tag}_hub_at = xform.move@1(w{tag}_hub, by=[0, 0.12, 0])
+  w{tag}_ru = solid.union@1(w{tag}_rim, w{tag}_disc_at, w{tag}_hub_at)
+  w{tag}_rm = solid.material@1(w{tag}_ru, color=[0.92, 0.72, 0.08], metallic=0.5, roughness=0.4)
+  w{tag}_rt = solid.finish@1(w{tag}_rm, clearcoat=0.5, clearcoat_roughness=0.15)
+  w{tag}_rr = xform.rotate@1(w{tag}_rt, angles=[0, 0, {rot}])
+  w{tag}_ra = xform.move@1(w{tag}_rr, by=[{wx}, {wy}, {wz}])
+  w{tag}_rs = anim.track@1(w{tag}_ra, property="rotation", keys="${spin_rear}", interpolation="linear", loop=true, pivot=[{wx}, {wy}, {wz}])
+  output w{tag}_rim = w{tag}_rs
+  w{tag}_bolt = solid.cylinder@1(radius=0.022, height=0.08, segments=10)
+  w{tag}_bolt_at = xform.move@1(w{tag}_bolt, by=[0, 0.2, 0])
+  w{tag}_bolts = inst.radial@1(w{tag}_bolt_at, count=10, radius=0.12)
+  w{tag}_bm = solid.material@1(w{tag}_bolts, color=[0.5, 0.52, 0.55], metallic=0.95, roughness=0.3)
+  w{tag}_br = xform.rotate@1(w{tag}_bm, angles=[0, 0, {rot}])
+  w{tag}_bt = xform.move@1(w{tag}_br, by=[{wx}, {wy}, {wz}])
+  w{tag}_bs = anim.track@1(w{tag}_bt, property="rotation", keys="${spin_rear}", interpolation="linear", loop=true, pivot=[{wx}, {wy}, {wz}])
+  output w{tag}_bolts = w{tag}_bs
+end
+def front_wheel(tag, wx, wy, wz, rot)
+  w{tag}_tp = profile.polygon@1(points=[[0.40, -0.24], [0.58, -0.255], [0.64, -0.21], [0.655, -0.12], [0.66, 0], [0.655, 0.12], [0.64, 0.21], [0.58, 0.255], [0.40, 0.24], [0.38, 0]])
+  w{tag}_tps = profile.smooth@1(w{tag}_tp, iterations=2)
+  w{tag}_tire = solid.revolve@1(w{tag}_tps, angle=360deg, segments=72)
+  w{tag}_tm = solid.material@1(w{tag}_tire, color=[0.025, 0.025, 0.027], roughness=0.92)
+  w{tag}_tf = solid.finish@1(w{tag}_tm, relief=0.5, relief_scale=70, relief_style="ridged", sheen=0.2)
+  w{tag}_tr = xform.rotate@1(w{tag}_tf, angles=[0, 0, {rot}])
+  w{tag}_ta = xform.move@1(w{tag}_tr, by=[{wx}, {wy}, {wz}])
+  w{tag}_ts = anim.track@1(w{tag}_ta, property="rotation", keys="${spin_front}", interpolation="linear", loop=true, pivot=[{wx}, {wy}, {wz}])
+  output w{tag}_tire = w{tag}_ts
+  w{tag}_rp = profile.polygon@1(points=[[0.3, -0.2], [0.4, -0.2], [0.4, 0.2], [0.3, 0.2]])
+  w{tag}_rim = solid.revolve@1(w{tag}_rp, angle=360deg, segments=48)
+  w{tag}_disc = solid.cylinder@1(radius=0.36, height=0.04, segments=40)
+  w{tag}_disc_at = xform.move@1(w{tag}_disc, by=[0, 0.1, 0])
+  w{tag}_hub = solid.cylinder@1(radius=0.11, height=0.3, segments=24)
+  w{tag}_hub_at = xform.move@1(w{tag}_hub, by=[0, 0.09, 0])
+  w{tag}_ru = solid.union@1(w{tag}_rim, w{tag}_disc_at, w{tag}_hub_at)
+  w{tag}_rm = solid.material@1(w{tag}_ru, color=[0.92, 0.72, 0.08], metallic=0.5, roughness=0.4)
+  w{tag}_rr = xform.rotate@1(w{tag}_rm, angles=[0, 0, {rot}])
+  w{tag}_ra = xform.move@1(w{tag}_rr, by=[{wx}, {wy}, {wz}])
+  w{tag}_rs = anim.track@1(w{tag}_ra, property="rotation", keys="${spin_front}", interpolation="linear", loop=true, pivot=[{wx}, {wy}, {wz}])
+  output w{tag}_rim = w{tag}_rs
+end
+rear_wheel("rl", 0.975, 0.98, -1.4, -90)
+rear_wheel("rr", -0.975, 0.98, -1.4, 90)
+front_wheel("fl", 0.95, 0.65, 1.4, -90)
+front_wheel("fr", -0.95, 0.65, 1.4, 90)
+
+# ---------------- THE CAB, FENDERS, INTERIOR, HITCH AND THE SMALL PARTS: one assembly script per material ----------------
+# parts: black (frame, rails, links, steps), paint (roof, fenders, tanks), glass, seat, trim, light (white lamps), amber (beacon), tail (red lamps), mirror, gold (badge)
+let jt4 = "const cab=()=>{ if(on('black')){ for(const s of [-1,1]){ bar([s*0.80,1.12,0.42],[s*0.80,3.0,0.30],0.04,4); bar([s*0.80,1.12,-1.25],[s*0.80,3.0,-1.25],0.04,4); bar([s*0.80,1.12,-0.45],[s*0.80,3.0,-0.45],0.03,4); bar([s*0.80,1.55,0.40],[s*0.80,1.55,-1.25],0.025,4); bar([s*0.80,3.0,0.30],[s*0.80,3.0,-1.25],0.035,4); } bar([-0.8,3.0,0.30],[0.8,3.0,0.30],0.035,4); bar([-0.8,3.0,-1.25],[0.8,3.0,-1.25],0.035,4); bar([-0.8,1.55,0.40],[0.8,1.55,0.40],0.025,4); bar([-0.8,1.55,-1.25],[0.8,1.55,-1.25],0.025,4); box(-0.82,1.04,-1.28,0.82,1.12,0.46); for(const s of [-1,1]){ box(s*0.84-0.02,1.88,-0.42,s*0.84+0.03,1.96,-0.3); bar([s*0.86,1.12,0.30],[s*0.86,1.95,0.36],0.018,6); } } if(on('paint')){ const f=(x,z)=>3.05+0.04*(1-(x/0.92)*(x/0.92)); slab(14,8,-0.92,0.92,-1.34,0.42,(x,z)=>f(x,z),0.08); box(-0.5,3.12,-1.3,0.5,3.27,-0.55); } if(on('glass')){ plate([-0.78,1.56,0.40],[0.78,1.56,0.40],[0.78,2.98,0.31],[-0.78,2.98,0.31],0.012,[0,0,1]); plate([-0.78,1.56,-1.27],[0.78,1.56,-1.27],[0.78,2.98,-1.27],[-0.78,2.98,-1.27],0.012,[0,0,-1]); for(const s of [-1,1]){ plate([s*0.81,1.56,-1.22],[s*0.81,1.56,0.38],[s*0.81,2.98,0.30],[s*0.81,2.98,-1.22],0.012,[s,0,0]); } } };"
+let jt5 = "const inside=()=>{ if(on('seat')){ box(-0.27,1.28,-0.86,0.27,1.4,-0.34); plate([-0.27,1.4,-0.86],[0.27,1.4,-0.86],[0.27,2.05,-1.0],[-0.27,2.05,-1.0],0.09,[0,0,1]); box(-0.13,2.05,-1.05,0.13,2.27,-0.97); box(-0.3,1.4,-0.82,-0.27,1.55,-0.4); box(0.27,1.4,-0.82,0.3,1.55,-0.4); } if(on('trim')){ box(0.3,1.4,-0.95,0.52,1.55,-0.15); cylN(0.4,-0.5,1.55,1.68,0.014,0.02,8); plate([0.3,1.56,-0.45],[0.5,1.56,-0.45],[0.5,1.72,-0.3],[0.3,1.72,-0.3],0.02,[0,1,0]); box(-0.68,1.32,0.0,0.68,1.58,0.36); box(-0.2,1.58,0.1,0.2,1.7,0.3); bar([0,1.48,0.22],[0,1.76,-0.03],0.03,6); const pts=[]; for(let i=0;i<16;i++){ const a=i*Math.PI/8; pts.push([0.19*Math.cos(a),1.8+0.19*Math.sin(a)*0.89,-0.04+0.19*Math.sin(a)*0.45]); } for(let i=0;i<16;i++) bar(pts[i],pts[(i+1)%16],0.013,4); bar([-0.19,1.8,-0.04],[0.19,1.8,-0.04],0.01,4); bar([0,1.8,-0.04],[0,1.8+0.17*0.89,-0.04+0.17*0.45],0.01,4); box(-0.5,1.15,0.18,-0.4,1.2,0.3); box(-0.35,1.15,0.18,-0.25,1.2,0.3); box(0.3,1.15,0.18,0.42,1.2,0.3); } };"
+let jt6 = "const bodywork=()=>{ if(on('paint')){ for(const s of [-1,1]){ arcplate(s*0.975,0.98,-1.4,1.08,-0.15,3.3,0.8,0.035,30); arcplate(s*0.95,0.65,1.4,0.76,0.12,2.6,0.62,0.03,20); cylZ(s*0.66,0.78,-1.05,-0.15,0.2,0.2,16); } } if(on('black')){ for(const s of [-1,1]){ for(const [y,w] of [[0.46,0.3],[0.8,0.3],[1.1,0.3]]) box(s*0.86,y,-0.38,s*1.14,y+0.04,0.1); bar([s*0.88,0.46,0.1],[s*0.88,1.12,0.1],0.018,4); bar([s*1.12,0.46,0.1],[s*1.12,1.1,0.1],0.018,4); for(const q of [-0.9,-0.55,-0.3]) bar([s*0.66,0.55,q],[s*0.66,0.8,q],0.012,4); bar([s*0.82,2.35,0.28],[s*1.3,2.42,0.4],0.02,6); bar([s*1.3,2.42,0.4],[s*1.3,2.15,0.4],0.02,6); bar([s*0.3,0.62,-1.3],[s*0.45,0.58,-2.4],0.03,6); bar([s*0.78,1.12,-1.45],[s*0.62,0.64,-2.1],0.02,6); bar([s*0.35,1.28,-1.35],[s*0.4,1.02,-2.05],0.026,6); bar([s*0.6,0.5,-1.5],[s*0.92,0.46,-2.2],0.018,6); bar([s*0.5,1.4,-1.38],[s*0.5,1.9,-1.38],0.02,6); } bar([0,1.42,-1.35],[0,1.0,-2.3],0.028,6); box(-0.1,0.46,-2.45,0.1,0.54,-2.3); cylZ(0,0.88,-2.0,-2.2,0.09,0.09,12); box(-0.5,0.55,2.64,0.5,1.25,2.8); for(let i=0;i<5;i++) box(-0.52,0.6+i*0.13,2.62,0.52,0.66+i*0.13,2.66); cylN(0.3,0.62,1.96,2.9,0.05,0.05,12); cylN(0.3,0.62,1.94,2.02,0.085,0.085,12); box(0.27,2.9,0.57,0.36,2.93,0.67); cylN(-0.3,0.9,1.92,2.55,0.07,0.07,12); cylN(-0.3,0.9,2.55,2.7,0.1,0.02,12); box(-0.26,1.08,2.43,0.26,1.56,2.45); for(let i=0;i<9;i++) box(-0.22,1.12+i*0.045,2.45,0.22,1.135+i*0.045,2.47); bar([0.45,1.6,0.41],[-0.2,2.2,0.33],0.008,4); } if(on('mirror')){ for(const s of [-1,1]) plate([s*1.22,2.15,0.38],[s*1.42,2.15,0.38],[s*1.42,2.62,0.38],[s*1.22,2.62,0.38],0.03,[0,0,-1]); } if(on('gold')) box(-0.1,1.58,2.43,0.1,1.64,2.46); if(on('amber')) cylN(0,-1.1,3.28,3.42,0.07,0.06,12); if(on('light')){ for(const s of [-1,1]){ box(s*0.18-0.1,1.38,2.4,s*0.18+0.1,1.48,2.43); box(s*0.55-0.1,3.04,0.3,s*0.55+0.1,3.12,0.42); box(s*0.55-0.1,3.04,-1.38,s*0.55+0.1,3.12,-1.26); } } if(on('tail')){ for(const s of [-1,1]) box(s*0.92-0.07,1.28,-2.43,s*0.92+0.07,1.4,-2.4); } };"
+def tpart(tag, part, cr, cg, cb, met, rough)
+  t{tag}_s = poly.script@1(code="const m = new Mesh(); const PART='${part}'; ${jt1} ${jt2} ${jt3} ${jt4} ${jt5} ${jt6} cab(); inside(); bodywork(); m", budget=9000)
+  t{tag}_m = solid.material@1(t{tag}_s, color=[{cr}, {cg}, {cb}], metallic={met}, roughness={rough})
+  output {tag} = t{tag}_m
+end
+tpart("tr_black", "black", 0.05, 0.05, 0.055, 0.5, 0.5)
+tpart("tr_seat", "seat", 0.06, 0.06, 0.07, 0.0, 0.9)
+tpart("tr_trim", "trim", 0.12, 0.12, 0.13, 0.1, 0.65)
+tpart("tr_mirror", "mirror", 0.7, 0.75, 0.8, 1.0, 0.05)
+tpart("tr_gold", "gold", 0.9, 0.76, 0.12, 0.9, 0.25)
+# the paint parts take the same shape-aware paint as the hood
+tpa_s = poly.script@1(code="const m = new Mesh(); const PART='paint'; ${jt1} ${jt2} ${jt3} ${jt4} ${jt5} ${jt6} cab(); inside(); bodywork(); m", budget=9000)
+tpa_m = solid.material@1(tpa_s, color=[0.1, 0.45, 0.17], metallic=0.25, roughness=0.34)
+tpa_t = solid.texture@1(tpa_m, program="${paint_flat}")
+tpa_f = solid.finish@1(tpa_t, clearcoat=0.7, clearcoat_roughness=0.08)
+output tr_paint = tpa_f
+tgl_s = poly.script@1(code="const m = new Mesh(); const PART='glass'; ${jt1} ${jt2} ${jt3} ${jt4} ${jt5} ${jt6} cab(); inside(); bodywork(); m", budget=9000)
+tgl_m = solid.material@1(tgl_s, color=[0.5, 0.65, 0.72], metallic=0.2, roughness=0.04, opacity=0.28)
+output tr_glass = tgl_m
+tli_s = poly.script@1(code="const m = new Mesh(); const PART='light'; ${jt1} ${jt2} ${jt3} ${jt4} ${jt5} ${jt6} cab(); inside(); bodywork(); m", budget=9000)
+tli_m = solid.material@1(tli_s, color=[1, 0.96, 0.85], roughness=0.1, emissive=[3.5, 3.2, 2.6])
+output tr_lamps = tli_m
+tam_s = poly.script@1(code="const m = new Mesh(); const PART='amber'; ${jt1} ${jt2} ${jt3} ${jt4} ${jt5} ${jt6} cab(); inside(); bodywork(); m", budget=9000)
+tam_m = solid.material@1(tam_s, color=[1, 0.55, 0.05], roughness=0.2, emissive=[3.0, 1.2, 0.1])
+output tr_beacon = tam_m
+tta_s = poly.script@1(code="const m = new Mesh(); const PART='tail'; ${jt1} ${jt2} ${jt3} ${jt4} ${jt5} ${jt6} cab(); inside(); bodywork(); m", budget=9000)
+tta_m = solid.material@1(tta_s, color=[0.9, 0.04, 0.03], roughness=0.15, emissive=[1.6, 0.05, 0.03])
+output tr_tail = tta_m
+hl_a = light.spot@1(position=[0.18, 1.43, 2.55], direction=[0, -0.1, 1], color=[1, 0.95, 0.82], intensity=900, range=26, inner_angle=0.4, outer_angle=0.8)
+output headlight_l = hl_a
+hl_b = light.spot@1(position=[-0.18, 1.43, 2.55], direction=[0, -0.1, 1], color=[1, 0.95, 0.82], intensity=900, range=26, inner_angle=0.4, outer_angle=0.8)
+output headlight_r = hl_b

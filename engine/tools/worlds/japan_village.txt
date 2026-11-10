@@ -1,0 +1,147 @@
+# A JAPANESE MOUNTAIN VILLAGE AT DUSK. A paved street between two rows of machiya townhouses (timber frame, plaster, wooden lattice, indigo noren, tiled roofs with a small eave between the floors), a thatched
+# farmhouse, a koi pond with an arched bridge, then stone stairs under three torii climbing the hillside to a shrine terrace with a main hall and a five-tier pagoda. Pines, cherry blossom and maples are
+# planted over the terrain by rule; lanterns, paper windows and a few real lights make the dusk. Everything is generated: the buildings come from ONE grammar (a facade width, depth, floors and a style
+# in a table -> posts, plaster, lattice, windows, eaves, roof), so a street of any length and variety is a loop, not hundreds of hand-placed nodes.
+# Metres, +y up. Tile coordinates are world coordinates (the tile starts at x = 0, z = 0): the village shelf is at height 4 around (96, 64), the street runs along z, the shrine terrace is at (96, 152) at height 16.
+# kind: world
+sky = scene.sky@1(sun_elevation=5, sun_azimuth=40, sun_intensity=5.0, turbidity=7, clouds=true, seed=4, haze=0.12, haze_color=[0.95, 0.52, 0.4], haze_height=60, focus_distance=40, aperture=6.3)
+output sky = sky
+env = scene.environment@1(sky_color=[0.8, 0.62, 0.62], ground_color=[0.2, 0.2, 0.18], intensity=1.25, reflection=0.3)
+output env = env
+
+# ---------------- THE LAND: a mountain valley with two levelled shelves and a pond hollow ----------------
+land = terrain.tile@1(size=[192, 192], cell=1.5, seed=7, height=70, scale=140, octaves=4, roughness=0.5)
+shelf = terrain.flatten@1(land, at=[96, 64], radius=46, blend=10, to="height", height=4.0)
+terrace = terrain.flatten@1(shelf, at=[96, 152], radius=24, blend=22, to="height", height=16.0)
+pad_pagoda = terrain.flatten@1(terrace, at=[66, 150], radius=10, blend=8, to="height", height=16.0)
+# the stair corridor: seven small level pads along x = 96, each at the stair's own height there (0.35 m under the steps), so the hill is cut to the stairs and never hides them
+ramp7 = terrain.flatten@1(pad_pagoda, at=[96, 126], radius=4.2, blend=2.5, to="height", height=15.0)
+ramp6 = terrain.flatten@1(ramp7, at=[96, 123], radius=4.2, blend=2.5, to="height", height=13.3)
+ramp5 = terrain.flatten@1(ramp6, at=[96, 120], radius=4.2, blend=2.5, to="height", height=11.6)
+ramp4 = terrain.flatten@1(ramp5, at=[96, 117], radius=4.2, blend=2.5, to="height", height=9.9)
+ramp3 = terrain.flatten@1(ramp4, at=[96, 114], radius=4.2, blend=2.5, to="height", height=8.2)
+ramp2 = terrain.flatten@1(ramp3, at=[96, 111], radius=4.2, blend=2.5, to="height", height=6.45)
+ramp1 = terrain.flatten@1(ramp2, at=[96, 108], radius=4.2, blend=2.5, to="height", height=3.8)
+hollow = terrain.flatten@1(ramp1, at=[122, 100], radius=8, blend=9, to="height", height=2.3)
+land_b = terrain.biomes@1(hollow, seed=3)
+pond = water.fill@1(hollow, at=[122, 100], level=3.1, shore=3, shallow=[0.2, 0.42, 0.4], deep=[0.03, 0.13, 0.2], clarity=2.5, ripple=0.4, foam=0.25, opacity=0.9)
+output pond = pond
+ground = terrain.material@1(land_b, grass=[0.17, 0.29, 0.1], rock=[0.4, 0.37, 0.33], rock_slope=36, sand_line=0.5)
+output ground = ground
+
+# ---------------- THE SHARED GEOMETRY HELPERS (plain JavaScript spliced into every script node; each adds faces to the mesh m, wound outward) ----------------
+# place(x, y, z, yaw) sets where the next things are built; box, cylN, slab (a curved roof slab with a thickness) and gable are the pieces; on(part) says whether this node is the one that emits that material.
+let jh1 = "let OX=0,OY=0,OZ=0,CY=1,SY=0; const place=(x,y,z,yaw)=>{OX=x;OY=y;OZ=z;CY=Math.cos(yaw);SY=Math.sin(yaw);}; const V=(x,y,z)=>m.vertex(OX+x*CY-z*SY,OY+y,OZ+x*SY+z*CY); const on=(p)=>PART===p; const box=(x0,y0,z0,x1,y1,z1)=>{const v=[V(x0,y0,z0),V(x1,y0,z0),V(x1,y1,z0),V(x0,y1,z0),V(x0,y0,z1),V(x1,y0,z1),V(x1,y1,z1),V(x0,y1,z1)]; m.face(v[0],v[3],v[2],v[1]); m.face(v[4],v[5],v[6],v[7]); m.face(v[0],v[1],v[5],v[4]); m.face(v[3],v[7],v[6],v[2]); m.face(v[0],v[4],v[7],v[3]); m.face(v[1],v[2],v[6],v[5]);}; const cylN=(cx,cz,y0,y1,r0,r1,n)=>{const b=[],t=[]; for(let k=0;k<n;k++){const a=k*6.283185/n,c=Math.cos(a),s=Math.sin(a); b.push(V(cx+c*r0,y0,cz+s*r0)); t.push(V(cx+c*r1,y1,cz+s*r1));} const cb=V(cx,y0,cz),ct=V(cx,y1,cz); for(let k=0;k<n;k++){const j=(k+1)%n; m.face(b[k],t[k],t[j],b[j]); m.face(cb,b[k],b[j]); m.face(ct,t[j],t[k]);}};"
+let jh2 = "const slab=(nx,nz,x0,x1,z0,z1,hf,th)=>{const A=[],B=[]; for(let iz=0;iz<=nz;iz++){const ra=[],rb=[]; const z=z0+(z1-z0)*iz/nz; for(let ix=0;ix<=nx;ix++){const x=x0+(x1-x0)*ix/nx; const y=hf(x,z,ix,iz); ra.push(V(x,y,z)); rb.push(V(x,y-th,z));} A.push(ra); B.push(rb);} for(let iz=0;iz<nz;iz++) for(let ix=0;ix<nx;ix++){ m.face(A[iz][ix],A[iz+1][ix],A[iz+1][ix+1],A[iz][ix+1]); m.face(B[iz][ix],B[iz][ix+1],B[iz+1][ix+1],B[iz+1][ix]); } for(let ix=0;ix<nx;ix++){ m.face(A[0][ix],A[0][ix+1],B[0][ix+1],B[0][ix]); m.face(A[nz][ix],B[nz][ix],B[nz][ix+1],A[nz][ix+1]); } for(let iz=0;iz<nz;iz++){ m.face(A[iz][0],B[iz][0],B[iz+1][0],A[iz+1][0]); m.face(A[iz][nx],A[iz+1][nx],B[iz+1][nx],B[iz][nx]); }}; const gable=(x,y,hz,H,th)=>{const a0=V(x,y,-hz),b0=V(x,y,hz),c0=V(x,y+H,0),a1=V(x+th,y,-hz),b1=V(x+th,y,hz),c1=V(x+th,y+H,0); m.face(a0,b0,c0); m.face(c1,b1,a1); m.face(a0,a1,b1,b0); m.face(a0,c0,c1,a1); m.face(b0,b1,c1,c0);}; const rh=(RX,RZ,H,RH,S)=>(x,z)=>{const tz=Math.abs(z)/RZ,tx=Math.abs(x); let h=H*(1-tz); if(RH<RX) h=Math.min(h,H*(RX-tx)/(RX-RH)); h=Math.max(h,0); const te=Math.max(tz,RH<RX&&tx>RH?(tx-RH)/(RX-RH):0); return h+S*Math.pow(te,4);};"
+# ---------------- THE VILLAGE: one grammar for every house ----------------
+# bld(x, z, yaw, W, D, floors, style): W is the facade width, D the depth, local +z is the front. Y0 is the shelf height. Styles 0 and 1 are machiya (slate roofs), 2 is a minka (thatch).
+let jb1 = "const Y0=4.0; const bld=(x,z,yaw,W,D,F,st)=>{ place(x,Y0,z,yaw); const hw=W/2,hd=D/2,y1=0.45,H1=3.1,y2=y1+H1,H2=F===2?2.5:0,yt=y2+H2; const thatch=st===2;"
+let jb2 = "if(on('stone')){ box(-hw-0.06,0,-hd-0.06,hw+0.06,0.45,hd+0.06); } if(on('plaster')){ box(-hw,y1,-hd,hw,yt,-hd+0.12); box(-hw,y1,-hd,-hw+0.12,yt,hd); box(hw-0.12,y1,-hd,hw,yt,hd); box(-hw,y1+2.55,hd-0.12,hw,y2,hd); if(F===2) box(-hw+0.04,y2,hd-0.14,hw-0.04,yt,hd-0.03); gable(-hw,yt,hd+0.1,thatch?2.4:1.4,0.12); gable(hw-0.12,yt,hd+0.1,thatch?2.4:1.4,0.12); }"
+let jb3 = "if(on('wood')){ const nxp=Math.max(2,Math.round(W/2.2)); for(let i=0;i<=nxp;i++){ const px=-hw+W*i/nxp; box(px-0.07,y1,hd-0.15,px+0.07,yt,hd); box(px-0.07,y1,-hd,px+0.07,yt,-hd+0.14); } box(-hw,y2-0.14,hd-0.17,hw,y2+0.04,hd+0.02); box(-hw,y1,hd-0.15,hw,y1+0.1,hd); box(-hw,yt-0.12,hd-0.17,hw,yt+0.02,hd+0.02); box(-hw,y1+0.9,hd-0.12,hw,y1+1.0,hd-0.02); box(-hw,y1+2.45,hd-0.12,hw,y1+2.55,hd-0.02); for(let s=-1;s<=1;s+=2){ for(let x=0.95;x<hw-0.25;x+=0.1){ box(s*x-0.014,y1+1.0,hd-0.1,s*x+0.014,y1+2.45,hd-0.05); } } box(-0.9,y1,hd-0.15,-0.8,y1+2.55,hd); box(0.8,y1,hd-0.15,0.9,y1+2.55,hd);"
+let jb4 = "if(F===2){ for(const wx of [-hw*0.5,hw*0.5]){ box(wx-0.8,y2+0.4,hd-0.04,wx+0.8,y2+0.5,hd+0.03); box(wx-0.8,y2+2.0,hd-0.04,wx+0.8,y2+2.1,hd+0.03); box(wx-0.8,y2+0.4,hd-0.04,wx-0.72,y2+2.1,hd+0.03); box(wx+0.72,y2+0.4,hd-0.04,wx+0.8,y2+2.1,hd+0.03); box(wx-0.04,y2+0.5,hd-0.04,wx+0.04,y2+2.0,hd+0.03); for(let by=y2+0.7;by<y2+2.0;by+=0.2) box(wx-0.72,by,hd-0.05,wx+0.72,by+0.03,hd+0.0); } } }"
+let jb5 = "if(on('dark')){ box(-0.8,y1,hd-0.3,0.8,y1+2.5,hd-0.12); box(-hw+0.12,y1+1.0,hd-0.2,hw-0.12,y1+2.45,hd-0.16); } if(on('noren')){ for(const nx of [-0.55,0,0.55]){ box(nx-0.25,y1+1.25,hd-0.07,nx+0.25,y1+2.45,hd-0.055); } } if(on('paper')&&F===2){ for(const wx of [-hw*0.5,hw*0.5]){ box(wx-0.72,y2+0.5,hd-0.05,wx+0.72,y2+2.0,hd+0.01); } } if(on('lamp')){ const lx=hw*0.8; cylN(lx,hd+0.35,y1+2.6,y1+3.0,0.14,0.14,10); cylN(-lx,hd+0.35,y1+2.6,y1+3.0,0.14,0.14,10); }"
+let jb6 = "if(F===2&&on('roof')){ slab(14,4,-hw-0.3,hw+0.3,hd-0.2,hd+1.1,(x,z)=>y2+0.35-0.5*((z-(hd-0.2))/1.3),0.07); } const RX=hw+(thatch?0.9:0.55),RZ=hd+(thatch?1.5:0.95),RH=thatch?hw*0.55:RX,HH=thatch?3.3:1.75,TH=thatch?0.55:0.16;"
+let jb7 = "if((on('roof')&&!thatch)||(on('thatch')&&thatch)){ const f=rh(RX,RZ,HH,RH,thatch?0.55:0.4); const cols=Math.max(8,Math.round(2*RX/0.17)); slab(cols,10,-RX,RX,-RZ,RZ,(x,z,ix,iz)=>yt-0.12+f(x,z)+(thatch?0:0.012*(ix%2)),TH); } if(on('roof')&&!thatch){ box(-RX-0.05,yt-0.12+HH,-0.11,RX+0.05,yt-0.12+HH+0.2,0.11); box(-RX-0.08,yt-0.12+HH+0.2,-0.13,-RX+0.25,yt-0.12+HH+0.5,0.13); box(RX-0.25,yt-0.12+HH+0.2,-0.13,RX+0.08,yt-0.12+HH+0.5,0.13); } if(on('thatch')&&thatch){ box(-RH-0.1,yt-0.12+HH,-0.25,RH+0.1,yt-0.12+HH+0.25,0.25); } };"
+# the street: two rows of facades facing it (west row faces +x, east row faces -x), widths and depths from a seeded sequence; then the farmhouse
+let jrows = "let sd=11; const rnd=()=>{sd=(sd*1103515245+12345)&0x7fffffff; return sd/2147483648;}; const row=(side)=>{ let z=side>0?40:43; while(z<102){ const W=6.4+rnd()*3.0,D=8+rnd()*2.4,F=rnd()<0.72?2:1,st=rnd()<0.5?0:1; bld(96+side*(4.8+D/2),z+W/2,side>0?-Math.PI/2:Math.PI/2,W,D,F,st); z+=W+0.55; } }; row(-1); row(1); bld(52,70,-Math.PI/2,11,9.5,1,2);"
+def vpart(tag, part, cr, cg, cb, rough)
+  v{tag}_s = poly.script@1(code="const m = new Mesh(); const PART='${part}'; ${jh1} ${jh2} ${jb1} ${jb2} ${jb3} ${jb4} ${jb5} ${jb6} ${jb7} ${jrows} m", budget=9000)
+  v{tag}_m = solid.material@1(v{tag}_s, color=[{cr}, {cg}, {cb}], roughness={rough})
+  output {tag} = v{tag}_m
+end
+vpart("v_stone", "stone", 0.34, 0.33, 0.31, 0.92)
+vpart("v_wood", "wood", 0.2, 0.12, 0.07, 0.6)
+vpart("v_plaster", "plaster", 0.82, 0.78, 0.68, 0.92)
+vpart("v_dark", "dark", 0.03, 0.025, 0.025, 0.9)
+vpart("v_noren", "noren", 0.07, 0.13, 0.3, 0.85)
+vpart("v_roof", "roof", 0.12, 0.14, 0.17, 0.4)
+vpart("v_thatch", "thatch", 0.55, 0.42, 0.22, 0.95)
+# lit paper windows and hanging lanterns glow
+vp_s = poly.script@1(code="const m = new Mesh(); const PART='paper'; ${jh1} ${jh2} ${jb1} ${jb2} ${jb3} ${jb4} ${jb5} ${jb6} ${jb7} ${jrows} m", budget=9000)
+vp_m = solid.material@1(vp_s, color=[1, 0.86, 0.6], roughness=0.8, emissive=[2.4, 1.3, 0.5])
+output v_paper = vp_m
+vl_s = poly.script@1(code="const m = new Mesh(); const PART='lamp'; ${jh1} ${jh2} ${jb1} ${jb2} ${jb3} ${jb4} ${jb5} ${jb6} ${jb7} ${jrows} m", budget=9000)
+vl_m = solid.material@1(vl_s, color=[0.9, 0.12, 0.05], roughness=0.5, emissive=[4.0, 0.6, 0.15])
+output v_lanterns = vl_m
+
+# ---------------- THE STREET: stone slabs with joints, 9.6 m between the facades ----------------
+street_b = solid.box@1(size=[9.6, 0.1, 74])
+street_m = solid.material@1(street_b, color=[1, 1, 1], roughness=0.85)
+street_t = solid.texture@1(street_m, program="a = expr(code=\"u = p.x * 3.0; v = p.y * 2.0; h = hash(vec2(floor(u), floor(v))); e = min(min(fract(u), 1.0 - fract(u)), min(fract(v), 1.0 - fract(v))); j = smoothstep(0.0, 0.07, e); out = vec3(0.26 + 0.1 * h, 0.26 + 0.09 * h, 0.25 + 0.08 * h) * (0.4 + 0.6 * j)\")\nalbedo = a", size="512", tile=4.4)
+street_p = xform.move@1(street_t, by=[96, 3.98, 73])
+output street = street_p
+
+# ---------------- THE SHRINE PRECINCT: stairs, three torii, lanterns, the main hall, the pagoda, the pond bridge ----------------
+# More pieces: sweep (a beam along a list of points, for the curved kasagi of a torii), torii, a stone lantern, and the shrine's parts, each guarded by on(part).
+let jc1 = "const sweep=(pts,zt,zb,th)=>{ const A=[],B=[],C=[],D=[]; for(const p of pts){ A.push(V(p[0],p[1],p[2]-zt)); B.push(V(p[0],p[1],p[2]+zt)); C.push(V(p[0],p[1]-th,p[2]+zb)); D.push(V(p[0],p[1]-th,p[2]-zb)); } const n=pts.length-1; for(let i=0;i<n;i++){ m.face(A[i],B[i],B[i+1],A[i+1]); m.face(D[i],D[i+1],C[i+1],C[i]); m.face(A[i],A[i+1],D[i+1],D[i]); m.face(B[i],C[i],C[i+1],B[i+1]); } m.face(A[0],D[0],C[0],B[0]); m.face(A[n],B[n],C[n],D[n]); };"
+let jc2 = "const torii=(cx,y,cz,s)=>{ place(0,0,0,0); const px=2.1*s; if(on('sred')){ for(const sx of [-1,1]) cylN(cx+sx*px,cz,y+0.35*s,y+4.6*s,0.26*s,0.22*s,14); box(cx-2.75*s,y+3.55*s,cz-0.13*s,cx+2.75*s,y+3.95*s,cz+0.13*s); box(cx-0.1*s,y+3.95*s,cz-0.1*s,cx+0.1*s,y+4.6*s,cz+0.1*s); } if(on('sblack')){ for(const sx of [-1,1]) cylN(cx+sx*px,cz,y,y+0.35*s,0.3*s,0.3*s,14); const pts=[],p2=[]; for(let i=0;i<=16;i++){ const t=-1+2*i/16; pts.push([cx+t*3.3*s,y+4.75*s+0.55*s*Math.pow(Math.abs(t),3),cz]); p2.push([cx+t*3.05*s,y+4.45*s+0.4*s*Math.pow(Math.abs(t),3),cz]); } sweep(pts,0.3*s,0.24*s,0.3*s); sweep(p2,0.22*s,0.2*s,0.2*s); } };"
+let jc3 = "const lantern=(x,y,z,s)=>{ place(0,0,0,0); if(on('sstone')){ cylN(x,z,y-0.8,y+0.2*s,0.42*s,0.38*s,8); cylN(x,z,y+0.2*s,y+1.0*s,0.17*s,0.2*s,8); cylN(x,z,y+1.0*s,y+1.12*s,0.4*s,0.4*s,8); for(let k=0;k<6;k++){ const a=k*1.0472+0.5236; cylN(x+Math.cos(a)*0.22*s,z+Math.sin(a)*0.22*s,y+1.12*s,y+1.6*s,0.04*s,0.04*s,6); } cylN(x,z,y+1.6*s,y+1.72*s,0.34*s,0.34*s,6); cylN(x,z,y+1.72*s,y+2.05*s,0.5*s,0.12*s,6); cylN(x,z,y+2.05*s,y+2.25*s,0.1*s,0.07*s,8); } if(on('sglow')) cylN(x,z,y+1.14*s,y+1.58*s,0.2*s,0.2*s,6); };"
+# the stairs climb from the street end (z = 106, height 4) to the terrace (z = 127, height 16): 66 steps; every torii and lantern sits on the step height at its z
+let jc4 = "const STY=(z)=>4+(z-106)*12/21; const stairs=()=>{ place(0,0,0,0); if(on('sstone')){ const n=66; for(let k=0;k<n;k++){ const za=106+21*k/n,zb=106+21*(k+1)/n,y=4+12*(k+1)/n; box(93.4,2.5,za,98.6,y,zb); box(92.3,2.5,za,93.4,y+0.5,zb); box(98.6,2.5,za,99.7,y+0.5,zb); } box(92.3,10,127,99.7,16,135); } for(const z of [111,117,123]) torii(96,STY(z),z,0.85); for(let z=108;z<126;z+=4.5){ lantern(91.0,STY(z),z,1.0); lantern(101.0,STY(z),z,1.0); } };"
+let jc5 = "const hall=()=>{ place(0,0,0,0); const X0=84,X1=108,ZF=143,ZB=157,Y=16,YF=17.2,YC=22.4; if(on('sstone')){ box(82,Y,141,110,YF,159); for(let k=0;k<5;k++) box(91,Y,141-0.45*(k+1),101,Y+0.24*(k+1),141); } const cols=[]; for(let i=0;i<=6;i++){ cols.push([X0+i*4,ZF]); cols.push([X0+i*4,ZB]); } cols.push([X0,150]); cols.push([X1,150]); if(on('sred')){ for(const c of cols) cylN(c[0],c[1],YF,YC,0.34,0.3,14); box(X0-0.4,YC,ZF-0.3,X1+0.4,YC+0.7,ZF+0.3); box(X0-0.4,YC,ZB-0.3,X1+0.4,YC+0.7,ZB+0.3); box(X0-0.3,YC,ZF,X0+0.3,YC+0.7,ZB); box(X1-0.3,YC,ZF,X1+0.3,YC+0.7,ZB); for(const c of cols){ box(c[0]-0.55,YC+0.7,c[1]-0.55,c[0]+0.55,YC+1.0,c[1]+0.55); box(c[0]-0.8,YC+1.0,c[1]-0.8,c[0]+0.8,YC+1.3,c[1]+0.8); } for(let x=X0;x<=X1;x+=4) box(x-0.08,YF+0.12,ZF+2.95,x+0.08,YC,ZF+3.15); } if(on('sdeck')){ for(let z=ZF-1;z<ZB+1;z+=0.3) box(X0-1,YF,z,X1+1,YF+0.12,z+0.28); } if(on('splaster')){ box(X0,YF+0.12,ZB-0.15,X1,YC,ZB); box(X0,YF+0.12,ZF,X0+0.15,YC,ZB); box(X1-0.15,YF+0.12,ZF,X1,YC,ZB); box(X0,YF+0.12,ZF+3,X1,YF+0.9,ZF+3.1); box(X0,YC-1.2,ZF+3,X1,YC,ZF+3.1); } if(on('spaper')){ for(let x=X0+0.3;x<X1-2;x+=4) box(x,YF+0.9,ZF+3.0,x+3.4,YC-1.2,ZF+3.06); } if(on('sroof')){ place(96,YC+1.3,150,0); const f=rh(15.8,11.6,6.2,7.0,1.1); slab(100,40,-15.8,15.8,-11.6,11.6,(x,z,ix,iz)=>f(x,z)+0.014*(ix%2),0.6); box(-7.4,6.2,-0.32,7.4,6.75,0.32); box(-7.8,6.4,-0.22,-7.0,7.7,0.22); box(7.0,6.4,-0.22,7.8,7.7,0.22); place(0,0,0,0); } };"
+let jc6 = "const pagoda=()=>{ place(0,0,0,0); const CX=66,CZ=150,Y=16; if(on('sstone')){ box(CX-5.5,Y,CZ-5.5,CX+5.5,Y+0.7,CZ+5.5); } let y=Y+0.7; for(let t=0;t<5;t++){ const w=3.3*Math.pow(0.86,t),hT=3.6; if(on('sred')){ for(const sx of [-1,1]) for(const sz of [-1,1]) cylN(CX+sx*w,CZ+sz*w,y,y+hT-0.4,0.17,0.15,12); box(CX-w-0.2,y+hT-0.4,CZ-w-0.2,CX+w+0.2,y+hT-0.15,CZ+w+0.2); } if(on('splaster')) box(CX-w,y,CZ-w,CX+w,y+hT-0.4,CZ+w); if(on('spaper')){ box(CX-w*0.4,y+0.7,CZ-w-0.03,CX+w*0.4,y+hT-1.2,CZ-w+0.03); box(CX-w*0.4,y+0.7,CZ+w-0.03,CX+w*0.4,y+hT-1.2,CZ+w+0.03); box(CX-w-0.03,y+0.7,CZ-w*0.4,CX-w+0.03,y+hT-1.2,CZ+w*0.4); box(CX+w-0.03,y+0.7,CZ-w*0.4,CX+w+0.03,y+hT-1.2,CZ+w*0.4); } if(on('sroof')){ place(CX,y+hT-0.25,CZ,0); const R=w+2.0*Math.pow(0.9,t); const f=rh(R,R,1.5,0.4,0.55); slab(26,26,-R,R,-R,R,(x,z)=>f(x,z),0.35); place(0,0,0,0); } y+=hT; } if(on('sroof')){ cylN(CX,CZ,y,y+6.2,0.13,0.07,8); for(let i=0;i<8;i++) cylN(CX,CZ,y+1.0+i*0.55,y+1.12+i*0.55,0.42-0.035*i,0.42-0.035*i,10); } };"
+let jc7 = "const bridge=()=>{ place(122,0,100,0); const yy=(x)=>4.2+1.2*(1-Math.pow(x/9,2)); if(on('sred')){ slab(36,2,-9,9,-1.1,1.1,(x,z)=>yy(x),0.14); for(let i=-6;i<=6;i++){ for(const s of [-1,1]) box(i*1.4-0.07,yy(i*1.4),s*1.0-0.07,i*1.4+0.07,yy(i*1.4)+1.0,s*1.0+0.07); } for(const s of [-1,1]) slab(36,1,-9,9,s*1.0-0.05,s*1.0+0.05,(x,z)=>yy(x)+1.0,0.08); } place(0,0,0,0); };"
+let jcall = "stairs(); hall(); pagoda(); bridge(); for(const p of [[88,138],[104,138],[96,162],[76,141],[116,150],[70,158]]) lantern(p[0],16,p[1],1.15);"
+def spart(tag, part, cr, cg, cb, rough)
+  s{tag}_s = poly.script@1(code="const m = new Mesh(); const PART='${part}'; ${jh1} ${jh2} ${jc1} ${jc2} ${jc3} ${jc4} ${jc5} ${jc6} ${jc7} ${jcall} m", budget=9000)
+  s{tag}_m = solid.material@1(s{tag}_s, color=[{cr}, {cg}, {cb}], roughness={rough})
+  output {tag} = s{tag}_m
+end
+spart("sh_stone", "sstone", 0.4, 0.39, 0.37, 0.9)
+spart("sh_red", "sred", 0.58, 0.07, 0.04, 0.35)
+spart("sh_black", "sblack", 0.03, 0.03, 0.035, 0.3)
+spart("sh_plaster", "splaster", 0.82, 0.78, 0.68, 0.9)
+spart("sh_deck", "sdeck", 0.3, 0.18, 0.1, 0.55)
+spart("sh_roof", "sroof", 0.1, 0.14, 0.15, 0.38)
+shp_s = poly.script@1(code="const m = new Mesh(); const PART='spaper'; ${jh1} ${jh2} ${jc1} ${jc2} ${jc3} ${jc4} ${jc5} ${jc6} ${jc7} ${jcall} m", budget=9000)
+shp_m = solid.material@1(shp_s, color=[1, 0.88, 0.62], roughness=0.8, emissive=[2.6, 1.4, 0.55])
+output sh_paper = shp_m
+shg_s = poly.script@1(code="const m = new Mesh(); const PART='sglow'; ${jh1} ${jh2} ${jc1} ${jc2} ${jc3} ${jc4} ${jc5} ${jc6} ${jc7} ${jcall} m", budget=9000)
+shg_m = solid.material@1(shg_s, color=[1, 0.7, 0.35], roughness=0.5, emissive=[5.5, 2.4, 0.7])
+output sh_glow = shg_m
+
+# ---------------- PLANTING BY RULE: masks say where each kind may grow (never through a building), scatter.place plants the rest on the terrain ----------------
+# keep-out: the village shelf (houses, street, pond) and the shrine terrace (stairs, hall, pagoda) stay clear of trees
+let keep = "smoothstep(0.0, 4.0, max(length(vec2(p.x - 100.0, p.z - 72.0)) - 50.0, 0.0)) * smoothstep(0.0, 5.0, max(abs(p.x - 96.0) - 40.0, abs(p.z - 152.0) - 32.0))"
+hills = field.expr@1(code="out = smoothstep(56.0, 72.0, length(vec2(p.x - 100.0, p.z - 72.0))) * smoothstep(0.0, 5.0, max(abs(p.x - 96.0) - 44.0, abs(p.z - 152.0) - 36.0))")
+bloom_zone = field.expr@1(code="a = (1.0 - smoothstep(36.0, 46.0, length(vec2(p.x - 96.0, p.z - 152.0)))) * smoothstep(33.0, 37.0, length(vec2(p.x - 96.0, p.z - 152.0))); b = (1.0 - smoothstep(13.0, 24.0, length(vec2(p.x - 122.0, p.z - 100.0)))) * smoothstep(10.5, 13.0, length(vec2(p.x - 122.0, p.z - 100.0))); c = (1.0 - smoothstep(0.0, 6.0, abs(p.x - 96.0) - 12.0)) * smoothstep(105.0, 112.0, p.z) * (1.0 - smoothstep(121.0, 130.0, p.z)) * (1.0 - smoothstep(0.0, 4.0, 14.0 - abs(p.x - 96.0))); out = max(max(a, b), c * 0.0)")
+maple_zone = field.expr@1(code="d = length(vec2(p.x - 100.0, p.z - 72.0)); out = smoothstep(52.0, 60.0, d) * (1.0 - smoothstep(70.0, 90.0, d)) * smoothstep(0.0, 5.0, max(abs(p.x - 96.0) - 44.0, abs(p.z - 152.0) - 36.0))")
+pine_a = flora.tree@1(kind="pine", height=11, seed=5, lod=3)
+pine_b = flora.tree@1(kind="pine", height=9, seed=17, lod=3, leaves=[0.08, 0.22, 0.13])
+pines_a = scatter.place@1(pine_a, land_b, hills, radius=11, density=0.7, seed=9, min_height=6, max_slope=34, mix="3, 2", pick=0, scale=[0.8, 1.3])
+pines_b = scatter.place@1(pine_b, land_b, hills, radius=11, density=0.7, seed=9, min_height=6, max_slope=34, mix="3, 2", pick=1, scale=[0.8, 1.3])
+output pines_a = pines_a
+output pines_b = pines_b
+sak_a = flora.tree@1(kind="oak", height=7, seed=21, lod=2, leaves=[0.97, 0.66, 0.77])
+sak_b = flora.tree@1(kind="oak", height=8.5, seed=24, lod=2, leaves=[0.95, 0.58, 0.72])
+sakura_a = scatter.place@1(sak_a, land_b, bloom_zone, radius=5, density=1.0, seed=13, max_slope=30, mix="1, 1", pick=0, scale=[0.85, 1.2])
+sakura_b = scatter.place@1(sak_b, land_b, bloom_zone, radius=5, density=1.0, seed=13, max_slope=30, mix="1, 1", pick=1, scale=[0.85, 1.2])
+output sakura_a = sakura_a
+output sakura_b = sakura_b
+maple_t = flora.tree@1(kind="oak", height=8, seed=31, lod=3, season="autumn")
+maples = scatter.place@1(maple_t, land_b, maple_zone, radius=11, density=0.6, seed=19, max_slope=28, scale=[0.85, 1.2])
+output maples = maples
+
+# bamboo: a clump of seven segmented stalks with leaf tufts at the top, scattered over two groves on the hillsides behind the shrine
+let jbam = "const stalk=(cx,cz,h,r,lean)=>{ const n=Math.round(h/1.0); for(let k=0;k<n;k++){ const y0=k*h/n,y1=(k+1)*h/n-0.04,t0=y0/h,t1=y1/h; const a=[],b=[]; for(let j=0;j<6;j++){ const an=j*1.0472,c=Math.cos(an),s=Math.sin(an); a.push(m.vertex(cx+lean*t0*t0*h+c*r,y0,cz+s*r)); b.push(m.vertex(cx+lean*t1*t1*h+c*r,y1,cz+s*r)); } for(let j=0;j<6;j++){ const i=(j+1)%6; m.face(a[j],b[j],b[i],a[i]); } } const tx=cx+lean*h,ty=h; for(let l=0;l<7;l++){ const an=l*0.9; const ex=Math.cos(an)*0.9,ez=Math.sin(an)*0.9; const p0=m.vertex(tx,ty,cz),p1=m.vertex(tx+ex*0.5,ty+0.15,cz+ez*0.5-0.05),p2=m.vertex(tx+ex,ty-0.35,cz+ez),p3=m.vertex(tx+ex*0.5,ty+0.15,cz+ez*0.5+0.05); m.face(p0,p1,p2); m.face(p0,p2,p3); m.face(p2,p1,p0); m.face(p3,p2,p0); } };"
+bamboo_s = poly.script@1(code="const m = new Mesh(); ${jbam} stalk(0,0,9.5,0.05,0.02); stalk(0.3,0.1,8.2,0.045,-0.015); stalk(-0.25,0.2,10.5,0.055,0.025); stalk(0.1,-0.3,7.6,0.04,0.01); stalk(-0.3,-0.2,9,0.05,-0.02); stalk(0.35,-0.25,8.6,0.045,0.02); stalk(-0.05,0.35,10,0.05,-0.01); m", budget=3000)
+bamboo_m = solid.material@1(bamboo_s, color=[0.28, 0.42, 0.14], roughness=0.5)
+bamboo_zone = field.expr@1(code="a = 1.0 - smoothstep(10.0, 22.0, length(vec2(p.x - 150.0, p.z - 150.0))); b = 1.0 - smoothstep(10.0, 24.0, length(vec2(p.x - 40.0, p.z - 130.0))); out = max(a, b) * smoothstep(0.0, 4.0, max(abs(p.x - 96.0) - 40.0, abs(p.z - 152.0) - 32.0))")
+bamboo = scatter.place@1(bamboo_m, land_b, bamboo_zone, radius=3.2, density=0.9, seed=3, min_height=5, max_slope=36, scale=[0.8, 1.25])
+output bamboo = bamboo
+
+# petals drifting down over the village (floor at 4.2) and over the terrace (floor at 16.2), each on its own sway (SimL, as the forest's falling leaves)
+petals_v = sim.program@1(size=0.06, seed=4, rate=30, source="sim petals\nstate pos: vec3[420]\nkernel init each i in pos {\n  pos[i] = vec3(52.0 + rand(i, 1.0) * 84.0, 4.5 + rand(i, 2.0) * 14.0, 40.0 + rand(i, 3.0) * 66.0)\n}\nkernel fall each i in pos {\n  let k = t * (0.7 + 0.5 * rand(i, 4.0)) + i * 1.7\n  let d = vec3(sin(k) * 0.9 + 0.35, -0.55 - 0.25 * rand(i, 5.0), cos(k * 0.8) * 0.9) * dt\n  let p = pos[i] + d\n  if p.y < 4.2 {\n    p = vec3(52.0 + rand(i, t + 6.0) * 84.0, 18.0, 40.0 + rand(i, t + 7.0) * 66.0)\n  }\n  pos[i] = p\n}\nschedule fall\noutput particles pos\n")
+petals_vm = solid.material@1(petals_v, color=[1.0, 0.78, 0.84], roughness=0.8, emissive=[0.25, 0.12, 0.15])
+output petals_village = petals_vm
+petals_t = sim.program@1(size=0.06, seed=8, rate=30, source="sim petals\nstate pos: vec3[420]\nkernel init each i in pos {\n  pos[i] = vec3(62.0 + rand(i, 1.0) * 70.0, 16.5 + rand(i, 2.0) * 14.0, 132.0 + rand(i, 3.0) * 50.0)\n}\nkernel fall each i in pos {\n  let k = t * (0.7 + 0.5 * rand(i, 4.0)) + i * 1.7\n  let d = vec3(sin(k) * 0.9 + 0.35, -0.55 - 0.25 * rand(i, 5.0), cos(k * 0.8) * 0.9) * dt\n  let p = pos[i] + d\n  if p.y < 16.2 {\n    p = vec3(62.0 + rand(i, t + 6.0) * 70.0, 30.0, 132.0 + rand(i, t + 7.0) * 50.0)\n  }\n  pos[i] = p\n}\nschedule fall\noutput particles pos\n")
+petals_tm = solid.material@1(petals_t, color=[1.0, 0.78, 0.84], roughness=0.8, emissive=[0.25, 0.12, 0.15])
+output petals_terrace = petals_tm
+
+# a few real lights: a warm glow in the hall, one at the pond bridge, one down the street
+hall_light = light.point@1(position=[96, 20, 150], color=[1, 0.72, 0.4], intensity=320, range=30)
+output hall_light = hall_light
+street_light = light.point@1(position=[96, 7, 76], color=[1, 0.7, 0.38], intensity=260, range=34)
+output street_light = street_light
+bridge_light = light.point@1(position=[122, 6.5, 100], color=[1, 0.66, 0.34], intensity=140, range=18)
+output bridge_light = bridge_light

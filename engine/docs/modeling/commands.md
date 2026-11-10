@@ -40,7 +40,7 @@ real ID or an alias.
 { "doc": "d_7k2m9q4x", "base_revision": 12, "transaction": "t_01HZ...", "label": "widen opening",
   "commands": [ { "set_param": { "node": "n_a1b2c3d4", "param": "points", "value": [[0,0],[0.06,0],[0.11,0.12],[0.09,0.26],[0.07,0.30],[0,0.30]] } } ] }
 ```
-Rules: at most 1,000 commands and 1 MiB per batch. The batch is atomic. Validation runs on a candidate
+Rules: at most 10,000 commands and 4 MiB per batch (a text program costs one command per node, one per input link and one per output). The batch is atomic. Validation runs on a candidate
 copy; the committed document changes only on success and a matching `base_revision`. The first
 failing command stops the batch and its index is in the diagnostic (`command`). After a connect or a
 version change the whole graph is re-checked (ports, arity, types, cycles), so every prefix of a
@@ -84,6 +84,58 @@ triangulated before Catmull-Clark and reports `poly.subdivide.concave_face_trian
 faces keep their cage topology. This adds diagonal edge flow across concave faces; keep the warning
 in mind when downstream selection depends on edge layout.
 
+## Organic sculpting
+
+`poly.sculpt@1(mesh, strokes="...", falloff="surface")` applies up to 64 ordered brush strokes.
+The brushes are `draw`, `inflate`, `smooth`, `flatten`, `pinch`, `grab`, `mask` and `unmask`;
+`grab` takes a displacement vector, while the others take a strength. `falloff="surface"` measures
+distance over connected mesh edges, so a brush does not reach through the opposite side of a head
+or a thin shell. Use `falloff="sphere"` for the prior world-space behavior. `mask` and `unmask`
+write the persistent point channel `sculpt_mask`; subsequent geometry strokes are weighted by the
+remaining unmasked amount. This channel survives chained sculpt operations and subdivision.
+
+```text
+cage = poly.from_solid@1(body)
+dense = poly.subdivide@1(cage, levels=1)
+masked = poly.sculpt@1(dense, strokes="mask 0 1.2 0.1 0.18 1", symmetry="x", falloff="surface")
+shaped = poly.sculpt@1(masked, strokes="draw 0 1.2 0.1 0.18 0.025; smooth 0 1.2 0.1 0.2 0.25", symmetry="x", falloff="surface")
+```
+
+The mesh must already have enough vertices for the requested detail; subdivide or remesh before
+sculpting. Surface falloff follows mesh connectivity, so disconnected UV or topology seams do not
+share brush influence unless the vertices are welded.
+
+On `body.human`, this operator keeps the source-point map, skin weights and rig landmarks. The
+edited body can feed `body.skin`, `body.eye`, `body.hair`, and body-fitted clothing directly. Keep
+the operation topology-preserving: remeshing and subdivision need explicit weight and landmark
+transfer before they can be inserted into a rigged character graph.
+
+```text
+body = body.human@1()
+face = poly.sculpt@1(body, strokes="grab 0 1.65 0.12 0.16 0 0 0.01", falloff="surface")
+eyes = body.eye@1(face)
+hair = body.hair@1(face, density=0.6, length=0.18)
+skin = body.skin@1(face, bones="root; spine01; spine03; head")
+```
+
+## Character shape keys
+
+`rig.morph@1(base, target, name="smile", weight=1)` creates a glTF shape key from an equal-topology
+edited copy. Make every expression from the neutral mesh, then chain `rig.morph` nodes on the output
+to retain prior keys. The node previews the chosen weight in the viewport and exports each name,
+weight and point delta as a glTF morph target. It supports up to 16 keys and 500,000 points per part.
+
+```text
+neutral = body.human@1(face="jawOpen=0")
+smile = poly.sculpt@1(neutral, strokes="grab 0 1.62 0.14 0.12 0 0 0.02", falloff="surface")
+expression = rig.morph@1(neutral, smile, name="smile", weight=0.65)
+blink = poly.sculpt@1(neutral, strokes="flatten 0 1.70 0.15 0.08 0.4", falloff="surface")
+face = rig.morph@1(expression, blink, name="blink", weight=0)
+```
+
+The target must preserve point count and face topology. Remesh, subdivision and other topology
+changes need a separate transfer step before they can become a shape key.
+
 ## Results
 ```json
 { "committed": { "revision": 13, "transaction": "t_01HZ...", "changed": ["n_a1b2c3d4"] } }
@@ -118,3 +170,6 @@ A batch that widens only `inner` would thin or break the wall: it must be reject
 `constraint.min_wall`, naming `wall`, `outer` and `inner`, and the document stays unchanged.
 Sequence: create (mock provider) -> select `vase` in the viewport -> widen opening -> manual edit of
 `segments` in the inspector -> undo -> reload. IDs and parameters match at each step.
+# Cloth and skin transfer
+
+`body.outfit(body, asset, standoff, bones)` fits real CC0 clothes and hair (ADR 0056) to a body.human and skins them with its weights. `body.skin_to(cloth, body, bones="root; spine01; ...")` transfers the nearest body's authored skin weights to a cloth solid for animation.

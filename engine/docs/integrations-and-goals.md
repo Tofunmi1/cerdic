@@ -4,7 +4,7 @@
 An AI-native 3D/VR authoring engine that runs in the browser (Rust to WASM), built for the Victoria VR AI Builder Hackathon 2026. A person types plain language; a model turns it into a 3D scene and working logic. The same typed commands serve the model and the person, so anything the model can do, the editor can do, and every edit is undoable and checkable.
 
 Principles that shape every choice:
-- **Everything procedural.** All geometry, materials and textures come from our own language. No imported models, textures, fonts or external 3D generators (ADR 0003). Source code (including shader text) from open projects is fine; assets are not.
+- **Hybrid worlds, typed authoring.** Procedural geometry, materials and textures remain editable outputs of our language. World projects may also reference captured or authored assets when the source, license, attribution and redistribution permissions are recorded. Large captured environments are streamed as runtime assets, not flattened into graph meshes (ADR 0071). Restricted or unknown-provenance content is excluded.
 - **Everything in the browser.** Tools run as WASM or WebGL2. A server is allowed only for selected heavy jobs, never by default.
 - **Typed graph language.** One line per node (`name = operator@1(inputs, params)`), validated, with errors that say how to fix them. Specs, guide, tool schemas and inspector all come from one registry.
 - **Missing pieces are ours to build.** GPL code is allowed (ADR 0024), with a `VENDOR.md` per vendored tree. Nothing is published without owner approval.
@@ -15,19 +15,21 @@ Document (typed node graph) -> evaluator (Rust/WASM, in a worker) -> parts (tria
 
 ## Integrations so far
 
+> **World-content direction updated 2026-10-28:** ADR 0071 supersedes the no-imported-assets rule for licensed world content only. The runtime does not yet implement a generic 3D Tiles importer/streamer; see [the hybrid city plan](plans/hybrid-city-capture.md). Existing graph-generated geometry and procedural materials remain the editable/gameplay layer.
+
 | Integration | What it gives us | Where |
 |---|---|---|
-| **Bevy 0.20 (trimmed fork)** | Renderer, ECS, window and input on the web; WebXR layer for headsets | `third_party/`, `crates/ve-render`, `ve-runtime`, `ve-xr-web` |
+| **Bevy 0.20 (trimmed fork)** | Renderer, ECS, window and input on the web; WebXR layer for headsets | `lib/`, `crates/ve-render`, `ve-runtime`, `ve-xr-web` |
 | **Manifold** | Robust solid booleans | `cpp/`, `ve-kernel` |
 | **OpenSubdiv** | Subdivision surfaces | `cpp/` |
 | **meshoptimizer** | Mesh simplification and optimisation | `cpp/` |
-| **Clipper2** | 2D profile offsetting and booleans | `third_party/` |
-| **MikkTSpace** | Standard tangent generation for normal maps | `third_party/mikktspace` |
-| **Blender source (GPL)** | Polygon editing in the language: bevel, inset, extrude, solidify, poke, wireframe, subdivide, dissolve, symmetrize, decimate (LOD), unsubdivide, UV unwrap (LSCM/ABF, island packing). About 640 Blender files compiled to native and WASM, with deterministic maths, trap stubs for unreachable symbols, and element provenance (`role` attributes) so a model can select "the cap" or "the ring" without indices | `cpp/blender/`, `third_party/blender`, `ve-kernel`, `ve-geometry`, `ve-graph` (`poly.*` nodes) |
-| **Eigen, fmt** | Dependencies Blender code needs | `third_party/eigen`, `third_party/fmt` |
+| **Clipper2** | 2D profile offsetting and booleans | `lib/` |
+| **MikkTSpace** | Standard tangent generation for normal maps | `lib/mikktspace` |
+| **Blender source (GPL)** | Polygon editing in the language: bevel, inset, extrude, solidify, poke, wireframe, subdivide, dissolve, symmetrize, decimate (LOD), unsubdivide, UV unwrap (LSCM/ABF, island packing). About 640 Blender files compiled to native and WASM, with deterministic maths, trap stubs for unreachable symbols, and element provenance (`role` attributes) so a model can select "the cap" or "the ring" without indices | `cpp/blender/`, `lib/bl`, `ve-kernel`, `ve-geometry`, `ve-graph` (`poly.*` nodes) |
+| **Eigen, fmt** | Dependencies Blender code needs | `lib/eigen`, `lib/fmt` |
 | **glTF export** | Our own exporter: welded meshes, crease-angle normals, PBR materials, instancing; validated by the Khronos validator. Button in the Document panel and an MCP tool | `src/engine/gltf.ts` |
 | **MCP test server** | A model drives the editor with typed tools: write program, evaluate, measure (volume, size, triangles), snapshot, export `.glb`. A guide teaches the language and the Blender-backed tools | `tools/mcp/server.mjs`, prompt eval harness `tools/mcp/eval-prompts.mjs` |
-| **Material Maker (MIT)** | A library of 398 procedural texture nodes (noises, patterns, filters, colour ops, 3D object-space textures). Our own compiler turns a node graph into one GLSL ES 3.0 shader, baked in the browser with WebGL2 | `third_party/material-maker`, `src/engine/texture/` |
+| **Material Maker (MIT)** | A library of 398 procedural texture nodes (noises, patterns, filters, colour ops, 3D object-space textures). Our own compiler turns a node graph into one GLSL ES 3.0 shader, baked in the browser with WebGL2 | `lib/material-maker`, `src/engine/texture/` |
 
 ### Blender integration, in short
 We pull Blender's algorithms, not its application. They are compiled with our flags, run through the same C ABI, and exposed as graph nodes with bounded parameters, caps and cancellation checks before and after the call. Measured: bevel of a 540k-face mesh takes 232 ms native and 478 ms in WASM. Native and WASM outputs match bit for bit on the corpus. Blender's bundled assets (brushes, HDRIs, fonts, models) are not used.

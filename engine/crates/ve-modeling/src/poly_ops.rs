@@ -8,13 +8,22 @@ mod blender;
 mod convert;
 mod edit;
 mod errors;
+mod import;
 mod lod;
 mod params;
 mod place;
+mod program;
+mod remesh;
 mod round;
+mod script;
+mod script_ops;
+mod sculpt;
 mod select;
 mod selection;
 mod subdivision;
+mod skin;
+mod surface_expr;
+mod uv_edit;
 mod uv_report;
 
 use crate::{Fail, cache::Value};
@@ -22,8 +31,19 @@ use std::rc::Rc;
 use ve_graph::Node;
 use ve_kernel::ExecutionContext;
 
+pub(crate) use convert::value_from_poly;
 pub use errors::suggestion;
-pub(crate) use selection::Selection;
+pub(crate) use program::{compile, compile_param};
+
+/// A geometry error on a polygon mesh as a diagnostic that names the node and the offending element.
+pub(crate) fn poly_failure(
+    node: &Node,
+    error: &ve_geometry::GeometryError,
+    mesh: &ve_geometry::PolyMesh,
+) -> Fail {
+    errors::poly_fail(node, error, Some(mesh))
+}
+pub(crate) use selection::{Elements, Selection, fingerprint};
 
 /// Memory held by a polygon mesh, for the cache budget.
 pub(crate) fn bytes(mesh: &ve_geometry::PolyMesh) -> usize {
@@ -44,6 +64,15 @@ pub(crate) fn run(
     context: &ExecutionContext,
 ) -> Option<Result<Value, Fail>> {
     let family = node.op.family().as_str();
+    if family == "poly.bisect" {
+        if let Some(poly) = inputs.first().and_then(|v| v.poly.as_ref()) {
+            eprintln!(
+                "bisect source mode {:?} faces {}",
+                poly.triangulation_mode(),
+                poly.face_count()
+            );
+        }
+    }
     // A polygon mesh moved, turned or scaled by a plain transform keeps its faces (the solid kernel would refuse an open one).
     if place::applies(family, inputs) {
         return Some(place::run(node, family, inputs, context));
@@ -61,12 +90,21 @@ fn dispatch(
 ) -> Result<Value, Fail> {
     match family {
         "poly.grid" => convert::grid(node, context),
+        "poly.import" => import::run(node, context),
         "poly.from_solid" => convert::from_solid(node, inputs, context),
         "poly.to_solid" => convert::to_solid(node, inputs, context),
         "poly.subdivide" => subdivision::run(node, inputs, context),
         "poly.select" => select::run(node, inputs, context),
         "poly.round_edges" => round::run(node, inputs, context),
         "poly.lod" => lod::run(node, inputs, context),
+        "poly.program" => program::run(node, inputs, context),
+        "poly.script" => script::run(node, inputs, context),
+        "poly.remesh_quads" => remesh::run(node, inputs, context),
+        "poly.sculpt" => sculpt::run(node, inputs, context),
+        "poly.uv_transform" => uv_edit::transform(node, inputs, context),
+        "poly.uv_layout" => uv_edit::layout(node, inputs, context),
+        "poly.surface_expr" => surface_expr::run(node, context),
+        "poly.skin" => skin::run(node, context),
         _ => edit::run(node, family, inputs, context),
     }
 }

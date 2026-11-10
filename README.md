@@ -10,7 +10,10 @@ vertical slice remains available at `?legacy=1` for comparison.
 Requires Bun 1.3+, the pinned Rust toolchain in `engine/rust-toolchain.toml`, CMake, Ninja and wasi-sdk.
 Set `WASI_SDK` to its installation directory (the default is
 `~/.local/share/toolchains/wasi-sdk-34.0-arm64-macos`). The build installs a matching wasm-bindgen CLI
-under `engine/target/tools`; no global CLI is needed for the engine.
+under `engine/target/tools`; no global CLI is needed for the engine. The build also selects wasi-sdk's
+clang for the `wasm32-unknown-unknown` C shim, since the Apple clang shipped with Xcode does not include
+the WebAssembly backend. Set `CC_wasm32_unknown_unknown` to a different WebAssembly-capable C compiler
+if your SDK is installed outside the default location.
 
 ```sh
 bun install --frozen-lockfile
@@ -34,7 +37,7 @@ cargo xtask advisories
 
 Strict validation needs cargo-nextest, cargo-deny, clang-format, clang-tidy and Playwright Chromium;
 install Chromium with `cd engine/web && bun install --frozen-lockfile && bun x playwright install chromium`.
-See [engine contributor instructions](engine/AGENTS.md), [V0 evidence](engine/docs/modeling/v0-report.md)
+See [V0 evidence](engine/docs/modeling/v0-report.md)
 and [G2 evidence](engine/docs/modeling/g2-report.md). Chat/language integration is the next G3 gate;
 the legacy app's capabilities below are not claims about the current engine editor. Actual headset
 worker CPU cost, GPU/frame timing and headed pointer lock remain untested.

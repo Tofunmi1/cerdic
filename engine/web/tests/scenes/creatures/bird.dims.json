@@ -1,0 +1,19 @@
+{
+  "title": "Bald eagle (Haliaeetus leucocephalus), soaring: 0.7-1.0 m long, 1.8-2.3 m wingspan, head and beak about a fifth of the length, beak about a third to a half of the head",
+  "rules": [
+    { "name": "wingspan", "parts": ["wing_*"], "measure": "size.x", "lo": 1.9, "hi": 2.3, "hint": "the wing ring x spread (0.1 + 0.9 t) and the primary lengths" },
+    { "name": "length, beak to tail tip", "parts": ["*"], "measure": "size.z", "lo": 0.85, "hi": 1.05, "hint": "the body skin joints and the tail feather length" },
+    { "name": "tail length / total length", "parts": ["tail"], "measure": "size.z", "per": { "parts": ["*"], "measure": "size.z" }, "lo": 0.2, "hi": 0.32, "hint": "the tail feather length" },
+    { "name": "head + beak length / total length", "parts": ["head", "beak"], "measure": "size.z", "per": { "parts": ["*"], "measure": "size.z" }, "lo": 0.14, "hi": 0.22, "hint": "the head key table (z range)" },
+    { "name": "beak length / head + beak length", "parts": ["beak"], "measure": "size.z", "per": { "parts": ["head", "beak"], "measure": "size.z" }, "lo": 0.3, "hi": 0.5, "hint": "where the head/beak split is (0.395) and the beak tip z" },
+    { "name": "head height / head + beak length", "parts": ["head"], "measure": "size.y", "per": { "parts": ["head", "beak"], "measure": "size.z" }, "lo": 0.3, "hi": 0.45, "hint": "the head key table top and bottom y" },
+    { "name": "head width / head height", "parts": ["head"], "measure": "size.x", "per": { "parts": ["head"], "measure": "size.y" }, "lo": 0.7, "hi": 1.0, "hint": "the head key table half widths" },
+    { "name": "beak depth (with the hook) / head height", "parts": ["beak"], "measure": "size.y", "per": { "parts": ["head"], "measure": "size.y" }, "lo": 0.6, "hi": 1.35, "hint": "the beak keys (top and bottom y near z 0.4)" },
+    { "name": "body width (chest) / wingspan", "parts": ["body"], "measure": "size.x", "per": { "parts": ["wing_*"], "measure": "size.x" }, "lo": 0.08, "hi": 0.16, "hint": "the chest and belly joint radii" },
+    { "name": "wing arm to flight feather chord", "parts": ["wing_arm_*_l"], "measure": "size.z", "per": { "parts": ["wing_flight_*_l"], "measure": "size.z" }, "lo": 0.4, "hi": 1.0, "hint": "the arm chord c and the flight feather length" },
+    { "name": "left-right symmetry", "parts": ["*"], "measure": "mid.x", "lo": -0.01, "hi": 0.01, "hint": "a part is not mirrored" },
+    { "name": "feet hang below the belly (y low)", "parts": ["legs", "talons"], "measure": "lo.y", "lo": -0.3, "hi": -0.1, "hint": "the leg and foot y" },
+    { "name": "foot span (toe tip to hind talon) in metres", "parts": ["legs", "talons"], "measure": "size.z", "lo": 0.12, "hi": 0.22, "hint": "the toe lengths" },
+    { "name": "talon spread across both feet in metres", "parts": ["talons"], "measure": "size.x", "lo": 0.1, "hi": 0.25, "hint": "the foot x and the toe yaw" }
+  ]
+}

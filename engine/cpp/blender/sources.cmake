@@ -1,8 +1,8 @@
-# Blender sources compiled into the engine, relative to third_party/blender.
+# Blender sources compiled into the engine, relative to lib/bl.
 #
 # This is the include closure of the bevel operator and the UV parametrizer (tools/blender-closure.py);
 # unused objects cost nothing in a link because the final link garbage-collects sections. Add a file here
-# only together with a test that needs it, and list new vendored files in third_party/blender/VENDOR.md.
+# only together with a test that needs it.
 
 set(VE_BLENDER_CORE_SOURCES
   intern/eigen/intern/eigenvalues.cc

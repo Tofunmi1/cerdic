@@ -4,7 +4,7 @@ import { compileTexture } from '../src/engine/texture/compile';
 import { loadHelpers, loadLibrary } from '../src/engine/texture/library';
 import { parseTextureProgram, TextureError } from '../src/engine/texture/program';
 
-const root = new URL('../engine/third_party/material-maker/', import.meta.url).pathname;
+const root = new URL('../engine/lib/material-maker/', import.meta.url).pathname;
 const library = loadLibrary(root);
 const helpers = loadHelpers(root);
 

@@ -78,14 +78,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     // (a changed vendor header or CMake option must rebuild without a `cargo clean`).
     for path in [
         "cpp",
-        "third_party/manifold",
-        "third_party/clipper2",
-        "third_party/meshoptimizer",
-        "third_party/opensubdiv",
-        "third_party/blender",
-        "third_party/eigen",
-        "third_party/fmt",
-        "third_party/mikktspace",
+        "lib/manifold",
+        "lib/clipper2",
+        "lib/meshoptimizer",
+        "lib/opensubdiv",
+        "lib/bl",
+        "lib/eigen",
+        "lib/fmt",
+        "lib/mikktspace",
     ] {
         println!("cargo:rerun-if-changed={}", engine.join(path).display());
     }

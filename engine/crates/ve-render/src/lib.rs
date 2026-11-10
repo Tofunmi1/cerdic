@@ -1,6 +1,6 @@
 //! Render core for the engine.
 //!
-//! Built on the vendored Bevy render crates (`third_party/bevy`). Rendering is one ECS schedule per
+//! Built on the vendored Bevy render crates (`lib/bevy`). Rendering is one ECS schedule per
 //! camera, run by a driver inside the `RenderGraph` schedule. The [`Forward3d`] schedule draws
 //! instance-batched meshes with a metallic-roughness PBR shader, a sun, point lights, MSAA and
 //! tonemapping; shadows and quality tiers come next (M6).
@@ -14,14 +14,23 @@ pub use exposure::FrameDelta;
 mod extract;
 mod placement;
 pub use placement::VeInstanceTransform;
+mod foliage;
 mod frame;
 mod geometry;
 mod grade;
+pub mod grass;
+mod grass_gpu;
 mod lens;
 mod light;
 mod material;
 mod pass;
 mod probes;
+pub mod stochastic;
+mod surface_terrain;
+mod surface_water;
+mod water_gpu;
+pub mod water_sim;
+pub mod water_waves;
 pub use probes::{MAX_PROBES, MAX_PROBES_PER_AXIS, ProbeVolume};
 mod wind;
 pub use wind::WindField;
@@ -68,27 +77,40 @@ pub use light::{
     MAX_POINT_LIGHTS, MAX_SPOT_LIGHTS, VeAmbientLight, VeDirectionalLight, VePointLight,
     VeSpotLight,
 };
-pub use material::{FoliageStyle, ProceduralRecipe, ToonStyle, VeMaterial};
-pub use quality::{QualityTier, RenderQuality};
-pub use readiness::mesh_ready;
+pub use material::{FoliageStyle, ProceduralRecipe, SurfaceFinish, ToonStyle, VeMaterial};
+pub use quality::{Effects, QualityTier, RenderQuality};
+pub use readiness::{VeReadinessPlugin, mesh_ready};
 pub use sky::SkyBackground;
+pub use surface_terrain::SurfaceTerrain;
+pub use surface_water::SurfaceWater;
 pub use textures::{
-    BUDGET_BYTES, LAYER_SIZE, MaterialTextures, TIER_SIZES, TIER_STRIDE, map_cost, tier_of_len,
+    BUDGET_BYTES, LAYER_SIZE, MapCosts, MapKey, MaterialTextures, TIER_SIZES, TIER_STRIDE,
+    TextureReport, map_cost, map_digest, tier_of_len,
 };
+pub use textures_gpu::{mip_chain, mip_levels};
 /// Per-vertex baked ambient visibility, stored as one float from zero to one.
 pub const ATTRIBUTE_OCCLUSION: bevy_mesh::MeshVertexAttribute = bevy_mesh::MeshVertexAttribute::new(
     "Vertex_Occlusion",
     1_948_275_003,
     bevy_render::render_resource::VertexFormat::Float32,
 );
+/// Per-vertex smooth (welded) normal of a skinned mesh, deformed with it: the toon outline hull is pushed out along this instead of the flat
+/// face normals, which would tear it open at every edge.
+pub const ATTRIBUTE_HULL_NORMAL: bevy_mesh::MeshVertexAttribute =
+    bevy_mesh::MeshVertexAttribute::new(
+        "Vertex_HullNormal",
+        1_948_275_004,
+        bevy_render::render_resource::VertexFormat::Float32x3,
+    );
 pub use schedule::{Forward3d, Forward3dSystems};
 pub use stereo::{StereoEye, StereoViews};
 
-/// Registers the engine's render systems.
+/// The engine's render data: the settings resources the runtime writes (ambient light, grading, sky, probes, wind, quality, material
+/// textures). It draws nothing, so a different renderer (`ve-bevy`) can read the same data.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct VeRenderPlugin;
+pub struct VeRenderDataPlugin;
 
-impl Plugin for VeRenderPlugin {
+impl Plugin for VeRenderDataPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ClearColor>()
             .init_resource::<VeAmbientLight>()
@@ -99,7 +121,18 @@ impl Plugin for VeRenderPlugin {
             .init_resource::<MaterialTextures>()
             .init_resource::<SkyBackground>()
             .init_resource::<ProbeVolume>()
-            .init_resource::<WindField>()
+            .init_resource::<water_sim::WaterSimTextures>()
+            .init_resource::<WindField>();
+    }
+}
+
+/// Registers the engine's own forward renderer: its data and its render systems.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct VeRenderPlugin;
+
+impl Plugin for VeRenderPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(VeRenderDataPlugin)
             .register_required_components_with::<Camera3d, CameraRenderGraph>(|| {
                 CameraRenderGraph::new(Forward3d)
             })
@@ -111,50 +144,39 @@ impl Plugin for VeRenderPlugin {
                 ExtractResourcePlugin::<SkyBackground>::default(),
                 ExtractResourcePlugin::<ProbeVolume>::default(),
                 ExtractResourcePlugin::<WindField>::default(),
+                ExtractResourcePlugin::<water_sim::WaterSimTextures>::default(),
             ));
 
-        let shaders = app
-            .world_mut()
-            .get_resource_mut::<Assets<Shader>>()
-            .map(|mut shaders| {
-                (
-                    shaders.add(Shader::from_wgsl(
-                        pipeline::FORWARD_SHADER,
-                        "ve_forward.wgsl",
-                    )),
-                    shaders.add(Shader::from_wgsl(
-                        pipeline::forward_shader_without_uv(),
-                        "ve_forward_without_uv.wgsl",
-                    )),
-                    shaders.add(Shader::from_wgsl(
-                        present::PRESENT_SHADER,
-                        present::PRESENT_SHADER_NAME,
-                    )),
-                    shaders.add(Shader::from_wgsl(
-                        shadow::SHADOW_SHADER,
-                        shadow::SHADOW_SHADER_NAME,
-                    )),
-                    shaders.add(Shader::from_wgsl(sky::SHADER, "ve_sky.wgsl")),
-                    shaders.add(Shader::from_wgsl(ao_depth::SHADER, ao_depth::SHADER_NAME)),
-                    shaders.add(Shader::from_wgsl(ao::SHADER, ao::SHADER_NAME)),
-                    shaders.add(Shader::from_wgsl(exposure::SHADER, exposure::SHADER_NAME)),
-                )
-            });
+        let shaders = load_shaders(app);
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
-        if let Some((
-            forward,
-            forward_without_uv,
-            present,
-            shadow,
-            sky_shader,
-            ao_depth_shader,
-            ao_shader,
-            exposure_shader,
-        )) = shaders
+        if let Some(
+            [
+                forward,
+                forward_without_uv,
+                colored,
+                colored_without_uv,
+                present,
+                shadow,
+                sky_shader,
+                ao_depth_shader,
+                ao_shader,
+                exposure_shader,
+                sim,
+                sim_no_uv,
+                sim_color,
+                sim_color_no_uv,
+            ],
+        ) = shaders
         {
-            let forward = pipeline::ForwardPipelines::new(forward, forward_without_uv);
+            let mut forward = pipeline::ForwardPipelines::new(
+                forward,
+                forward_without_uv,
+                colored,
+                colored_without_uv,
+            );
+            forward.sim_shaders = Some([sim, sim_no_uv, sim_color, sim_color_no_uv]);
             let sky_pipelines = sky::SkyPipelines::new(sky_shader, forward.view_layout.clone());
             render_app
                 .insert_resource(cutout::CutoutPipelines::new(
@@ -180,9 +202,17 @@ impl Plugin for VeRenderPlugin {
     }
 }
 
+#[path = "load_shaders.rs"]
+mod shader_assets;
+use shader_assets::load_shaders;
+
 /// Resources and systems of the render world: extraction, preparation, queueing and the passes.
 fn add_render_systems(render_app: &mut SubApp) {
+    prepare_render_resources(render_app);
     render_app
+        .init_resource::<water_gpu::WaterGpu>()
+        .init_resource::<water_sim::SimGpu>()
+        .init_resource::<grass_gpu::GrassBounds>()
         .init_resource::<extract::ExtractedMeshes>()
         .init_resource::<instance_sets::ExtractedSets>()
         .init_resource::<light::ExtractedLights>()
@@ -208,6 +238,9 @@ fn add_render_systems(render_app: &mut SubApp) {
             ExtractSchedule,
             (
                 extract::extract_meshes,
+                grass_gpu::extract_grass_bounds
+                    .after(extract::extract_meshes)
+                    .after(instance_sets::extract_instance_sets),
                 instance_sets::extract_instance_sets,
                 light::extract_lights,
                 quality::extract_quality,
@@ -216,40 +249,6 @@ fn add_render_systems(render_app: &mut SubApp) {
                 lens::extract_lens,
                 textures::extract_textures,
             ),
-        )
-        .add_systems(
-            Render,
-            (
-                prepare::prepare_instances,
-                instance_sets::prepare_sets.after(prepare::prepare_instances),
-                readiness::publish,
-                // The view bind group carries the exposure texture, so that is settled first.
-                (
-                    exposure::prepare_exposure_state,
-                    prepare::prepare_view_uniforms,
-                )
-                    .chain(),
-                // The lights uniform includes the sun's shadow matrix and binds the shadow map.
-                (
-                    shadow::prepare_shadow_map,
-                    shadow::prepare_shadow_state,
-                    probes::prepare_probes,
-                    prepare::prepare_lights,
-                )
-                    .chain(),
-                // Which chunks of the instance sets each view draws: after the views and the cascades are known.
-                set_visibility::cull_sets
-                    .after(instance_sets::prepare_sets)
-                    .after(shadow::prepare_shadow_state),
-                targets::prepare_depth_textures,
-                targets::prepare_msaa_targets,
-                targets::prepare_offscreen_targets,
-                ao_depth::prepare_ao_depth_targets,
-                present::prepare_present_sampler,
-                textures::prepare_textures,
-                lens::prepare_lens,
-            )
-                .in_set(RenderSystems::PrepareResources),
         )
         .add_systems(
             Render,
@@ -295,6 +294,48 @@ fn add_render_systems(render_app: &mut SubApp) {
                 .chain()
                 .in_set(RenderGraphSystems::Submit),
         );
+}
+
+/// Schedules uploads and render targets before pipeline queueing and drawing.
+fn prepare_render_resources(render_app: &mut SubApp) {
+    render_app.add_systems(
+        Render,
+        (
+            prepare::prepare_instances,
+            instance_sets::prepare_sets.after(prepare::prepare_instances),
+            water_sim::prepare,
+            water_gpu::prepare_water
+                .after(instance_sets::prepare_sets)
+                .after(water_sim::prepare),
+            readiness::publish,
+            // The view bind group carries the exposure texture, so that is settled first.
+            (
+                exposure::prepare_exposure_state,
+                prepare::prepare_view_uniforms,
+            )
+                .chain(),
+            // The lights uniform includes the sun's shadow matrix and binds the shadow map.
+            (
+                shadow::prepare_shadow_map,
+                shadow::prepare_shadow_state,
+                probes::prepare_probes,
+                prepare::prepare_lights,
+            )
+                .chain(),
+            // Which chunks of the instance sets each view draws: after the views and the cascades are known.
+            set_visibility::cull_sets
+                .after(instance_sets::prepare_sets)
+                .after(shadow::prepare_shadow_state),
+            targets::prepare_depth_textures,
+            targets::prepare_msaa_targets,
+            targets::prepare_offscreen_targets,
+            ao_depth::prepare_ao_depth_targets,
+            present::prepare_present_sampler,
+            textures::prepare_textures,
+            lens::prepare_lens,
+        )
+            .in_set(RenderSystems::PrepareResources),
+    );
 }
 
 #[cfg(test)]

@@ -139,6 +139,10 @@ fn polygon_cases() -> Result<(), Box<dyn std::error::Error>> {
             "box = solid.box(size=[1,1,1])\ntriangles = poly.from_solid(box)\ncage = poly.merge_coplanar(triangles)\nsharp_edges = poly.select(cage, element=\"edge\", by=\"sharp\", angle=1.0)\ncorners = poly.select(cage, element=\"vertex\")\nsmooth = poly.subdivide(cage, creases=sharp_edges, corners=corners, levels=1, sharpness={sharpness}, corner_sharpness={sharpness})\noutput smooth"
         ))?;
     }
+    // Character sculpting: persistent mask weights survive a node boundary; surface geodesics stay on the connected shell.
+    text_case(
+        "box = solid.box(size=[1,1,1])\ncage = poly.from_solid(box)\ndense = poly.subdivide(cage, levels=1)\nmask = poly.sculpt(dense, strokes=\"mask 0 0 0.5 0.5 1\", symmetry=\"x\", falloff=\"surface\")\nshape = poly.sculpt(mask, strokes=\"unmask 0 0 0.5 0.25 0.5; draw 0 0 0.5 0.25 0.04\", falloff=\"surface\")\noutput shape",
+    )?;
     Ok(())
 }
 
@@ -155,6 +159,15 @@ fn colour_cases() -> Result<(), Box<dyn std::error::Error>> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     attribute_warning_case();
     subdivision_channel_case()?;
+    text_case(
+        "masonry = building.asset@1(width=12, depth=10, floors=3, bays=3, floor_height=3.2, detail=3, style=\"tenement\", part=\"masonry\", seed=23)\noutput masonry\nglass = building.asset@1(width=12, depth=10, floors=3, bays=3, floor_height=3.2, detail=3, style=\"tenement\", part=\"glass\", seed=23)\noutput glass\ntrim = building.asset@1(width=12, depth=10, floors=3, bays=3, floor_height=3.2, detail=3, style=\"tenement\", part=\"trim\", seed=23)\noutput trim\nroof = building.asset@1(width=12, depth=10, floors=3, bays=3, floor_height=3.2, detail=3, style=\"tenement\", part=\"roof\", seed=23)\noutput roof\ndoors = building.asset@1(width=12, depth=10, floors=3, bays=3, floor_height=3.2, detail=3, style=\"tenement\", part=\"doors\", seed=23)\noutput doors",
+    )?;
+    text_case(
+        "asphalt = street.road@1(at=[0,0,0], length=36, width=10, lanes=2, part=\"asphalt\")\noutput asphalt\npaint = street.road@1(at=[0,0,0], length=36, width=10, lanes=2, part=\"markings\")\noutput paint\ncrosswalk = street.road@1(at=[0,0,0], length=36, width=10, lanes=2, part=\"crosswalk\")\noutput crosswalk\nkerb = street.road@1(at=[0,0,0], length=36, width=10, lanes=2, part=\"kerb\")\noutput kerb\npavement = street.road@1(at=[0,0,0], length=36, width=10, lanes=2, part=\"pavement\")\noutput pavement",
+    )?;
+    text_case(
+        "lamp = street.prop@1(at=[0,0,0], kind=\"streetlight\", part=\"body\")\noutput lamp\nhead = street.prop@1(at=[0,0,0], kind=\"streetlight\", part=\"lens\")\noutput head\nmast = street.prop@1(at=[0,0,0], kind=\"utility_mast\", part=\"accent\")\noutput mast\nbench = street.prop@1(at=[3,0,0], kind=\"bench\", part=\"body\")\noutput bench",
+    )?;
     surface_cases()?;
     opacity_case()?;
     field_cases()?;

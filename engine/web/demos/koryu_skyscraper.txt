@@ -1,0 +1,161 @@
+# KŌRYŪ TOWER — a 44-storey Art Deco tower, assembled from the engine's facade grammar and custom diagrid.
+# A stepped cool limestone and silver-blue silhouette rises above a broad transit podium; glazed bays, setbacks, an illuminated crown,
+# a fine antenna, a reflecting forecourt, and a small skyline establish its scale. Axis +z, metres, y up.
+
+sky = scene.sky@1(sun_elevation=24, sun_azimuth=48, sun_intensity=3.0, turbidity=2.2, ground_color=[0.20, 0.27, 0.31], clouds=true, cloud_cover=0.28, seed=54)
+output sky = sky
+fill = scene.environment@1(sky_color=[0.48, 0.62, 0.74], ground_color=[0.28, 0.32, 0.33], intensity=0.72, reflection=0.36, bounce=0.44, bounce_color=[0.60, 0.73, 0.78])
+output fill = fill
+
+# Dark city ground and a raised stone forecourt around the tower.
+site = solid.box@1(size=[210, 0.5, 190])
+site_at = xform.move@1(site, by=[0, -0.25, 0])
+site_mat = solid.material@1(site_at, color=[0.17, 0.19, 0.20], roughness=0.91)
+output site = site_mat
+forecourt = solid.box@1(size=[104, 0.38, 96])
+forecourt_at = xform.move@1(forecourt, by=[0, -0.01, 0])
+forecourt_mat = solid.material@1(forecourt_at, color=[0.49, 0.53, 0.54], roughness=0.78, recipe="concrete")
+output forecourt = forecourt_mat
+
+# Material-separated building.asset parts keep the authored facade grammar editable and reusable.
+
+podium_masonry = building.asset@1(at=[0, 0.0, 0], width=72, depth=56, floors=4, bays=10, floor_height=4.4, detail=3, style="art_deco", part="masonry", seed=811)
+podium_masonry_mat = solid.material@1(podium_masonry, color=[0.68, 0.72, 0.72], roughness=0.72, recipe="concrete")
+output podium_masonry = podium_masonry_mat
+
+podium_glass = building.asset@1(at=[0, 0.0, 0], width=72, depth=56, floors=4, bays=10, floor_height=4.4, detail=3, style="art_deco", part="glass", seed=811)
+podium_glass_mat = solid.material@1(podium_glass, color=[0.035, 0.15, 0.21], metallic=0.52, roughness=0.18, emissive=[0.014, 0.035, 0.052])
+output podium_glass = podium_glass_mat
+
+podium_trim = building.asset@1(at=[0, 0.0, 0], width=72, depth=56, floors=4, bays=10, floor_height=4.4, detail=3, style="art_deco", part="trim", seed=811)
+podium_trim_mat = solid.material@1(podium_trim, color=[0.28, 0.40, 0.45], metallic=0.78, roughness=0.28)
+output podium_trim = podium_trim_mat
+
+podium_roof = building.asset@1(at=[0, 0.0, 0], width=72, depth=56, floors=4, bays=10, floor_height=4.4, detail=3, style="art_deco", part="roof", seed=811)
+podium_roof_mat = solid.material@1(podium_roof, color=[0.24, 0.25, 0.25], metallic=0.34, roughness=0.68)
+output podium_roof = podium_roof_mat
+
+podium_doors = building.asset@1(at=[0, 0.0, 0], width=72, depth=56, floors=4, bays=10, floor_height=4.4, detail=3, style="art_deco", part="doors", seed=811)
+podium_doors_mat = solid.material@1(podium_doors, color=[0.15, 0.085, 0.045], metallic=0.26, roughness=0.42)
+output podium_doors = podium_doors_mat
+
+shaft_masonry = building.asset@1(at=[0, 17.6, 0], width=42, depth=34, floors=24, bays=8, floor_height=4.4, detail=3, style="art_deco", part="masonry", seed=812)
+shaft_masonry_mat = solid.material@1(shaft_masonry, color=[0.48, 0.56, 0.59], roughness=0.72, recipe="concrete")
+output shaft_masonry = shaft_masonry_mat
+
+shaft_glass = building.asset@1(at=[0, 17.6, 0], width=42, depth=34, floors=24, bays=8, floor_height=4.4, detail=3, style="art_deco", part="glass", seed=812)
+shaft_glass_mat = solid.material@1(shaft_glass, color=[0.035, 0.17, 0.23], metallic=0.52, roughness=0.18, emissive=[0.014, 0.035, 0.052])
+output shaft_glass = shaft_glass_mat
+
+shaft_trim = building.asset@1(at=[0, 17.6, 0], width=42, depth=34, floors=24, bays=8, floor_height=4.4, detail=3, style="art_deco", part="trim", seed=812)
+shaft_trim_mat = solid.material@1(shaft_trim, color=[0.24, 0.36, 0.42], metallic=0.78, roughness=0.28)
+output shaft_trim = shaft_trim_mat
+
+shaft_roof = building.asset@1(at=[0, 17.6, 0], width=42, depth=34, floors=24, bays=8, floor_height=4.4, detail=3, style="art_deco", part="roof", seed=812)
+shaft_roof_mat = solid.material@1(shaft_roof, color=[0.17, 0.2, 0.21], metallic=0.34, roughness=0.68)
+output shaft_roof = shaft_roof_mat
+
+shaft_doors = building.asset@1(at=[0, 17.6, 0], width=42, depth=34, floors=24, bays=8, floor_height=4.4, detail=3, style="art_deco", part="doors", seed=812)
+shaft_doors_mat = solid.material@1(shaft_doors, color=[0.15, 0.085, 0.045], metallic=0.26, roughness=0.42)
+output shaft_doors = shaft_doors_mat
+
+shoulder_masonry = building.asset@1(at=[0, 123.2, 0], width=34, depth=28, floors=9, bays=7, floor_height=4.4, detail=3, style="art_deco", part="masonry", seed=813)
+shoulder_masonry_mat = solid.material@1(shoulder_masonry, color=[0.64, 0.70, 0.71], roughness=0.72, recipe="concrete")
+output shoulder_masonry = shoulder_masonry_mat
+
+shoulder_glass = building.asset@1(at=[0, 123.2, 0], width=34, depth=28, floors=9, bays=7, floor_height=4.4, detail=3, style="art_deco", part="glass", seed=813)
+shoulder_glass_mat = solid.material@1(shoulder_glass, color=[0.045, 0.19, 0.25], metallic=0.52, roughness=0.18, emissive=[0.014, 0.035, 0.052])
+output shoulder_glass = shoulder_glass_mat
+
+shoulder_trim = building.asset@1(at=[0, 123.2, 0], width=34, depth=28, floors=9, bays=7, floor_height=4.4, detail=3, style="art_deco", part="trim", seed=813)
+shoulder_trim_mat = solid.material@1(shoulder_trim, color=[0.34, 0.47, 0.51], metallic=0.78, roughness=0.28)
+output shoulder_trim = shoulder_trim_mat
+
+shoulder_roof = building.asset@1(at=[0, 123.2, 0], width=34, depth=28, floors=9, bays=7, floor_height=4.4, detail=3, style="art_deco", part="roof", seed=813)
+shoulder_roof_mat = solid.material@1(shoulder_roof, color=[0.2, 0.21, 0.22], metallic=0.34, roughness=0.68)
+output shoulder_roof = shoulder_roof_mat
+
+shoulder_doors = building.asset@1(at=[0, 123.2, 0], width=34, depth=28, floors=9, bays=7, floor_height=4.4, detail=3, style="art_deco", part="doors", seed=813)
+shoulder_doors_mat = solid.material@1(shoulder_doors, color=[0.15, 0.085, 0.045], metallic=0.26, roughness=0.42)
+output shoulder_doors = shoulder_doors_mat
+
+crown_masonry = building.asset@1(at=[0, 162.8, 0], width=25, depth=21, floors=7, bays=6, floor_height=4.4, detail=3, style="art_deco", part="masonry", seed=814)
+crown_masonry_mat = solid.material@1(crown_masonry, color=[0.76, 0.78, 0.75], roughness=0.72, recipe="concrete")
+output crown_masonry = crown_masonry_mat
+
+crown_glass = building.asset@1(at=[0, 162.8, 0], width=25, depth=21, floors=7, bays=6, floor_height=4.4, detail=3, style="art_deco", part="glass", seed=814)
+crown_glass_mat = solid.material@1(crown_glass, color=[0.055, 0.20, 0.26], metallic=0.52, roughness=0.18, emissive=[0.014, 0.035, 0.052])
+output crown_glass = crown_glass_mat
+
+crown_trim = building.asset@1(at=[0, 162.8, 0], width=25, depth=21, floors=7, bays=6, floor_height=4.4, detail=3, style="art_deco", part="trim", seed=814)
+crown_trim_mat = solid.material@1(crown_trim, color=[0.44, 0.55, 0.57], metallic=0.78, roughness=0.28)
+output crown_trim = crown_trim_mat
+
+crown_roof = building.asset@1(at=[0, 162.8, 0], width=25, depth=21, floors=7, bays=6, floor_height=4.4, detail=3, style="art_deco", part="roof", seed=814)
+crown_roof_mat = solid.material@1(crown_roof, color=[0.23, 0.23, 0.23], metallic=0.34, roughness=0.68)
+output crown_roof = crown_roof_mat
+
+crown_doors = building.asset@1(at=[0, 162.8, 0], width=25, depth=21, floors=7, bays=6, floor_height=4.4, detail=3, style="art_deco", part="doors", seed=814)
+crown_doors_mat = solid.material@1(crown_doors, color=[0.15, 0.085, 0.045], metallic=0.26, roughness=0.42)
+output crown_doors = crown_doors_mat
+
+# Silver diagrid: paired swept members wrap the main shaft and both setbacks, giving the long elevations a readable structural rhythm.
+let brace_code = "function tube(ax,ay,az,bx,by,bz,r,n){ let dx=bx-ax,dy=by-ay,dz=bz-az,L=Math.hypot(dx,dy,dz)||1; dx/=L; dy/=L; dz/=L; let hx=0,hy=1,hz=0; if(Math.abs(dy)>0.9){hx=1;hy=0;} let ux=dy*hz-dz*hy,uy=dz*hx-dx*hz,uz=dx*hy-dy*hx,U=Math.hypot(ux,uy,uz)||1; ux/=U;uy/=U;uz/=U; const vx=uy*dz-uz*dy,vy=uz*dx-ux*dz,vz=ux*dy-uy*dx,A=[],B=[]; for(let i=0;i<n;i++){const t=i*6.283185/n,c=Math.cos(t),s=Math.sin(t),ox=ux*c+vx*s,oy=uy*c+vy*s,oz=uz*c+vz*s;A.push(m.vertex(ax+ox*r,ay+oy*r,az+oz*r));B.push(m.vertex(bx+ox*r,by+oy*r,bz+oz*r));} for(let i=0;i<n;i++){const j=(i+1)%n;m.face(A[i],B[i],B[j],A[j]);} m.face(...A.slice().reverse());m.face(...B);}; function wrap(x0,x1,z0,z1,y0,y1,bays,rows){const P=(side,u,y)=>side===0?[x0+(x1-x0)*u,y,z0-0.48]:side===1?[x1+0.48,y,z0+(z1-z0)*u]:side===2?[x1-(x1-x0)*u,y,z1+0.48]:[x0-0.48,y,z1-(z1-z0)*u]; for(let side=0;side<4;side++)for(let j=0;j<rows;j++)for(let i=0;i<bays;i++){const a=P(side,i/bays,y0+(y1-y0)*j/rows),b=P(side,(i+1)/bays,y0+(y1-y0)*(j+1)/rows),c=P(side,(i+1)/bays,y0+(y1-y0)*j/rows),d=P(side,i/bays,y0+(y1-y0)*(j+1)/rows);tube(...a,...b,0.105,7);tube(...c,...d,0.105,7);}} const m=new Mesh(); wrap(-21,21,-17,17,18,123,6,6); wrap(-17,17,-14,14,124,162,5,3); wrap(-12.5,12.5,-10.5,10.5,163,193,4,2); m"
+diagrid = poly.script@1(code="${brace_code}", budget=16000)
+diagrid_mat = solid.material@1(diagrid, color=[0.43, 0.57, 0.62], metallic=0.82, roughness=0.24)
+output silver_diagrid = diagrid_mat
+
+# Tight vertical corner piers on the principal shaft and the two setback shoulders.
+corner_pier = solid.box@1(size=[0.52, 105, 0.52])
+corner_piers = inst.place@1(corner_pier, at=[[-20.9, 70.1, -16.9], [20.9, 70.1, -16.9], [-20.9, 70.1, 16.9], [20.9, 70.1, 16.9]])
+corner_pier_mat = solid.material@1(corner_piers, color=[0.55, 0.67, 0.70], metallic=0.74, roughness=0.28)
+output shaft_corner_piers = corner_pier_mat
+
+# Crown lantern, crown cap, and antenna mast above the stepped roofline.
+crown_cap = solid.box@1(size=[15, 2.2, 13])
+crown_cap_at = xform.move@1(crown_cap, by=[0, 194.7, 0])
+crown_cap_mat = solid.material@1(crown_cap_at, color=[0.70, 0.78, 0.79], metallic=0.78, roughness=0.26, emissive=[0.018, 0.044, 0.060])
+output crown_cap = crown_cap_mat
+mast = solid.cylinder@1(radius=0.32, height=25, segments=24)
+mast_at = xform.move@1(mast, by=[0, 208.3, 0])
+mast_mat = solid.material@1(mast_at, color=[0.50, 0.62, 0.66], metallic=0.88, roughness=0.22)
+output antenna = mast_mat
+mast_tip = solid.sphere@1(radius=0.78, segments=20)
+mast_tip_at = xform.move@1(mast_tip, by=[0, 220.9, 0])
+mast_tip_mat = solid.material@1(mast_tip_at, color=[0.30, 0.76, 1.0], roughness=0.22, emissive=[0.10, 0.62, 1.4])
+output crown_beacon = mast_tip_mat
+
+# A shallow reflecting basin and concentric steel lip anchor the arrival court in front of the entrance.
+basin = solid.cylinder@1(radius=11, height=0.42, segments=64)
+basin_at = xform.move@1(basin, by=[0, 0.22, -43])
+basin_mat = solid.material@1(basin_at, color=[0.035, 0.17, 0.22], metallic=0.68, roughness=0.12)
+output reflecting_basin = basin_mat
+lip = solid.torus@1(major=10.8, minor=0.24, segments=80, tube_segments=10)
+lip_at = xform.move@1(lip, by=[0, 0.48, -43])
+lip_mat = solid.material@1(lip_at, color=[0.43, 0.59, 0.62], metallic=0.86, roughness=0.22)
+output basin_lip = lip_mat
+fountain = solid.cylinder@1(radius=1.2, height=2.4, segments=32)
+fountain_at = xform.move@1(fountain, by=[0, 1.55, -43])
+fountain_mat = solid.material@1(fountain_at, color=[0.65, 0.70, 0.69], metallic=0.32, roughness=0.38)
+output fountain = fountain_mat
+
+# Small street trees, low planters, and warm entry lights give a human scale to the supertall.
+planter = solid.box@1(size=[5.2, 0.85, 5.2])
+planter_at = inst.place@1(planter, at=[[-43, 0.43, -27], [43, 0.43, -27], [-43, 0.43, 28], [43, 0.43, 28]])
+planter_mat = solid.material@1(planter_at, color=[0.29, 0.36, 0.37], roughness=0.77, recipe="concrete")
+output planters = planter_mat
+oak = flora.tree@1(kind="oak", height=7.5, seed=226, lod=2, sides=7, bark=[0.20, 0.16, 0.12], leaves=[0.10, 0.30, 0.18], leaf_style="crossed", leaf_size=0.95, sway=0.12)
+oak_row = inst.place@1(oak, at=[[-43, 0.86, -27], [43, 0.86, -27], [-43, 0.86, 28], [43, 0.86, 28]])
+output plaza_trees = oak_row
+arrival_lamp_body = street.prop@1(at=[0, 0, -28.6], height=8.5, axis="x", kind="streetlight", part="body")
+arrival_lamp_body_at = inst.place@1(arrival_lamp_body, at=[[-17, 0, 0], [17, 0, 0]])
+arrival_lamp_body_mat = solid.material@1(arrival_lamp_body_at, color=[0.12, 0.14, 0.16], metallic=0.72, roughness=0.36)
+output arrival_lamp_bodies = arrival_lamp_body_mat
+arrival_lamp_accent = street.prop@1(at=[0, 0, -28.6], height=8.5, axis="x", kind="streetlight", part="accent")
+arrival_lamp_accent_at = inst.place@1(arrival_lamp_accent, at=[[-17, 0, 0], [17, 0, 0]])
+arrival_lamp_accent_mat = solid.material@1(arrival_lamp_accent_at, color=[0.48, 0.33, 0.16], metallic=0.74, roughness=0.3)
+output arrival_lamp_accents = arrival_lamp_accent_mat
+arrival_lamp_lens = street.prop@1(at=[0, 0, -28.6], height=8.5, axis="x", kind="streetlight", part="lens")
+arrival_lamp_lens_at = inst.place@1(arrival_lamp_lens, at=[[-17, 0, 0], [17, 0, 0]])
+arrival_lamp_lens_mat = solid.material@1(arrival_lamp_lens_at, color=[1.0, 0.68, 0.31], emissive=[2.4, 1.05, 0.24], roughness=0.25)
+output arrival_lamp_lenses = arrival_lamp_lens_mat

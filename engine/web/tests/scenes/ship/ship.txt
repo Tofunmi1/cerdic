@@ -1,0 +1,315 @@
+# FRIGATE, after USS CONSTITUTION (1797). BRIEF: a three-masted 44-gun frigate: 62 m on deck, 53.3 m at the waterline, beam 13.26 m, draft 6.4 m forward and 7.0 m aft,
+# spar deck 4.9 m above the water, 15 long guns a side on the gun deck, masts 60 / 67 / 52.6 m, bowsprit to spanker boom 93 m, copper-sheathed below the waterline.
+# Sources: Wikipedia and the US Navy fact file (sizes); the sources disagree on what height the masts are measured from, so heights here are above the waterline, scaled from
+# the 198 / 220 / 172.5 ft figures and anchored to 172 ft from the spar deck to the main truck (= 57.3 m above the water). Yard lengths and mast positions are ESTIMATED from model plans.
+# Built like the car: every dimension is a named value; the hull is a LOFT of cross-sections along its length (the naval architect's body plan: half-beam, keel line and sheer
+# are tables), subdivided; the deck, bulwarks and gun ports are cut out of it and each opening is filled with its own material. engine/tools/audit-ship.ts measures the
+# evaluated mesh against the real dimensions and says which value to change.
+# Metres, +y up, the ship faces +z (bow), waterline at y = 0, midships near z = 0.
+# kind: world
+sky = scene.sky@1(sun_elevation=35, sun_azimuth=-40, sun_intensity=3.4, turbidity=3, ground_color=[0.12, 0.2, 0.3], clouds=true, haze=0.1)
+env = scene.environment@1(sky_color=[0.7, 0.8, 0.95], ground_color=[0.12, 0.2, 0.3], intensity=1.0, reflection=0.5, bounce=0.5)
+output sky = sky
+output env = env
+
+# ---------------- PARAMETER TABLE ----------------
+let beam = "13.26"
+let draft_aft = "7.0"
+let draft_fwd = "6.4"
+let freeboard = "4.9"
+# ports: the gun deck's 15 ports a side, their centre height and spacing
+let port_y = "2.9"
+let port_gap = "2.2"
+# --------------------------------------------------
+
+# shared by the hull, deck and ports: piecewise-linear lookup of the body plan, and the half-width of the hull at a height
+let jsh = "const pl = (k, z) => { if (z <= k[0][0]) return k[0][1]; for (let i = 1; i < k.length; i++) { if (z <= k[i][0]) { const t = (z - k[i - 1][0]) / (k[i][0] - k[i - 1][0]); return k[i - 1][1] + (k[i][1] - k[i - 1][1]) * t; } } return k[k.length - 1][1]; }; const BEAM = ${beam}, DA = ${draft_aft}, DF = ${draft_fwd}, FB = ${freeboard}; const bK = [[-29, 3.9], [-27, 4.7], [-24, 5.7], [-16, 6.45], [-8, 6.63], [0, 6.63], [8, 6.5], [16, 5.9], [22, 4.6], [26, 2.4], [28, 1.3], [30, 0.7], [33, 0.2]]; const yK = [[-29, 3.0], [-26.5, 0], [-24, -DA * 0.57], [-20, -DA * 0.99], [-10, -DA], [19, -DF], [23, -DF * 0.7], [26.8, 0], [29, 2.5], [31, 4.5], [33, 6.5]]; const dK = [[-29, FB + 1.4], [-9.2, FB + 1.4], [-8, FB], [21, FB], [22.2, FB + 1.4], [33, FB + 1.4]]; const half = (z) => pl(bK, z) * BEAM / 13.26; const railY = (z) => pl(dK, z) + 1.15; const fS = [[0, 1.0], [0.22, 1.012], [0.45, 1.0], [0.70, 0.965], [1, 0.935]]; const y0Of = (z) => Math.min(Math.max(0, pl(yK, z) + (pl(yK, z) > 0 ? 1.0 : 0)), railY(z) - 0.3); const sideX = (z, y) => { const y0 = y0Of(z), r = railY(z); return half(z) * pl(fS, Math.min(1, Math.max(0, (y - y0) / (r - y0)))); }; const ring = (rh) => { const r = rh.slice(); for (let i = rh.length - 2; i >= 1; i--) r.push([-rh[i][0], rh[i][1]]); return r; };"
+# the hull rings: the keel line up to the waterline in eight points (U-shaped section), then tumblehome up to the rail, then across the top
+let hull_code = "${jsh} const m = new Mesh(); const S = [0, 0.22, 0.45, 0.66, 0.82, 0.93, 0.985, 1.0], Hh = [0, 0.035, 0.10, 0.22, 0.42, 0.65, 0.87, 1.0], U = [0.22, 0.45, 0.70, 1.0]; const fn = (z) => { const b = half(z), yk = pl(yK, z), r = railY(z), y0 = y0Of(z); const out = []; for (let i = 0; i < S.length; i++) out.push([b * S[i], yk + (y0 - yk) * Hh[i]]); for (let i = 0; i < U.length; i++) out.push([b * pl(fS, U[i]), y0 + (r - y0) * U[i]]); const e = b * 0.935, d = Math.min(0.2, e * 0.4); out.push([e - d, r]); out.push([e * 0.5, r]); out.push([0, r]); return out; }; const zs = []; const N = 64; for (let i = 0; i <= N; i++) zs.push(-29 + 62 * i / N); const rows = zs.map((z) => ring(fn(z)).map((q) => m.vertex(q[0], q[1], z))); const n = rows[0].length; for (let k = 0; k < rows.length - 1; k++) for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(rows[k][j], rows[k][j2], rows[k + 1][j2], rows[k + 1][j]); } const cf = m.vertex(0, (pl(yK, 33) + railY(33)) / 2, 33), cb = m.vertex(0, (pl(yK, -29) + railY(-29)) / 2, -29); for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(cf, rows[rows.length - 1][j], rows[rows.length - 1][j2]); m.face(cb, rows[0][j2], rows[0][j]); } m"
+# the open deck: a loft inset by the bulwark thickness (0.3 m), from 0.08 m below the deck up past the rail (cut), and the same 0.08 m plate (the deck planking); steps follow the deck table
+let deck_body = "${jsh} const m = new Mesh(); const zs = []; const N = 90; for (let i = 0; i <= N; i++) zs.push(-28.7 + 60.1 * i / N); for (const e of [-9.2, -8.6, -8, 21, 21.6, 22.2]) zs.push(e); zs.sort((a, b) => a - b); for (let i = zs.length - 1; i > 0; i--) if (zs[i] - zs[i - 1] < 0.08) zs.splice(i, 1); const fn = (z) => { const bi = Math.max(half(z) * 0.935 - 0.3, 0.05), dy = pl(dK, z); return [[0, dy - 0.08], [bi * 0.5, dy - 0.08], [bi, dy - 0.08], [bi, TOP(z, dy)], [bi * 0.5, TOP(z, dy)], [0, TOP(z, dy)]]; }; const rows = zs.map((z) => ring(fn(z)).map((q) => m.vertex(q[0], q[1], z))); const n = rows[0].length; for (let k = 0; k < rows.length - 1; k++) for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(rows[k][j], rows[k][j2], rows[k + 1][j2], rows[k + 1][j]); } const cf = m.vertex(0, (fn(zs[zs.length - 1])[0][1] + fn(zs[zs.length - 1])[3][1]) / 2, zs[zs.length - 1]), cb = m.vertex(0, (fn(zs[0])[0][1] + fn(zs[0])[3][1]) / 2, zs[0]); for (let j = 0; j < n; j++) { const j2 = (j + 1) % n; m.face(cf, rows[rows.length - 1][j], rows[rows.length - 1][j2]); m.face(cb, rows[0][j2], rows[0][j]); } m"
+# gun ports: a closed box for every port, both sides, positioned from the hull's own width at the port height; `deep` is how far in it reaches, `out` how far past the surface
+let ports_body = "${jsh} const m = new Mesh(); const box = (x0, x1, y0, y1, z0, z1) => { const v = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]].map((p) => m.vertex(p[0], p[1], p[2])); m.face(v[0], v[3], v[2], v[1]); m.face(v[4], v[5], v[6], v[7]); m.face(v[0], v[1], v[5], v[4]); m.face(v[3], v[7], v[6], v[2]); m.face(v[0], v[4], v[7], v[3]); m.face(v[1], v[2], v[6], v[5]); }; for (let i = 0; i < 15; i++) { const z = -15.4 + ${port_gap} * i, py = ${port_y}, sx = sideX(z, py); for (const s of [1, -1]) { const a = s * (sx - DEEP), b = s * (sx + OUT); box(Math.min(a, b), Math.max(a, b), py - 0.38, py + 0.38, z - 0.42, z + 0.42); } } m"
+# the guns: a ten-sided barrel through each port, muzzle out past the hull
+let guns_body = "${jsh} const m = new Mesh(); const barrel = (x0, x1, y, z, r) => { const a = [], b = []; for (let k = 0; k < 10; k++) { const t = 2 * Math.PI * k / 10; a.push(m.vertex(x0, y + r * Math.cos(t), z + r * Math.sin(t))); b.push(m.vertex(x1, y + r * Math.cos(t), z + r * Math.sin(t))); } for (let k = 0; k < 10; k++) { const k2 = (k + 1) % 10; m.face(a[k], a[k2], b[k2], b[k]); } m.face(...a.slice().reverse()); m.face(...b); }; for (let i = 0; i < 15; i++) { const z = -15.4 + ${port_gap} * i, py = ${port_y}, sx = sideX(z, py); barrel(sx - 0.5, sx + 0.55, py, z, 0.17); barrel(-sx - 0.55, -sx + 0.5, py, z, 0.17); } m"
+
+hull_s = poly.script@1(code="${hull_code}", budget=8000)
+hull_sub = poly.subdivide@1(hull_s, levels=2)
+hull_solid = poly.to_solid@1(hull_sub)
+cut_s = poly.script@1(code="const TOP = (z, dy) => railY(z) + 0.6; ${deck_body}", budget=6000)
+cut_sub = poly.subdivide@1(cut_s, levels=1)
+cut_solid = poly.to_solid@1(cut_sub)
+plate_s = poly.script@1(code="const TOP = (z, dy) => dy; ${deck_body}", budget=6000)
+plate_sub = poly.subdivide@1(plate_s, levels=1)
+plate_solid = poly.to_solid@1(plate_sub)
+ports_cut_s = poly.script@1(code="const DEEP = 0.55, OUT = 0.25; ${ports_body}", budget=4000)
+ports_cut = poly.to_solid@1(ports_cut_s)
+ports_fill_s = poly.script@1(code="const DEEP = 0.55, OUT = -0.1; ${ports_body}", budget=4000)
+ports_fill = poly.to_solid@1(ports_fill_s)
+guns_s = poly.script@1(code="${guns_body}", budget=4000)
+guns_solid = poly.to_solid@1(guns_s)
+
+# ---- stern windows: five panes in the transom, a cutter and its fill ----
+win_b = solid.box@1(size=[0.9, 1.1, 0.5])
+win_1 = xform.move@1(win_b, by=[-3.2, 6.0, -28.9])
+win_2 = xform.move@1(win_b, by=[-1.6, 6.0, -28.9])
+win_3 = xform.move@1(win_b, by=[0, 6.0, -28.9])
+win_4 = xform.move@1(win_b, by=[1.6, 6.0, -28.9])
+win_5 = xform.move@1(win_b, by=[3.2, 6.0, -28.9])
+win_u = solid.union@1(win_1, win_2, win_3, win_4, win_5)
+
+# ---- the hull: the deck cut away, ports cut away; then split into colour bands with the same planes the car's inlays used ----
+hull_open = solid.difference@1(hull_solid, cut_solid)
+hull_paint = solid.difference@1(hull_open, ports_cut, win_u)
+band_copper_b = solid.box@1(size=[30, 12.3, 100])
+band_copper = xform.move@1(band_copper_b, by=[0, -5.85, 2])
+band_low_b = solid.box@1(size=[30, 1.85, 100])
+band_low = xform.move@1(band_low_b, by=[0, 1.225, 2])
+band_ochre_b = solid.box@1(size=[30, 1.5, 100])
+band_ochre = xform.move@1(band_ochre_b, by=[0, 2.9, 2])
+band_high_b = solid.box@1(size=[30, 8, 100])
+band_high = xform.move@1(band_high_b, by=[0, 7.65, 2])
+hull_copper = solid.intersect@1(hull_paint, band_copper)
+copper_m = solid.material@1(hull_copper, color=[0.5, 0.3, 0.2], metallic=0.8, roughness=0.42)
+copper_h = anim.parent@1(copper_m, parent="hull")
+output hull_copper = copper_h
+hull_low = solid.intersect@1(hull_paint, band_low)
+low_m = solid.material@1(hull_low, color=[0.025, 0.025, 0.03], roughness=0.55)
+low_h = anim.parent@1(low_m, parent="hull")
+output hull_black_low = low_h
+hull_ochre_s = solid.intersect@1(hull_paint, band_ochre)
+ochre_m = solid.material@1(hull_ochre_s, color=[0.72, 0.55, 0.14], roughness=0.6)
+ochre_h = anim.parent@1(ochre_m, parent="hull")
+output hull_ochre = ochre_h
+hull_high = solid.intersect@1(hull_paint, band_high)
+high_m = solid.material@1(hull_high, color=[0.025, 0.025, 0.03], roughness=0.55)
+high_h = anim.parent@1(high_m, parent="hull")
+output hull_black_high = high_h
+ports_dark_s = solid.intersect@1(hull_open, ports_fill)
+ports_dark_m = solid.material@1(ports_dark_s, color=[0.01, 0.01, 0.012], roughness=0.9)
+ports_dark_h = anim.parent@1(ports_dark_m, parent="hull")
+output gun_ports = ports_dark_h
+win_dark_s = solid.intersect@1(hull_open, win_u)
+win_dark_m = solid.material@1(win_dark_s, color=[0.04, 0.06, 0.09], metallic=0.3, roughness=0.1)
+win_dark_h = anim.parent@1(win_dark_m, parent="hull")
+output stern_windows = win_dark_h
+plate_m = solid.material@1(plate_solid, color=[0.55, 0.42, 0.25], roughness=0.85, recipe="planks")
+plate_h = anim.parent@1(plate_m, parent="hull")
+output deck = plate_h
+guns_m = solid.material@1(guns_solid, color=[0.05, 0.05, 0.055], metallic=0.7, roughness=0.5)
+guns_h = anim.parent@1(guns_m, parent="hull")
+output guns = guns_h
+# the rudder hangs behind the stern post
+rud_b = solid.box@1(size=[0.35, 7.0, 0.9])
+rud_at = xform.move@1(rud_b, by=[0, -2.3, -27.9])
+rud_m = solid.material@1(rud_at, color=[0.14, 0.09, 0.05], roughness=0.8)
+rud_h = anim.parent@1(rud_m, parent="hull")
+output rudder = rud_h
+
+# ================= THE RIG =================
+# mast heights above the waterline: main 57.3 m (172 ft deck to truck + 4.9 m freeboard); fore and mizzen scaled by 198/220 and 172.5/220 (Navy fact file); rake aft in degrees
+let main_h = "57.3"
+let fore_h = "51.6"
+let mizzen_h = "44.9"
+let rake_deg = "2"
+# mast positions along the ship (z): estimated from model plans
+let fore_z = "17.0"
+let main_z = "-2.0"
+let mizzen_z = "-19.0"
+
+# the mast leans aft, so every spar and sail is placed at the mast's z for ITS height
+let jsr = "const RK = ${rake_deg} * Math.PI / 180; const zAt = (mz, y) => mz - Math.sin(RK) * y;"
+# a rope or spar: an n-sided prism between two points (n = 4 for a rope, 10 for a spar), closed and outward-facing
+let jsrope = "const rope = (m, a, b, r, n) => { const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; const L = Math.hypot(d[0], d[1], d[2]); const t = [d[0] / L, d[1] / L, d[2] / L]; const up = Math.abs(t[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0]; let n1 = [t[1] * up[2] - t[2] * up[1], t[2] * up[0] - t[0] * up[2], t[0] * up[1] - t[1] * up[0]]; const l1 = Math.hypot(n1[0], n1[1], n1[2]); n1 = n1.map((v) => v / l1); const n2 = [t[1] * n1[2] - t[2] * n1[1], t[2] * n1[0] - t[0] * n1[2], t[0] * n1[1] - t[1] * n1[0]]; const A = [], B = []; for (let k = 0; k < n; k++) { const th = 2 * Math.PI * k / n, c = Math.cos(th), s = Math.sin(th); const o = [r * (c * n1[0] + s * n2[0]), r * (c * n1[1] + s * n2[1]), r * (c * n1[2] + s * n2[2])]; A.push(m.vertex(a[0] + o[0], a[1] + o[1], a[2] + o[2])); B.push(m.vertex(b[0] + o[0], b[1] + o[1], b[2] + o[2])); } for (let k = 0; k < n; k++) { const k2 = (k + 1) % n; m.face(A[k], A[k2], B[k2]); m.face(A[k], B[k2], B[k]); } m.face(...A.slice().reverse()); m.face(...B); };"
+
+# a mast: four tapered segments (lower, top, topgallant, royal pole) revolved, a top platform, raked aft; r0 is the radius at the deck
+def mast(tag, mz, mh, r0, rake)
+  mp{tag}_a = profile.polygon@1(points=[[0, 4.0], [{r0}, 4.0], [{r0 * 0.72}, {mh * 0.5}], [0, {mh * 0.5}]])
+  mp{tag}_b = profile.polygon@1(points=[[0, {mh * 0.42}], [{r0 * 0.58}, {mh * 0.42}], [{r0 * 0.42}, {mh * 0.78}], [0, {mh * 0.78}]])
+  mp{tag}_c = profile.polygon@1(points=[[0, {mh * 0.72}], [{r0 * 0.33}, {mh * 0.72}], [{r0 * 0.23}, {mh * 0.93}], [0, {mh * 0.93}]])
+  mp{tag}_d = profile.polygon@1(points=[[0, {mh * 0.89}], [{r0 * 0.19}, {mh * 0.89}], [{r0 * 0.09}, {mh}], [0, {mh}]])
+  mr{tag}_a = solid.revolve@1(mp{tag}_a, angle=360deg, segments=16)
+  mr{tag}_b = solid.revolve@1(mp{tag}_b, angle=360deg, segments=14)
+  mr{tag}_c = solid.revolve@1(mp{tag}_c, angle=360deg, segments=12)
+  mr{tag}_d = solid.revolve@1(mp{tag}_d, angle=360deg, segments=10)
+  mt{tag}_p = solid.box@1(size=[{mh * 0.062}, 0.2, {mh * 0.05}])
+  mt{tag}_q = xform.move@1(mt{tag}_p, by=[0, {mh * 0.5}, 0.2])
+  mu{tag} = solid.union@1(mr{tag}_a, mr{tag}_b, mr{tag}_c, mr{tag}_d, mt{tag}_q)
+  mk{tag} = xform.rotate@1(mu{tag}, angles=[{0 - rake}, 0, 0])
+  mm{tag} = xform.move@1(mk{tag}, by=[0, 0, {mz}])
+  mc{tag} = solid.material@1(mm{tag}, color=[0.5, 0.36, 0.2], roughness=0.8)
+  mq{tag} = anim.parent@1(mc{tag}, parent="hull")
+  output mast_{tag} = mq{tag}
+end
+mast("fore", 17.0, 51.6, 0.4, 2)
+mast("main", -2.0, 57.3, 0.45, 2)
+mast("mizzen", -19.0, 44.9, 0.35, 2)
+
+# bowsprit: 15 degrees above horizontal, 34.2 m long, from inside the forecastle to a tip at z = 61
+bs_p = profile.polygon@1(points=[[0, 0], [0.42, 0], [0.12, 34.2], [0, 34.2]])
+bs_r = solid.revolve@1(bs_p, angle=360deg, segments=14)
+bs_t = xform.rotate@1(bs_r, angles=[75, 0, 0])
+bs_a = xform.move@1(bs_t, by=[0, 6.8, 28.0])
+bs_m = solid.material@1(bs_a, color=[0.5, 0.36, 0.2], roughness=0.8)
+bs_h = anim.parent@1(bs_m, parent="hull")
+output bowsprit = bs_h
+
+# yards: [mast z, height, length, radius]; course, topsail, topgallant, royal on the fore and main, crossjack and three above it on the mizzen (lengths estimated)
+let yards_code = "${jsr} ${jsrope} const m = new Mesh(); const Y = [[17.0, 10.4, 24, 0.3], [17.0, 23.5, 19.5, 0.24], [17.0, 35, 13.5, 0.17], [17.0, 43, 9, 0.12], [-2.0, 11.5, 27, 0.33], [-2.0, 25.5, 22, 0.27], [-2.0, 38, 15, 0.19], [-2.0, 47, 10, 0.13], [-19.0, 10.0, 19, 0.26], [-19.0, 21, 15.5, 0.2], [-19.0, 31, 10.5, 0.15], [-19.0, 38.5, 7, 0.1]]; for (const q of Y) rope(m, [-q[2] / 2, q[1], zAt(q[0], q[1]) + 0.55], [q[2] / 2, q[1], zAt(q[0], q[1]) + 0.55], q[3], 10); m"
+yards_s = poly.script@1(code="${yards_code}", budget=4000)
+yards_m = solid.material@1(yards_s, color=[0.5, 0.36, 0.2], roughness=0.8)
+yards_h = anim.parent@1(yards_m, parent="hull")
+output yards = yards_h
+# the spanker's boom (to z = -31.9, past the taffrail) and gaff
+let spars_code = "${jsrope} const m = new Mesh(); rope(m, [0, 9, -19.9], [0, 9, -31.9], 0.17, 10); rope(m, [0, 23.5, -19.9], [0, 28.5, -30.4], 0.13, 10); m"
+spars_s = poly.script@1(code="${spars_code}", budget=2000)
+spars_m = solid.material@1(spars_s, color=[0.5, 0.36, 0.2], roughness=0.8)
+spars_h = anim.parent@1(spars_m, parent="hull")
+output spanker_boom = spars_h
+
+# standing rigging, ONE script: five shrouds a side on each mast, thirteen rungs of ratlines between every pair, backstays, and the stays between the masts and out to the bowsprit
+let rig_code = "${jsh} ${jsr} ${jsrope} const m = new Mesh(); const masts = [[${fore_z}, ${fore_h}], [${main_z}, ${main_h}], [${mizzen_z}, ${mizzen_h}]]; for (const M of masts) { const ty = M[1] * 0.5; for (const s of [1, -1]) { const top = [], low = []; for (let i = 0; i < 5; i++) { const zl = M[0] + (i - 2) * 0.95; top.push([s * 1.3, ty, zAt(M[0], ty) + (i - 2) * 0.3]); low.push([s * (sideX(zl, 5.3) + 0.28), 5.3, zl]); rope(m, low[i], top[i], 0.045, 4); } for (let k = 1; k <= 13; k++) { const t = 0.1 + k * 0.05; const p = (q) => [low[q][0] + (top[q][0] - low[q][0]) * t, low[q][1] + (top[q][1] - low[q][1]) * t, low[q][2] + (top[q][2] - low[q][2]) * t]; for (let i = 0; i < 4; i++) rope(m, p(i), p(i + 1), 0.018, 4); } const th = M[1] * 0.78; for (const dz of [-1.2, -2.6]) { const zl = M[0] + dz * 2.2 - 1.0; rope(m, [s * 0.7, th, zAt(M[0], th) - 0.3], [s * (sideX(zl, 5.3) + 0.28), 5.3, zl], 0.035, 4); } } } rope(m, [0, ${fore_h} * 0.78, zAt(${fore_z}, ${fore_h} * 0.78)], [0, 13.5, 52], 0.05, 4); rope(m, [0, ${main_h} * 0.78, zAt(${main_z}, ${main_h} * 0.78)], [0, 11, ${fore_z} + 0.4], 0.05, 4); rope(m, [0, ${mizzen_h} * 0.78, zAt(${mizzen_z}, ${mizzen_h} * 0.78)], [0, 11, ${main_z} - 0.4], 0.05, 4); rope(m, [0, ${fore_h} * 0.93, zAt(${fore_z}, ${fore_h} * 0.93)], [0, 12, 58], 0.04, 4); m"
+rig_s = poly.script@1(code="${rig_code}", budget=12000)
+rig_m = solid.material@1(rig_s, color=[0.12, 0.09, 0.06], roughness=0.9)
+rig_h = anim.parent@1(rig_m, parent="hull")
+output rigging = rig_h
+
+# sails: a grid of vertices per sail, billowed forward (the wind is from astern), double-sided canvas; one mesh per mast. [top y, foot y, head width, foot width, billow]
+let sail_fn = "const NU = 12, NV = 8; const sail = (m, mz, yt, yb, wt, wb, bel) => { const g = []; for (let iv = 0; iv <= NV; iv++) { const v = iv / NV, y = yt + (yb - yt) * v, w = wt + (wb - wt) * v, row = []; for (let iu = 0; iu <= NU; iu++) { const u = iu / NU; row.push(m.vertex((u - 0.5) * w, y, zAt(mz, y) + 0.62 + bel * Math.sin(Math.PI * u) * Math.sin(Math.PI * (0.08 + 0.84 * v)))); } g.push(row); } for (let iv = 0; iv < NV; iv++) for (let iu = 0; iu < NU; iu++) { m.face(g[iv][iu], g[iv][iu + 1], g[iv + 1][iu + 1], g[iv + 1][iu]); } };"
+let sails_main = "${jsr} ${sail_fn} const m = new Mesh(); sail(m, -2.0, 11.3, 5.9, 26.5, 28, 1.5); sail(m, -2.0, 25.3, 12.9, 21.5, 25, 1.7); sail(m, -2.0, 37.8, 26.2, 14.8, 20, 1.3); sail(m, -2.0, 46.8, 39.0, 9.8, 13, 0.8); m"
+let sails_fore = "${jsr} ${sail_fn} const m = new Mesh(); sail(m, 17.0, 10.2, 5.6, 23.6, 25, 1.4); sail(m, 17.0, 23.3, 12.0, 19, 22.5, 1.5); sail(m, 17.0, 34.8, 24.0, 13.3, 17.5, 1.2); sail(m, 17.0, 42.8, 35.8, 8.8, 11.5, 0.7); m"
+let sails_mizzen = "${jsr} ${sail_fn} const m = new Mesh(); sail(m, -19.0, 20.8, 11.0, 15.3, 19, 1.2); sail(m, -19.0, 30.8, 22.5, 10.3, 14, 0.9); sail(m, -19.0, 38.3, 32.3, 6.8, 9, 0.6); m"
+# CLOTH: every sail is its own mesh run by a position-based cloth program (SimL, as in the armada). Its pinned vertices ride the hull body; the rest are blown by a gusty wind from astern
+# (+z), pulled down by gravity, and held by their rest edge lengths. Square sails are pinned along the yard (top row) and at the two foot corners (the sheets); jibs along the luff;
+# the spanker along the mast, the boom and the gaff. Each source differs only in its pin test.
+let square_src = "sim sail\nparam wind = vec3(1.4, 0.0, 6.0)\nparam gust = 0.6\nparam damping = 0.98\nparam top = 0.0\nparam bot = 0.0\nparam hw = 1.0\ninput mesh sail\ninput bone hull\nstate pos: vec3[sail]\nstate prev: vec3[sail]\nkernel init each i in pos {\n  let w = bone_point(hull, rest(sail, i))\n  pos[i] = w\n  prev[i] = w\n}\nkernel predict each i in pos {\n  let r = rest(sail, i)\n  let pin = r.y > top - 0.05 || (r.y < bot + 0.05 && abs(r.x) > hw - 0.5)\n  let w = bone_point(hull, r)\n  if pin || distance(pos[i], w) > 8.0 {\n    pos[i] = w\n    prev[i] = w\n  } else {\n    let v = (pos[i] - prev[i]) * damping\n    v = v * min(1.0, 0.12 / max(length(v), 0.0001))\n    prev[i] = pos[i]\n    let puff = wind * (1.0 + gust * sin(t * 1.7 + r.y * 0.6 + r.x * 0.5))\n    pos[i] += v + (vec3(0.0, -9.8, 0.0) + puff * 2.4) * dt * dt\n  }\n}\nkernel solve each i in pos {\n  let r = rest(sail, i)\n  let pin = r.y > top - 0.05 || (r.y < bot + 0.05 && abs(r.x) > hw - 0.5)\n  let p = pos[i]\n  if !pin {\n    let corr = vec3(0.0)\n    let count = 0.0\n    for j, len in adjacent(sail, i) {\n      let rj = rest(sail, j)\n      let pj = rj.y > top - 0.05 || (rj.y < bot + 0.05 && abs(rj.x) > hw - 0.5)\n      corr += pull(p, pos[j], len) * select(pj, 1.0, 0.5)\n      count += 1.0\n    }\n    if count > 0.0 {\n      p += corr * (1.3 / count)\n    }\n  }\n  pos[i] = p\n}\nschedule predict; repeat 6 { solve }\noutput mesh pos\n"
+let jib_src = "sim jib\nparam wind = vec3(1.4, 0.0, 6.0)\nparam gust = 0.6\nparam damping = 0.98\nparam pa = 0.0\nparam pb = 0.0\nparam pc = 0.0\ninput mesh sail\ninput bone hull\nstate pos: vec3[sail]\nstate prev: vec3[sail]\nkernel init each i in pos {\n  let w = bone_point(hull, rest(sail, i))\n  pos[i] = w\n  prev[i] = w\n}\nkernel predict each i in pos {\n  let r = rest(sail, i)\n  let pin = pa * r.y + pb * r.z > pc\n  let w = bone_point(hull, r)\n  if pin || distance(pos[i], w) > 8.0 {\n    pos[i] = w\n    prev[i] = w\n  } else {\n    let v = (pos[i] - prev[i]) * damping\n    v = v * min(1.0, 0.12 / max(length(v), 0.0001))\n    prev[i] = pos[i]\n    let puff = wind * (1.0 + gust * sin(t * 1.9 + r.y * 0.5 + r.z * 0.4))\n    pos[i] += v + (vec3(0.0, -9.8, 0.0) + puff * 2.4) * dt * dt\n  }\n}\nkernel solve each i in pos {\n  let r = rest(sail, i)\n  let pin = pa * r.y + pb * r.z > pc\n  let p = pos[i]\n  if !pin {\n    let corr = vec3(0.0)\n    let count = 0.0\n    for j, len in adjacent(sail, i) {\n      let rj = rest(sail, j)\n      let pj = pa * rj.y + pb * rj.z > pc\n      corr += pull(p, pos[j], len) * select(pj, 1.0, 0.5)\n      count += 1.0\n    }\n    if count > 0.0 {\n      p += corr * (1.3 / count)\n    }\n  }\n  pos[i] = p\n}\nschedule predict; repeat 6 { solve }\noutput mesh pos\n"
+let span_src = "sim spanker\nparam wind = vec3(1.4, 0.0, 6.0)\nparam gust = 0.6\nparam damping = 0.98\ninput mesh sail\ninput bone hull\nstate pos: vec3[sail]\nstate prev: vec3[sail]\nkernel init each i in pos {\n  let w = bone_point(hull, rest(sail, i))\n  pos[i] = w\n  prev[i] = w\n}\nkernel predict each i in pos {\n  let r = rest(sail, i)\n  let pin = r.z > -20.3 || r.y < 9.05 || 9.9 * r.y + 5.0 * r.z > 132.05\n  let w = bone_point(hull, r)\n  if pin || distance(pos[i], w) > 8.0 {\n    pos[i] = w\n    prev[i] = w\n  } else {\n    let v = (pos[i] - prev[i]) * damping\n    v = v * min(1.0, 0.12 / max(length(v), 0.0001))\n    prev[i] = pos[i]\n    let puff = wind * (1.0 + gust * sin(t * 1.6 + r.y * 0.5 + r.z * 0.4))\n    pos[i] += v + (vec3(0.0, -9.8, 0.0) + puff * 2.4) * dt * dt\n  }\n}\nkernel solve each i in pos {\n  let r = rest(sail, i)\n  let pin = r.z > -20.3 || r.y < 9.05 || 9.9 * r.y + 5.0 * r.z > 132.05\n  let p = pos[i]\n  if !pin {\n    let corr = vec3(0.0)\n    let count = 0.0\n    for j, len in adjacent(sail, i) {\n      let rj = rest(sail, j)\n      let pj = rj.z > -20.3 || rj.y < 9.05 || 9.9 * rj.y + 5.0 * rj.z > 132.05\n      corr += pull(p, pos[j], len) * select(pj, 1.0, 0.5)\n      count += 1.0\n    }\n    if count > 0.0 {\n      p += corr * (1.3 / count)\n    }\n  }\n  pos[i] = p\n}\nschedule predict; repeat 6 { solve }\noutput mesh pos\n"
+def sq(tag, mz, yt, yb, wt, wb, bel, hw)
+  sq{tag}_s = poly.script@1(code="${jsr} ${sail_fn} const m = new Mesh(); sail(m, ${mz}, ${yt}, ${yb}, ${wt}, ${wb}, ${bel}); m", budget=2000)
+  sq{tag}_p = sim.program@1(sq{tag}_s, rate=30, values="top=${yt}; bot=${yb}; hw=${hw}", source="${square_src}")
+  sq{tag}_m = solid.material@1(sq{tag}_p, color=[0.9, 0.86, 0.74], metallic=0.0, roughness=1.0)
+  sq{tag}_f = solid.finish@1(sq{tag}_m, sheen=0.35, translucency=0.3)
+  output sail_{tag} = sq{tag}_f
+end
+sq("m1", -2.0, 11.3, 5.9, 26.5, 28, 1.5, 14)
+sq("m2", -2.0, 25.3, 12.9, 21.5, 25, 1.7, 12.5)
+sq("m3", -2.0, 37.8, 26.2, 14.8, 20, 1.3, 10)
+# the renderer runs at most 16 sim programs at once (12 sails + 3 jibs-and-spanker + sea + buoyancy would be 17), so the three small royals are shaped sails that ride the hull
+def sr(tag, mz, yt, yb, wt, wb, bel)
+  sr{tag}_s = poly.script@1(code="${jsr} ${sail_fn} const m = new Mesh(); sail(m, ${mz}, ${yt}, ${yb}, ${wt}, ${wb}, ${bel}); m", budget=2000)
+  sr{tag}_m = solid.material@1(sr{tag}_s, color=[0.9, 0.86, 0.74], metallic=0.0, roughness=1.0)
+  sr{tag}_f = solid.finish@1(sr{tag}_m, sheen=0.35, translucency=0.3)
+  sr{tag}_h = anim.parent@1(sr{tag}_f, parent="hull")
+  output sail_{tag} = sr{tag}_h
+end
+sr("m4", -2.0, 46.8, 39.0, 9.8, 13, 0.8)
+sq("f1", 17.0, 10.2, 5.6, 23.6, 25, 1.4, 12.5)
+sq("f2", 17.0, 23.3, 12.0, 19, 22.5, 1.5, 11.25)
+sq("f3", 17.0, 34.8, 24.0, 13.3, 17.5, 1.2, 8.75)
+sr("f4", 17.0, 42.8, 35.8, 8.8, 11.5, 0.7)
+sq("z1", -19.0, 20.8, 11.0, 15.3, 19, 1.2, 9.5)
+sq("z2", -19.0, 30.8, 22.5, 10.3, 14, 0.9, 7)
+sr("z3", -19.0, 38.3, 32.3, 6.8, 9, 0.6)
+# jibs (triangles between the foremast and the bowsprit, billowed to starboard) and the spanker (between boom and gaff)
+let jibs_code = "const m = new Mesh(); const N = 12; const jib = (hy, hz, ty, tz, cy, cz, bel) => { const A = [hy, hz], B = [ty, tz], C = [cy, cz]; const V = []; for (let i = 0; i <= N; i++) { const row = []; for (let j = 0; j <= N - i; j++) { const u = i / N, v = j / N, w = 1 - u - v; row.push(m.vertex(bel * 27 * u * v * w, A[0] * w + B[0] * u + C[0] * v, A[1] * w + B[1] * u + C[1] * v)); } V.push(row); } for (let i = 0; i < N; i++) for (let j = 0; j < N - i; j++) { m.face(V[i][j], V[i + 1][j], V[i][j + 1]); if (j < N - i - 1) { m.face(V[i + 1][j], V[i + 1][j + 1], V[i][j + 1]); } } }; jib(38, 17.5, 9.0, 36, 7.8, 25, 1.2); jib(44, 17.3, 9.3, 52, 8.6, 36, 1.2); jib(50, 17.1, 9.5, 59.5, 9.0, 47, 1.0); m"
+let jib_fn = "const m = new Mesh(); const N = 12; const jib = (hy, hz, ty, tz, cy, cz, bel) => { const A = [hy, hz], B = [ty, tz], C = [cy, cz]; const V = []; for (let i = 0; i <= N; i++) { const row = []; for (let j = 0; j <= N - i; j++) { const u = i / N, v = j / N, w = 1 - u - v; row.push(m.vertex(bel * 27 * u * v * w, A[0] * w + B[0] * u + C[0] * v, A[1] * w + B[1] * u + C[1] * v)); } V.push(row); } for (let i = 0; i < N; i++) for (let j = 0; j < N - i; j++) { m.face(V[i][j], V[i + 1][j], V[i][j + 1]); if (j < N - i - 1) { m.face(V[i + 1][j], V[i + 1][j + 1], V[i][j + 1]); } } };"
+def jb(tag, hy, hz, ty, tz, cy, cz, bel, pa, pb, pc)
+  jb{tag}_s = poly.script@1(code="${jib_fn} jib(${hy}, ${hz}, ${ty}, ${tz}, ${cy}, ${cz}, ${bel}); m", budget=2000)
+  jb{tag}_p = sim.program@1(jb{tag}_s, rate=30, values="pa=${pa}; pb=${pb}; pc=${pc}", source="${jib_src}")
+  jb{tag}_m = solid.material@1(jb{tag}_p, color=[0.9, 0.86, 0.74], metallic=0.0, roughness=1.0)
+  jb{tag}_f = solid.finish@1(jb{tag}_m, sheen=0.35, translucency=0.3)
+  output jib_{tag} = jb{tag}_f
+end
+jb("1", 38, 17.5, 9.0, 36, 7.8, 25, 1.2, 18.5, 29, 1207.1)
+jb("2", 44, 17.3, 9.3, 52, 8.6, 36, 1.2, 34.7, 34.7, 2122.2)
+jb("3", 50, 17.1, 9.5, 59.5, 9.0, 47, 1.0, 42.4, 40.5, 2806.7)
+let spanker_code = "const m = new Mesh(); const NS = 14, NV = 10; const T = [-19.9, 9], C = [-31.5, 9], P = [-29.8, 28.5], H = [-19.9, 23.5]; const g = []; for (let iv = 0; iv <= NV; iv++) { const v = iv / NV, row = []; for (let is = 0; is <= NS; is++) { const s = is / NS; const z = (T[0] + (C[0] - T[0]) * s) * (1 - v) + (H[0] + (P[0] - H[0]) * s) * v, y = (T[1] + (C[1] - T[1]) * s) * (1 - v) + (H[1] + (P[1] - H[1]) * s) * v; row.push(m.vertex(0.9 * Math.sin(Math.PI * s) * Math.sin(Math.PI * v), y, z)); } g.push(row); } for (let iv = 0; iv < NV; iv++) for (let is = 0; is < NS; is++) { m.face(g[iv][is], g[iv][is + 1], g[iv + 1][is + 1], g[iv + 1][is]); } m"
+spanker_s = poly.script@1(code="${spanker_code}", budget=3000)
+spanker_p = sim.program@1(spanker_s, rate=30, source="${span_src}")
+spanker_m = solid.material@1(spanker_p, color=[0.9, 0.86, 0.74], metallic=0.0, roughness=1.0)
+spanker_f = solid.finish@1(spanker_m, sheen=0.35, translucency=0.3)
+output spanker = spanker_f
+
+# ================= ON DECK =================
+def bxs(tag, sx, sy, sz, px, py, pz, cr, cg, cb, met, rgh)
+  q{tag}_b = solid.box@1(size=[{sx}, {sy}, {sz}])
+  q{tag}_a = xform.move@1(q{tag}_b, by=[{px}, {py}, {pz}])
+  q{tag}_m = solid.material@1(q{tag}_a, color=[{cr}, {cg}, {cb}], metallic={met}, roughness={rgh})
+  q{tag}_h = anim.parent@1(q{tag}_m, parent="hull")
+  output {tag} = q{tag}_h
+end
+# the helm on the quarterdeck: a wheel (a ring and four spokes) facing aft, and the binnacle in front of it
+wheel_t = solid.torus@1(major=0.6, minor=0.045, segments=32, tube_segments=8)
+wheel_r = xform.rotate@1(wheel_t, angles=[90, 0, 0])
+spoke_b = solid.box@1(size=[1.3, 0.07, 0.07])
+spoke_1 = xform.move@1(spoke_b, by=[0, 0, 0])
+spoke_2 = xform.rotate@1(spoke_b, angles=[0, 0, 45])
+spoke_3 = xform.rotate@1(spoke_b, angles=[0, 0, 90])
+spoke_4 = xform.rotate@1(spoke_b, angles=[0, 0, 135])
+wheel_u = solid.union@1(wheel_r, spoke_1, spoke_2, spoke_3, spoke_4)
+wheel_at = xform.move@1(wheel_u, by=[0, 7.45, -14.0])
+wheel_m = solid.material@1(wheel_at, color=[0.35, 0.22, 0.1], roughness=0.7)
+wheel_h = anim.parent@1(wheel_m, parent="hull")
+output helm = wheel_h
+bxs("binnacle", 0.6, 0.9, 0.6, 0, 6.75, -15.1, 0.2, 0.12, 0.06, 0.1, 0.7)
+# hatch gratings in the waist, the galley funnel, the stern skylight
+bxs("hatch_fore", 2.4, 0.16, 2.4, 0, 4.98, 3.0, 0.1, 0.07, 0.04, 0.0, 0.9)
+bxs("hatch_aft", 2.4, 0.16, 2.4, 0, 4.98, -5.5, 0.1, 0.07, 0.04, 0.0, 0.9)
+bxs("skylight", 3.0, 0.8, 1.6, 0, 6.7, -24.5, 0.28, 0.18, 0.1, 0.0, 0.7)
+funnel_c = solid.cylinder@1(radius=0.32, height=2.4, segments=16)
+funnel_at = xform.move@1(funnel_c, by=[0, 6.1, 10.0])
+funnel_m = solid.material@1(funnel_at, color=[0.03, 0.03, 0.035], metallic=0.5, roughness=0.6)
+funnel_h = anim.parent@1(funnel_m, parent="hull")
+output galley_funnel = funnel_h
+# two ship's boats on the booms amidships: upturned hulls (the top half of a long ellipsoid)
+boat_s = solid.sphere@1(radius=1.0, segments=24)
+boat_e = xform.scale@1(boat_s, by=[1.5, 0.8, 4.4])
+boat_cut_b = solid.box@1(size=[6, 3, 12])
+boat_cut_a = xform.move@1(boat_cut_b, by=[0, 1.5, 0])
+boat_h = solid.intersect@1(boat_e, boat_cut_a)
+boat_1 = xform.move@1(boat_h, by=[0, 5.5, -2.3])
+boat_2 = xform.move@1(boat_h, by=[0, 5.5, 7.2])
+boat_u = solid.union@1(boat_1, boat_2)
+boat_m = solid.material@1(boat_u, color=[0.62, 0.5, 0.32], roughness=0.8)
+boat_h2 = anim.parent@1(boat_m, parent="hull")
+output boats = boat_h2
+# the windlass on the forecastle
+wind_c = solid.cylinder@1(radius=0.38, height=3.2, segments=16)
+wind_r = xform.rotate@1(wind_c, angles=[0, 0, 90])
+wind_at = xform.move@1(wind_r, by=[0, 7.0, 25.0])
+wind_m = solid.material@1(wind_at, color=[0.3, 0.2, 0.1], roughness=0.8)
+wind_h = anim.parent@1(wind_m, parent="hull")
+output windlass = wind_h
+# stern lanterns, lit
+lan_s = solid.sphere@1(radius=0.36, segments=14)
+lan_l = xform.move@1(lan_s, by=[3.6, 8.7, -28.6])
+lan_r = xform.move@1(lan_s, by=[-3.6, 8.7, -28.6])
+lan_u = solid.union@1(lan_l, lan_r)
+lan_m = solid.material@1(lan_u, color=[1, 0.82, 0.5], roughness=0.3, emissive=[5, 3.4, 1.6])
+lan_h = anim.parent@1(lan_m, parent="hull")
+output lanterns = lan_h
+
+# ================= THE SEA AND THE FLOAT =================
+# the sea: a grid driven by three travelling waves (the armada's), mean level y = 2 so the studio floor stays under the troughs
+# the sea: the three travelling sine waves of the armada (kept as they were); only the surface below was improved
+sea_g = poly.grid@1(width=260, height=260, columns=140, rows=140)
+sea_r = xform.rotate@1(sea_g, angles=[-90, 0, 0])
+sea_up = xform.move@1(sea_r, by=[0, 2, 0])
+sea_p = sim.program@1(sea_up, rate=30, source="sim ocean\ninput mesh sea\nstate pos: vec3[sea]\nkernel wave each i in pos {\n  let r = rest(sea, i)\n  let x = r.x\n  let z = r.z\n  let h = 0.9 * sin(0.21 * x + 0.13 * z - 0.9 * t) + 0.5 * sin(-0.11 * x + 0.27 * z - 1.3 * t + 1.7) + 0.22 * sin(0.43 * x + 0.37 * z - 2.1 * t + 0.6)\n  pos[i] = vec3(x, r.y + h, z)\n}\nschedule wave\noutput mesh pos\n")
+sea_m = solid.material@1(sea_p, color=[0.04, 0.17, 0.26], roughness=0.45, metallic=0.0)
+output sea = sea_m
+# the carrier: a small dynamic body hidden inside the hull at the waterline. Every part above is parented to it ("hull"), and so are the cloth sails' pinned vertices.
+carrier_b = solid.box@1(size=[1.2, 1.2, 1.2])
+carrier_m = solid.material@1(carrier_b, color=[0.3, 0.2, 0.1], roughness=0.8)
+carrier = phys.body@1(carrier_m, kind="dynamic", density=0.5, linear_damping=0.15, angular_damping=2.0)
+output hull = carrier
+# buoyancy: the carrier is pushed toward the height of the SAME three waves the sea shows (spring and damper, gravity cancelled)
+buoy = sim.program@1(size=0.03, rate=60, source="sim buoyancy\nparam spring = 7.0\nparam damp = 3.2\nparam gravity = 9.8\ninput bone hull\nstate probe: vec3[1]\nstate push: vec3[1]\nstate last: vec3[1]\nkernel feel each i in probe {\n  let c = bone_point(hull, vec3(0.0, 0.0, 0.0))\n  let h = 2.0 + 0.9 * sin(0.21 * c.x + 0.13 * c.z - 0.9 * t) + 0.5 * sin(-0.11 * c.x + 0.27 * c.z - 1.3 * t + 1.7) + 0.22 * sin(0.43 * c.x + 0.37 * c.z - 2.1 * t + 0.6)\n  let vy = clamp((c.y - last[i].y) / dt, -12.0, 12.0)\n  let err = clamp(h - c.y, -2.5, 2.5)\n  probe[i] = c\n  last[i] = c\n  push[i] = vec3(0.0, clamp((gravity + spring * err - damp * vy) * dt, -0.2, 0.3), 0.0)\n}\nschedule feel\noutput particles probe\noutput push hull push\n")
+buoy_m = solid.material@1(buoy, color=[1, 1, 0.2], roughness=0.5)
+output hull_probe = buoy_m
+# in the game layer the ship is a model spawned at the waterline of the sea (y = 2)
+kind_ship = game.kind@1(name="frigate", size=30, part="hull", tags=["ship"])
+ship1 = game.spawn@1(kind="frigate", at=[0, 2, 0], heading=0)
+rules = game.collect@1(kind_ship, ship1, name="frigate_game")
+output rules = rules

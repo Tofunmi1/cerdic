@@ -198,7 +198,10 @@ stack stays out. New ADR before B2.
       vendored and unbuilt; swap it in behind the same node only if bit-identical. Open: joint limits, pole targets, target
       orientation, chains from other chains' bones.
 - [ ] B6 Rig examples a model can author: arm, leg + foot, tail, simple biped, spider; real-model prompts.
-- [ ] B7 Shape keys / morph targets (typed blend of two meshes with equal topology) and glTF morph export.
+- [~] B7 Shape keys / morph targets: `rig.morph@1` blends an equal-topology edited target at a named weight, chains up to
+      16 keys, and exports glTF POSITION and NORMAL deltas with source remapping through welded seams and material regions.
+      Native Rust and browser builds pass. The `wasm32-unknown-unknown` runtime and evaluator compile, wasm-bindgen emits
+      both browser modules, and evaluator morph accessors are present. No headset evaluation has been done yet.
 - [ ] B8 Procedural character helpers (skin modifier bodies, see C3) feeding B2 to B4.
 
 ## C. Blender modeling still missing

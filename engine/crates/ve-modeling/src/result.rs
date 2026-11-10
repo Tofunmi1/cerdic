@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 use ve_graph::NodeId;
 
-pub use crate::scene_settings::{LightProbes, Wind};
+pub use crate::scene_settings::{Haze, LightProbes, Wind};
 
 const PREVIEW_FIELD_EDGE_SCALE: f64 = 2.0;
 
@@ -13,9 +13,9 @@ pub const MAX_SCENE_LIGHTS: usize = 128;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Quality {
-    /// Interactive work, at most 200,000 output triangles.
+    /// Interactive work: coarser field spacing for speed; no triangle limit.
     Preview,
-    /// Final output, at most 2,000,000 triangles.
+    /// Final output at full detail; no triangle limit.
     Final,
 }
 
@@ -28,21 +28,20 @@ impl Quality {
         }
     }
 
-    /// Triangles a result may store: each part's mesh counted once, however many placements share it.
+    /// Triangles a result may store: no limit (owner decision 2026-11-06). What really bounds a document is its memory
+    /// ([`crate::budget::MEMORY_LIMIT`]), which is still checked, and the evaluation's own time and cancellation.
     pub(crate) fn triangles(self) -> usize {
         match self {
-            Self::Preview => 200_000,
-            Self::Final => 2_000_000,
+            Self::Preview | Self::Final => usize::MAX,
         }
     }
 
-    /// Triangles a result may draw at full detail, every placement of a shared mesh counted. A sanity bound on what an
-    /// edit can ask the viewer for (the viewer's own culling and detail levels decide what it really draws): stored geometry
-    /// is limited by [`Quality::triangles`], and a scene heavier than [`DRAWN_TRIANGLES_WARNING`] gets a warning.
+    /// Triangles a result may draw at full detail, every placement of a shared mesh counted: no limit either. The viewer's
+    /// culling and detail levels decide what it really draws, and a scene heavier than [`DRAWN_TRIANGLES_WARNING`] still gets
+    /// a warning so the author knows.
     pub(crate) fn drawn_triangles(self) -> usize {
         match self {
-            Self::Preview => 20_000_000,
-            Self::Final => 200_000_000,
+            Self::Preview | Self::Final => usize::MAX,
         }
     }
 }
@@ -106,62 +105,15 @@ fn default_outline_color() -> [f32; 3] {
     [0.1, 0.06, 0.14]
 }
 
-/// How a leaf-like surface is cut out and moves, from a `solid.foliage` node.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Foliage {
-    /// The surface is cut away where its albedo map's alpha is below this (0 keeps every pixel, 1 keeps only the opaque ones).
-    pub alpha_cutoff: f32,
-    /// How far the whole shape bends with the wind, 0 still to 1 swaying strongly; stronger the higher it is above its base.
-    pub sway: f32,
-    /// How much the surface flutters in the wind at a smaller scale (leaves trembling), 0 to 1.
-    pub flutter: f32,
-}
+pub(crate) use crate::finish::Finish;
 
-/// A solid's surface, as set by a `solid.material` node. Colour is sRGB, emissive is linear.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Material {
-    /// Base colour, each 0 to 1.
-    pub color: [f32; 3],
-    /// Surface opacity; 0 is transparent and 1 is opaque. Older saved results default to opaque.
-    #[serde(default = "opaque_opacity")]
-    pub opacity: f32,
-    /// 0 dielectric, 1 metal.
-    pub metallic: f32,
-    /// 0 mirror, 1 matte.
-    pub roughness: f32,
-    /// Light given off; above 1 glows.
-    pub emissive: [f32; 3],
-    /// Whether this surface also creates a bounded point light from its area and emission.
-    pub emits_light: bool,
-    /// Optional shader-side procedural pattern.
-    pub recipe: MaterialRecipe,
-    /// Bounded object-space frequency multiplier for the recipe.
-    pub texture_scale: f32,
-    /// Metres one repeat of a texture program covers when it tiles in world space (0 means the texture is laid out once
-    /// over the part).
-    #[serde(default)]
-    pub texture_tile: f32,
-    /// Side in texels of the maps the viewer bakes for this surface (256, 512 or 1024); 0 leaves it to the viewer (1024). Smaller
-    /// maps leave room in the viewer's texture memory for more surfaces.
-    #[serde(default)]
-    pub texture_size: u32,
-    /// Cel shading from a `solid.toon` node; `None` keeps the surface physically based.
-    #[serde(default)]
-    pub toon: Option<Toon>,
-    /// Optional Material Maker-compatible procedural texture program source.
-    pub texture_program: Option<String>,
-    /// How the baked texture maps are finished, from a `solid.style` node: `painterly`, `retro` or `ink`; `None` leaves them as
-    /// the program made them.
-    #[serde(default)]
-    pub texture_style: Option<String>,
-    /// Cutout and wind from a `solid.foliage` node; `None` is an ordinary solid surface.
-    #[serde(default)]
-    pub foliage: Option<Foliage>,
-}
+#[path = "result/foliage.rs"]
+mod foliage;
+pub use foliage::Foliage;
 
-const fn opaque_opacity() -> f32 {
-    1.0
-}
+#[path = "result/material.rs"]
+mod material;
+pub use material::Material;
 
 /// The authored kind of a scene light.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -231,6 +183,9 @@ pub struct SceneEnvironment {
     /// The wind that bends foliage (see `solid.foliage`).
     #[serde(default)]
     pub wind: Wind,
+    /// Distance haze and sunlight shafts.
+    #[serde(default)]
+    pub haze: Haze,
 }
 
 /// Analytic procedural sky authored by `scene.sky`.
@@ -278,6 +233,13 @@ pub struct Part {
     /// Scene-baked ambient occlusion per source vertex, from 0 (occluded) to 1 (open sky).
     #[serde(skip)]
     pub occlusion: Vec<f32>,
+    /// Explicit unit normals, one per vertex in `positions` order, for a part whose shading must not depend on the mesh alone (a terrain
+    /// tile, whose edge normals come from the neighbouring ground). Empty means the viewer derives its own.
+    #[serde(skip)]
+    pub normals: Vec<[f32; 3]>,
+    /// Per-vertex data in `positions` order, drawn as vertex colour (water: flow x and z remapped to 0..1, depth, foam); empty for none.
+    #[serde(skip)]
+    pub colors: Vec<[f32; 4]>,
     /// Volume of the evaluated solid.
     pub volume: f64,
     /// The surface given by the nearest `solid.material`, if any.
@@ -286,6 +248,9 @@ pub struct Part {
     pub frames: std::collections::BTreeMap<String, crate::Frame>,
     /// Keyframed transform tracks from `anim.track` nodes (empty for a part that does not move).
     pub animation: Vec<crate::anim::Track>,
+    /// Authored animation state machine, carried as data for the play runtime.
+    #[serde(default)]
+    pub state_machine: Option<ve_animstate::StateMachine>,
     /// The response from a `behavior.on` node (None for a part that does not react).
     pub behavior: Option<crate::anim::Behavior>,
     /// The output name of the part this one is attached to; it moves with that part (None for a free part).
@@ -294,13 +259,32 @@ pub struct Part {
     pub bone: Option<crate::rig::Segment>,
     /// How this part is skinned to bone parts, with per-vertex weights (from `rig.skin`); None for a rigid part.
     pub skin: Option<crate::rig::Skinning>,
+    /// Editable shape keys (glTF morph targets), stored as per-vertex position deltas.
+    #[serde(default)]
+    pub morph_targets: Vec<MorphTarget>,
     /// The chain of bones this part is the target of (from `rig.ik`, with the bones' segments); None otherwise.
     pub ik: Option<crate::rig::IkChain>,
+    /// The particle effect this part emits (from `fx.emitter` and the nodes that refine it); None otherwise.
+    pub fx: Option<crate::fx::PartFx>,
+    /// The ragdoll this part triggers (from `phys.ragdoll`, resolved against the bones); None otherwise.
+    pub ragdoll: Option<crate::ragdoll::RagdollSpec>,
+    /// The live-cloth description of this part (from `cloth.sim`, resolved against the bones); None for a part that is not cloth.
+    pub cloth: Option<crate::cloth_sim::ClothSpec>,
+    /// The live-fluid description of this part (from `fluid.sim`, resolved against the bones); None for a part that is not a liquid.
+    pub fluid: Option<crate::fluid_sim::FluidSpec>,
+    /// The simulation program of this part (from `sim.program`); None for a part that is not driven by one.
+    pub sim: Option<crate::sim_program::SimSpec>,
     /// The physics properties of this part (from `phys.body`); None for a part that is not simulated.
     pub body: Option<crate::physics::PhysBody>,
     /// Column-major positive-determinant render placements; None means an ordinary solid.
     #[serde(skip)]
     pub transforms: Option<Vec<[f32; 16]>>,
+    /// Camera distance band in metres for drawing placed copies; `None` means no range. Not serialized.
+    #[serde(skip)]
+    pub visible_range: Option<(f32, f32)>,
+    /// Camera distance cross-fade width in metres for placed copies. Not serialized.
+    #[serde(skip)]
+    pub visible_fade: f32,
     /// Original placement indices, retained when reflected prototypes are separated.
     #[serde(skip)]
     pub instance_indices: Vec<u32>,
@@ -311,6 +295,18 @@ pub struct Part {
     /// Maps baked onto this part's UVs by `bake.maps`; None for a part without any.
     #[serde(skip)]
     pub baked: Option<std::sync::Arc<BakedMaps>>,
+}
+
+/// One named shape key relative to a part's neutral mesh.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct MorphTarget {
+    /// Stable authored key name.
+    pub name: String,
+    /// Default glTF weight used when the part is loaded.
+    pub weight: f32,
+    /// Per-vertex offsets from the neutral mesh; transferred separately from JSON by the worker.
+    #[serde(skip)]
+    pub positions: Vec<[f32; 3]>,
 }
 
 /// Images baked onto a part's UV layout: square RGBA8, row 0 at v = 0.
@@ -333,6 +329,12 @@ pub struct Evaluation {
     pub lights: Vec<SceneLight>,
     /// The scene environment, if one was authored; separate from geometry outputs.
     pub environment: Option<SceneEnvironment>,
+    /// Saved scripts for the page to start, restart or stop.
+    #[serde(default)]
+    pub scripts: Vec<crate::ScriptDef>,
+    /// The collected deterministic game definition, if a `game.collect` node is output.
+    #[serde(skip)]
+    pub game: Option<ve_game::GameDef>,
     /// Operators executed in this job, excluding cache hits.
     pub evaluated_nodes: usize,
     /// Cache hits in this job.
@@ -350,6 +352,8 @@ pub struct EvaluationWarning {
     pub code: String,
     /// Authored node ID that produced the warning.
     pub node: String,
+    /// Related authored nodes, when a diagnostic links multiple parts.
+    pub related: Vec<String>,
     /// Human-readable detail.
     pub message: String,
 }
@@ -361,6 +365,7 @@ impl EvaluationWarning {
         Self {
             code: "poly.subdivide.concave_face_triangulated".to_owned(),
             node: node.into(),
+            related: Vec::new(),
             message: format!("Triangulated {count} concave face(s) before subdivision"),
         }
     }
@@ -371,6 +376,7 @@ impl EvaluationWarning {
         Self {
             code: "poly.subdivide.attribute_dropped".to_owned(),
             node: node.into(),
+            related: Vec::new(),
             message: format!("Integer point attribute '{name}' was dropped during subdivision"),
         }
     }

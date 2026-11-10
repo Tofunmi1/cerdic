@@ -1,0 +1,26 @@
+# SKIN BODY: the whole body as ONE closed surface from a skeleton of named joints (poly.skin = Blender's Skin modifier, the B-Mesh method), 1.75 m, matched to body.txt and head.txt.
+# Each joint is `name x y z rx rz`: a position and the half extents of the cross-section across and along its bone. Joint heights come from the standard stature fractions the body audit
+# uses (crotch 0.470, navel 0.600, elbow 0.630, shoulder 0.818, wrist 0.485, knee 0.285 of stature H = 1.75). The surface STOPS at an end joint, so the crown, toes and fingertips are joints.
+# The left side is written, the right side mirrored by hand below (the `symmetry` setting only keeps quads from crossing the mirror plane). Fingers hang off a chain of knuckles, because
+# several thin bones leaving one joint collide. Subdivided twice for a smooth surface; shaping and detail come after.
+# Metres, +y up, facing +z.
+# kind: world
+sky = scene.sky@1(sun_elevation=38, sun_azimuth=-35, sun_intensity=3.4, turbidity=3, ground_color=[0.32, 0.3, 0.28], clouds=false, haze=0.08)
+env = scene.environment@1(sky_color=[0.75, 0.82, 0.95], ground_color=[0.42, 0.38, 0.34], intensity=0.9, reflection=0.35, bounce=0.6)
+output sky = sky
+output env = env
+
+let spine = "pelvis 0 0.95 0 0.17 0.11 root; waist 0 1.10 0 0.135 0.09; chest 0 1.30 0 0.155 0.105; neck 0 1.47 0.005 0.052 0.055; skull 0 1.64 0.012 0.085 0.095; crown 0 1.745 0.01 0.04 0.045"
+let leg_l = "hip_l 0.095 0.90 0 0.095 0.10; knee_l 0.098 0.50 0.01 0.058 0.062; calf_l 0.097 0.30 -0.01 0.052 0.056; ankle_l 0.093 0.08 0 0.036 0.04; toe_l 0.093 0.035 0.14 0.038 0.03"
+let leg_r = "hip_r -0.095 0.90 0 0.095 0.10; knee_r -0.098 0.50 0.01 0.058 0.062; calf_r -0.097 0.30 -0.01 0.052 0.056; ankle_r -0.093 0.08 0 0.036 0.04; toe_r -0.093 0.035 0.14 0.038 0.03"
+let arm_l = "shoulder_l 0.18 1.41 0 0.055 0.06; elbow_l 0.24 1.10 0.01 0.040 0.042; wrist_l 0.265 0.86 0.03 0.028 0.025; palm_l 0.272 0.79 0.04 0.036 0.016"
+let arm_r = "shoulder_r -0.18 1.41 0 0.055 0.06; elbow_r -0.24 1.10 0.01 0.040 0.042; wrist_r -0.265 0.86 0.03 0.028 0.025; palm_r -0.272 0.79 0.04 0.036 0.016"
+# a hand: the palm joint, one centre knuckle straight below it, and knuckles to each side of that (90 degrees between every pair of bones at a branch, which the skin needs)
+let hand_l = "k2_l 0.272 0.75 0.045 0.011 0.011; t2_l 0.272 0.65 0.05 0.008 0.008; k1_l 0.240 0.75 0.045 0.011 0.011; t1_l 0.240 0.66 0.05 0.008 0.008; k3_l 0.304 0.75 0.045 0.011 0.011; t3_l 0.304 0.66 0.05 0.008 0.008"
+let hand_r = "k2_r -0.272 0.75 0.045 0.011 0.011; t2_r -0.272 0.65 0.05 0.008 0.008; k1_r -0.240 0.75 0.045 0.011 0.011; t1_r -0.240 0.66 0.05 0.008 0.008; k3_r -0.304 0.75 0.045 0.011 0.011; t3_r -0.304 0.66 0.05 0.008 0.008"
+let bones = "pelvis-waist; waist-chest; chest-neck; neck-skull; skull-crown; pelvis-hip_l; hip_l-knee_l; knee_l-calf_l; calf_l-ankle_l; ankle_l-toe_l; pelvis-hip_r; hip_r-knee_r; knee_r-calf_r; calf_r-ankle_r; ankle_r-toe_r; chest-shoulder_l; shoulder_l-elbow_l; elbow_l-wrist_l; wrist_l-palm_l; palm_l-k2_l; k2_l-t2_l; k2_l-k1_l; k1_l-t1_l; k2_l-k3_l; k3_l-t3_l; chest-shoulder_r; shoulder_r-elbow_r; elbow_r-wrist_r; wrist_r-palm_r; palm_r-k2_r; k2_r-t2_r; k2_r-k1_r; k1_r-t1_r; k2_r-k3_r; k3_r-t3_r"
+
+base = poly.skin@1(joints="${spine}; ${leg_l}; ${leg_r}; ${arm_l}; ${arm_r}; ${hand_l}; ${hand_r}", bones="${bones}", symmetry="x", branch_smoothing=0.0)
+smooth = poly.subdivide@1(base, levels=2)
+skin_m = solid.material@1(smooth, color=[0.84, 0.64, 0.52], roughness=0.55)
+output body_skin = skin_m

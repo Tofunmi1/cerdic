@@ -56,6 +56,46 @@ pub(crate) fn bevel(
     read(&handle)
 }
 
+/// Skins a skeleton graph into one surface (Blender's Skin modifier).
+pub(crate) fn skin(
+    joints: &[crate::skin::SkinJoint],
+    bones: &[[u32; 2]],
+    options: &crate::skin::SkinOptions,
+) -> Result<crate::bevel::BeveledMesh, KernelError> {
+    let positions: Vec<[f32; 3]> = joints.iter().map(|j| j.position).collect();
+    let radii: Vec<[f32; 2]> = joints.iter().map(|j| j.radius).collect();
+    let flags: Vec<u8> = joints.iter().map(|j| u8::from(j.root) | (u8::from(j.loose) << 1)).collect();
+    let flat_positions = positions.as_flattened();
+    let flat_radii = radii.as_flattened();
+    let flat_bones = bones.as_flattened();
+    let input = sys::VeSkinInput {
+        struct_size: core::mem::size_of::<sys::VeSkinInput>(),
+        positions: flat_positions.as_ptr(),
+        radii: flat_radii.as_ptr(),
+        flags: flags.as_ptr(),
+        vertex_count: joints.len(),
+        edges: flat_bones.as_ptr(),
+        edge_count: bones.len(),
+        branch_smoothing: options.branch_smoothing,
+        symmetry_axes: options.symmetry_axes,
+        smooth_shading: 0,
+        subdivide: i32::from(options.subdivide),
+    };
+    let mut status = sys::VE_OK;
+    // SAFETY: `input` points at slices that outlive the call (positions `3 * joints`, radii `2 * joints`, flags `joints`, edges two
+    // indices per bone); the C side validates every index and value and copies what it keeps. `status` is a valid out-pointer.
+    let ptr = unsafe { sys::ve_skin(&raw const input, &raw mut status) };
+    let handle = match NonNull::new(ptr) {
+        Some(ptr) if status == sys::VE_OK => Handle(ptr),
+        Some(ptr) => {
+            drop(Handle(ptr));
+            return Err(KernelError::from_status(status));
+        }
+        None => return Err(KernelError::from_status(status)),
+    };
+    read(&handle)
+}
+
 /// Runs one of Blender's bmesh operators (`VE_MESH_OP_*`) on the mesh.
 pub(crate) fn mesh_op(
     mesh: &PolygonMesh<'_>,

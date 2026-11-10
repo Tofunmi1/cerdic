@@ -8,12 +8,20 @@ publish.workspace = true
 
 [dependencies]
 ve-geometry = { path = "../ve-geometry" }
+ve-human = { path = "../ve-human" }
+ve-world = { path = "../ve-world" }
 ve-graph = { path = "../ve-graph" }
 ve-kernel = { path = "../ve-kernel" }
 ve-measure = { path = "../ve-measure" }
+ve-game = { path = "../ve-game" }
+ve-animstate = { path = "../ve-animstate" }
+ve-particles = { path = "../ve-particles" }
 serde.workspace = true
 serde_json.workspace = true
 glam = "0.33"
+rquickjs = { version = "0.14", default-features = false, features = ["allocator"] }
+# Vendored and patched (lib/quadrs): quad remeshing for organic meshes.
+quadrs = { path = "../../lib/quadrs" }
 
 [lints]
 workspace = true

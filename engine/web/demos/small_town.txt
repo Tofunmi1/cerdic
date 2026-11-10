@@ -1,0 +1,315 @@
+# A compact, green small town: a short main street, mixed low-rise shopfronts, town square, church, real engine-grown trees and street furniture.
+# Metres; Y is up. The shop grammar supplies separate masonry, windows, trim, roofs and doors.
+
+sky = scene.sky@1(sun_elevation=28, sun_azimuth=138, sun_intensity=2.5, turbidity=4.2, clouds=true, cloud_cover=0.36, seed=18, haze=0.06, ground_color=[0.30,0.34,0.31], contact_shadows=true)
+output sky = sky
+env = scene.environment@1(sky_color=[0.56,0.66,0.76], ground_color=[0.28,0.32,0.27], intensity=0.78, reflection=0.28, bounce=0.42)
+output environment = env
+
+let brick = "n=fbm(scale_x=22,scale_y=15,iterations=4); mortar=bricks(rows=18,columns=11,mortar=0.045,bevel=0.08,round=0.01); albedo=colorize(mortar,gradient=[0:#4b4034,0.12:#4b4034,0.18:#956b4f,1:#b2805e]); roughness=n"
+let plaster = "n=fbm(scale_x=38,scale_y=38,iterations=4); albedo=colorize(n,gradient=[0:#b7aa8e,0.5:#d3c9b2,1:#e0d9c8]); roughness=n"
+let slate = "n=fbm(scale_x=24,scale_y=12,iterations=3); albedo=colorize(n,gradient=[0:#252e31,0.5:#3a4548,1:#526064]); roughness=n"
+
+# A broad crossroad with raised stone pavements, kerbs and painted pedestrian crossing.
+ground = solid.box@1(size=[72,0.24,64])
+ground_at = xform.move@1(ground, by=[0,-0.12,12])
+ground_mat = solid.material@1(ground_at, color=[0.20,0.27,0.15], roughness=0.98)
+output green_ground = ground_mat
+
+road = street.road@1(at=[0,0,0], length=66, width=8, lanes=2, axis="x", part="asphalt")
+road_mat = solid.material@1(road, color=[0.20,0.21,0.20], roughness=0.94)
+output main_street = road_mat
+road_lines = street.road@1(at=[0,0,0], length=66, width=8, lanes=2, axis="x", part="markings")
+road_lines_mat = solid.material@1(road_lines, color=[0.82,0.78,0.63], roughness=0.9)
+output road_lines = road_lines_mat
+road_crossing = street.road@1(at=[0,0,0], length=66, width=8, lanes=2, axis="x", part="crosswalk")
+road_crossing_mat = solid.material@1(road_crossing, color=[0.86,0.85,0.79], roughness=0.9)
+output crosswalk = road_crossing_mat
+road_kerb = street.road@1(at=[0,0,0], length=66, width=8, lanes=2, axis="x", part="kerb")
+kerb_mat = solid.material@1(road_kerb, color=[0.50,0.51,0.47], roughness=0.9, recipe="concrete")
+output kerbs = kerb_mat
+road_walk = street.road@1(at=[0,0,0], length=66, width=8, lanes=2, axis="x", part="pavement")
+walk_mat = solid.material@1(road_walk, color=[0.53,0.53,0.48], roughness=0.92, recipe="concrete")
+output pavements = walk_mat
+
+cross_road = street.road@1(at=[0,0,11], length=27, width=6, lanes=2, axis="z", part="asphalt")
+cross_road_mat = solid.material@1(cross_road, color=[0.20,0.21,0.20], roughness=0.94)
+output square_road = cross_road_mat
+cross_walk = street.road@1(at=[0,0,11], length=27, width=6, lanes=2, axis="z", part="pavement")
+cross_walk_mat = solid.material@1(cross_walk, color=[0.53,0.53,0.48], roughness=0.92, recipe="concrete")
+output square_pavements = cross_walk_mat
+
+# ---- the building script, shared. Local frame: front wall on the plane z = 0 facing +z, building goes back to z = -D, centred on x = 0, y up. PART picks what to emit. ----
+let jb1 = "const m = new Mesh(); function fb(p,x0,x1,y0,z0,z1,y1,a0,a1,b0,b1){ if(p!==PART)return; const v=[m.vertex(x0,y0,z0),m.vertex(x1,y0,z0),m.vertex(a1,y1,b0),m.vertex(a0,y1,b0),m.vertex(x0,y0,z1),m.vertex(x1,y0,z1),m.vertex(a1,y1,b1),m.vertex(a0,y1,b1)]; m.face(v[0],v[3],v[2],v[1]); m.face(v[4],v[5],v[6],v[7]); m.face(v[0],v[1],v[5],v[4]); m.face(v[3],v[7],v[6],v[2]); m.face(v[1],v[2],v[6],v[5]); m.face(v[0],v[4],v[7],v[3]); } function bx(p,x0,y0,z0,x1,y1,z1){ if(x1-x0<1e-4||y1-y0<1e-4||z1-z0<1e-4)return; fb(p,x0,x1,y0,z0,z1,y1,x0,x1,z0,z1); } function gab(p,x0,x1,zf,zb,y0,y1){ if(p!==PART)return; const xm=(x0+x1)/2; const a=m.vertex(x0,y0,zf),b=m.vertex(x1,y0,zf),c=m.vertex(xm,y1,zf),d=m.vertex(x1,y0,zb),e=m.vertex(x0,y0,zb),f=m.vertex(xm,y1,zb); m.face(a,b,c); m.face(d,e,f); m.face(b,d,f,c); m.face(e,a,c,f); m.face(e,d,b,a); } function awn(p,x0,x1,zt,yt,zb,yb){ if(p!==PART)return; const A=m.vertex(x0,yt,zt),B=m.vertex(x1,yt,zt),C=m.vertex(x1,yb,zb),D2=m.vertex(x0,yb,zb); m.face(A,D2,C,B); m.face(A,B,C,D2); } function frame(x0,x1,y1,y2,z){ bx('frame',x0,y1,z,x0+0.07,y2,z+0.1); bx('frame',x1-0.07,y1,z,x1,y2,z+0.1); bx('frame',x0,y1,z,x1,y1+0.07,z+0.1); bx('frame',x0,y2-0.07,z,x1,y2,z+0.1); bx('frame',(x0+x1)/2-0.025,y1,z,(x0+x1)/2+0.025,y2,z+0.08); bx('frame',x0,y1+(y2-y1)*0.72,z,x1,y1+(y2-y1)*0.72+0.05,z+0.08); } function rail(xa,xb,yb){ bx('iron',xa,yb+0.3,0.72,xb,yb+0.36,0.78); bx('iron',xa,yb+1.22,0.7,xb,yb+1.3,0.8); for(let x=xa+0.06;x<xb-0.03;x+=0.12) bx('iron',x-0.008,yb+0.36,0.735,x+0.008,yb+1.22,0.751); for(const s of [xa,xb-0.06]){ bx('iron',s,yb+1.22,0,s+0.06,yb+1.3,0.8); for(let z=0.12;z<0.72;z+=0.12) bx('iron',s+0.02,yb+0.36,z-0.008,s+0.04,yb+1.22,z+0.008); } for(let x=xa+0.3;x<xb-0.2;x+=0.36) bx('iron',x-0.05,yb+0.62,0.725,x+0.05,yb+0.7,0.76); } "
+let jb2 = "const T=0.5, nb=Math.max(3,Math.round(W/3.4)), bw=W/nb, X0=-W/2, ww=1.25, cb=Math.floor(nb/2); const FH=[4.6,4.2,3.6,3.4,3.2,3.2,3.2,3.2]; let H=0; const YB=[]; for(let f=0;f<NF;f++){ YB.push(H); H+=FH[Math.min(f,7)]; } bx('walls',X0,0,-D,-X0,H,-T); function wall(x0,x1,y0,y1,rust){ if(rust){ bx('walls',x0,y0,-T,x1,y1,-0.05); for(let y=y0;y<y1-0.01;y+=0.5) bx('walls',x0,y,-0.05,x1,Math.min(y+0.44,y1),0); } else bx('walls',x0,y0,-T,x1,y1,0); } const CX=[]; for(let i=0;i<nb;i++) CX.push(X0+bw*(i+0.5)); const F0=FH[0]; for(let i=0;i<=nb;i++){ const hw=(i-1===cb||i===cb)?1.3:1.35; const xl=i===0?X0:CX[i-1]+(i-1===cb?1.3:1.35), xr=i===nb?-X0:CX[i]-(i===cb?1.3:1.35); wall(xl,xr,0,F0,true); } for(let i=0;i<nb;i++){ const cx=CX[i], door=i===cb, ow=door?1.3:1.35, x0=cx-ow, x1=cx+ow, top=door?3.9:3.6; wall(x0,x1,top,F0,true); if(door){ bx('shop',x0,0,-T+0.1,x1,top,-T+0.22); bx('walls',x0-0.25,top,-T,x1+0.25,top+0.25,0.14); bx('walls',cx-0.2,top+0.25,-T,cx+0.2,top+0.55,0.18); for(let k=-1;k<=1;k+=2) bx('walls',cx+k*(ow+0.1)-0.12,0,-T,cx+k*(ow+0.1)+0.12,top,0.12); } else { wall(x0,x1,0,0.45,true); bx(Math.random()<0.8?'lit':'glass',x0,0.45,-T+0.15,x1,top,-T+0.17); bx('shop',x0,0.45,-T+0.1,x0+0.1,top,-T+0.22); bx('shop',x1-0.1,0.45,-T+0.1,x1,top,-T+0.22); bx('shop',cx-0.04,0.45,-T+0.1,cx+0.04,top,-T+0.2); bx('shop',x0,2.7,-T+0.1,x1,2.78,-T+0.2); bx('shop',x0-0.2,top,0,x1+0.2,top+0.6,0.12); awn('awn',x0-0.1,x1+0.1,0.12,top-0.05,1.6,top-0.75); bx('awn',x0-0.1,top-0.95,1.56,x1+0.1,top-0.75,1.6); } } bx('walls',X0-0.05,F0-0.15,-T,-X0+0.05,F0+0.25,0.22); "
+let jb3 = "for(let f=1;f<NF;f++){ const yb=YB[f], h=FH[Math.min(f,7)], fr=(f<=3||f===NF-1), sill=fr?0.3:0.95, y1=yb+sill, y2=yb+h-0.8; for(let i=0;i<=nb;i++){ const xl=i===0?X0:CX[i-1]+ww/2, xr=i===nb?-X0:CX[i]-ww/2; wall(xl,xr,yb,yb+h,false); } for(let i=0;i<nb;i++){ const cx=CX[i], x0=cx-ww/2, x1=cx+ww/2; wall(x0,x1,yb,y1,false); wall(x0,x1,y2,yb+h,false); const rr=Math.random(); bx(rr<0.42?(rr<0.2?'lit':'lit2'):'glass',x0,y1,-T+0.14,x1,y2,-T+0.16); if(rr<0.42) bx('curtain',x0+0.06,y1+0.05,-T+0.19,x0+0.06+ww*(0.25+rr),y2-0.05,-T+0.23); frame(x0,x1,y1,y2,-T+0.1); if(f===1){ bx('walls',x0-0.15,y2,-T,x1+0.15,y2+0.12,0.12); gab('walls',x0-0.2,x1+0.2,0.16,-0.05,y2+0.12,y2+0.55); } else if(f===2){ bx('walls',x0-0.15,y2,-T,x1+0.15,y2+0.14,0.2); } else bx('walls',x0-0.1,y2,-T,x1+0.1,y2+0.1,0.1); if(!fr){ bx('walls',x0-0.12,y1-0.08,-T,x1+0.12,y1,0.1); } if(f===2||f===3){ bx('walls',cx-ww/2-0.3,yb+0.15,0,cx+ww/2+0.3,yb+0.28,0.8); for(const s of [-1,1]) bx('walls',cx+s*0.6-0.08,yb-0.3,0,cx+s*0.6+0.08,yb+0.15,0.45); rail(cx-ww/2-0.3,cx+ww/2+0.3,yb); } } if(f===1||f===NF-1){ bx('walls',X0-0.05,yb+0.15,0,-X0+0.05,yb+0.28,0.8); for(let i=0;i<=nb;i++){ const px=X0+bw*i; bx('walls',px-0.12,yb-0.4,0,px+0.12,yb+0.15,0.5); } rail(X0-0.05,-X0+0.05,yb); } for(const sx of [-1,1]){ const xo=sx*W/2, xi=xo+sx*0.05, xf=xo+sx*0.1; const lo=Math.min(xo,xi), hi=Math.max(xo,xi), a=Math.min(xo,xf), b=Math.max(xo,xf); bx('walls',Math.min(xo,xo+sx*0.12),yb+h-0.12,-D,Math.max(xo,xo+sx*0.12),yb+h+0.12,0); for(let k=0;k<5;k++){ const zc=-1.2-3.4*k; bx(Math.random()<0.3?'lit':'glass',lo,y1,zc-0.62,hi,y2,zc+0.62); bx('frame',a,y1,zc-0.62,b,y2,zc-0.55); bx('frame',a,y1,zc+0.55,b,y2,zc+0.62); bx('frame',a,y1,zc-0.62,b,y1+0.07,zc+0.62); bx('frame',a,y2-0.07,zc-0.62,b,y2,zc+0.62); bx('frame',a,y1+(y2-y1)*0.7,zc-0.62,b,y1+(y2-y1)*0.7+0.05,zc+0.62); bx('walls',Math.min(xo,xo+sx*0.1),y2,zc-0.75,Math.max(xo,xo+sx*0.1),y2+0.12,zc+0.75); } } bx('walls',X0-0.03,yb+h-0.12,-T,-X0+0.03,yb+h+0.12,0.12); } "
+let jb4 = "bx('walls',X0-0.08,H,-T,-X0+0.08,H+0.14,0.55); bx('walls',X0-0.1,H+0.14,-T,-X0+0.1,H+0.3,0.72); for(let x=X0;x<-X0-0.2;x+=0.38) bx('walls',x,H-0.28,0,x+0.16,H,0.5); const yE=H+0.3, Hm=3.3, I=1.3; fb('roof',X0,-X0,yE,-D,0.4,yE+Hm,X0,-X0,-D+I,0.4-I); bx('roof',X0,yE+Hm,-D+I,-X0,yE+Hm+0.25,0.4-I); for(let i=0;i<nb;i++){ const cx=CX[i], y0=yE+0.55, hd=1.5, zf=0.28; bx('walls',cx-0.8,y0-0.1,zf-0.15,cx-0.5,y0+hd,zf); bx('walls',cx+0.5,y0-0.1,zf-0.15,cx+0.8,y0+hd,zf); bx('walls',cx-0.5,y0-0.1,zf-0.15,cx+0.5,y0+0.15,zf); bx('walls',cx-0.8,y0+hd-0.2,zf-0.15,cx+0.8,y0+hd+0.05,zf+0.05); bx('roof',cx-0.8,y0-0.2,-0.9,cx-0.66,y0+hd,zf-0.15); bx('roof',cx+0.66,y0-0.2,-0.9,cx+0.8,y0+hd,zf-0.15); bx(Math.random()<0.45?'lit':'glass',cx-0.5,y0+0.15,zf-0.12,cx+0.5,y0+hd-0.2,zf-0.1); frame(cx-0.5,cx+0.5,y0+0.15,y0+hd-0.2,zf-0.14); gab('roof',cx-0.9,cx+0.9,zf+0.12,-0.9,y0+hd+0.05,y0+hd+0.8); } const topY=yE+Hm+0.2; for(const u of [0.18,0.5,0.84]){ const cx=X0+W*u, z=-D*0.55; bx('brick',cx-0.5,topY,z-0.3,cx+0.5,topY+2.6,z+0.3); bx('walls',cx-0.6,topY+2.6,z-0.4,cx+0.6,topY+2.75,z+0.4); for(const s of [-0.28,0.28]) bx('brick',cx+s-0.1,topY+2.75,z-0.1,cx+s+0.1,topY+3.3,z+0.1); } m"
+
+# One building: eight parts, each the same script with a different PART, then turned to face the street and placed.
+# tint 0 is clean cream limestone, 1 a little greyer.
+def bld(tag, w, d, nf, rot, px, pz, tint)
+  p{tag}_wl = poly.script@1(code="const PART='walls'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_wl2 = xform.rotate@1(p{tag}_wl, angles=[0, {rot}, 0])
+  p{tag}_wl3 = xform.move@1(p{tag}_wl2, by=[{px}, 0, {pz}])
+  p{tag}_wl4 = solid.material@1(p{tag}_wl3, color=[{0.82 - 0.05 * tint}, {0.76 - 0.05 * tint}, {0.63 - 0.04 * tint}], roughness=0.85, recipe="painted_wall", texture_scale=2)
+  p{tag}_wl5 = solid.finish@1(p{tag}_wl4, subsurface=0.15, relief=0.4, relief_scale=30, relief_style="smooth")
+  output p{tag}_walls = p{tag}_wl5
+  p{tag}_gl = poly.script@1(code="const PART='glass'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_gl2 = xform.rotate@1(p{tag}_gl, angles=[0, {rot}, 0])
+  p{tag}_gl3 = xform.move@1(p{tag}_gl2, by=[{px}, 0, {pz}])
+  p{tag}_gl4 = solid.material@1(p{tag}_gl3, color=[0.05, 0.07, 0.09], roughness=0.06)
+  p{tag}_gl5 = solid.finish@1(p{tag}_gl4, clearcoat=1, clearcoat_roughness=0.03)
+  output p{tag}_glass = p{tag}_gl5
+  p{tag}_li = poly.script@1(code="const PART='lit'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_li2 = xform.rotate@1(p{tag}_li, angles=[0, {rot}, 0])
+  p{tag}_li3 = xform.move@1(p{tag}_li2, by=[{px}, 0, {pz}])
+  p{tag}_li4 = solid.material@1(p{tag}_li3, color=[1, 0.82, 0.55], roughness=0.3, emissive=[0.25, 0.14, 0.05])
+  p{tag}_li5 = anim.wave@1(p{tag}_li4, property="glow", amplitude=[0.06, 0, 0], period=5, phase={tint * 0.3})
+  output p{tag}_lit = p{tag}_li5
+  p{tag}_lb = poly.script@1(code="const PART='lit2'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_lb2 = xform.rotate@1(p{tag}_lb, angles=[0, {rot}, 0])
+  p{tag}_lb3 = xform.move@1(p{tag}_lb2, by=[{px}, 0, {pz}])
+  p{tag}_lb4 = solid.material@1(p{tag}_lb3, color=[0.8, 0.9, 1], roughness=0.3, emissive=[0.12, 0.15, 0.22])
+  p{tag}_lb5 = anim.wave@1(p{tag}_lb4, property="glow", amplitude=[0.35, 0, 0], period=0.9, phase={0.2 + tint * 0.3})
+  output p{tag}_lit2 = p{tag}_lb5
+  p{tag}_cu = poly.script@1(code="const PART='curtain'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_cu2 = xform.rotate@1(p{tag}_cu, angles=[0, {rot}, 0])
+  p{tag}_cu3 = xform.move@1(p{tag}_cu2, by=[{px}, 0, {pz}])
+  p{tag}_cu4 = solid.material@1(p{tag}_cu3, color=[0.9, 0.82, 0.68], roughness=0.9, recipe="fabric", texture_scale=8)
+  p{tag}_cu5 = solid.finish@1(p{tag}_cu4, translucency=0.5, sheen=0.4)
+  output p{tag}_curtains = p{tag}_cu5
+  p{tag}_fr = poly.script@1(code="const PART='frame'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_fr2 = xform.rotate@1(p{tag}_fr, angles=[0, {rot}, 0])
+  p{tag}_fr3 = xform.move@1(p{tag}_fr2, by=[{px}, 0, {pz}])
+  p{tag}_fr4 = solid.material@1(p{tag}_fr3, color=[0.9, 0.88, 0.8], roughness=0.5)
+  output p{tag}_frames = p{tag}_fr4
+  p{tag}_ir = poly.script@1(code="const PART='iron'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_ir2 = xform.rotate@1(p{tag}_ir, angles=[0, {rot}, 0])
+  p{tag}_ir3 = xform.move@1(p{tag}_ir2, by=[{px}, 0, {pz}])
+  p{tag}_ir4 = solid.material@1(p{tag}_ir3, color=[0.03, 0.03, 0.035], metallic=0.7, roughness=0.4)
+  output p{tag}_iron = p{tag}_ir4
+  p{tag}_rf = poly.script@1(code="const PART='roof'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_rf2 = xform.rotate@1(p{tag}_rf, angles=[0, {rot}, 0])
+  p{tag}_rf3 = xform.move@1(p{tag}_rf2, by=[{px}, 0, {pz}])
+  p{tag}_rf4 = solid.material@1(p{tag}_rf3, color=[0.34, 0.38, 0.44], metallic=0.5, roughness=0.45)
+  p{tag}_rf5 = solid.finish@1(p{tag}_rf4, relief=0.2, relief_scale=45, relief_style="ridged")
+  output p{tag}_zinc = p{tag}_rf5
+  p{tag}_bk = poly.script@1(code="const PART='brick'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_bk2 = xform.rotate@1(p{tag}_bk, angles=[0, {rot}, 0])
+  p{tag}_bk3 = xform.move@1(p{tag}_bk2, by=[{px}, 0, {pz}])
+  p{tag}_bk4 = solid.material@1(p{tag}_bk3, color=[0.5, 0.21, 0.13], roughness=0.9, recipe="brick", texture_scale=6)
+  output p{tag}_brick = p{tag}_bk4
+  p{tag}_sh = poly.script@1(code="const PART='shop'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_sh2 = xform.rotate@1(p{tag}_sh, angles=[0, {rot}, 0])
+  p{tag}_sh3 = xform.move@1(p{tag}_sh2, by=[{px}, 0, {pz}])
+  p{tag}_sh4 = solid.material@1(p{tag}_sh3, color=[0.05, 0.2, 0.14], roughness=0.35)
+  p{tag}_sh5 = solid.finish@1(p{tag}_sh4, clearcoat=0.5, clearcoat_roughness=0.2)
+  output p{tag}_shops = p{tag}_sh5
+  p{tag}_aw = poly.script@1(code="const PART='awn'; const W=${w}; const D=${d}; const NF=${nf}; ${jb1} ${jb2} ${jb3} ${jb4}", budget=20000)
+  p{tag}_aw2 = xform.rotate@1(p{tag}_aw, angles=[0, {rot}, 0])
+  p{tag}_aw3 = xform.move@1(p{tag}_aw2, by=[{px}, 0, {pz}])
+  p{tag}_aw4 = solid.material@1(p{tag}_aw3, color=[0.5, 0.08, 0.07], roughness=0.8)
+  p{tag}_aw5 = solid.finish@1(p{tag}_aw4, sheen=0.5, translucency=0.25)
+  output p{tag}_awnings = p{tag}_aw5
+end
+
+# Custom town-house facades: the Paris generator's material-separated mesh workflow, scaled for a small town.
+# North row has an opening to the market square; the south row closes the street without blocking the church.
+bld("n1", 20, 9, 2, 180, -21, 7, 0)
+bld("n2", 20, 9, 3, 180, 21, 7, 1)
+bld("s1", 20, 9, 2, 0, -21, -7, 1)
+bld("s2", 18, 9, 3, 0, 0, -7, 0)
+bld("s3", 20, 9, 2, 0, 21, -7, 1)
+
+# The market square: lawn, stone walk, clipped planting beds, and a small fountain.
+square_lawn = solid.box@1(size=[20,0.10,17])
+square_lawn_at = xform.move@1(square_lawn, by=[0,0.05,22])
+square_lawn_mat = solid.material@1(square_lawn_at, color=[0.17,0.29,0.13], roughness=0.96)
+output square_lawn = square_lawn_mat
+square_path = solid.box@1(size=[3.0,0.08,17])
+square_path_at = xform.move@1(square_path, by=[0,0.12,22])
+square_path_mat = solid.material@1(square_path_at, color=[0.57,0.55,0.48], roughness=0.91, recipe="concrete")
+output square_walk = square_path_mat
+paver = solid.box@1(size=[0.72,0.09,0.72])
+paver_at = xform.move@1(paver,by=[-1.14,0.17,14.2])
+paver_row = xform.array@1(paver_at,count_x=4,count_y=1,count_z=1,spacing=[0.76,0,0])
+paver_run = xform.array@1(paver_row,count_x=1,count_y=1,count_z=22,spacing=[0,0,0.78])
+paver_mat = solid.material@1(paver_run,color=[0.63,0.60,0.53],roughness=0.92,recipe="concrete")
+output square_pavers = paver_mat
+
+fountain_base_raw = solid.cylinder@1(radius=2.0,height=0.38,segments=48)
+fountain_base = solid.chamfer@1(fountain_base_raw,width=0.035)
+fountain_base_at = xform.move@1(fountain_base, by=[0,0.27,23])
+fountain_bowl_raw = solid.cylinder@1(radius=1.48,height=0.36,segments=48)
+fountain_bowl = solid.chamfer@1(fountain_bowl_raw,width=0.025)
+fountain_bowl_at = xform.move@1(fountain_bowl, by=[0,0.58,23])
+fountain_core = solid.cylinder@1(radius=0.24,height=1.1,segments=24)
+fountain_core_at = xform.move@1(fountain_core, by=[0,1.10,23])
+fountain = solid.union@1(fountain_base_at,fountain_bowl_at,fountain_core_at)
+fountain_mat = solid.material@1(fountain, color=[0.50,0.53,0.51], roughness=0.72, recipe="concrete")
+output fountain = fountain_mat
+fountain_water = water.surface@1(size=[2.8,2.8], level=0.72, depth=0.18, color=[0.12,0.32,0.38], opacity=0.74, wave_height=0.008, wave_length=0.6, speed=0.25, seed=9, resolution=24)
+fountain_water_at = xform.move@1(fountain_water, by=[0,0.77,23])
+output fountain_water = fountain_water_at
+
+# A small stone church at the square's end, with a pitched roof, bell tower and stained-glass windows.
+church_body = solid.box@1(size=[9,6.8,13])
+church_body_at = xform.move@1(church_body, by=[0,3.4,24])
+church_body_mat = solid.material@1(church_body_at, color=[1,1,1], roughness=0.92, recipe="marble")
+church_body_paint = solid.texture@1(church_body_mat, program="${plaster}", size="512")
+output church = church_body_paint
+roof_left_profile = profile.polygon@1(points=[[-4.8,0],[-0.04,2.66],[-0.12,2.43],[-4.8,-0.16]])
+roof_left_extruded = solid.extrude@1(roof_left_profile,height=13.6)
+roof_left_turned = xform.rotate@1(roof_left_extruded,angles=[90,0,0])
+roof_left_at = xform.move@1(roof_left_turned,by=[0,7.0,17.2])
+roof_right_profile = profile.polygon@1(points=[[0.04,2.66],[4.8,0],[4.8,-0.16],[0.12,2.43]])
+roof_right_extruded = solid.extrude@1(roof_right_profile,height=13.6)
+roof_right_turned = xform.rotate@1(roof_right_extruded,angles=[90,0,0])
+roof_right_at = xform.move@1(roof_right_turned,by=[0,7.0,17.2])
+church_roof = solid.union@1(roof_left_at,roof_right_at)
+church_roof_mat = solid.material@1(church_roof, color=[1,1,1], roughness=0.88)
+church_roof_finish = solid.texture@1(church_roof_mat, program="${slate}", size="512")
+output church_roof = church_roof_finish
+
+# Swept copper gutters and downpipes follow the roof edge and church corners.
+gutter_profile = profile.circle@1(radius=0.045,segments=10)
+gutter_left_path = curve.polyline@1(points=[[-4.82,7.06,17.3],[-4.82,7.06,30.7]])
+gutter_left = solid.sweep@1(gutter_left_path,gutter_profile)
+gutter_right_path = curve.polyline@1(points=[[4.82,7.06,17.3],[4.82,7.06,30.7]])
+gutter_right = solid.sweep@1(gutter_right_path,gutter_profile)
+gutters = solid.union@1(gutter_left,gutter_right)
+gutter_mat = solid.material@1(gutters,color=[0.24,0.29,0.26],metallic=0.48,roughness=0.46)
+output church_gutters = gutter_mat
+
+downpipe_profile = profile.circle@1(radius=0.032,segments=8)
+downpipe_left_path = curve.bezier@1(points=[[-4.82,7.0,18.0],[-4.82,5.1,17.8],[-4.82,2.2,17.8],[-4.82,0.25,17.8]],steps=20)
+downpipe_left = solid.sweep@1(downpipe_left_path,downpipe_profile)
+downpipe_right_path = curve.bezier@1(points=[[4.82,7.0,30.0],[4.82,5.1,30.2],[4.82,2.2,30.2],[4.82,0.25,30.2]],steps=20)
+downpipe_right = solid.sweep@1(downpipe_right_path,downpipe_profile)
+downpipes = solid.union@1(downpipe_left,downpipe_right)
+downpipe_mat = solid.material@1(downpipes,color=[0.21,0.25,0.23],metallic=0.42,roughness=0.52)
+output church_downpipes = downpipe_mat
+
+bell_tower = solid.box@1(size=[2.5,10,2.7])
+bell_tower_at = xform.move@1(bell_tower, by=[-5.8,5,18.3])
+bell_tower_mat = solid.material@1(bell_tower_at, color=[0.78,0.72,0.61], roughness=0.92, recipe="marble")
+output bell_tower = bell_tower_mat
+spire_profile = profile.polygon@1(points=[[0,0],[1.62,0],[1.55,0.18],[1.30,0.54],[0.92,1.05],[0.52,1.65],[0.20,2.28],[0.02,3.2]])
+spire_revolved = solid.revolve@1(spire_profile,angle=360deg,segments=12)
+bell_roof_at = xform.move@1(spire_revolved, by=[-5.8,10.0,18.3])
+bell_roof_mat = solid.material@1(bell_roof_at, color=[0.24,0.29,0.29], roughness=0.88)
+output bell_roof = bell_roof_mat
+
+church_door = solid.box@1(size=[1.8,2.7,0.16])
+church_door_at = xform.move@1(church_door, by=[0,1.45,17.42])
+church_door_mat = solid.material@1(church_door_at, color=[0.24,0.15,0.09], roughness=0.66)
+output church_entry = church_door_mat
+# A real circular rose window: build its glazed disk and a separate raised ring from profiles.
+rose_profile = profile.circle@1(radius=0.82,segments=32)
+rose_glass_raw = solid.extrude@1(rose_profile,height=0.08)
+rose_glass_at = xform.move@1(rose_glass_raw,by=[0,5.15,17.39])
+rose_glass = solid.material@1(rose_glass_at,color=[0.20,0.30,0.43],metallic=0.18,roughness=0.27,emissive=[0.018,0.025,0.05])
+output church_rose_glass = rose_glass
+rose_outer = profile.circle@1(radius=0.98,segments=32)
+rose_inner = profile.circle@1(radius=0.82,segments=32)
+rose_ring_profile = profile.difference@1(rose_outer,rose_inner)
+rose_ring_raw = solid.extrude@1(rose_ring_profile,height=0.14)
+rose_ring_bevel = solid.round@1(rose_ring_raw,radius=0.018)
+rose_ring_at = xform.move@1(rose_ring_bevel,by=[0,5.15,17.35])
+rose_ring = solid.material@1(rose_ring_at,color=[0.61,0.51,0.34],metallic=0.36,roughness=0.49)
+output church_rose_surround = rose_ring
+stained_window = solid.box@1(size=[0.78,1.45,0.06])
+stained_window_at = inst.place@1(stained_window, at=[[-4.54,3.8,20],[-4.54,3.8,24],[-4.54,3.8,28],[4.54,3.8,20],[4.54,3.8,24],[4.54,3.8,28]])
+stained_window_mat = solid.material@1(stained_window_at, color=[0.20,0.32,0.39], metallic=0.12, roughness=0.28, emissive=[0.025,0.04,0.06])
+output stained_glass = stained_window_mat
+
+# Mature oaks and birches from the engine's tree generator, placed around the square and road edges.
+oak = flora.tree@1(kind="oak",height=7.0,seed=203,lod=2,sides=7,bark=[0.24,0.15,0.09],leaves=[0.14,0.29,0.10],leaf_style="crossed",leaf_size=0.9,sway=0.16)
+oak_at = inst.place@1(oak, at=[[-9,0,16],[9,0,16],[-9,0,29],[9,0,29],[-29,0,6],[29,0,-6]])
+output town_oaks = oak_at
+birch = flora.tree@1(kind="birch",height=6.4,seed=209,lod=2,sides=7,bark=[0.72,0.69,0.60],leaves=[0.24,0.36,0.15],leaf_style="crossed",leaf_size=0.78,sway=0.2)
+birch_at = inst.place@1(birch, at=[[-31,0,-4],[31,0,5]])
+output town_birches = birch_at
+
+# Script-built grass tufts scatter into the two planted beds, clear of the path and fountain.
+let grass_code = "const m=new Mesh();for(let i=0;i<9;i++){const a=i*2.399963,r=0.015+(i%3)*0.012,h=0.16+(i%4)*0.045,dx=Math.cos(a),dz=Math.sin(a),b=m.vertex(dx*r,0,dz*r),l=m.vertex(dx*r*0.45,h*0.72,dz*r*0.45),t=m.vertex(dx*(r+0.028),h,dz*(r+0.028)),q=m.vertex(dx*(r+0.012),h*0.73,dz*(r+0.012));m.face(b,l,t);m.face(b,t,l);m.face(b,t,q);m.face(b,q,t);}m"
+grass_mesh = poly.script@1(code="${grass_code}",seed=27,budget=120)
+grass_mat = solid.material@1(grass_mesh,color=[0.20,0.36,0.12],roughness=0.94)
+grass_look = solid.foliage@1(grass_mat,grass=true,ground_color=[0.12,0.21,0.08],ground_blend=0.42,sway=0.08,fade_near=22,fade_far=50)
+grass_left = inst.scatter@1(grass_look,count=52,width=6.5,depth=12,min_spacing=0.45,seed=81,yaw_jitter=3.14,scale_jitter=0.38)
+grass_left_at = xform.move@1(grass_left,by=[-6.1,0,22])
+grass_right = inst.scatter@1(grass_look,count=52,width=6.5,depth=12,min_spacing=0.45,seed=82,yaw_jitter=3.14,scale_jitter=0.38)
+grass_right_at = xform.move@1(grass_right,by=[6.1,0,22])
+output square_grass = grass_left_at
+output square_grass_east = grass_right_at
+
+# Streetlights, benches, bins and a parked compact car for scale.
+lamp_body = street.prop@1(at=[-26,0,5.3],height=5.2,axis="x",kind="streetlight",part="body")
+lamp_body_row = xform.array@1(lamp_body,count_x=4,count_y=1,count_z=1,spacing=[17,0,0])
+lamp_body_mat = solid.material@1(lamp_body_row,color=[0.12,0.14,0.13],metallic=0.55,roughness=0.4)
+output street_lamps = lamp_body_mat
+lamp_lens = street.prop@1(at=[-26,0,5.3],height=5.2,axis="x",kind="streetlight",part="lens")
+lamp_lens_row = xform.array@1(lamp_lens,count_x=4,count_y=1,count_z=1,spacing=[17,0,0])
+lamp_lens_mat = solid.material@1(lamp_lens_row,color=[0.84,0.70,0.40],roughness=0.35,emissive=[0.55,0.32,0.12])
+output lamp_lenses = lamp_lens_mat
+
+# A catenary service wire hangs naturally between the streetlight tops.
+wire_path = curve.hang@1(from=[-26,5.5,5.3],to=[25,5.5,5.3],slack=0.035,points=40)
+wire_profile = profile.circle@1(radius=0.018,segments=8)
+wire = solid.sweep@1(wire_path,wire_profile)
+wire_mat = solid.material@1(wire,color=[0.10,0.11,0.10],metallic=0.18,roughness=0.68)
+output overhead_wire = wire_mat
+
+bench_body = street.prop@1(at=[-7,0,16],height=1.1,axis="x",kind="bench",part="body")
+bench_body_pair = xform.mirror@1(bench_body,axis="x")
+bench_body_mat = solid.material@1(bench_body_pair,color=[0.22,0.14,0.08],roughness=0.74)
+output square_benches = bench_body_mat
+bench_accent = street.prop@1(at=[-7,0,16],height=1.1,axis="x",kind="bench",part="accent")
+bench_accent_pair = xform.mirror@1(bench_accent,axis="x")
+bench_accent_mat = solid.material@1(bench_accent_pair,color=[0.37,0.26,0.15],roughness=0.62)
+output bench_slats = bench_accent_mat
+
+bin = street.prop@1(at=[7,0,15],height=1.0,axis="z",kind="bin",part="body")
+bin_mat = solid.material@1(bin,color=[0.17,0.22,0.19],metallic=0.18,roughness=0.65)
+output town_bins = bin_mat
+
+# Street-scale infrastructure, using the engine's segmented prop kits rather than box stand-ins.
+signal_body = street.prop@1(at=[2.4,0,5.7],height=4.2,axis="x",kind="traffic_signal",part="body")
+signal_body_mat = solid.material@1(signal_body,color=[0.13,0.15,0.14],metallic=0.42,roughness=0.48)
+output traffic_signal_posts = signal_body_mat
+signal_lens = street.prop@1(at=[2.4,0,5.7],height=4.2,axis="x",kind="traffic_signal",part="lens")
+signal_lens_mat = solid.material@1(signal_lens,color=[0.64,0.28,0.12],roughness=0.32,emissive=[0.12,0.025,0.008])
+output traffic_signal_lenses = signal_lens_mat
+
+hydrant = street.prop@1(at=[-29,0,5.4],kind="hydrant",part="body")
+hydrant_pair = xform.mirror@1(hydrant,axis="x")
+hydrant_mat = solid.material@1(hydrant_pair,color=[0.68,0.17,0.10],roughness=0.58)
+output fire_hydrants = hydrant_mat
+
+street_sign = street.prop@1(at=[-31,0,5.4],height=3.1,axis="x",kind="sign",part="body")
+street_sign_pair = xform.mirror@1(street_sign,axis="x")
+street_sign_mat = solid.material@1(street_sign_pair,color=[0.18,0.30,0.25],metallic=0.12,roughness=0.58)
+output street_signs = street_sign_mat
+
+square_bollard = street.prop@1(at=[-8,0,13],kind="bollard",part="body")
+square_bollard_row = xform.array@1(square_bollard,count_x=7,count_y=1,count_z=1,spacing=[2.65,0,0])
+square_bollard_mat = solid.material@1(square_bollard_row,color=[0.21,0.23,0.21],metallic=0.32,roughness=0.56)
+output square_bollards = square_bollard_mat
+
+bus_shelter = street.prop@1(at=[29,0,13],height=3.0,axis="x",kind="bus_shelter",part="body")
+bus_shelter_mat = solid.material@1(bus_shelter,color=[0.24,0.28,0.27],metallic=0.45,roughness=0.38)
+output town_bus_shelter = bus_shelter_mat
+
+car_body = solid.box@1(size=[1.82,0.66,3.8])
+car_body_at = xform.move@1(car_body,by=[-16,0.61,-0.9])
+car_body_mat = solid.material@1(car_body_at,color=[0.22,0.34,0.40],metallic=0.35,roughness=0.34)
+output parked_car = car_body_mat
+car_cabin = solid.box@1(size=[1.52,0.58,1.9])
+car_cabin_at = xform.move@1(car_cabin,by=[-16,1.18,-0.82])
+car_glass = solid.material@1(car_cabin_at,color=[0.10,0.16,0.18],metallic=0.25,roughness=0.2)
+output car_windows = car_glass
+car_wheel = solid.cylinder@1(radius=0.31,height=0.18,segments=24)
+car_wheel_turn = xform.rotate@1(car_wheel,angles=[90,0,0])
+car_wheel_at = inst.place@1(car_wheel_turn,at=[[-16.72,0.31,-2.1],[-16.72,0.31,0.35],[-15.28,0.31,-2.1],[-15.28,0.31,0.35]])
+car_wheel_mat = solid.material@1(car_wheel_at,color=[0.035,0.04,0.04],roughness=0.86)
+output car_wheels = car_wheel_mat

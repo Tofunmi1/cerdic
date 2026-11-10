@@ -1,4 +1,5 @@
 node_modules/
+engine/tools/mcp/recipes-local/
 dist/
 public/engine/
 rust/geometry/target/
@@ -9,11 +10,6 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 
-# engine workspace and spikes
+# engine workspace
 engine/target/
-spikes/**/target/
-spikes/**/node_modules/
-spikes/hybrid-wasm/third_party/
-spikes/hybrid-wasm/build/
-spikes/bevy-cpp/web/*.wasm
-spikes/xr-framebuffer/web/*.wasm
+engine/web/dist*/

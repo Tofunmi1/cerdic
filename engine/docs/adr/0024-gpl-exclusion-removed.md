@@ -9,7 +9,7 @@ owner decision. The owner now directs that it be removed and that forking or pul
 
 ## Decision
 - GPL-family code may be used in the engine, including Blender source, subject to the consequences below. No GPL code is adopted by this ADR alone: each
-  adoption (a Blender module, a library) still needs a feasibility note and a `third_party/<name>/VENDOR.md` entry (upstream, commit, licence file, patches).
+  adoption (a Blender module, a library) still needs a feasibility note and a `lib/<name>/VENDOR.md` entry (upstream, commit, licence file, patches).
 - The no-imported-assets rule from ADR 0003 stands unchanged: all geometry and materials come from our own system. Blender's source code is not an asset;
   Blender's bundled models, brushes, textures, HDRIs and sample files are, and stay out.
 - `deny.toml` licence allow-list is extended with a specific SPDX identifier (for example `GPL-2.0-or-later`) only when an actual dependency needs it,

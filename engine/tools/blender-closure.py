@@ -2,7 +2,7 @@
 
 usage: blender-closure.py <blender-checkout> <list-of-sources> [more lists]
 
-Used to choose what `third_party/blender` holds and to refresh it (see its VENDOR.md): run it against a
+Used to choose what `lib/bl` holds and to refresh it: run it against a
 full or sparse Blender checkout, then fetch exactly the printed paths with
 `git sparse-checkout set --no-cone --stdin`. Sources whose path contains a SKIP token are not built
 (OS, file I/O and editor code we replace with stubs).

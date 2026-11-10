@@ -1,4 +1,4 @@
-// Loading the vendored Material Maker node library (engine/third_party/material-maker, MIT).
+// Loading the vendored Material Maker node library (engine/lib/material-maker, MIT).
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { helperFunctions } from './compile';

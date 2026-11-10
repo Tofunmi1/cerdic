@@ -1,6 +1,8 @@
 //! Operators consume immutable mesh values. Native solids exist only while one node executes.
 use crate::regions::{self, Labels};
-use crate::{Fail, Quality, appearance, cache::Value, fail, instances, profile_ops, shapes};
+use crate::{
+    Fail, Quality, appearance, cache::Value, fail, fail_suggest, instances, profile_ops, shapes,
+};
 use std::rc::Rc;
 use ve_graph::{Node, Value as Param};
 use ve_kernel::{ExecutionContext, KernelError, Mesh, Solid};
@@ -10,6 +12,7 @@ pub(crate) fn execute(
     inputs: &[Rc<Value>],
     context: &ExecutionContext,
     quality: Quality,
+    labels: &std::collections::BTreeMap<ve_graph::NodeId, String>,
 ) -> Result<Value, Fail> {
     if context.is_cancelled() {
         return Err(fail("eval.cancelled", "evaluation was cancelled"));
@@ -23,10 +26,38 @@ pub(crate) fn execute(
             .ok_or_else(|| fail("graph.missing_input", "bypass requires an input"))?;
         return Ok((**input).clone());
     }
+    let family = node.op.family().as_str();
+    let edits_shape = family.starts_with("poly.")
+        || (family.starts_with("xform.") && family != "xform.attach")
+        || (family.starts_with("solid.")
+            && !matches!(
+                family,
+                "solid.material"
+                    | "solid.texture"
+                    | "solid.toon"
+                    | "solid.style"
+                    | "solid.finish"
+                    | "solid.foliage"
+            ));
+    if edits_shape && inputs.iter().any(|input| !input.morph_targets.is_empty()) {
+        return Err(fail_suggest(
+            "rig.morph_operation_order",
+            format!("{family} cannot preserve shape keys after changing mesh geometry"),
+            "finish transforms, remeshing, and topology edits before adding shape keys",
+        ));
+    }
     if let Some(result) = execute_special(node, inputs, context, quality) {
         return result;
     }
-    let family = node.op.family().as_str();
+    if family == "check.attached" {
+        return crate::profile_ops::attached(node, inputs, labels);
+    }
+    if family == "check.motion" {
+        return Ok(Value::nothing());
+    }
+    if family == "script.js" {
+        return Ok(Value::nothing());
+    }
     let first_empty = inputs.first().is_some_and(|input| input.mesh.is_empty());
     if ((family == "solid.difference" || family.starts_with("xform.")) && first_empty)
         || (family == "solid.intersect" && inputs.iter().any(|input| input.mesh.is_empty()))
@@ -59,6 +90,9 @@ pub(crate) fn execute(
             .map_err(|e| fail("kernel.failed", e.to_string()))?
     };
     let mut value = inherited(node, inputs, Value::solid(mesh, result.volume()))?;
+    if family == "sign.text" {
+        value.material = Some(crate::sign_text::material(node)?);
+    }
     if tracking && !result.is_empty() {
         let found = labels
             .regions(&result, value.material.as_ref())
@@ -96,16 +130,73 @@ fn execute_special(
     if family == "xform.attach" {
         return Some(crate::frames::attach(node, inputs));
     }
+    if let Some(result) = crate::world_field::run(node, inputs) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::game_nodes::run(node, inputs) {
+        return Some(result);
+    }
     if family.starts_with("field.") {
         return Some(
             crate::field_ops::execute(family, node, inputs, context, quality)
                 .map_err(|error| at_node(error, node)),
         );
     }
+    if let Some(result) = crate::fracture::run(node, inputs, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::fluid_sim::run(node, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::sim_program::run(node, inputs, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::anim_simplify::run(node, inputs) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::anim_retarget::run(node, inputs) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::cloth_sim::run(node, inputs) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::drape::run(node, inputs, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::volume::run(node, inputs, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
     if let Some(result) = crate::curves::run(node, inputs, context) {
         return Some(result.map_err(|error| at_node(error, node)));
     }
     if let Some(result) = crate::deform::run(node, inputs, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::human::run(node, inputs) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::world_city::run(node) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::world_flora::run(node, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::world_river::run(node, inputs, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::world_scatter::run(node, inputs, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::terrain_look::run(node, inputs) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::world_pad::run(node, inputs) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::world_ops::run(node, inputs, context) {
+        return Some(result.map_err(|error| at_node(error, node)));
+    }
+    if let Some(result) = crate::world_terrain::run(node, context) {
         return Some(result.map_err(|error| at_node(error, node)));
     }
     if let Some(result) = crate::terrain::run(node, inputs, context) {
@@ -126,6 +217,12 @@ fn execute_special(
     if family == "anim.track" {
         return Some(crate::anim::track(node, inputs));
     }
+    if family == "anim.machine" {
+        return Some(crate::anim_machine::machine(node, inputs));
+    }
+    if family == "anim.drop" {
+        return Some(crate::anim::drop(node, inputs));
+    }
     if family == "phys.body" {
         return Some(crate::physics::body(node, inputs));
     }
@@ -135,8 +232,17 @@ fn execute_special(
     if family == "phys.joint" {
         return Some(crate::physics::joint(node, inputs));
     }
-    if let Some(result) = execute_rig(node, inputs) {
+    if let Some(result) = execute_rig(node, inputs, context) {
         return Some(result);
+    }
+    match family {
+        "phys.ragdoll" => return Some(crate::ragdoll::ragdoll(node, inputs)),
+        "fx.emitter" => return Some(crate::fx::emitter(node, inputs)),
+        "fx.force" => return Some(crate::fx::force(node, inputs)),
+        "fx.collide" => return Some(crate::fx::collide(node, inputs)),
+        "fx.trail" => return Some(crate::fx::trail(node, inputs)),
+        "fx.sub" => return Some(crate::fx::sub(node, inputs)),
+        _ => {}
     }
     if family == "anim.wave" {
         return Some(crate::wave::wave(node, inputs));
@@ -150,11 +256,17 @@ fn execute_special(
     if family == "solid.texture" {
         return Some(appearance::texture(node, inputs));
     }
+    if family == "material.preset" {
+        return Some(appearance::preset(node, inputs));
+    }
     if family == "solid.toon" {
         return Some(appearance::toon(node, inputs));
     }
     if family == "solid.style" {
         return Some(crate::style::style(node, inputs));
+    }
+    if family == "solid.finish" {
+        return Some(crate::finish::finish(node, inputs));
     }
     if family == "solid.foliage" {
         return Some(crate::foliage::foliage(node, inputs));
@@ -178,11 +290,19 @@ fn execute_scene_environment(node: &Node) -> Option<Result<Value, Fail>> {
     }
 }
 
-fn execute_rig(node: &Node, inputs: &[Rc<Value>]) -> Option<Result<Value, Fail>> {
+fn execute_rig(
+    node: &Node,
+    inputs: &[Rc<Value>],
+    context: &ExecutionContext,
+) -> Option<Result<Value, Fail>> {
     match node.op.family().as_str() {
         "rig.bone" => Some(crate::rig::bone(node, inputs)),
         "rig.ik" => Some(crate::rig::ik(node, inputs)),
+        "rig.aim" => Some(crate::rig::aim(node, inputs)),
+        "rig.secondary" => Some(crate::rig::secondary(node, inputs)),
+        "rig.gait" => Some(crate::rig::gait(node, inputs)),
         "rig.skin" => Some(crate::rig::skin(node, inputs)),
+        "rig.morph" => Some(crate::morph::run(node, inputs, context)),
         _ => None,
     }
 }
@@ -232,6 +352,10 @@ pub(crate) fn inherited(
             value.frames = crate::frames::propagate(node, &input.frames)?;
         }
     }
+    if let Some(input) = inputs.first() {
+        value.state_machine = input.state_machine.clone();
+        value.state_machine_node = input.state_machine_node.clone();
+    }
     Ok(value)
 }
 
@@ -278,6 +402,15 @@ fn solid(
     };
     match kind {
         "solid.box" => Solid::cube(vector(node, "size")?, true),
+        "sign.text" => crate::sign_text::build(node, context),
+        "rooms.plan" => crate::rooms_plan::build(node, context),
+        "detail.panels" => {
+            let input = inputs.first().ok_or(KernelError::InvalidArgument(
+                "detail.panels needs a solid on `in`",
+            ))?;
+            let base = convert(input)?;
+            crate::detail_panels::build(node, &base, context)
+        }
         "solid.sphere" => Solid::sphere(number("radius")?, segments()?),
         "solid.cylinder" => Solid::cylinder(
             number("height")?,

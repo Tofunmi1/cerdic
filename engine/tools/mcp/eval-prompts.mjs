@@ -16,7 +16,7 @@ import { compileTexture } from '../../../src/engine/texture/compile.ts';
 import { loadHelpers, loadLibrary } from '../../../src/engine/texture/library.ts';
 import { parseTextureProgram } from '../../../src/engine/texture/program.ts';
 
-const materialMaker = path.resolve(import.meta.dir, '../../third_party/material-maker');
+const materialMaker = path.resolve(import.meta.dir, '../../lib/material-maker');
 const textureLibrary = loadLibrary(materialMaker);
 const textureHelpers = loadHelpers(materialMaker);
 
