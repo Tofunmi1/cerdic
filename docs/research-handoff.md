@@ -43,7 +43,6 @@ The engine browser run used Chromium/SwiftShader. Its boot result, approximately
 
 Read these before implementing:
 
-- [Engine contributor rules](../engine/AGENTS.md).
 - [ADR 0001: trimmed Bevy engine](../engine/docs/adr/0001-single-engine-bevy-fork.md).
 - [ADR 0002: textual geometry node graph](../engine/docs/adr/0002-node-graph-geometry-language.md).
 - [ADR 0003: licensing and generated assets](../engine/docs/adr/0003-licensing-and-no-imported-assets.md).

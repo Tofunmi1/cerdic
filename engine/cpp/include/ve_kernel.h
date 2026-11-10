@@ -145,7 +145,9 @@ enum {
   VE_FIELD_MIRROR = 22,
   VE_FIELD_OFFSET = 23,
   VE_FIELD_SHELL = 24,
-  VE_FIELD_REPEAT = 25
+  VE_FIELD_REPEAT = 25,
+  VE_FIELD_NOISE = 26,
+  VE_FIELD_WARP = 27
 };
 ve_solid* ve_solid_from_field(const ve_field_input* input, double clipped_point[3],
                               ve_status* status);
@@ -210,7 +212,7 @@ ve_status ve_subdivision_copy_channels(const ve_subdivision* subdivision, float*
                                        size_t fvar_corner_capacity);
 void ve_subdivision_free(ve_subdivision* subdivision);
 
-/* Polygon meshes through Blender's bmesh (vendored Blender code, see third_party/blender). The
+/* Polygon meshes through Blender's bmesh (vendored Blender code, see lib/bl). The
  * input is an indexed polygon mesh: `face_sizes[i]` corners per face, `corners` holds vertex
  * indices face after face. Faces need at least 3 distinct corners; at most 1,000,000 vertices,
  * 1,000,000 faces and 4,000,000 corners. The result keeps provenance: a vertex's origin is the
@@ -255,6 +257,26 @@ typedef struct ve_bevel_input {
 } ve_bevel_input;
 ve_polymesh* ve_bevel(const ve_bevel_input* input, ve_status* status);
 
+/* Skin (Blender's Skin modifier, the B-Mesh algorithm): a skeleton graph becomes one closed surface of mostly quads. `positions` holds 3 floats per joint, `radii` 2 per
+ * joint (the half extents of the cross-section across and along the bone frame, metres), `edges` pairs of joints, `flags` (may be NULL) one byte per joint: bit 0 marks a
+ * root (one per connected piece, the joint the bone frames are oriented from; refused with VE_ERR_INVALID_ARG when a piece has none), bit 1 marks a branch joint "loose" (its
+ * hull is not subdivided). `branch_smoothing` 0..1 relaxes the surface around branches, `symmetry_axes` (bits 0 x, 1 y, 2 z) keeps quads from crossing a mirror plane,
+ * `subdivide` adds joints along long edges as Blender's modifier does. The result's vertex origin is the joint (index into the input) each vertex was made from. */
+typedef struct ve_skin_input {
+  size_t struct_size;
+  const float* positions;
+  const float* radii;
+  const uint8_t* flags;
+  size_t vertex_count;
+  const uint32_t* edges;
+  size_t edge_count;
+  float branch_smoothing;
+  uint32_t symmetry_axes;
+  int32_t smooth_shading;
+  int32_t subdivide;
+} ve_skin_input;
+ve_polymesh* ve_skin(const ve_skin_input* input, ve_status* status);
+
 /* Blender's bmesh operators on a polygon mesh, selected by faces or edges. Faces are indices into
  * the mesh's face list; edges are vertex-index pairs, each an edge of the mesh. An empty face
  * selection means "every face" where the operator allows it. `params` and `flags` by operator:
@@ -291,6 +313,38 @@ enum {
   VE_MESH_OP_SPIN = 13,
   VE_MESH_OP_MIRROR = 14,
   VE_MESH_OP_LOOP_CUT = 15,
+  /* Whole-mesh tools (every element is selected):
+   *   RECALC_NORMALS      flags 1 point the faces inward instead of outward.
+   *   SMOOTH              params[0] factor 0..1, params[1] iterations 1..50. Moves vertices toward their neighbours.
+   *   FILL_HOLES          params[0] most sides a hole may have (3..1000); larger holes stay open.
+   *   BEAUTIFY            params[0] 0 area, 1 angle. Rotates the edges of triangle pairs for more even triangles.
+   *   PLANAR_FACES        params[0] iterations 1..50, params[1] factor 0..1. Flattens each face.
+   *   JOIN_TRIANGLES      params[0] face-angle limit and params[1] shape-angle limit, radians 0..pi. Makes quads.
+   *   DISSOLVE_DEGENERATE params[0] distance (> 0) under which edges and faces count as degenerate. */
+  VE_MESH_OP_RECALC_NORMALS = 16,
+  VE_MESH_OP_SMOOTH = 17,
+  VE_MESH_OP_FILL_HOLES = 18,
+  VE_MESH_OP_BEAUTIFY = 19,
+  VE_MESH_OP_PLANAR_FACES = 20,
+  VE_MESH_OP_JOIN_TRIANGLES = 21,
+  VE_MESH_OP_DISSOLVE_DEGENERATE = 22,
+  /* Tools that need a selection:
+   *   SPLIT_EDGES      edges (required). Disconnects the faces along them, leaving a hard seam.
+   *   ROTATE_EDGES     edges (required); flags 1 counter-clockwise. Spins each edge to the other diagonal of its two faces.
+   *   CONNECT_VERTICES vertices (at least two, required); flags 1 refuse splits that overlap or intersect. Adds edges
+   *                    between the selected vertices of each face, splitting it. */
+  VE_MESH_OP_SPLIT_EDGES = 23,
+  VE_MESH_OP_ROTATE_EDGES = 24,
+  VE_MESH_OP_CONNECT_VERTICES = 25,
+  /* Edge-loop tools; all take edges (required), the edges of one or more loops:
+   *   SPACE_EDGE_LOOPS  params[0] factor 0..1; flags 1 linear instead of cubic interpolation. Moves the loop's vertices
+   *                     to even spacing along its own curve.
+   *   RELAX_EDGE_LOOPS  params[0] iterations 1..50; flags 1 linear, 2 even spacing. Smooths the loop.
+   *   CIRCULARIZE       params[0] factor 0..1, params[1] radius (0 fits one), params[2] angle in radians, params[3]
+   *                     flatten 0..1; flags 1 regular spacing. Reshapes the loop into a circle. */
+  VE_MESH_OP_SPACE_EDGE_LOOPS = 26,
+  VE_MESH_OP_RELAX_EDGE_LOOPS = 27,
+  VE_MESH_OP_CIRCULARIZE = 28,
 };
 typedef struct ve_mesh_op_input {
   size_t struct_size;

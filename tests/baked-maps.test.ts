@@ -74,9 +74,9 @@ test('a part with a baked normal map sends its own UVs with its vertices, others
   const originalRaf = globalThis.requestAnimationFrame;
   globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => { callback(0); return 1; }) as typeof requestAnimationFrame;
   const token = { document: 'd', revision: 1, request: 2, generation: 3, quality: 'final' as const, hash: 'h' };
-  const chunks: { floats: number; hasUvs: boolean }[] = [];
+  const chunks: { floats: number; layout: number }[] = [];
   const runtime = new Proxy({}, { get: (_target, key) => {
-    if (key === 'eval_projection_chunk_part') return (...args: unknown[]) => { chunks.push({ floats: (args[5] as Float32Array).length, hasUvs: args[6] as boolean }); return true; };
+    if (key === 'eval_projection_chunk_part') return (...args: unknown[]) => { chunks.push({ floats: (args[5] as Float32Array).length, layout: args[6] as number }); return true; };
     if (key === 'eval_projection_status') return () => JSON.stringify({ committed: token });
     return () => true;
   } }) as Parameters<typeof uploadResult>[0];
@@ -85,7 +85,7 @@ test('a part with a baked normal map sends its own UVs with its vertices, others
     await uploadResult(runtime, token, [part()], [], null, () => true);
     await uploadResult(runtime, token, [part({ baked: { size: 4, normal: new Uint8Array(64) } })], [], null, () => true);
     await uploadResult(runtime, token, [part({ baked: { size: 4, ao: new Uint8Array(64) } })], [], null, () => true);
-    expect(chunks).toEqual([{ floats: 21, hasUvs: false }, { floats: 27, hasUvs: true }, { floats: 21, hasUvs: false }]);
+    expect(chunks).toEqual([{ floats: 21, layout: 0 }, { floats: 27, layout: 1 }, { floats: 21, layout: 0 }]);
   } finally { globalThis.requestAnimationFrame = originalRaf; }
 });
 

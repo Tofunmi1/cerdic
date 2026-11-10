@@ -22,9 +22,9 @@ if(VE_SANITIZE)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${SAN_FLAGS}")
 endif()
 
-# Vendored, offline dependencies (see ../third_party/*/VENDOR.md).
+# Vendored, offline dependencies (../lib).
 set(FETCHCONTENT_FULLY_DISCONNECTED ON CACHE BOOL "" FORCE)
-set(FETCHCONTENT_SOURCE_DIR_CLIPPER2 "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/clipper2" CACHE PATH "" FORCE)
+set(FETCHCONTENT_SOURCE_DIR_CLIPPER2 "${CMAKE_CURRENT_SOURCE_DIR}/../lib/clipper2" CACHE PATH "" FORCE)
 set(MANIFOLD_TEST OFF CACHE BOOL "" FORCE)
 set(MANIFOLD_PAR OFF CACHE BOOL "" FORCE)
 set(MANIFOLD_CBIND OFF CACHE BOOL "" FORCE)
@@ -34,15 +34,15 @@ set(MANIFOLD_CROSS_SECTION ON CACHE BOOL "" FORCE)
 set(MANIFOLD_USE_BUILTIN_CLIPPER2 ON CACHE BOOL "" FORCE)
 set(MANIFOLD_NO_IOSTREAM ON CACHE BOOL "" FORCE)
 set(MANIFOLD_EXPORT OFF CACHE BOOL "" FORCE)
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/manifold" manifold EXCLUDE_FROM_ALL)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../lib/manifold" manifold EXCLUDE_FROM_ALL)
 
-file(GLOB MESHOPT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/meshoptimizer/src/*.cpp")
+file(GLOB MESHOPT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../lib/meshoptimizer/src/*.cpp")
 add_library(ve_meshopt STATIC ${MESHOPT_SOURCES})
-target_include_directories(ve_meshopt PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/meshoptimizer/src")
+target_include_directories(ve_meshopt PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../lib/meshoptimizer/src")
 
 # OpenSubdiv Far CPU Catmull-Clark only. Keep Sdc/Vtr/Far behind ve_kernel's C ABI;
 # no Hbr, Bfr, Osd, Ptex, OpenMP, TBB, or GPU backend is compiled.
-set(OSD_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/opensubdiv")
+set(OSD_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../lib/opensubdiv")
 file(GLOB OSD_SDC_SOURCES "${OSD_ROOT}/opensubdiv/sdc/*.cpp")
 file(GLOB OSD_VTR_SOURCES "${OSD_ROOT}/opensubdiv/vtr/*.cpp")
 file(GLOB OSD_FAR_SOURCES "${OSD_ROOT}/opensubdiv/far/*.cpp")
@@ -60,7 +60,7 @@ add_library(ve_kernel STATIC src/kernel.cpp src/profiles.cpp src/subdivision.cpp
   src/field_mesh.cpp src/field_tape.cpp src/subdivision_channels.cpp src/tangents.cpp)
 target_include_directories(ve_kernel PUBLIC include)
 # MikkTSpace (vendored from Blender, Apache-2.0): headers only; SYSTEM so its warnings stay upstream's.
-target_include_directories(ve_kernel SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/mikktspace")
+target_include_directories(ve_kernel SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../lib/mikktspace")
 target_link_libraries(ve_kernel PUBLIC manifold ve_meshopt ve_opensubdiv ve_blender_ops)
 target_compile_options(ve_kernel PRIVATE
   -Wall -Wextra -Wpedantic -Werror -fno-rtti -ffp-contract=off -fexcess-precision=standard)
@@ -81,6 +81,9 @@ if(VE_BUILD_TESTS)
   add_executable(bevel_test tests/bevel_test.cpp)
   target_link_libraries(bevel_test PRIVATE ve_kernel)
   target_compile_options(bevel_test PRIVATE -Wall -Wextra -Wpedantic -Werror -fno-rtti)
+  add_executable(skin_test tests/skin_test.cpp)
+  target_link_libraries(skin_test PRIVATE ve_kernel)
+  target_compile_options(skin_test PRIVATE -Wall -Wextra -Wpedantic -Werror -fno-rtti)
   add_executable(uv_test tests/uv_test.cpp)
   target_link_libraries(uv_test PRIVATE ve_kernel)
   target_compile_options(uv_test PRIVATE -Wall -Wextra -Wpedantic -Werror -fno-rtti)

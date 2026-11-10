@@ -1,0 +1,227 @@
+# TIGER I — a graph-native late-war German heavy tank study.
+# Front is +Z, Y is up. All meshes and materials are generated from this document.
+
+sky = scene.sky@1(sun_elevation=31, sun_azimuth=-32, sun_intensity=2.2, turbidity=3.2, clouds=false, ground_color=[0.22, 0.23, 0.22], contact_shadows=true)
+output sky = sky
+env = scene.environment@1(sky_color=[0.58, 0.62, 0.67], ground_color=[0.35, 0.34, 0.31], intensity=0.72, reflection=0.24, bounce=0.32)
+output environment = env
+
+let paint = "albedo = expr(code=\"u=p.x;v=p.y;a=fbm(vec2(u*4.2+1.7,v*4.2-0.8));b=fbm(vec2(u*7.0+a*2.3,v*6.0-a*1.8));patch1=smoothstep(0.43,0.57,b);c=fbm(vec2(u*3.2-4.0,v*3.5+2.0));patch2=smoothstep(0.50,0.63,c);base=mix(vec3(0.46,0.36,0.22),vec3(0.25,0.31,0.19),patch1);base=mix(base,vec3(0.29,0.19,0.14),patch2*(1.0-patch1*0.55));grain=fbm(vec2(u*95.0,v*95.0));out=vec4(base*(0.91+0.16*grain),1.0)\"); roughness = expr(code=\"n=fbm(vec2(p.x*80.0,p.y*80.0));out=vec4(vec3(0.76+0.16*n),1.0)\"); height = expr(code=\"n=fbm(vec2(p.x*115.0,p.y*115.0));out=vec4(vec3(0.49+0.035*(n-0.5)),1.0)\")"
+let rubber = "albedo = expr(code=\"n=fbm(vec2(p.x*42.0,p.y*42.0));out=vec4(vec3(0.075,0.082,0.078)*(0.72+0.5*n),1.0)\"); roughness = expr(code=\"out=vec4(vec3(0.88),1.0)\")"
+let steel = "albedo = expr(code=\"n=fbm(vec2(p.x*45.0,p.y*45.0));out=vec4(vec3(0.19,0.20,0.19)*(0.75+0.5*n),1.0)\"); roughness = expr(code=\"out=vec4(vec3(0.52),1.0)\")"
+let dark_steel = "albedo = expr(code=\"n=fbm(vec2(p.x*35.0,p.y*35.0));out=vec4(vec3(0.07,0.075,0.07)*(0.8+0.4*n),1.0)\"); roughness = expr(code=\"out=vec4(vec3(0.72),1.0)\")"
+
+# Low angular hull; sloped front and rear glacis, fenders, engine deck and exhausts.
+hull_raw = solid.box@1(size=[2.78,0.82,5.48])
+hull_bevel = solid.chamfer@1(hull_raw, width=0.075)
+hull_at = xform.move@1(hull_bevel, by=[0,1.39,-0.04])
+hull_mat = solid.material@1(hull_at, color=[1,1,1], roughness=0.94)
+hull_paint = solid.texture@1(hull_mat, program="${paint}", size="512")
+output hull = hull_paint
+
+front_plate_raw = solid.box@1(size=[2.76,0.16,1.35])
+front_plate_tilt = xform.rotate@1(front_plate_raw, angles=[17,0,0])
+front_plate_at = xform.move@1(front_plate_tilt, by=[0,1.72,2.17])
+front_plate_mat = solid.material@1(front_plate_at, color=[1,1,1], roughness=0.92)
+front_plate_paint = solid.texture@1(front_plate_mat, program="${paint}", size="512")
+output glacis = front_plate_paint
+
+rear_plate = solid.box@1(size=[2.76,0.14,0.72])
+rear_plate_at = xform.move@1(rear_plate, by=[0,1.77,-2.46])
+rear_plate_mat = solid.material@1(rear_plate_at, color=[1,1,1], roughness=0.94)
+rear_plate_paint = solid.texture@1(rear_plate_mat, program="${paint}", size="512")
+output rear_deck = rear_plate_paint
+
+deck_raw = solid.box@1(size=[2.7,0.14,3.45])
+deck_bevel = solid.chamfer@1(deck_raw, width=0.035)
+deck_at = xform.move@1(deck_bevel, by=[0,1.88,-0.24])
+deck_mat = solid.material@1(deck_at, color=[1,1,1], roughness=0.94)
+deck_paint = solid.texture@1(deck_mat, program="${paint}", size="512")
+output engine_deck = deck_paint
+
+# Two wide fenders and their segmented skirts.
+fender = solid.box@1(size=[0.34,0.12,5.36])
+fender_at = xform.move@1(fender, by=[1.54,1.48,-0.04])
+fender_mirror = xform.mirror@1(fender_at, axis="x")
+fender_mat = solid.material@1(fender_mirror, color=[0.40,0.32,0.22], roughness=0.86)
+output fenders = fender_mat
+
+skirt_panel = solid.box@1(size=[0.08,0.54,0.92])
+skirt_panel_at = xform.move@1(skirt_panel, by=[1.52,1.14,-1.55])
+skirt_row = xform.array@1(skirt_panel_at, count_x=1, count_y=1, count_z=4, spacing=[0,0,1.02])
+skirt_both = xform.mirror@1(skirt_row, axis="x")
+skirt_mat = solid.material@1(skirt_both, color=[0.36,0.29,0.20], roughness=0.9)
+output side_skirts = skirt_mat
+
+# Interleaved road wheels: seven paired stations, outer and inner rows on both sides.
+road_wheel = solid.cylinder@1(radius=0.43,height=0.16,segments=48)
+road_wheel_side = xform.rotate@1(road_wheel, angles=[0,0,90])
+road_wheel_place = xform.move@1(road_wheel_side, by=[1.52,0.63,-1.53])
+road_wheel_row = xform.array@1(road_wheel_place, count_x=1, count_y=1, count_z=7, spacing=[0,0,0.51])
+road_wheel_pair = xform.mirror@1(road_wheel_row, axis="x")
+road_wheel_mat = solid.material@1(road_wheel_pair, color=[0.12,0.13,0.12], roughness=0.88)
+output road_wheels = road_wheel_mat
+
+inner_wheel = solid.cylinder@1(radius=0.39,height=0.15,segments=48)
+inner_wheel_side = xform.rotate@1(inner_wheel, angles=[0,0,90])
+inner_wheel_place = xform.move@1(inner_wheel_side, by=[1.42,0.63,-1.28])
+inner_wheel_row = xform.array@1(inner_wheel_place, count_x=1, count_y=1, count_z=6, spacing=[0,0,0.51])
+inner_wheel_pair = xform.mirror@1(inner_wheel_row, axis="x")
+inner_wheel_mat = solid.material@1(inner_wheel_pair, color=[0.075,0.08,0.075], roughness=0.92)
+output inner_wheels = inner_wheel_mat
+
+hub = solid.cylinder@1(radius=0.205,height=0.18,segments=40)
+hub_side = xform.rotate@1(hub, angles=[0,0,90])
+hub_place = xform.move@1(hub_side, by=[1.64,0.63,-1.53])
+hub_row = xform.array@1(hub_place, count_x=1, count_y=1, count_z=7, spacing=[0,0,0.51])
+hub_pair = xform.mirror@1(hub_row, axis="x")
+hub_mat = solid.material@1(hub_pair, color=[0.43,0.35,0.24], metallic=0.28, roughness=0.66)
+output wheel_hubs = hub_mat
+
+hub_cap = solid.cylinder@1(radius=0.075,height=0.20,segments=32)
+hub_cap_side = xform.rotate@1(hub_cap, angles=[0,0,90])
+hub_cap_place = xform.move@1(hub_cap_side, by=[1.76,0.63,-1.53])
+hub_cap_row = xform.array@1(hub_cap_place, count_x=1, count_y=1, count_z=7, spacing=[0,0,0.51])
+hub_cap_pair = xform.mirror@1(hub_cap_row, axis="x")
+hub_cap_mat = solid.material@1(hub_cap_pair, color=[0.16,0.16,0.14], metallic=0.58, roughness=0.46)
+output hub_caps = hub_cap_mat
+
+# Continuous belt follows two straight runs and annular end loops, leaving the road wheels visible.
+track_run = solid.box@1(size=[0.23,0.16,4.22])
+track_upper_at = xform.move@1(track_run, by=[1.65,1.10,0.0])
+track_lower_at = xform.move@1(track_run, by=[1.65,0.16,0.0])
+track_straights = solid.union@1(track_upper_at,track_lower_at)
+track_outer_raw = solid.cylinder@1(radius=0.55,height=0.23,segments=56)
+track_inner_raw = solid.cylinder@1(radius=0.465,height=0.28,segments=56)
+track_outer_side = xform.rotate@1(track_outer_raw, angles=[0,0,90])
+track_inner_side = xform.rotate@1(track_inner_raw, angles=[0,0,90])
+track_outer_front = xform.move@1(track_outer_side, by=[1.65,0.63,2.10])
+track_inner_front = xform.move@1(track_inner_side, by=[1.65,0.63,2.10])
+track_outer_rear = xform.move@1(track_outer_side, by=[1.65,0.63,-2.10])
+track_inner_rear = xform.move@1(track_inner_side, by=[1.65,0.63,-2.10])
+track_loop_front = solid.difference@1(track_outer_front,track_inner_front)
+track_loop_rear = solid.difference@1(track_outer_rear,track_inner_rear)
+track_one_side = solid.union@1(track_straights,track_loop_front,track_loop_rear)
+track_both_sides = xform.mirror@1(track_one_side, axis="x")
+track_belt_mat = solid.material@1(track_both_sides, color=[1,1,1], roughness=0.95)
+track_belts = solid.texture@1(track_belt_mat, program="${rubber}", size="512")
+output track_belts = track_belts
+
+shoe = solid.box@1(size=[0.29,0.10,0.27])
+shoe_top_at = xform.move@1(shoe, by=[1.79,1.11,-1.62])
+shoe_top_row = xform.array@1(shoe_top_at, count_x=1, count_y=1, count_z=13, spacing=[0,0,0.27])
+shoe_bottom_at = xform.move@1(shoe, by=[1.79,0.13,-1.62])
+shoe_bottom_row = xform.array@1(shoe_bottom_at, count_x=1, count_y=1, count_z=13, spacing=[0,0,0.27])
+shoe_runs = solid.union@1(shoe_top_row, shoe_bottom_row)
+shoe_pair = xform.mirror@1(shoe_runs, axis="x")
+shoe_mat = solid.material@1(shoe_pair, color=[0.19,0.20,0.19], metallic=0.38, roughness=0.78)
+output tread_shoes = shoe_mat
+
+# Front drive sprockets and rear idlers, with outer rings and hubs.
+end_wheel = solid.cylinder@1(radius=0.48,height=0.20,segments=56)
+end_wheel_side = xform.rotate@1(end_wheel, angles=[0,0,90])
+drive_place = xform.move@1(end_wheel_side, by=[1.55,0.63,2.10])
+idler_place = xform.move@1(end_wheel_side, by=[1.55,0.63,-2.10])
+end_pair = solid.union@1(drive_place,idler_place)
+end_both = xform.mirror@1(end_pair, axis="x")
+end_mat = solid.material@1(end_both, color=[0.11,0.12,0.11], roughness=0.9)
+output sprockets_and_idlers = end_mat
+
+# Main turret: squared cast shell, mantlet, long 88 mm gun, muzzle brake and coaxial port.
+turret_raw = solid.box@1(size=[2.05,0.88,2.32])
+turret_bevel = solid.chamfer@1(turret_raw, width=0.11)
+turret_at = xform.move@1(turret_bevel, by=[0,2.31,0.08])
+turret_mat = solid.material@1(turret_at, color=[1,1,1], roughness=0.94)
+turret_paint = solid.texture@1(turret_mat, program="${paint}", size="512")
+output turret = turret_paint
+
+turret_ring = solid.cylinder@1(radius=0.92,height=0.16,segments=64)
+ring_at = xform.move@1(turret_ring, by=[0,1.91,0.08])
+ring_mat = solid.material@1(ring_at, color=[0.19,0.18,0.15], metallic=0.34, roughness=0.6)
+output turret_ring = ring_mat
+
+mantlet_raw = solid.cylinder@1(radius=0.36,height=0.56,segments=56)
+mantlet_side = xform.rotate@1(mantlet_raw, angles=[90,0,0])
+mantlet_at = xform.move@1(mantlet_side, by=[0,2.38,1.29])
+mantlet_mat = solid.material@1(mantlet_at, color=[0.39,0.31,0.21], roughness=0.78)
+output gun_mantlet = mantlet_mat
+
+barrel_raw = solid.cylinder@1(radius=0.105,height=2.85,segments=48)
+barrel_side = xform.rotate@1(barrel_raw, angles=[90,0,0])
+barrel_at = xform.move@1(barrel_side, by=[0,2.38,2.83])
+barrel_mat = solid.material@1(barrel_at, color=[0.14,0.15,0.14], metallic=0.62, roughness=0.42)
+barrel_surface = solid.texture@1(barrel_mat, program="${steel}", size="512")
+output barrel_88mm = barrel_surface
+
+muzzle_raw = solid.cylinder@1(radius=0.17,height=0.34,segments=48)
+muzzle_side = xform.rotate@1(muzzle_raw, angles=[90,0,0])
+muzzle_at = xform.move@1(muzzle_side, by=[0,2.38,4.37])
+muzzle_mat = solid.material@1(muzzle_at, color=[0.12,0.13,0.12], metallic=0.55, roughness=0.48)
+output muzzle_brake = muzzle_mat
+
+# Commander cupola and split hatch lids.
+cupola_base = solid.cylinder@1(radius=0.34,height=0.18,segments=48)
+cupola_base_at = xform.move@1(cupola_base, by=[0,2.84,-0.05])
+cupola_top = solid.cylinder@1(radius=0.29,height=0.24,segments=48)
+cupola_top_at = xform.move@1(cupola_top, by=[0,3.02,-0.05])
+cupola = solid.union@1(cupola_base_at,cupola_top_at)
+cupola_mat = solid.material@1(cupola, color=[1,1,1], roughness=0.94)
+cupola_paint = solid.texture@1(cupola_mat, program="${paint}", size="512")
+output cupola = cupola_paint
+
+hatch = solid.cylinder@1(radius=0.34,height=0.055,segments=48)
+hatch_left = xform.move@1(hatch, by=[-0.57,2.78,0.16])
+hatch_right = xform.move@1(hatch, by=[0.57,2.78,0.16])
+hatches = solid.union@1(hatch_left,hatch_right)
+hatch_mat = solid.material@1(hatches, color=[0.39,0.31,0.21], metallic=0.12, roughness=0.72)
+output hatches = hatch_mat
+
+# Deck panels, paired exhaust stacks, tow eyes, tools and spare track links.
+vent = solid.box@1(size=[0.62,0.045,0.38])
+vent_at = xform.move@1(vent, by=[-0.76,1.99,-1.05])
+vent_pair = xform.mirror@1(vent_at, axis="x")
+vent_mat = solid.material@1(vent_pair, color=[0.13,0.14,0.12], roughness=0.78)
+output engine_grilles = vent_mat
+
+exhaust = solid.cylinder@1(radius=0.12,height=0.48,segments=32)
+exhaust_at = xform.move@1(exhaust, by=[-0.78,2.08,-2.43])
+exhaust_pair = xform.mirror@1(exhaust_at, axis="x")
+exhaust_mat = solid.material@1(exhaust_pair, color=[0.11,0.12,0.11], metallic=0.25, roughness=0.86)
+output exhausts = exhaust_mat
+
+tool_bar = solid.cylinder@1(radius=0.035,height=1.4,segments=20)
+tool_bar_side = xform.rotate@1(tool_bar, angles=[90,0,0])
+tool_bar_at = xform.move@1(tool_bar_side, by=[1.53,1.62,-0.55])
+tool_bar_mirror = xform.mirror@1(tool_bar_at, axis="x")
+tool_mat = solid.material@1(tool_bar_mirror, color=[0.18,0.15,0.11], metallic=0.12, roughness=0.8)
+output side_tools = tool_mat
+
+spare_link = solid.box@1(size=[0.08,0.18,0.28])
+spare_link_at = xform.move@1(spare_link, by=[1.48,2.02,-1.63])
+spare_row = xform.array@1(spare_link_at, count_x=1, count_y=1, count_z=4, spacing=[0,0,0.32])
+spare_pair = xform.mirror@1(spare_row, axis="x")
+spare_mat = solid.material@1(spare_pair, color=[0.17,0.18,0.17], metallic=0.32, roughness=0.82)
+output spare_track_links = spare_mat
+
+# Weld beads and lifting hooks give scale cues along the hull sides.
+weld = solid.cylinder@1(radius=0.018,height=2.9,segments=10)
+weld_side = xform.rotate@1(weld, angles=[90,0,0])
+weld_at = xform.move@1(weld_side, by=[1.405,1.65,0.0])
+weld_pair = xform.mirror@1(weld_at, axis="x")
+weld_mat = solid.material@1(weld_pair, color=[0.47,0.37,0.25], metallic=0.08, roughness=0.85)
+output hull_welds = weld_mat
+
+# Large plain white markings are omitted; small monochrome Balkenkreuz are subdued and removable.
+cross_bar = solid.box@1(size=[0.38,0.24,0.025])
+cross_hole = solid.box@1(size=[0.18,0.10,0.05])
+cross_cut = solid.difference@1(cross_bar,cross_hole)
+cross_side = xform.rotate@1(cross_cut, angles=[0,90,0])
+cross_at = xform.move@1(cross_side, by=[1.42,1.68,0.74])
+cross_mat = solid.material@1(cross_at, color=[0.73,0.68,0.54], roughness=0.88)
+cross_mirror = xform.mirror@1(cross_mat, axis="x")
+output subdued_side_markings = cross_mirror
+
+ground = solid.box@1(size=[13,0.18,13])
+ground_at = xform.move@1(ground, by=[0,-0.11,0])
+ground_mat = solid.material@1(ground_at, color=[0.21,0.22,0.20], roughness=0.98)
+output ground = ground_mat

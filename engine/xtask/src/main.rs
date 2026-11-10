@@ -171,7 +171,7 @@ fn lint_gates(report: &mut stamp::Report, no_cache: bool) -> Result<(), Failure>
         &[
             "crates",
             "cpp",
-            "third_party",
+            "lib",
             "xtask",
             "Cargo.toml",
             "Cargo.lock"
@@ -193,7 +193,7 @@ fn lint_gates(report: &mut stamp::Report, no_cache: bool) -> Result<(), Failure>
         report,
         no_cache,
         "wasm-clippy",
-        &["crates", "cpp", "third_party", "Cargo.toml", "Cargo.lock"],
+        &["crates", "cpp", "lib", "Cargo.toml", "Cargo.lock"],
         "cargo clippy --workspace --exclude xtask --target wasm32-unknown-unknown -- -D warnings",
         || run(
             "wasm-clippy",
@@ -244,7 +244,7 @@ fn system_gates(report: &mut stamp::Report, no_cache: bool) -> Result<(), Failur
         report,
         no_cache,
         "cpp",
-        &["cpp", "third_party", "crates/ve-kernel-sys"],
+        &["cpp", "lib", "crates/ve-kernel-sys"],
         "cargo xtask cpp",
         || timed("cpp", cpp::run)
     );
@@ -255,7 +255,7 @@ fn system_gates(report: &mut stamp::Report, no_cache: bool) -> Result<(), Failur
         &[
             "crates",
             "cpp",
-            "third_party",
+            "lib",
             "tools/run-wasi.mjs",
             "Cargo.toml",
             "Cargo.lock"
@@ -288,7 +288,7 @@ fn browser_gate(
                 "../tsconfig.server.json",
                 "crates",
                 "cpp",
-                "third_party",
+                "lib",
                 "Cargo.lock",
                 "tools/mcp"
             ],

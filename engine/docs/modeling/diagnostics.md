@@ -37,7 +37,7 @@ string. Severity: `error` blocks a commit, `warning` does not, `info` is progres
 | `graph.unused` | warning | Node not reachable from any output | |
 | `budget.source` | error | Source text over the byte limit | `limit`, `observed` |
 | `budget.nodes` | error | Node count over limit (parsed or expanded); also output, material and ID limits | |
-| `budget.commands` | error | More than 1,000 commands in a batch | Reduce the batch size |
+| `budget.commands` | error | More than 10,000 commands in a batch | Reduce the batch size |
 | `budget.expansion` | error | Predicted geometry or instance expansion over limit | Predicted size |
 | `budget.geometry` | error | Vertex, face, grid-cell or point count over limit | |
 | `budget.memory` | error | Predicted temporary or cached bytes over limit | |
@@ -61,6 +61,7 @@ string. Severity: `error` blocks a commit, `warning` does not, `info` is progres
 | `geometry.floating_part` | warning | Disconnected pieces with no declared socket relation | The piece IDs |
 | `geometry.unsupported_case` | error | Valid input outside the operator's published contract | The documented limits |
 | `poly.triangulation_unsupported` | error | Polygon is non-simple, degenerate or non-planar and cannot be safely triangulated by the current adapter | Keep it as a polygon or make it planar/simple |
+| `poly.sculpt_mask_attribute` | error | Existing `sculpt_mask` is not one finite F32 value per mesh vertex | Rename the conflicting channel or restore its point-float layout |
 | `poly.selection_empty` | error | Polygon operator requires at least one selected face | Select a face or resolve a semantic selection |
 | `poly.selection_invalid` | error | Face selection contains a duplicate or out-of-range ordinal | Refresh the selection against the current mesh |
 | `poly.selection_disconnected` | error | Dissolve selection contains multiple edge-connected patches | Select one connected face patch |

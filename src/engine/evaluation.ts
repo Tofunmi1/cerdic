@@ -1,7 +1,8 @@
 import type { Runtime } from './bridge';
-import { uploadResult } from './mesh-upload';
-import type { Candidate, EvaluationStats, EvaluationWarning, Job, Quality, Token, WorkerMessage, MeshPart } from './worker-types';
+import { lastRefusal, uploadResult } from './mesh-upload';
+import type { Attachments, Candidate, EvaluationStats, EvaluationWarning, GameInfo, Job, Quality, Token, WorkerMessage, MeshPart } from './worker-types';
 import { sameToken } from './worker-types';
+import { EvaluatorText } from './evaluator-text';
 
 function boundsOf(parts: MeshPart[]) {
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
@@ -25,6 +26,31 @@ function boundsOf(parts: MeshPart[]) {
   return Number.isFinite(min[0]) ? { min, max } : null;
 }
 
+/**
+ * The part of a scene worth looking at. A scene with a sea, a terrain or a big ground plane would otherwise be framed as one huge box and the camera would stand
+ * back until the subject is a dot. So background parts are left out: those named like one (sea, ocean, ground, land, terrain, lawn, cliff, mountains, backdrop,
+ * outer) and, in one pass, any part whose box is over half the size of what is left and over three times the median part (a forest field, a sky dome).
+ * If nothing would remain, the whole scene is used.
+ */
+export type Box = { min: number[]; max: number[] };
+export function subjectBounds(parts: Array<{ name: string; min: number[] | null; max: number[] | null }>): Box | null {
+  const boxes = parts.filter((p): p is { name: string; min: number[]; max: number[] } => !!p.min && !!p.max);
+  if (boxes.length === 0) return null;
+  const diag = (b: Box) => Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
+  const union = (list: Box[]): Box => ({
+    min: [0, 1, 2].map(k => Math.min(...list.map(b => b.min[k]))),
+    max: [0, 1, 2].map(k => Math.max(...list.map(b => b.max[k]))),
+  });
+  const background = /(^|_)(sea|ocean|ground|land|terrain|lawn|cliffs?|mountains?|backdrop|horizon|outer)(_|\d|$)/i;
+  const named = boxes.filter(b => !background.test(b.name));
+  const pool = named.length > 0 ? named : boxes;
+  const sizes = pool.map(diag).sort((a, b) => a - b);
+  const median = sizes[Math.floor(sizes.length / 2)] ?? 0;
+  const whole = diag(union(pool));
+  const kept = pool.filter(b => !(diag(b) > 0.5 * whole && diag(b) > 3 * median));
+  return union(kept.length > 0 ? kept : pool);
+}
+
 /** What the last accepted evaluation measured for one output part, in metres and cubic metres. */
 export type PartMeasure = {
   node: string; name: string; volume: number; triangles: number;
@@ -32,15 +58,20 @@ export type PartMeasure = {
 };
 
 export class EvaluationHost {
+  readonly text = new EvaluatorText(() => this.worker);
   /** Per-part measurements of the last accepted result (read by the MCP `measure` tool). */
   measures: PartMeasure[] = [];
   /** The meshes of the last accepted result, kept so the model can be exported (`exportGlb`). */
   parts: MeshPart[] = [];
+  /** Surface gap report from the last accepted final quality evaluation. */
+  attachments: Attachments | null = null;
   /** Named sockets on the last accepted outputs, including placement data for selected instances. */
   socketParts: Pick<MeshPart,'node'|'name'|'frames'|'transforms'|'instance_indices'>[] = [];
   readonly state = {
     worker: 'booting', generation: 0, queue: 0, revision: null as number | null,
     refining: false,
+    /** Nodes the running evaluation has finished, out of the document's nodes (0 of 0 when none is running). */
+    progress: { evaluated: 0, total: 0 },
     lastFailure: null as { code: string; message: string; node?: string; related?: string[] } | null,
     /** Whether `lastFailure` still describes the document on screen (false once a later evaluation succeeded). */
     failureCurrent: false,
@@ -48,6 +79,15 @@ export class EvaluationHost {
     stats: null as EvaluationStats | null,
     warnings: [] as EvaluationWarning[],
   };
+  /** The game of the last accepted result (ADR 0062), as the evaluator printed it. */
+  game: GameInfo = { present: false };
+  /** The parts of the running evaluation finished so far, shown as a draft while the rest evaluates (`draft` messages from the worker). */
+  private draftParts = new Map<string, MeshPart[]>();
+  private draftDirty = false;
+  private draftStop = false;
+  private draftUpload: Promise<void> | null = null;
+  private playtests = new Map<number, (report: string) => void>();
+  private playtestId = 0;
   private worker: Worker | null = null;
   private active: Job | null = null;
   private queued: Job | null = null;
@@ -64,6 +104,8 @@ export class EvaluationHost {
 
   /** Bounds of the last scene the renderer accepted, in metres. */
   bounds: { min: number[]; max: number[] } | null = null;
+  /** The box worth framing: `bounds` without the background (sea, terrain, ground, a forest field); F, R and the first view use it. */
+  subject: { min: number[]; max: number[] } | null = null;
   boundsByNode: Record<string, { min: number[]; max: number[] }> = {};
   /** Small view-only samples from the last accepted mesh, kept separate from document state. */
   overlaysByNode: Record<string, { wire: number[][][]; normals: number[][][] }> = {};
@@ -130,7 +172,7 @@ export class EvaluationHost {
 
   constructor(private runtime: Runtime, private notify: () => void,
     private resources: { workers: number },
-    private options: { workerUrl?: string; onProjected?: (bounds: { min: number[]; max: number[] }) => void } = {}) { this.start(); }
+    private options: { workerUrl?: string; onProjected?: (bounds: { min: number[]; max: number[] }) => void; onScripts?: (scripts: Array<{ name: string; source: string; enabled: boolean; node: string }>) => void } = {}) { this.start(); }
 
   request(quality: Quality = 'preview', test?: Job['test']) {
     if (this.disposed || this.state.worker === 'failed') return;
@@ -146,6 +188,17 @@ export class EvaluationHost {
     if (this.active) this.worker?.postMessage({ kind: 'cancel', token: this.active.token });
     else this.dispatch();
     this.notify();
+  }
+
+  /** Plays a game text headless in the evaluator worker and answers its report (JSON text). Policy: idle, random or seek:<hero tag>:<target tag>. */
+  playtest(text: string, policy: string, seed: number, steps: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      if (!this.worker) { reject(new Error('the evaluator is not running')); return; }
+      const id = ++this.playtestId;
+      const timer = setTimeout(() => { this.playtests.delete(id); reject(new Error('the playtest took more than 20 seconds')); }, 20000);
+      this.playtests.set(id, report => { clearTimeout(timer); resolve(report); });
+      this.worker.postMessage({ kind: 'playtest', id, text, policy, seed, steps });
+    });
   }
 
   private start() {
@@ -167,11 +220,33 @@ export class EvaluationHost {
     job.token.generation = this.state.generation;
     if (!this.runtime.eval_bind(JSON.stringify(job.token))) { this.state.staleResults++; return; }
     this.latest = job.token; this.active = job; this.state.worker = 'evaluating';
+    this.state.progress = { evaluated: 0, total: 0 };
+    this.draftParts = new Map(); this.draftDirty = false; this.draftStop = false;
     this.worker?.postMessage({ kind: 'evaluate', ...job });
     this.soft = setTimeout(() => { this.state.worker = 'overdue'; this.notify(); }, job.token.quality === 'preview' ? 2000 : 30000);
     this.hard = setTimeout(() => this.failed('eval.worker_timeout', 'Evaluation exceeded its hard time limit'),
-      job.token.quality === 'preview' ? 10000 : 60000);
+      job.token.quality === 'preview' ? 120000 : 600000);
     this.notify();
+  }
+
+  /** Shows every part finished so far, one upload at a time: while one is in flight, newer parts wait and go together in the next. */
+  private showDraft(token: Token) {
+    if (this.draftUpload) return;
+    this.draftUpload = (async () => {
+      try {
+        while (this.draftDirty && !this.draftStop && !this.disposed && sameToken(this.active?.token ?? null, token)) {
+          this.draftDirty = false;
+          const current = () => !this.disposed && !this.draftStop && sameToken(this.latest, token) && sameToken(this.active?.token ?? null, token);
+          // A draft shows shapes only: whatever ties a part to other parts (a parent, a skin, a leg chain, a body) or moves it waits for the finished scene.
+          const shapes = [...this.draftParts.values()].flat().map(part => ({
+            ...part, parent: undefined, skin: undefined, ik: undefined, ragdoll: undefined, fluid: undefined, sim: undefined, cloth: undefined, fx: undefined,
+            body: undefined, behavior: undefined, state_machine: undefined, animation: undefined,
+          } as MeshPart));
+          await uploadResult(this.runtime, token, shapes, [], null, current, [], true);
+        }
+      } catch (error) { console.warn('a draft could not be shown (the finished scene still will be)', error); }
+      finally { this.draftUpload = null; }
+    })();
   }
 
   private async message(message: WorkerMessage) {
@@ -180,7 +255,19 @@ export class EvaluationHost {
       this.ready = true; this.state.startupMs = message.startup_ms; this.state.worker = 'idle';
       this.dispatch(); this.notify(); return;
     }
+    if (message.kind === 'playtest_result') { this.playtests.get(message.id)?.(message.report); this.playtests.delete(message.id); return; }
+    if (message.kind === 'document_text_result') { this.text.receive(message.id, message.reply); return; }
     if (!sameToken(this.active?.token ?? null, message.token)) { this.state.staleResults++; this.notify(); return; }
+    if (message.kind === 'progress') { this.state.progress = { evaluated: message.evaluated, total: message.total }; this.notify(); return; }
+    if (message.kind === 'draft') {
+      this.state.progress = { evaluated: message.evaluated, total: message.total };
+      // A draft is an output as built so far: it replaces the previous stage of the same output.
+      const grown = new Map<string, MeshPart[]>();
+      for (const part of message.parts) grown.set(part.node, [...(grown.get(part.node) ?? []), part]);
+      for (const [node, parts] of grown) this.draftParts.set(node, parts);
+      this.draftDirty = true;
+      this.showDraft(message.token); this.notify(); return;
+    }
     if (message.kind === 'cancelled') { this.complete(); return; }
     if (message.kind === 'crash') { this.failed(message.error.code, message.error.message); return; }
     if (message.kind === 'failure') {
@@ -192,10 +279,19 @@ export class EvaluationHost {
       this.complete(false, message.token); return;
     }
     if (!sameToken(this.latest, message.token)) { this.state.staleResults++; this.complete(); return; }
+    // The finished scene replaces any draft: let the draft upload in flight end, and send no more.
+    this.draftStop = true;
+    if (this.draftUpload) await this.draftUpload;
+    if (!sameToken(this.active?.token ?? null, message.token)) return;
     this.clearTimers(); this.state.worker = 'uploading'; this.notify();
     // A page on a slow (software) GPU, such as the test browser, may set `__veUploadTimeoutMs` to give texture baking longer.
     const uploadLimit = Number((globalThis as { __veUploadTimeoutMs?: number }).__veUploadTimeoutMs) || 60000;
-    this.hard = setTimeout(() => this.failed('eval.projection_timeout', `Scene upload exceeded ${uploadLimit / 1000} seconds`), uploadLimit);
+    // The upload advances one frame at a time, and a background tab gets no frames, so time spent hidden is not counted against it.
+    const expire = () => {
+      if (typeof document !== 'undefined' && document.hidden) { this.hard = setTimeout(expire, uploadLimit); return; }
+      this.failed('eval.projection_timeout', `Scene upload exceeded ${uploadLimit / 1000} seconds`);
+    };
+    this.hard = setTimeout(expire, uploadLimit);
     this.state.transferBytes = message.bytes;
     this.state.transferMs = Math.max(0, performance.timeOrigin + performance.now() - message.sent_ms);
     this.state.stats = message.stats;
@@ -221,7 +317,13 @@ export class EvaluationHost {
       // changes is whether it still describes the document on screen.
       this.state.failureCurrent = false;
       this.bounds = boundsOf(message.parts);
+      this.game = message.game ?? { present: false };
+      const gameError = this.runtime.game_load(this.game.present ? (this.game.text ?? '') : '');
+      if (gameError) console.error(`Game load failed: ${gameError}`);
+      // The scripts the document carries (`script.js` nodes): the page starts, restarts and stops its running scripts to match.
+      this.options.onScripts?.(message.scripts ?? []);
       this.parts = message.parts;
+      if (message.token.quality === 'final') this.attachments = message.attachments ?? null;
       this.measures = message.parts.map(part => {
         const bounds = boundsOf([part]);
         return {
@@ -251,11 +353,13 @@ export class EvaluationHost {
       }
       this.socketParts=message.parts.filter(part=>Object.keys(part.frames ?? {}).length>0)
         .map(({node,name,frames,transforms,instance_indices})=>({node,name,frames,transforms,instance_indices}));
-      if (this.bounds) this.options.onProjected?.(this.bounds);
+      this.subject = subjectBounds(this.measures);
+      if (this.bounds) this.options.onProjected?.(this.subject ?? this.bounds);
       if (this.recoveryStarted !== null) { this.state.recoveryMs = performance.now() - this.recoveryStarted; this.recoveryStarted = null; }
     }
     else if (sameToken(this.latest, message.token)) {
-      this.failed('eval.projection_failed', 'The renderer rejected the evaluated scene');
+      const step = lastRefusal();
+      this.failed('eval.projection_failed', `The renderer rejected the evaluated scene${step ? ` (${step} said no)` : ' (the scene was replaced while it uploaded)'}`);
       return;
     }
     else this.state.staleResults++;
@@ -277,6 +381,7 @@ export class EvaluationHost {
   }
   private failed(code: string, message: string) {
     if (this.disposed) return;
+    this.text.fail(message);
     const token = this.active?.token;
     const retryQuality = this.queued?.token.quality ?? token?.quality ?? 'preview';
     if (token) this.runtime.eval_reject(JSON.stringify(token), code, message);
@@ -294,6 +399,7 @@ export class EvaluationHost {
   }
 
   dispose() {
+    this.text.fail('the evaluator was disposed');
     this.disposed = true; this.clearTimers(); clearTimeout(this.refineTimer); this.refineTimer = undefined; this.worker?.terminate(); this.worker = null;
     this.active = null; this.queued = null; this.resources.workers = 0; this.state.worker = 'disposed';this.socketParts=[];this.boundsByNode={};this.overlaysByNode={};
   }

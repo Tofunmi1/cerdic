@@ -1,0 +1,69 @@
+# THE PERSON GRAMMAR: a stylized human about seven and a half heads tall, written ONCE at unit height (every number a fraction of the height) as a poly.skin skeleton, then placed by the macro
+# `person(tag, px, h, sr, sg, sb, cr, cg, cb)` at any height with its own skin tone and clothing colour, so a tall man and a short woman come from the same code. Method (researched): a skeleton of
+# named joints skinned into one smooth quad surface (Blender's Skin modifier, B-Mesh), subdivided twice; loops fall on every joint because every joint is a skin vertex; face features are separate masses
+# placed from the measured skin front; clothing is a second skin shell a hair wider than the body (so it moves with the same skeleton later).
+# Skin rules in force: the surface stops at an end joint (crown, fist, toe are joints); the shoulders hang off a NARROW hub (chest2) with bones longer than its radius; no joint has two bones in nearly the same direction.
+# Stature fractions: ankle 0.04, knee 0.28, hip 0.50, waist 0.62, chest 0.72, shoulder line 0.80, chin 0.86, crown 1.0, wrist 0.47.
+# Metres, +y up, facing +z.
+# kind: world
+sky = scene.sky@1(sun_elevation=40, sun_azimuth=-35, sun_intensity=3.4, turbidity=3, ground_color=[0.32, 0.3, 0.28], clouds=false, haze=0.08)
+env = scene.environment@1(sky_color=[0.78, 0.82, 0.9], ground_color=[0.45, 0.43, 0.4], intensity=1.0, reflection=0.3, bounce=0.6)
+output sky = sky
+output env = env
+
+let p_spine = "pelvis 0 0.52 0 0.095 0.07 root; waist 0 0.62 0.005 0.082 0.058; chest 0 0.72 0.01 0.092 0.065; chest2 0 0.785 0.005 0.06 0.05; neck 0 0.84 0.012 0.03 0.032; skull 0 0.92 0.02 0.062 0.07; crown 0 0.985 0.018 0.034 0.04"
+let p_leg_l = "hip_l 0.055 0.50 0 0.058 0.065; knee_l 0.058 0.28 0.008 0.042 0.046; ankle_l 0.06 0.045 -0.004 0.03 0.032; toe_l 0.06 0.012 0.07 0.034 0.02"
+let p_leg_r = "hip_r -0.055 0.50 0 0.058 0.065; knee_r -0.058 0.28 0.008 0.042 0.046; ankle_r -0.06 0.045 -0.004 0.03 0.032; toe_r -0.06 0.012 0.07 0.034 0.02"
+let p_arm_l = "shoulder_l 0.115 0.785 0 0.04 0.042; uarm_l 0.145 0.70 0.002 0.036 0.038; elbow_l 0.152 0.615 0.008 0.03 0.032; farm_l 0.155 0.54 0.018 0.027 0.029; wrist_l 0.157 0.47 0.022 0.02 0.017; fist_l 0.158 0.425 0.026 0.028 0.02"
+let p_arm_r = "shoulder_r -0.115 0.785 0 0.04 0.042; uarm_r -0.145 0.70 0.002 0.036 0.038; elbow_r -0.152 0.615 0.008 0.03 0.032; farm_r -0.155 0.54 0.018 0.027 0.029; wrist_r -0.157 0.47 0.022 0.02 0.017; fist_r -0.158 0.425 0.026 0.028 0.02"
+let p_bones = "pelvis-waist; waist-chest; chest-chest2; chest2-neck; neck-skull; skull-crown; chest2-shoulder_l; shoulder_l-uarm_l; uarm_l-elbow_l; elbow_l-farm_l; farm_l-wrist_l; wrist_l-fist_l; chest2-shoulder_r; shoulder_r-uarm_r; uarm_r-elbow_r; elbow_r-farm_r; farm_r-wrist_r; wrist_r-fist_r; pelvis-hip_l; hip_l-knee_l; knee_l-ankle_l; ankle_l-toe_l; pelvis-hip_r; hip_r-knee_r; knee_r-ankle_r; ankle_r-toe_r"
+
+pn_s = poly.skin@1(joints="${p_spine}; ${p_leg_l}; ${p_leg_r}; ${p_arm_l}; ${p_arm_r}", bones="${p_bones}", symmetry="x")
+pn_sub = poly.subdivide@1(pn_s, levels=3)
+# micro modelling: the face is sculpted into the skin with brush strokes (unit height, +z forward): eye sockets, brow ridge, nose bridge and tip, cheekbones, lips and mouth line, chin, a soft jaw
+pn_d = poly.sculpt@1(pn_sub, falloff="surface", strokes="draw 0.027 0.945 0.074 0.017 -0.004; draw -0.027 0.945 0.074 0.017 -0.004; draw 0.026 0.962 0.071 0.016 0.004; draw -0.026 0.962 0.071 0.016 0.004; draw 0 0.935 0.076 0.012 0.012; draw 0 0.92 0.08 0.011 0.022; draw 0.017 0.916 0.076 0.008 0.005; draw -0.017 0.916 0.076 0.008 0.005; draw 0.04 0.935 0.062 0.022 0.004; draw -0.04 0.935 0.062 0.022 0.004; draw 0 0.892 0.071 0.014 0.004; draw 0 0.878 0.07 0.014 0.004; pinch 0 0.885 0.072 0.01 0.5; draw 0 0.883 0.073 0.007 -0.002; draw 0 0.862 0.066 0.016 0.006; draw 0.045 0.88 0.05 0.03 -0.003; draw -0.045 0.88 0.05 0.03 -0.003; smooth 0 0.9 0.07 0.012 0.3")
+# the clothing shell: trousers and shirt in one, a hair wider than the body underneath
+let c_spine = "pelvis 0 0.52 0 0.108 0.082 root; waist 0 0.62 0.005 0.094 0.07; chest 0 0.72 0.01 0.103 0.077; chest2 0 0.795 0.005 0.075 0.062; neck 0 0.838 0.012 0.045 0.047"
+let c_leg_l = "hip_l 0.055 0.50 0 0.07 0.077; knee_l 0.058 0.28 0.008 0.052 0.056; ankle_l 0.06 0.07 -0.004 0.04 0.042"
+let c_leg_r = "hip_r -0.055 0.50 0 0.07 0.077; knee_r -0.058 0.28 0.008 0.052 0.056; ankle_r -0.06 0.07 -0.004 0.04 0.042"
+let c_arm_l = "shoulder_l 0.115 0.795 0 0.05 0.052; uarm_l 0.145 0.70 0.002 0.045 0.047; elbow_l 0.152 0.615 0.008 0.039 0.041; cuff_l 0.155 0.52 0.018 0.034 0.036"
+let c_arm_r = "shoulder_r -0.115 0.795 0 0.05 0.052; uarm_r -0.145 0.70 0.002 0.045 0.047; elbow_r -0.152 0.615 0.008 0.039 0.041; cuff_r -0.155 0.52 0.018 0.034 0.036"
+let c_bones = "pelvis-waist; waist-chest; chest-chest2; chest2-neck; chest2-shoulder_l; shoulder_l-uarm_l; uarm_l-elbow_l; elbow_l-cuff_l; chest2-shoulder_r; shoulder_r-uarm_r; uarm_r-elbow_r; elbow_r-cuff_r; pelvis-hip_l; hip_l-knee_l; knee_l-ankle_l; pelvis-hip_r; hip_r-knee_r; knee_r-ankle_r"
+pn_cs = poly.skin@1(joints="${c_spine}; ${c_leg_l}; ${c_leg_r}; ${c_arm_l}; ${c_arm_r}", bones="${c_bones}", symmetry="x")
+pn_cd = poly.subdivide@1(pn_cs, levels=2)
+
+def person(tag, px, h, sr, sg, sb, cr, cg, cb)
+  pn{tag}_sc = xform.scale@1(pn_d, by=[{h}, {h}, {h}])
+  pn{tag}_p = xform.move@1(pn{tag}_sc, by=[{px}, 0, 0])
+  pn{tag}_m = solid.material@1(pn{tag}_p, color=[{sr}, {sg}, {sb}], roughness=0.55)
+  pn{tag}_f = solid.finish@1(pn{tag}_m, subsurface=0.3, clearcoat=0.04, clearcoat_roughness=0.5)
+  output {tag}_body = pn{tag}_f
+  pn{tag}_csc = xform.scale@1(pn_cd, by=[{h}, {h}, {h}])
+  pn{tag}_cp = xform.move@1(pn{tag}_csc, by=[{px}, 0, 0])
+  pn{tag}_cm = solid.material@1(pn{tag}_cp, color=[{cr}, {cg}, {cb}], roughness=0.8)
+  output {tag}_cloth = pn{tag}_cm
+
+  # ---- the face, placed from the skull front (z about 0.09 h at eye level) ----
+  pn{tag}_es = solid.sphere@1(radius={h * 0.0075}, segments=16)
+  pn{tag}_el = xform.move@1(pn{tag}_es, by=[{px + h * 0.027}, {h * 0.945}, {h * 0.07}])
+  pn{tag}_er = xform.move@1(pn{tag}_es, by=[{px - h * 0.027}, {h * 0.945}, {h * 0.07}])
+  pn{tag}_eu = solid.union@1(pn{tag}_el, pn{tag}_er)
+  pn{tag}_em = solid.material@1(pn{tag}_eu, color=[0.05, 0.04, 0.035], roughness=0.2)
+  output {tag}_eyes = pn{tag}_em
+  # ears
+  pn{tag}_cs = solid.sphere@1(radius=1.0, segments=16)
+  pn{tag}_ce = xform.scale@1(pn{tag}_cs, by=[{h * 0.006}, {h * 0.022}, {h * 0.014}])
+  pn{tag}_cl = xform.move@1(pn{tag}_ce, by=[{px + h * 0.064}, {h * 0.93}, {h * 0.02}])
+  pn{tag}_cr = xform.move@1(pn{tag}_ce, by=[{px - h * 0.064}, {h * 0.93}, {h * 0.02}])
+  pn{tag}_cu = solid.union@1(pn{tag}_cl, pn{tag}_cr)
+  pn{tag}_cm2 = solid.material@1(pn{tag}_cu, color=[{sr}, {sg}, {sb}], roughness=0.55)
+  output {tag}_ears = pn{tag}_cm2
+  # hair: a cap over the top and back of the skull
+  pn{tag}_hs = solid.sphere@1(radius=1.0, segments=32)
+  pn{tag}_he = xform.scale@1(pn{tag}_hs, by=[{h * 0.068}, {h * 0.058}, {h * 0.07}])
+  pn{tag}_ha = xform.move@1(pn{tag}_he, by=[{px}, {h * 0.955}, {h * -0.012}])
+  pn{tag}_hm = solid.material@1(pn{tag}_ha, color=[0.16, 0.1, 0.07], roughness=0.7)
+  output {tag}_hair = pn{tag}_hm
+end
+person("man", -0.6, 1.82, 0.84, 0.64, 0.52, 0.22, 0.32, 0.5)
+person("woman", 0.6, 1.68, 0.9, 0.7, 0.58, 0.55, 0.2, 0.25)

@@ -1,0 +1,176 @@
+# THE RANGE OF GAME CHARACTERS, one scene, three kinds: an ORGANIC stylized adventurer (5 heads tall, skin body with separate clothing shells: tunic, trousers, boots, gloves, belt, hair, sword), an ANIMAL (a fox: spine, four legs, tail,
+# ears and snout from one skeleton), and a MECHANICAL robot (rigid parts on joints: housings, pistons, a glowing core). The two living ones come from poly.skin (Blender's Skin modifier: a skeleton of named joints with radii becomes
+# one smooth quad surface); clothes are the same kind of skin with slightly larger radii over part of the skeleton, so they fit by construction. Toon shading for the stylized pair, PBR metal for the machine.
+# Metres, +y up, facing +z. Adventurer at x = -1.3, fox at x = 0.5, robot at x = 2.0.
+# kind: world
+sky = scene.sky@1(sun_elevation=38, sun_azimuth=-35, sun_intensity=3.4, turbidity=3, ground_color=[0.32, 0.3, 0.28], clouds=false, haze=0.08)
+env = scene.environment@1(sky_color=[0.75, 0.82, 0.95], ground_color=[0.42, 0.38, 0.34], intensity=0.9, reflection=0.35, bounce=0.6)
+output sky = sky
+output env = env
+
+# a skin shell: a skeleton skinned into one surface, smoothed, moved to its place, toon shaded. `tag` names the output; px is where the character stands.
+def shell(tag, px, js, bs, cr, cg, cb)
+  sh{tag}_s = poly.skin@1(joints="${js}", bones="${bs}", symmetry="x")
+  sh{tag}_d = poly.subdivide@1(sh{tag}_s, levels=2)
+  sh{tag}_p = xform.move@1(sh{tag}_d, by=[{px}, 0, 0])
+  sh{tag}_m = solid.material@1(sh{tag}_p, color=[{cr}, {cg}, {cb}], roughness=0.65)
+  sh{tag}_t = solid.toon@1(sh{tag}_m, bands=3, feather=0.12, outline=1.3, shade_color=[{cr * 0.45}, {cg * 0.45}, {cb * 0.55}], rim=0.25, spec=0.35, outline_color=[0.05, 0.04, 0.07])
+  output {tag} = sh{tag}_t
+end
+
+# =============== THE ADVENTURER (5 heads tall: a big head, short strong limbs) ===============
+let a_body = "pelvis 0 0.62 0 0.13 0.09 root; waist 0 0.78 0 0.115 0.08; chest 0 0.93 0 0.13 0.10; chest2 0 1.03 0 0.09 0.08; neck 0 1.10 0 0.045 0.045; skull 0 1.26 0.01 0.11 0.115; crown 0 1.40 0.01 0.05 0.055; shoulder_l 0.17 1.03 0 0.045 0.05; elbow_l 0.22 0.80 0 0.036 0.038; wrist_l 0.24 0.60 0.02 0.03 0.03; fist_l 0.245 0.50 0.03 0.042 0.03; shoulder_r -0.17 1.03 0 0.045 0.05; elbow_r -0.22 0.80 0 0.036 0.038; wrist_r -0.24 0.60 0.02 0.03 0.03; fist_r -0.245 0.50 0.03 0.042 0.03; hip_l 0.075 0.60 0 0.075 0.08; knee_l 0.08 0.33 0.01 0.055 0.058; ankle_l 0.08 0.09 0 0.045 0.048; toe_l 0.08 0.02 0.09 0.05 0.035; hip_r -0.075 0.60 0 0.075 0.08; knee_r -0.08 0.33 0.01 0.055 0.058; ankle_r -0.08 0.09 0 0.045 0.048; toe_r -0.08 0.02 0.09 0.05 0.035"
+let a_bones = "pelvis-waist; waist-chest; chest-chest2; chest2-neck; neck-skull; skull-crown; chest2-shoulder_l; shoulder_l-elbow_l; elbow_l-wrist_l; wrist_l-fist_l; chest2-shoulder_r; shoulder_r-elbow_r; elbow_r-wrist_r; wrist_r-fist_r; pelvis-hip_l; hip_l-knee_l; knee_l-ankle_l; ankle_l-toe_l; pelvis-hip_r; hip_r-knee_r; knee_r-ankle_r; ankle_r-toe_r"
+shell("hero_body", -1.3, a_body, a_bones, 0.93, 0.72, 0.58)
+# tunic: torso and upper arms, a hair larger than the body underneath, ending at the pelvis hem and at the elbows
+let a_tunic = "pelvis 0 0.64 0 0.15 0.108 root; waist 0 0.78 0 0.13 0.095; chest 0 0.93 0 0.145 0.114; chest2 0 1.03 0 0.105 0.094; shoulder_l 0.17 1.03 0 0.058 0.063; elbow_l 0.22 0.80 0 0.048 0.05; shoulder_r -0.17 1.03 0 0.058 0.063; elbow_r -0.22 0.80 0 0.048 0.05"
+let a_tunic_bones = "pelvis-waist; waist-chest; chest-chest2; chest2-shoulder_l; shoulder_l-elbow_l; chest2-shoulder_r; shoulder_r-elbow_r"
+shell("hero_tunic", -1.3, a_tunic, a_tunic_bones, 0.20, 0.50, 0.32)
+# trousers: hips to ankles
+let a_legs = "pelvis 0 0.62 0 0.14 0.10 root; hip_l 0.075 0.60 0 0.088 0.092; knee_l 0.08 0.33 0.01 0.066 0.069; ankle_l 0.08 0.14 0 0.054 0.056; hip_r -0.075 0.60 0 0.088 0.092; knee_r -0.08 0.33 0.01 0.066 0.069; ankle_r -0.08 0.14 0 0.054 0.056"
+let a_legs_bones = "pelvis-hip_l; hip_l-knee_l; knee_l-ankle_l; pelvis-hip_r; hip_r-knee_r; knee_r-ankle_r"
+shell("hero_trousers", -1.3, a_legs, a_legs_bones, 0.24, 0.30, 0.55)
+# boots: two separate pieces, each from the knee to the toe
+let a_boots = "bk_l 0.08 0.26 0.01 0.068 0.071 root; ankle_l 0.08 0.09 0 0.06 0.062; toe_l 0.08 0.02 0.10 0.062 0.045; bk_r -0.08 0.26 0.01 0.068 0.071 root; ankle_r -0.08 0.09 0 0.06 0.062; toe_r -0.08 0.02 0.10 0.062 0.045"
+let a_boots_bones = "bk_l-ankle_l; ankle_l-toe_l; bk_r-ankle_r; ankle_r-toe_r"
+shell("hero_boots", -1.3, a_boots, a_boots_bones, 0.33, 0.20, 0.12)
+# gloves: two pieces, wrist to fist
+let a_gloves = "wrist_l 0.24 0.62 0.02 0.037 0.037 root; fist_l 0.245 0.49 0.03 0.05 0.04; wrist_r -0.24 0.62 0.02 0.037 0.037 root; fist_r -0.245 0.49 0.03 0.05 0.04"
+let a_gloves_bones = "wrist_l-fist_l; wrist_r-fist_r"
+shell("hero_gloves", -1.3, a_gloves, a_gloves_bones, 0.45, 0.30, 0.18)
+
+# hair: a cap on the skull (an ellipsoid cut flat across the forehead line), a fringe, and a short tail
+hair_s = solid.sphere@1(radius=1.0, segments=36)
+hair_e = xform.scale@1(hair_s, by=[0.125, 0.135, 0.13])
+hair_at = xform.move@1(hair_e, by=[-1.3, 1.30, 0.0])
+hair_cut = solid.box@1(size=[0.5, 0.2, 0.5])
+hair_cut_at = xform.move@1(hair_cut, by=[-1.3, 1.46, -0.04])
+hair_c = solid.intersect@1(hair_at, hair_cut_at)
+hair_m = solid.material@1(hair_c, color=[0.45, 0.22, 0.10], roughness=0.5)
+hair_t = solid.toon@1(hair_m, bands=3, feather=0.12, outline=1.3, shade_color=[0.2, 0.09, 0.05], rim=0.3, spec=0.5, outline_color=[0.05, 0.04, 0.07])
+output hero_hair = hair_t
+# face: two eyes and a nose
+eye_s = solid.sphere@1(radius=0.016, segments=16)
+eye_l = xform.move@1(eye_s, by=[-1.245, 1.26, 0.11])
+eye_r = xform.move@1(eye_s, by=[-1.355, 1.26, 0.11])
+eyes_u = solid.union@1(eye_l, eye_r)
+eyes_m = solid.material@1(eyes_u, color=[0.06, 0.08, 0.12], roughness=0.2)
+output hero_eyes = eyes_m
+nose_s = solid.sphere@1(radius=0.02, segments=16)
+nose_at = xform.move@1(nose_s, by=[-1.3, 1.225, 0.118])
+nose_m = solid.material@1(nose_at, color=[0.9, 0.67, 0.53], roughness=0.65)
+output hero_nose = nose_m
+# belt with a gold buckle, and a sword on the back
+belt_t = solid.torus@1(major=0.125, minor=0.017, segments=36, tube_segments=10)
+belt_at = xform.move@1(belt_t, by=[-1.3, 0.74, 0])
+belt_m = solid.material@1(belt_at, color=[0.30, 0.17, 0.08], roughness=0.7)
+output hero_belt = belt_m
+buckle_b = solid.box@1(size=[0.05, 0.045, 0.02])
+buckle_at = xform.move@1(buckle_b, by=[-1.3, 0.74, 0.115])
+buckle_m = solid.material@1(buckle_at, color=[0.95, 0.78, 0.25], metallic=0.9, roughness=0.3)
+output hero_buckle = buckle_m
+blade_b = solid.box@1(size=[0.045, 0.85, 0.012])
+blade_t = xform.rotate@1(blade_b, angles=[0, 0, 28])
+blade_at = xform.move@1(blade_t, by=[-1.15, 1.05, -0.13])
+blade_m = solid.material@1(blade_at, color=[0.82, 0.85, 0.9], metallic=0.95, roughness=0.2)
+output hero_blade = blade_m
+guard_b = solid.box@1(size=[0.16, 0.025, 0.03])
+guard_t = xform.rotate@1(guard_b, angles=[0, 0, 28])
+guard_at = xform.move@1(guard_t, by=[-1.37, 0.62, -0.13])
+guard_m = solid.material@1(guard_at, color=[0.95, 0.78, 0.25], metallic=0.9, roughness=0.3)
+output hero_guard = guard_m
+
+# =============== THE FOX (an animal: one skeleton of spine, four legs, tail, ears and snout) ===============
+let f_body = "rump 0 0.38 -0.25 0.085 0.095 root; mid 0 0.40 -0.05 0.105 0.11; chest 0 0.42 0.15 0.065 0.075; neck 0 0.50 0.28 0.07 0.07; head 0 0.55 0.40 0.085 0.085; snout 0 0.52 0.53 0.035 0.04; tail1 0 0.40 -0.44 0.06 0.06; tail2 0 0.38 -0.62 0.085 0.085; tailtip 0 0.35 -0.80 0.05 0.05; hhip_l 0.13 0.33 -0.25 0.06 0.07; hhock_l 0.125 0.20 -0.32 0.038 0.04; hpaw_l 0.12 0.012 -0.28 0.03 0.045; hhip_r -0.13 0.33 -0.25 0.06 0.07; hhock_r -0.125 0.20 -0.32 0.038 0.04; hpaw_r -0.12 0.012 -0.28 0.03 0.045; fsh_l 0.13 0.32 0.15 0.05 0.055; felb_l 0.125 0.19 0.14 0.035 0.038; fpaw_l 0.12 0.012 0.17 0.03 0.04; fsh_r -0.13 0.32 0.15 0.05 0.055; felb_r -0.125 0.19 0.14 0.035 0.038; fpaw_r -0.12 0.012 0.17 0.03 0.04"
+let f_bones = "rump-mid; mid-chest; chest-neck; neck-head; head-snout; rump-tail1; tail1-tail2; tail2-tailtip; rump-hhip_l; hhip_l-hhock_l; hhock_l-hpaw_l; rump-hhip_r; hhip_r-hhock_r; hhock_r-hpaw_r; chest-fsh_l; fsh_l-felb_l; felb_l-fpaw_l; chest-fsh_r; fsh_r-felb_r; felb_r-fpaw_r"
+shell("fox_body", 0.5, f_body, f_bones, 0.92, 0.45, 0.13)
+# white chest bib, white tail tip, dark paws and dark ear tips, as thin shells over the same joints
+let f_bib = "chest 0 0.40 0.15 0.125 0.115 root; neck 0 0.49 0.28 0.075 0.075"
+shell("fox_bib", 0.5, f_bib, "chest-neck", 0.97, 0.94, 0.88)
+let f_tip = "tail2 0 0.38 -0.64 0.09 0.09 root; tailtip 0 0.35 -0.80 0.056 0.056"
+shell("fox_tailtip", 0.5, f_tip, "tail2-tailtip", 0.98, 0.96, 0.92)
+let f_paws = "fe_l 0.125 0.12 0.14 0.039 0.042 root; fpaw_l 0.12 0.012 0.17 0.034 0.044; fe_r -0.125 0.12 0.14 0.039 0.042 root; fpaw_r -0.12 0.012 0.17 0.034 0.044; he_l 0.125 0.13 -0.31 0.042 0.044 root; hpaw_l 0.12 0.012 -0.28 0.034 0.049; he_r -0.125 0.13 -0.31 0.042 0.044 root; hpaw_r -0.12 0.012 -0.28 0.034 0.049"
+shell("fox_paws", 0.5, f_paws, "fe_l-fpaw_l; fe_r-fpaw_r; he_l-hpaw_l; he_r-hpaw_r", 0.12, 0.08, 0.07)
+# the ears: tall cones leaning out a little, orange outside with a dark cone inside each
+def ear(tag, ex, tilt, cr, cg, cb, sc)
+  er{tag}_c = solid.cone@1(radius={0.045 * sc}, height={0.15 * sc}, segments=16)
+  er{tag}_t = xform.rotate@1(er{tag}_c, angles=[0, 0, {tilt}])
+  er{tag}_a = xform.move@1(er{tag}_t, by=[{ex}, {0.61 + 0.03 * sc}, 0.37])
+  er{tag}_m = solid.material@1(er{tag}_a, color=[{cr}, {cg}, {cb}], roughness=0.65)
+  er{tag}_k = solid.toon@1(er{tag}_m, bands=3, feather=0.12, outline=1.3, shade_color=[{cr * 0.45}, {cg * 0.45}, {cb * 0.55}], rim=0.25, spec=0.35, outline_color=[0.05, 0.04, 0.07])
+  output {tag} = er{tag}_k
+end
+ear("fox_ear_l", 0.595, -12, 0.92, 0.45, 0.13, 1.0)
+ear("fox_ear_r", 0.405, 12, 0.92, 0.45, 0.13, 1.0)
+ear("fox_ear_in_l", 0.595, -12, 0.12, 0.08, 0.07, 0.6)
+ear("fox_ear_in_r", 0.405, 12, 0.12, 0.08, 0.07, 0.6)
+# eyes and nose
+feye_s = solid.sphere@1(radius=0.014, segments=14)
+feye_l = xform.move@1(feye_s, by=[0.545, 0.575, 0.465])
+feye_r = xform.move@1(feye_s, by=[0.455, 0.575, 0.465])
+feyes_u = solid.union@1(feye_l, feye_r)
+feyes_m = solid.material@1(feyes_u, color=[0.04, 0.04, 0.05], roughness=0.2)
+output fox_eyes = feyes_m
+fnose_s = solid.sphere@1(radius=0.016, segments=14)
+fnose_at = xform.move@1(fnose_s, by=[0.5, 0.525, 0.565])
+fnose_m = solid.material@1(fnose_at, color=[0.05, 0.04, 0.05], roughness=0.3)
+output fox_nose = fnose_m
+
+# =============== THE ROBOT (mechanical: rigid housings on joints, pistons, a glowing core) ===============
+def rbox(tag, sx, sy, sz, px, py, pz, cr, cg, cb, met, rgh)
+  rb{tag}_b = solid.box@1(size=[{sx}, {sy}, {sz}])
+  rb{tag}_r = solid.round@1(rb{tag}_b, radius=0.005, segments=6)
+  rb{tag}_a = xform.move@1(rb{tag}_r, by=[{px}, {py}, {pz}])
+  rb{tag}_m = solid.material@1(rb{tag}_a, color=[{cr}, {cg}, {cb}], metallic={met}, roughness={rgh})
+  output {tag} = rb{tag}_m
+end
+def rcyl(tag, rad, ht, px, py, pz, cr, cg, cb, met, rgh)
+  rc{tag}_c = solid.cylinder@1(radius={rad}, height={ht}, segments=24)
+  rc{tag}_a = xform.move@1(rc{tag}_c, by=[{px}, {py}, {pz}])
+  rc{tag}_m = solid.material@1(rc{tag}_a, color=[{cr}, {cg}, {cb}], metallic={met}, roughness={rgh})
+  output {tag} = rc{tag}_m
+end
+def rball(tag, rad, px, py, pz, cr, cg, cb, met, rgh)
+  rl{tag}_s = solid.sphere@1(radius={rad}, segments=24)
+  rl{tag}_a = xform.move@1(rl{tag}_s, by=[{px}, {py}, {pz}])
+  rl{tag}_m = solid.material@1(rl{tag}_a, color=[{cr}, {cg}, {cb}], metallic={met}, roughness={rgh})
+  output {tag} = rl{tag}_m
+end
+# torso, pelvis, neck, head and visor
+rbox("rb_torso", 0.52, 0.55, 0.32, 2.0, 1.28, 0, 0.55, 0.60, 0.68, 0.85, 0.32)
+rbox("rb_chestplate", 0.46, 0.30, 0.04, 2.0, 1.36, 0.17, 0.90, 0.42, 0.12, 0.7, 0.38)
+rbox("rb_pelvis", 0.40, 0.18, 0.28, 2.0, 0.92, 0, 0.30, 0.33, 0.38, 0.9, 0.4)
+rcyl("rb_neck", 0.06, 0.12, 2.0, 1.62, 0, 0.25, 0.27, 0.30, 0.9, 0.45)
+rbox("rb_head", 0.28, 0.24, 0.26, 2.0, 1.78, 0, 0.55, 0.60, 0.68, 0.85, 0.32)
+rbox("rb_visor", 0.22, 0.07, 0.03, 2.0, 1.79, 0.135, 0.05, 0.08, 0.10, 0.2, 0.15)
+rbox("rb_eye_bar", 0.16, 0.018, 0.012, 2.0, 1.79, 0.15, 0.2, 0.9, 1.0, 0.0, 0.2)
+rcyl("rb_antenna", 0.008, 0.16, 2.09, 1.98, 0, 0.9, 0.42, 0.12, 0.7, 0.4)
+# the core: an emissive sphere in a ring, visible in the chest
+rb_core_s = solid.sphere@1(radius=0.06, segments=28)
+rb_core_a = xform.move@1(rb_core_s, by=[2.0, 1.36, 0.19])
+rb_core_m = solid.material@1(rb_core_a, color=[0.3, 0.9, 1.0], roughness=0.2, emissive=[1.2, 4.0, 5.0])
+output rb_core = rb_core_m
+# shoulders, upper arms, elbows, forearms with pistons, claws
+rball("rb_shoulder_l", 0.11, 2.34, 1.48, 0, 0.30, 0.33, 0.38, 0.9, 0.4)
+rball("rb_shoulder_r", 0.11, 1.66, 1.48, 0, 0.30, 0.33, 0.38, 0.9, 0.4)
+rcyl("rb_uarm_l", 0.06, 0.34, 2.36, 1.28, 0, 0.55, 0.60, 0.68, 0.85, 0.32)
+rcyl("rb_uarm_r", 0.06, 0.34, 1.64, 1.28, 0, 0.55, 0.60, 0.68, 0.85, 0.32)
+rball("rb_elbow_l", 0.07, 2.36, 1.08, 0, 0.9, 0.42, 0.12, 0.7, 0.38)
+rball("rb_elbow_r", 0.07, 1.64, 1.08, 0, 0.9, 0.42, 0.12, 0.7, 0.38)
+rbox("rb_farm_l", 0.12, 0.34, 0.14, 2.37, 0.86, 0.02, 0.55, 0.60, 0.68, 0.85, 0.32)
+rbox("rb_farm_r", 0.12, 0.34, 0.14, 1.63, 0.86, 0.02, 0.55, 0.60, 0.68, 0.85, 0.32)
+rcyl("rb_piston_l", 0.018, 0.26, 2.44, 1.0, 0.07, 0.8, 0.82, 0.85, 1.0, 0.15)
+rcyl("rb_piston_r", 0.018, 0.26, 1.56, 1.0, 0.07, 0.8, 0.82, 0.85, 1.0, 0.15)
+rbox("rb_claw_l", 0.14, 0.12, 0.10, 2.38, 0.63, 0.03, 0.30, 0.33, 0.38, 0.9, 0.4)
+rbox("rb_claw_r", 0.14, 0.12, 0.10, 1.62, 0.63, 0.03, 0.30, 0.33, 0.38, 0.9, 0.4)
+# legs: thighs, knee balls, shins with a hydraulic, wide feet
+rcyl("rb_thigh_l", 0.075, 0.36, 2.11, 0.70, 0, 0.55, 0.60, 0.68, 0.85, 0.32)
+rcyl("rb_thigh_r", 0.075, 0.36, 1.89, 0.70, 0, 0.55, 0.60, 0.68, 0.85, 0.32)
+rball("rb_knee_l", 0.085, 2.11, 0.46, 0.01, 0.9, 0.42, 0.12, 0.7, 0.38)
+rball("rb_knee_r", 0.085, 1.89, 0.46, 0.01, 0.9, 0.42, 0.12, 0.7, 0.38)
+rbox("rb_shin_l", 0.14, 0.34, 0.16, 2.11, 0.24, 0, 0.55, 0.60, 0.68, 0.85, 0.32)
+rbox("rb_shin_r", 0.14, 0.34, 0.16, 1.89, 0.24, 0, 0.55, 0.60, 0.68, 0.85, 0.32)
+rcyl("rb_hydraulic_l", 0.016, 0.26, 2.11, 0.30, -0.095, 0.8, 0.82, 0.85, 1.0, 0.15)
+rcyl("rb_hydraulic_r", 0.016, 0.26, 1.89, 0.30, -0.095, 0.8, 0.82, 0.85, 1.0, 0.15)
+rbox("rb_foot_l", 0.17, 0.07, 0.30, 2.11, 0.035, 0.04, 0.30, 0.33, 0.38, 0.9, 0.4)
+rbox("rb_foot_r", 0.17, 0.07, 0.30, 1.89, 0.035, 0.04, 0.30, 0.33, 0.38, 0.9, 0.4)

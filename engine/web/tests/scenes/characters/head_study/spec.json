@@ -1,0 +1,28 @@
+{
+  "scene": "head_study",
+  "units": "metres",
+  "body_height": 1.72,
+  "targets": [
+    { "id": "head-height-in-heads", "min": 7.3, "max": 8.0, "unit": "ratio", "hint": "crown and chin" },
+    { "id": "eye-line-from-crown", "min": 0.47, "max": 0.53, "unit": "ratio", "hint": "eye_y" },
+    { "id": "nose-base-eye-to-chin", "min": 0.44, "max": 0.56, "unit": "ratio", "hint": "nose_base" },
+    { "id": "mouth-line-nose-to-chin", "min": 0.28, "max": 0.45, "unit": "ratio", "hint": "mouth_y" },
+    { "id": "pupillary-distance", "min": 58, "max": 66, "unit": "mm", "hint": "eye_x" },
+    { "id": "eye-centre-mismatch", "min": 0, "max": 1, "unit": "mm", "hint": "mirror the right eye around the face midline" },
+    { "id": "eye-protrusion", "min": -1, "max": 3, "unit": "mm", "hint": "eye_z" },
+    { "id": "head-breadth", "min": 135, "max": 155, "unit": "mm", "hint": "loft ring half-widths" },
+    { "id": "head-length", "min": 175, "max": 195, "unit": "mm", "hint": "head_depth and loft front/back profile" },
+    { "id": "cephalic-index", "min": 0.74, "max": 0.86, "unit": "ratio", "hint": "loft widths against depths" },
+    { "id": "nose-projection", "min": 12, "max": 20, "unit": "mm", "hint": "nose_tip and nose_bridge" },
+    { "id": "head-and-eye-triangles", "min": 10000, "max": 200000, "unit": "triangles", "hint": "head subdivision level" }
+  ],
+  "not_yet_measured": [
+    "nose width",
+    "mouth width",
+    "eye opening width",
+    "ear height",
+    "expression deformation",
+    "UV and texture budgets",
+    "game export round trip"
+  ]
+}

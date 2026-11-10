@@ -5,7 +5,7 @@ import { parseTextureProgram } from '../src/engine/texture/program';
 import { cornerOcclusion } from '../src/engine/texture/signals';
 
 // The curvature itself is measured per texel on the GPU and checked in engine/web/tests/g10-surface-signals.mjs.
-const root = new URL('../engine/third_party/material-maker/', import.meta.url).pathname;
+const root = new URL('../engine/lib/material-maker/', import.meta.url).pathname;
 const library = loadLibrary(root);
 const helpers = loadHelpers(root);
 
@@ -27,14 +27,14 @@ test('surface nodes compile to a shader that declares the maps it reads', () => 
     height = n
   `, library);
   const albedo = compileTexture(library, { nodes: program.nodes, output: program.channels.albedo as { node: string } }, helpers);
-  expect(albedo.needs).toEqual({ position: false, surface: true });
+  expect(albedo.needs).toEqual({ position: false, surface: true, images: [] });
   expect(albedo.source).toContain('uniform sampler2D uSurface;');
   expect(albedo.source).not.toContain('uniform sampler2D uPosition;');
   const plain = compileTexture(library, { nodes: program.nodes, output: program.channels.height as { node: string } }, helpers);
-  expect(plain.needs).toEqual({ position: false, surface: false });
+  expect(plain.needs).toEqual({ position: false, surface: false, images: [] });
   const height = parseTextureProgram('h = surface_height(low=0, high=1.7)\nalbedo = h', library);
   const compiled = compileTexture(library, { nodes: height.nodes, output: height.channels.albedo as { node: string } }, helpers);
-  expect(compiled.needs).toEqual({ position: true, surface: false });
+  expect(compiled.needs).toEqual({ position: true, surface: false, images: [] });
 });
 
 test('every surface node is described in the catalog so a model can find it', async () => {

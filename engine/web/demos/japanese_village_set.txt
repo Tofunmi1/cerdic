@@ -1,0 +1,353 @@
+# KASUGA HILLSIDE PRECINCT — a Japanese shrine and old-town approach at blue hour.
+# This extended set adds a six-building machiya market row to the original lantern avenue, curved-roof honden,
+# five-tier pagoda, koi pond, bridge, bamboo hills, sakura, maple, and raked-stone garden. Axis +z; metres; y up.
+# Almost everything is built by poly.script nodes (one node builds a whole structure out of boxes, lathes and curved roofs), because a program may hold
+# only about 2,000 statements: detail has to come from loops inside scripts, not from thousands of nodes.
+sky = scene.sky@1(sun_elevation=4, sun_azimuth=25, sun_intensity=5.5, turbidity=8, clouds=false, seed=3, haze=0.11, haze_color=[0.95, 0.5, 0.38], haze_height=55, light_shafts=0.5, focus_distance=40, aperture=6.3, contact_shadows=true, ground_color=[0.05, 0.05, 0.07])
+output sky = sky
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# Shared geometry helpers (plain JavaScript spliced into every script node). Each adds faces to the mesh m, wound outward.
+let jbox = "function box(x0,y0,z0,x1,y1,z1){ const v=[m.vertex(x0,y0,z0),m.vertex(x1,y0,z0),m.vertex(x1,y1,z0),m.vertex(x0,y1,z0),m.vertex(x0,y0,z1),m.vertex(x1,y0,z1),m.vertex(x1,y1,z1),m.vertex(x0,y1,z1)]; m.face(v[0],v[3],v[2],v[1]); m.face(v[4],v[5],v[6],v[7]); m.face(v[0],v[1],v[5],v[4]); m.face(v[3],v[7],v[6],v[2]); m.face(v[1],v[2],v[6],v[5]); m.face(v[0],v[4],v[7],v[3]); }; "
+let jcyl = "function cyl(cx,cz,y0,y1,r0,r1,n){ const b=[],t=[]; for(let i=0;i<n;i++){ const a=i*6.283185/n,c=Math.cos(a),s=Math.sin(a); b.push(m.vertex(cx+c*r0,y0,cz+s*r0)); t.push(m.vertex(cx+c*r1,y1,cz+s*r1)); } for(let i=0;i<n;i++){ const j=(i+1)%n; m.face(b[i],t[i],t[j],b[j]); } m.face(...t.slice().reverse()); m.face(...b); }; "
+let jlathe = "function lathe(cx,cz,p,n){ const R=[]; for(let k=0;k<p.length;k++){ const row=[]; for(let i=0;i<n;i++){ const a=i*6.283185/n; row.push(m.vertex(cx+Math.cos(a)*p[k][1],p[k][0],cz+Math.sin(a)*p[k][1])); } R.push(row); } for(let k=0;k<p.length-1;k++){ for(let i=0;i<n;i++){ const j=(i+1)%n; m.face(R[k][i],R[k+1][i],R[k+1][j],R[k][j]); } } m.face(...R[p.length-1].slice().reverse()); m.face(...R[0]); }; "
+let jroof = "function roof(cx,cy,cz,A,B,H,L,T,rf,nx,nz,k){ const hg=function(x,z){ const ax=Math.abs(x),az=Math.abs(z),mx=Math.min(A-ax,B-az),R=Math.min(A,B)*rf,u=Math.min(mx/R,1); let y=H*Math.pow(u,k); y+=L*Math.pow((ax/A)*(az/B),5); const ac=(A-ax)<(B-az)?z:x; y+=0.035*Math.cos(ac*17)*Math.min(1,mx*1.5); return y; }; const top=[],bot=[]; for(let j=0;j<=nz;j++){ const rt=[],rb=[]; for(let i=0;i<=nx;i++){ const x=-A+2*A*i/nx,z=-B+2*B*j/nz,y=hg(x,z); rt.push(m.vertex(cx+x,cy+y,cz+z)); rb.push(m.vertex(cx+x*0.96,cy+y-T,cz+z*0.96)); } top.push(rt); bot.push(rb); } for(let j=0;j<nz;j++){ for(let i=0;i<nx;i++){ m.face(top[j][i],top[j+1][i],top[j+1][i+1],top[j][i+1]); m.face(bot[j][i],bot[j][i+1],bot[j+1][i+1],bot[j+1][i]); } } for(let i=0;i<nx;i++){ m.face(top[0][i],top[0][i+1],bot[0][i+1],bot[0][i]); m.face(top[nz][i+1],top[nz][i],bot[nz][i],bot[nz][i+1]); } for(let j=0;j<nz;j++){ m.face(top[j+1][0],top[j][0],bot[j][0],bot[j+1][0]); m.face(top[j][nx],top[j+1][nx],bot[j+1][nx],bot[j][nx]); } }; "
+# A beam along x whose centre line rises toward its ends (a torii kasagi): X half length, zh half depth, yb bottom height at the middle, th thickness, lift end rise.
+let jbeam = "function beam(cx,cz,X,zh,yb,th,lift,n){ const f=[],g=[]; for(let i=0;i<=n;i++){ const x=-X+2*X*i/n,l=lift*Math.pow(Math.abs(x)/X,3.5); const bf=m.vertex(cx+x,yb+l,cz-zh*(1-0.25*Math.abs(x)/X)),bb=m.vertex(cx+x,yb+l,cz+zh*(1-0.25*Math.abs(x)/X)),tb=m.vertex(cx+x,yb+l+th,cz+zh*(1-0.25*Math.abs(x)/X)),tf=m.vertex(cx+x,yb+l+th,cz-zh*(1-0.25*Math.abs(x)/X)); f.push([bf,bb,tb,tf]); } for(let i=0;i<n;i++){ const p=f[i],q=f[i+1]; m.face(p[3],p[2],q[2],q[3]); m.face(p[0],q[0],q[1],p[1]); m.face(p[0],p[3],q[3],q[0]); m.face(p[1],q[1],q[2],p[2]); } m.face(f[0][0],f[0][1],f[0][2],f[0][3]); m.face(f[n][0],f[n][3],f[n][2],f[n][1]); }; "
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# GROUND: one height function used everywhere (flat precinct, wooded hills around it, a pond basin). 190 m square, 200 x 200 cells.
+let jgh = "function gh(x,z){ const dx=x*0.8,dz=(z-14)*(z<14?0.62:1.25),d=Math.sqrt(dx*dx+dz*dz); let k=Math.max(0,Math.min(1,(d-50)/34)); k=k*k*(3-2*k); let y=k*(7+6*Math.sin(x*0.06+1.3)+4*Math.sin(z*0.05+0.4)+3*Math.sin((x+z)*0.09)+1.6*Math.sin(x*0.21)*Math.sin(z*0.17)); const px=x-24,pz=(z+4)*1.5,pd=Math.sqrt(px*px+pz*pz); if(pd<14){ y-=1.5*Math.pow(1-pd/14,0.7); } return y; }; "
+ground_s = poly.script@1(code="const m = new Mesh(); ${jgh} const N=130,S=95; const v=[]; for(let j=0;j<=N;j++){ const row=[]; for(let i=0;i<=N;i++){ const x=-S+2*S*i/N,z=-S+2*S*j/N; row.push(m.vertex(x,gh(x,z),z)); } v.push(row); } for(let j=0;j<N;j++){ for(let i=0;i<N;i++){ m.face(v[j][i],v[j+1][i],v[j+1][i+1],v[j][i+1]); } } const c0=m.vertex(0,-10,0); const bs=[],bn=[]; for(let i=0;i<=N;i++){ const x=-S+2*S*i/N; bs.push(m.vertex(x,-10,-S)); bn.push(m.vertex(x,-10,S)); } const wc=[bs[0]],ec=[bs[N]]; for(let j=1;j<N;j++){ const z=-S+2*S*j/N; wc.push(m.vertex(-S,-10,z)); ec.push(m.vertex(S,-10,z)); } wc.push(bn[0]); ec.push(bn[N]); for(let i=0;i<N;i++){ m.face(v[0][i],v[0][i+1],bs[i+1],bs[i]); m.face(v[N][i+1],v[N][i],bn[i],bn[i+1]); } for(let j=0;j<N;j++){ m.face(v[j+1][0],v[j][0],wc[j],wc[j+1]); m.face(v[j][N],v[j+1][N],ec[j+1],ec[j]); } const per=[]; for(let i=0;i<=N;i++){ per.push(bs[i]); } for(let j=1;j<=N;j++){ per.push(ec[j]); } for(let i=N-1;i>=0;i--){ per.push(bn[i]); } for(let j=N-1;j>=1;j--){ per.push(wc[j]); } for(let k=0;k<per.length;k++){ m.face(c0,per[k],per[(k+1)%per.length]); } m", budget=4000)
+ground_solid = poly.to_solid@1(ground_s)
+ground_m = solid.material@1(ground_s, color=[1, 1, 1], roughness=0.96)
+ground_t = solid.texture@1(ground_m, program="a = expr(code=\"n = fbm(vec2(p.x * 13.0, p.y * 13.0)); w = fbm(vec2(p.x * 3.0 + 5.0, p.y * 3.0)); f = fbm(vec2(p.x * 110.0, p.y * 110.0)); moss = mix(vec3(0.06, 0.12, 0.035), vec3(0.12, 0.19, 0.06), smoothstep(0.3, 0.7, n)); dirt = vec3(0.14, 0.11, 0.075); c = mix(moss, dirt, smoothstep(0.72, 0.9, w)); out = c * (0.82 + 0.3 * f)\")\nalbedo = a", size="1024")
+output ground = ground_t
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# THE APPROACH: a paved path with slab joints, 4.4 m wide, from the first torii to the hall steps.
+path_b = solid.box@1(size=[4.4, 0.12, 56])
+path_m = solid.material@1(path_b, color=[1, 1, 1], roughness=0.8)
+path_t = solid.texture@1(path_m, program="a = expr(code=\"u = p.x * 3.0; v = p.y * 2.0; h = hash(vec2(floor(u), floor(v))); e = min(min(fract(u), 1.0 - fract(u)), min(fract(v), 1.0 - fract(v))); j = smoothstep(0.0, 0.07, e); out = vec3(0.26 + 0.1 * h, 0.26 + 0.09 * h, 0.25 + 0.08 * h) * (0.4 + 0.6 * j)\")\nalbedo = a", size="512", tile=4.4)
+path_p = xform.move@1(path_t, by=[0, 0.06, -36])
+output path = path_p
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# THREE TORII along the path (vermilion pillars and tie beam; black kasagi and shimaki caps).
+let jtorii_red = "function torii(z,s){ const px=2.9*s; for(const sx of [-1,1]){ cyl(sx*px,z,0.4*s,6.7*s,0.37*s,0.29*s,16); } box(-px-0.95*s,4.95*s,z-0.17*s,px+0.95*s,5.3*s,z+0.17*s); box(-0.2*s,5.3*s,z-0.15*s,0.2*s,6.75*s,z+0.15*s); }; "
+let jtorii_black = "function torii(z,s){ const px=2.9*s; beam(0,z,4.7*s,0.52*s,6.75*s,0.36*s,0.75*s,28); beam(0,z,4.3*s,0.4*s,6.42*s,0.3*s,0.65*s,28); for(const sx of [-1,1]){ lathe(sx*px,z,[[0,0.52*s],[0.18*s,0.5*s],[0.4*s,0.4*s]],14); } box(-0.45*s,5.3*s,z-0.17*s,0.45*s,6.2*s,z+0.17*s); }; "
+torii_red_s = poly.script@1(code="const m = new Mesh(); ${jcyl} ${jbox} ${jtorii_red} torii(0, 1.0); m", budget=300)
+torii_red_m = solid.material@1(torii_red_s, color=[0.58, 0.05, 0.03], roughness=0.3)
+torii_red = inst.place@1(torii_red_m, at=[[0, 0, -56], [0, 0, -44], [0, 0, -32]], yaw_scale=[[0, 1.0], [0, 0.94], [0, 0.88]])
+output torii_red = torii_red
+torii_black_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jbox} ${jbeam} ${jtorii_black} torii(0, 1.0); m", budget=300)
+torii_black_m = solid.material@1(torii_black_s, color=[0.025, 0.025, 0.03], roughness=0.3)
+torii_black = inst.place@1(torii_black_m, at=[[0, 0, -56], [0, 0, -44], [0, 0, -32]], yaw_scale=[[0, 1.0], [0, 0.94], [0, 0.88]])
+output torii_black = torii_black
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# STONE LANTERNS: 18 along the avenue, each a hexagonal base, bulging shaft, platform, six-pillared fire chamber (glowing core), flared roof and jewel.
+let jlantern = "function lantern(x,z,s){ cyl(x,z,0,0.2*s,0.58*s,0.52*s,8); lathe(x,z,[[0.2*s,0.2*s],[0.5*s,0.15*s],[0.85*s,0.22*s],[1.15*s,0.16*s],[1.25*s,0.3*s]],12); cyl(x,z,1.25*s,1.4*s,0.64*s,0.6*s,6); for(let k=0;k<6;k++){ const a=k*1.047198+0.5236; cyl(x+Math.cos(a)*0.37*s,z+Math.sin(a)*0.37*s,1.4*s,1.95*s,0.05*s,0.05*s,5); } cyl(x,z,1.4*s,1.5*s,0.4*s,0.4*s,6); cyl(x,z,1.85*s,1.95*s,0.4*s,0.4*s,6); lathe(x,z,[[1.95*s,0.66*s],[2.04*s,0.7*s],[2.22*s,0.5*s],[2.5*s,0.17*s]],6); lathe(x,z,[[2.5*s,0.12*s],[2.56*s,0.1*s],[2.7*s,0.13*s],[2.82*s,0.04*s]],10); }; "
+let jlantern_glow = "function glow(x,z,s){ cyl(x,z,1.42*s,1.93*s,0.31*s,0.31*s,8); }; "
+let lpos = join(i in 0..9, "[-3.7, 0, {-54 + i * 5.6}], [3.7, 0, {-54 + i * 5.6}]")
+let lyaw = join(i in 0..9, "[{i * 40}, 1.0], [{i * 40 + 90}, 1.0]")
+lant_s = poly.script@1(code="const m = new Mesh(); ${jcyl} ${jlathe} ${jlantern} lantern(0,0,1.0); m", budget=600)
+lant_m = solid.material@1(lant_s, color=[0.34, 0.34, 0.33], roughness=0.92)
+lant = inst.place@1(lant_m, at=[${lpos}], yaw_scale=[${lyaw}])
+output lanterns = lant
+lantg_s = poly.script@1(code="const m = new Mesh(); ${jcyl} ${jlantern_glow} glow(0,0,1.0); m", budget=200)
+lantg_m = solid.material@1(lantg_s, color=[1, 0.7, 0.35], roughness=0.5, emissive=[5.5, 2.4, 0.7])
+lantg = inst.place@1(lantg_m, at=[${lpos}], yaw_scale=[${lyaw}])
+output lantern_glow = lantg
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# THE MAIN HALL at z = 14 to 24 (walls), veranda around it, roof with curved eaves and a long ridge. Floor level 1.4 m.
+hall_stone_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jcyl} box(-12.4,0,9.8,12.4,0.4,28.2); box(-11.7,0.4,10.3,11.7,1.4,27.7); for(let k=0;k<7;k++){ box(-3.4-0.1*k,0,10.3-0.8*(k+1),3.4+0.1*k,1.4-0.2*k,10.3-0.8*k); } for(let x=-10.2;x<10.3;x+=3.4){ cyl(x,11.8,1.4,1.55,0.44,0.4,10); cyl(x,26.2,1.4,1.55,0.44,0.4,10); } for(let z=11.8+2.9;z<26.1;z+=2.9){ cyl(-10.2,z,1.4,1.55,0.44,0.4,10); cyl(10.2,z,1.4,1.55,0.44,0.4,10); } m", budget=400)
+hall_stone_m = solid.material@1(hall_stone_s, color=[1, 1, 1], roughness=0.88)
+hall_stone_t = solid.texture@1(hall_stone_m, program="a = expr(code=\"u = p.x * 6.0; v = p.y * 6.0; h = hash(vec2(floor(u), floor(v))); e = min(min(fract(u), 1.0 - fract(u)), min(fract(v), 1.0 - fract(v))); j = smoothstep(0.0, 0.06, e); out = vec3(0.3 + 0.1 * h, 0.3 + 0.09 * h, 0.28 + 0.08 * h) * (0.5 + 0.5 * j)\")\nalbedo = a", size="512", tile=3)
+output hall_stone = hall_stone_t
+
+# The wooden frame: outer posts, inner posts, beams, bracket sets under the eaves, rafter ends, railings, lattice frames of the doors.
+let jbracket = "function bracket(x,z,nx,nz){ for(let l=0;l<4;l++){ const e=0.4+0.42*l,w=0.26-0.04*l,y=5.1+0.17*l; if(nx===0){ const z1=z+nz*e; box(x-w,y,Math.min(z,z1),x+w,y+0.16,Math.max(z,z1)); } else { const x1=x+nx*e; box(Math.min(x,x1),y,z-w,Math.max(x,x1),y+0.16,z+w); } } }; "
+let jwood = "const FZ=11.8,BZ=26.2,SX=10.2; const px=[-10.2,-6.8,-3.4,0,3.4,6.8,10.2]; for(const x of px){ cyl(x,FZ,1.55,5.1,0.3,0.27,14); cyl(x,BZ,1.55,5.1,0.3,0.27,14); bracket(x,FZ,0,-1); bracket(x,BZ,0,1); } for(let z=FZ+2.9;z<BZ-0.1;z+=2.9){ cyl(-SX,z,1.55,5.1,0.3,0.27,14); cyl(SX,z,1.55,5.1,0.3,0.27,14); bracket(-SX,z,-1,0); bracket(SX,z,1,0); } bracket(-SX,FZ,-1,0); bracket(SX,FZ,1,0); bracket(-SX,BZ,-1,0); bracket(SX,BZ,1,0); box(-SX-0.3,5.1,FZ-0.15,SX+0.3,5.45,FZ+0.15); box(-SX-0.3,5.1,BZ-0.15,SX+0.3,5.45,BZ+0.15); box(-SX-0.15,5.1,FZ,-SX+0.15,5.45,BZ); box(SX-0.15,5.1,FZ,SX+0.15,5.45,BZ); for(let x=-7.6;x<7.7;x+=0.55){ box(x-0.06,5.45,FZ-1.9,x+0.06,5.63,FZ-0.15); box(x-0.06,5.45,BZ+0.15,x+0.06,5.63,BZ+1.9); } for(let z=FZ+0.6;z<BZ;z+=0.55){ box(-SX-1.9,5.45,z-0.06,-SX-0.15,5.63,z+0.06); box(SX+0.15,5.45,z-0.06,SX+1.9,5.63,z+0.06); } for(let x=-8;x<8.1;x+=3.2){ cyl(x,14,1.4,5.1,0.2,0.18,12); cyl(x,24,1.4,5.1,0.2,0.18,12); } for(const x of [-8,8]){ for(let z=14;z<24.1;z+=2.5){ cyl(x,z,1.4,5.1,0.2,0.18,12); } } box(-8.2,4.5,13.85,8.2,4.8,14.15); box(-8.2,1.6,13.85,8.2,1.75,14.15); box(-8.2,4.2,23.85,8.2,4.5,24.15); box(-8.15,4.2,13.9,-7.85,4.5,24.1); box(7.85,4.2,13.9,8.15,4.5,24.1); for(let x=-8;x<8;x+=3.2){ for(let i=0;i<=14;i++){ box(x+0.1+i*0.215-0.018,1.75,13.9,x+0.1+i*0.215+0.018,4.5,14.06); } for(let j=0;j<=7;j++){ box(x+0.1,1.75+j*0.4-0.018,13.9,x+3.1,1.75+j*0.4+0.018,14.06); } } "
+let jrail = "for(let x=-10.2;x<-4;x+=0.35){ cyl(x,11.8,1.52,2.4,0.04,0.04,6); } for(let x=4.2;x<10.3;x+=0.35){ cyl(x,11.8,1.52,2.4,0.04,0.04,6); } box(-10.3,2.35,11.7,-4,2.45,11.9); box(4,2.35,11.7,10.3,2.45,11.9); for(let z=12.3;z<26.2;z+=0.35){ cyl(-10.2,z,1.52,2.4,0.04,0.04,6); cyl(10.2,z,1.52,2.4,0.04,0.04,6); } box(-10.3,2.35,11.7,-10.1,2.45,26.3); box(10.1,2.35,11.7,10.3,2.45,26.3); for(let x=-10.2;x<10.3;x+=0.35){ cyl(x,26.2,1.52,2.4,0.04,0.04,6); } box(-10.3,2.35,26.1,10.3,2.45,26.3); "
+hall_wood_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jcyl} ${jbracket} ${jwood} ${jrail} m", budget=6000)
+hall_wood_m = solid.material@1(hall_wood_s, color=[0.34, 0.07, 0.04], roughness=0.42)
+output hall_wood = hall_wood_m
+
+hall_plaster_s = poly.script@1(code="const m = new Mesh(); ${jbox} box(-8.1,1.4,13.9,8.1,4.2,14.0); box(-8.1,4.8,13.9,8.1,5.1,14.0); box(-8.1,1.4,24,8.1,5.1,24.1); box(-8.1,1.4,14,-7.95,5.1,24); box(7.95,1.4,14,8.1,5.1,24); box(-8.1,1.4,14,8.1,1.5,24); m", budget=200)
+hall_plaster = solid.material@1(hall_plaster_s, color=[0.78, 0.74, 0.64], roughness=0.9)
+output hall_plaster = hall_plaster
+
+hall_floor_s = poly.script@1(code="const m = new Mesh(); ${jbox} for(let z=11.7;z<26.2;z+=0.28){ box(-10.3,1.4,z,10.3,1.52,z+0.26); } m", budget=300)
+hall_floor = solid.material@1(hall_floor_s, color=[0.28, 0.17, 0.09], roughness=0.55)
+output hall_floor = hall_floor
+
+hall_paper_s = poly.script@1(code="const m = new Mesh(); ${jbox} for(let x=-8;x<8;x+=3.2){ box(x+0.1,1.75,14.0,x+3.1,4.5,14.04); } m", budget=200)
+hall_paper = solid.material@1(hall_paper_s, color=[1, 0.88, 0.62], roughness=0.8, emissive=[2.6, 1.4, 0.55])
+output hall_paper = hall_paper
+
+hall_roof_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jlathe} ${jroof} roof(0,5.4,19,12.4,9.6,5.0,1.1,0.55,0.85,100,70,1.2); box(-4.6,10.3,18.55,4.6,10.9,19.45); lathe(-4.9,19,[[10.3,0.3],[10.6,0.38],[11.2,0.28],[11.7,0.1]],8); lathe(4.9,19,[[10.3,0.3],[10.6,0.38],[11.2,0.28],[11.7,0.1]],8); m", budget=6000)
+hall_roof_m = solid.material@1(hall_roof_s, color=[0.06, 0.07, 0.09], roughness=0.32, metallic=0.2)
+output hall_roof = hall_roof_m
+hall_light = light.point@1(position=[0, 3.4, 19], color=[1, 0.72, 0.4], intensity=260, range=26)
+output hall_light = hall_light
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# More helpers: a tube between two points, a leaf blob, and a recursive branching tree (the same random stream builds trunk and blossoms, so they match).
+let jtube = "function tube(ax,ay,az,bx,by,bz,r0,r1,n){ let dx=bx-ax,dy=by-ay,dz=bz-az; const L=Math.sqrt(dx*dx+dy*dy+dz*dz)||1; dx/=L; dy/=L; dz/=L; let hx=0,hy=1,hz=0; if(Math.abs(dy)>0.9){ hx=1; hy=0; } let ux=dy*hz-dz*hy,uy=dz*hx-dx*hz,uz=dx*hy-dy*hx; const l=Math.sqrt(ux*ux+uy*uy+uz*uz)||1; ux/=l; uy/=l; uz/=l; const vx=uy*dz-uz*dy,vy=uz*dx-ux*dz,vz=ux*dy-uy*dx; const A=[],B=[]; for(let i=0;i<n;i++){ const t=i*6.283185/n,c=Math.cos(t),s=Math.sin(t); const ox=ux*c+vx*s,oy=uy*c+vy*s,oz=uz*c+vz*s; A.push(m.vertex(ax+ox*r0,ay+oy*r0,az+oz*r0)); B.push(m.vertex(bx+ox*r1,by+oy*r1,bz+oz*r1)); } for(let i=0;i<n;i++){ const j=(i+1)%n; m.face(A[i],B[i],B[j],A[j]); } }; "
+let jblob = "function blob(cx,cy,cz,r){ lathe(cx,cz,[[cy-r*0.95,r*0.3],[cy-r*0.75,r*0.62],[cy-r*0.4,r*0.9],[cy,r],[cy+r*0.4,r*0.92],[cy+r*0.75,r*0.64],[cy+r*0.95,r*0.3]],10); }; "
+let jtree = "function rn(){ return Math.random(); }; function nrm(v){ const l=Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2])||1; return [v[0]/l,v[1]/l,v[2]/l]; }; function br(x,y,z,d,len,r,depth,mode,col){ const nx=x+d[0]*len,ny=y+d[1]*len,nz=z+d[2]*len; if(mode===0){ tube(x,y,z,nx,ny,nz,r,r*0.72,6); } const rb=0.5+rn()*0.4,ox=(rn()-0.5)*0.9,oy=(rn()-0.5)*0.5,oz=(rn()-0.5)*0.9; if(depth<=1&&mode===1){ blob(nx,ny,nz,rb*col); blob(nx+ox,ny+oy+0.2,nz+oz,rb*0.75*col); } if(depth<=0){ return; } const k=depth>=2?3:2; for(let i=0;i<k;i++){ const a=rn()*6.283,s=0.55+rn()*0.35; const nd=nrm([d[0]+Math.cos(a)*s,d[1]*0.9+0.35+rn()*0.15,d[2]+Math.sin(a)*s]); br(nx,ny,nz,nd,len*(0.68+rn()*0.12),r*0.62,depth-1,mode,col); } }; function tree(x,z,sc,mode,col){ const gy=gh(x,z); const lean=(rn()-0.5)*0.35,lz=(rn()-0.5)*0.35; const t=nrm([lean,1,lz]); const tx=x+t[0]*3*sc,tz=z+t[2]*3*sc; if(mode===0){ tube(x,gy-0.3,z,tx,gy+3*sc,tz,0.5*sc,0.34*sc,8); } for(let i=0;i<4;i++){ const a=i*1.571+rn()*0.8,s=0.9; br(tx,gy+3*sc,tz,nrm([Math.cos(a)*s,0.75,Math.sin(a)*s]),2.6*sc,0.26*sc,3,mode,col); } }; "
+let jsak = "const T=[[-9.5,-18,1.0],[9.5,-14,1.1],[-10,-33,1.05],[11,-39,0.95],[-8.5,-47,1.0],[10.5,-51,1.1],[-16,-2,1.15],[-17,26,1.0],[17,34,1.05],[-4,37,1.2]]; "
+sak_trunk_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jgh} ${jtree} tree(0,0,1.0,0,1.0); m", budget=2000)
+sak_trunk_m = solid.material@1(sak_trunk_s, color=[0.09, 0.065, 0.055], roughness=0.95)
+let sak_at = "[-9.5, 0, -18], [9.5, 0, -14], [-10, 0, -33], [11, 0, -39], [-8.5, 0, -47], [10.5, 0, -51], [-16, 0, -2], [-17, 0, 26], [17, 0, 34], [-4, 0, 37], [-21, 0, 8], [8, 0, 44]"
+let sak_ys = "[10, 1.0], [95, 1.1], [200, 1.05], [300, 0.95], [40, 1.0], [150, 1.1], [250, 1.15], [20, 1.0], [330, 1.05], [120, 1.2], [75, 1.0], [220, 1.1]"
+sak_trunk = inst.place@1(sak_trunk_m, at=[${sak_at}], yaw_scale=[${sak_ys}])
+output sakura_trunks = sak_trunk
+sak_bloom_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jgh} ${jtree} tree(0,0,1.0,1,1.0); m", budget=2000)
+sak_bloom_m = solid.material@1(sak_bloom_s, color=[0.96, 0.62, 0.74], roughness=0.85, emissive=[0.2, 0.07, 0.1])
+sak_bloom = inst.place@1(sak_bloom_m, at=[${sak_at}], yaw_scale=[${sak_ys}])
+output sakura_blossoms = sak_bloom
+let jmap = "const T=[[13,-15,0.95],[37,-14,0.9],[-21,-12,1.0]]; "
+map_trunk_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jgh} ${jtree} tree(0,0,0.9,0,0.9); m", seed=7, budget=2000)
+map_trunk_m = solid.material@1(map_trunk_s, color=[0.07, 0.055, 0.05], roughness=0.95)
+let map_at = "[13, 0, -15], [37, 0, -14], [-21, 0, -12]"
+let map_ys = "[0, 1.0], [140, 0.95], [260, 1.05]"
+map_trunk = inst.place@1(map_trunk_m, at=[${map_at}], yaw_scale=[${map_ys}])
+output maple_trunks = map_trunk
+map_leaf_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jblob} ${jgh} ${jtree} tree(0,0,0.9,1,0.8); m", seed=7, budget=2000)
+map_leaf_m = solid.material@1(map_leaf_s, color=[0.75, 0.12, 0.05], roughness=0.8, emissive=[0.25, 0.04, 0.0])
+map_leaf = inst.place@1(map_leaf_m, at=[${map_at}], yaw_scale=[${map_ys}])
+output maple_leaves = map_leaf
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# THE FIVE-TIER PAGODA at (-33, 16): stone base, five shrinking tiers each with posts, bracket sets, plaster walls, glowing windows and its own curved roof; sorin spire on top.
+let jpag = "const CX=-33,CZ=16; function wd(t){ return 3.4*Math.pow(0.87,t); } function y0(t){ return 1.2+3.9*t; } function brk(x,z,nx,nz,y){ for(let l=0;l<3;l++){ const e=0.35+0.38*l,w=0.2-0.04*l,yy=y+0.14*l; if(nx===0){ const z1=z+nz*e; box(x-w,yy,Math.min(z,z1),x+w,yy+0.13,Math.max(z,z1)); } else { const x1=x+nx*e; box(Math.min(x,x1),yy,z-w,Math.max(x,x1),yy+0.13,z+w); } } }; "
+pag_stone_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jcyl} ${jpag} box(CX-7.5,0,CZ-7.5,CX+7.5,0.5,CZ+7.5); box(CX-6.3,0.5,CZ-6.3,CX+6.3,1.2,CZ+6.3); for(let k=0;k<4;k++){ box(CX-2.2-0.1*k,0,CZ-6.3-0.6*(k+1),CX+2.2+0.1*k,1.2-0.3*k,CZ-6.3-0.6*k); } m", budget=200)
+pag_stone = solid.material@1(pag_stone_s, color=[0.3, 0.3, 0.29], roughness=0.9)
+output pagoda_stone = pag_stone
+pag_wood_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jcyl} ${jpag} for(let t=0;t<5;t++){ const w=wd(t),b=y0(t); for(const a of [-w,0,w]){ for(const c of [-w,w]){ cyl(CX+a,CZ+c,b,b+2.35,0.17,0.15,10); cyl(CX+c,CZ+a,b,b+2.35,0.17,0.15,10); } } box(CX-w-0.2,b+2.3,CZ-w-0.2,CX+w+0.2,b+2.62,CZ+w+0.2); for(const a of [-w,0,w]){ brk(CX+a,CZ-w-0.2,0,-1,b+2.35); brk(CX+a,CZ+w+0.2,0,1,b+2.35); brk(CX-w-0.2,CZ+a,-1,0,b+2.35); brk(CX+w+0.2,CZ+a,1,0,b+2.35); } for(let x=-w;x<=w;x+=0.34){ box(CX+x-0.04,b+2.62,CZ-w-1.5,CX+x+0.04,b+2.78,CZ-w-0.1); box(CX+x-0.04,b+2.62,CZ+w+0.1,CX+x+0.04,b+2.78,CZ+w+1.5); box(CX-w-1.5,b+2.62,CZ+x-0.04,CX-w-0.1,b+2.78,CZ+x+0.04); box(CX+w+0.1,b+2.62,CZ+x-0.04,CX+w+1.5,b+2.78,CZ+x+0.04); } } m", budget=2000)
+pag_wood = solid.material@1(pag_wood_s, color=[0.36, 0.07, 0.04], roughness=0.42)
+output pagoda_wood = pag_wood
+pag_plaster_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jpag} for(let t=0;t<5;t++){ const w=wd(t),b=y0(t); box(CX-w,b,CZ-w,CX+w,b+2.3,CZ+w); } m", budget=200)
+pag_plaster = solid.material@1(pag_plaster_s, color=[0.8, 0.76, 0.66], roughness=0.9)
+output pagoda_plaster = pag_plaster
+pag_glow_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jpag} for(let t=0;t<5;t++){ const w=wd(t),b=y0(t),h=w*0.28; box(CX-h,b+0.45,CZ-w-0.05,CX+h,b+1.9,CZ-w); box(CX-h,b+0.45,CZ+w,CX+h,b+1.9,CZ+w+0.05); box(CX-w-0.05,b+0.45,CZ-h,CX-w,b+1.9,CZ+h); box(CX+w,b+0.45,CZ-h,CX+w+0.05,b+1.9,CZ+h); } m", budget=200)
+pag_glow = solid.material@1(pag_glow_s, color=[1, 0.85, 0.55], roughness=0.8, emissive=[3.0, 1.5, 0.55])
+output pagoda_windows = pag_glow
+pag_roof_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jlathe} ${jroof} ${jpag} for(let t=0;t<5;t++){ const w=wd(t),A=w+2.3*Math.pow(0.9,t); roof(CX,y0(t)+2.6,CZ,A,A,1.35,0.5,0.3,0.9,40,40,1.15); } m", budget=3000)
+pag_roof = solid.material@1(pag_roof_s, color=[0.06, 0.07, 0.09], roughness=0.32, metallic=0.2)
+output pagoda_roofs = pag_roof
+pag_gold_s = poly.script@1(code="const m = new Mesh(); ${jcyl} ${jlathe} ${jpag} const top=y0(4)+2.6+1.35; cyl(CX,CZ,top,top+6.5,0.14,0.1,10); for(let i=0;i<9;i++){ const yy=top+0.9+i*0.5; lathe(CX,CZ,[[yy,0.55-i*0.04],[yy+0.06,0.55-i*0.04]],12); } lathe(CX,CZ,[[top+5.4,0.4],[top+5.6,0.5],[top+5.9,0.2],[top+6.3,0.05]],12); lathe(CX,CZ,[[top+6.5,0.12],[top+6.9,0.18],[top+7.4,0.02]],10); m", budget=300)
+pag_gold = solid.material@1(pag_gold_s, color=[0.9, 0.66, 0.2], roughness=0.3, metallic=0.9)
+output pagoda_spire = pag_gold
+pag_light = light.point@1(position=[-33, 3, 9], color=[1, 0.7, 0.4], intensity=120, range=18)
+output pagoda_light = pag_light
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# HANGING PAPER LANTERNS (chochin) along the hall eaves, with black caps, glowing.
+let jchop = "const L=[]; for(let x=-9.5;x<9.6;x+=1.9){ L.push([x,10.7]); } for(let z=12.5;z<26;z+=2.3){ L.push([-11.1,z]); L.push([11.1,z]); } for(let x=-9.5;x<9.6;x+=1.9){ L.push([x,27.6]); } "
+let cat = join(i in 0..11, "[{-9.5 + i * 1.9}, 0, 10.7]")
+let cat2 = join(i in 0..7, "[-11.1, 0, {12.5 + i * 2.3}], [11.1, 0, {12.5 + i * 2.3}]")
+let cat3 = join(i in 0..11, "[{-9.5 + i * 1.9}, 0, 27.6]")
+choc_s = poly.script@1(code="const m = new Mesh(); ${jlathe} lathe(0,0,[[3.78,0.1],[3.85,0.2],[3.99,0.29],[4.15,0.31],[4.31,0.29],[4.45,0.2],[4.52,0.1]],10); m", budget=200)
+choc_m = solid.material@1(choc_s, color=[1, 0.82, 0.55], roughness=0.8, emissive=[3.4, 1.3, 0.42])
+choc = inst.place@1(choc_m, at=[${cat}, ${cat2}, ${cat3}])
+output chochin = choc
+choc_cap_s = poly.script@1(code="const m = new Mesh(); ${jcyl} cyl(0,0,3.72,3.8,0.13,0.13,10); cyl(0,0,4.5,4.58,0.13,0.13,10); cyl(0,0,4.58,5.1,0.012,0.012,4); m", budget=200)
+choc_cap_m = solid.material@1(choc_cap_s, color=[0.03, 0.03, 0.03], roughness=0.4)
+choc_cap = inst.place@1(choc_cap_m, at=[${cat}, ${cat2}, ${cat3}])
+output chochin_caps = choc_cap
+choc_l1 = light.point@1(position=[-6, 4.0, 10.2], color=[1, 0.62, 0.32], intensity=70, range=11)
+choc_l2 = light.point@1(position=[6, 4.0, 10.2], color=[1, 0.62, 0.32], intensity=70, range=11)
+output chochin_light_1 = choc_l1
+output chochin_light_2 = choc_l2
+lane_l1 = light.point@1(position=[0, 2.0, -46], color=[1, 0.62, 0.32], intensity=60, range=14)
+lane_l2 = light.point@1(position=[0, 2.0, -28], color=[1, 0.62, 0.32], intensity=60, range=14)
+lane_l3 = light.point@1(position=[0, 2.0, -12], color=[1, 0.62, 0.32], intensity=60, range=14)
+output lane_light_1 = lane_l1
+output lane_light_2 = lane_l2
+output lane_light_3 = lane_l3
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# THE POND (centre 24, -4): dark water with a live ripple, rim rocks, lotus pads and blossoms, koi, and a red arched bridge.
+water = solid.box@1(size=[26, 0.12, 18])
+water_m = solid.material@1(water, color=[1, 1, 1], roughness=0.14, opacity=1.0)
+water_t = solid.texture@1(water_m, program="h = expr(code=\"r = snoise(vec2(p.x * 70.0, p.y * 70.0)) * 0.5 + snoise(vec2(p.x * 150.0, p.y * 150.0)) * 0.25; out = vec3(0.5 + 0.06 * r)\")\na = expr(code=\"n = fbm(vec2(p.x * 12.0, p.y * 12.0)); out = mix(vec3(0.03, 0.09, 0.1), vec3(0.08, 0.17, 0.17), n)\")\nalbedo = a\nheight = h", size="512")
+water_p = xform.move@1(water_t, by=[24, -0.4, -4])
+output water = water_p
+let jrock = "function rock(cx,cz,r,sy,ys){ const gy=gh(cx,cz)+ys; const R=[]; for(let k=0;k<5;k++){ const row=[]; const yy=gy+r*sy*[-0.1,0.35,0.75,1.0,0.85][k]; const rr=r*[0.7,1.0,0.95,0.65,0.25][k]; for(let i=0;i<9;i++){ const a=i*0.698132,j=0.78+rn()*0.44; row.push(m.vertex(cx+Math.cos(a)*rr*j,yy,cz+Math.sin(a)*rr*j)); } R.push(row); } for(let k=0;k<4;k++){ for(let i=0;i<9;i++){ const j=(i+1)%9; m.face(R[k][i],R[k+1][i],R[k+1][j],R[k][j]); } } m.face(...R[4].slice().reverse()); m.face(...R[0]); }; "
+let jrim = "const Q=[]; for(let i=0;i<46;i++){ const a=i*0.1366+rn()*0.1; const rr=12.9+rn()*1.1; Q.push([24+Math.cos(a)*rr,-4+Math.sin(a)*rr*0.66,0.5+rn()*1.1]); } "
+rocks_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jgh} ${jtree} ${jrock} ${jrim} for(const q of Q){ rock(q[0],q[1],q[2],0.8+rn()*0.4,-0.15); } rock(31,-9.5,1.7,1.1,-0.2); rock(17,0,1.4,1.0,-0.2); rock(34,-1,1.2,0.9,-0.2); m", seed=3, budget=800)
+rocks = solid.material@1(rocks_s, color=[1, 1, 1], roughness=0.95)
+rocks_t = solid.texture@1(rocks, program="a = expr(code=\"n = fbm(vec2(p.x * 7.0 + p.y * 3.0, p.y * 7.0 - p.x * 2.0)); m = fbm(vec2(p.x * 25.0, p.y * 25.0)); out = mix(vec3(0.17, 0.17, 0.16), vec3(0.06, 0.1, 0.04), smoothstep(0.45, 0.7, n)) * (0.6 + 0.6 * m)\")\nalbedo = a", size="512", tile=3)
+output pond_rocks = rocks_t
+let jpads = "const D=[]; for(let i=0;i<46;i++){ const a=rn()*6.283,rr=Math.sqrt(rn())*10.5; const x=24+Math.cos(a)*rr,z=-4+Math.sin(a)*rr*0.68; if(Math.abs(z+4)>1.8) D.push([x,z,0.28+rn()*0.22]); } "
+pads_s = poly.script@1(code="const m = new Mesh(); ${jcyl} ${jtree} ${jpads} for(const q of D){ cyl(q[0],q[1],-0.37,-0.34,q[2],q[2],12); } m", seed=5, budget=300)
+pads = solid.material@1(pads_s, color=[0.05, 0.25, 0.06], roughness=0.5)
+output lotus_pads = pads
+flowers_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtree} ${jpads} let c=0; for(const q of D){ if(c++%5===0){ lathe(q[0],q[1],[[-0.34,0.05],[-0.28,0.16],[-0.15,0.2],[-0.05,0.12],[0,0.03]],8); } } m", seed=5, budget=300)
+flowers = solid.material@1(flowers_s, color=[1, 0.62, 0.74], roughness=0.7, emissive=[0.3, 0.1, 0.14])
+output lotus_flowers = flowers
+let jfish = "function fish(x,z,ang,len,ph){ const ca=Math.cos(ang),sa=Math.sin(ang),S=[]; for(let i=0;i<=8;i++){ const s=i/8,w=len*0.13*Math.sin(Math.PI*Math.pow(s,0.75)+0.001)+0.004,h=w*0.8; const lx=-len/2+len*s,lz=Math.sin(s*4+ph)*0.05*len; const row=[]; for(let k=0;k<6;k++){ const a=k*1.047198; const px=lx,py=-0.52+Math.sin(a)*h,pz=lz+Math.cos(a)*w; row.push(m.vertex(x+px*ca-pz*sa,py,z+px*sa+pz*ca)); } S.push(row); } for(let i=0;i<8;i++){ for(let k=0;k<6;k++){ const j=(k+1)%6; m.face(S[i][k],S[i+1][k],S[i+1][j],S[i][j]); } } const tx=len/2,tz=Math.sin(4+ph)*0.05*len; const t0=m.vertex(x+tx*ca-tz*sa,-0.52,z+tx*sa+tz*ca),t1=m.vertex(x+(tx+len*0.28)*ca-(tz+len*0.16)*sa,-0.52,z+(tx+len*0.28)*sa+(tz+len*0.16)*ca),t2=m.vertex(x+(tx+len*0.28)*ca-(tz-len*0.16)*sa,-0.52,z+(tx+len*0.28)*sa+(tz-len*0.16)*ca); m.face(t0,t1,t2); m.face(t0,t2,t1); }; "
+koi_a_s = poly.script@1(code="const m = new Mesh(); ${jfish} fish(20,-1,0.4,0.7,0); fish(27,-6,2.4,0.8,1); fish(25,0,4.0,0.65,2); fish(30,-3,5.5,0.75,3); fish(22,-7,1.2,0.6,4); m", budget=300)
+koi_a = solid.material@1(koi_a_s, color=[0.95, 0.35, 0.05], roughness=0.4, emissive=[0.15, 0.04, 0.0])
+output koi_orange = koi_a
+koi_b_s = poly.script@1(code="const m = new Mesh(); ${jfish} fish(18,-3,2.0,0.75,5); fish(28,-1,3.3,0.7,6); fish(26,-8,0.2,0.8,7); m", budget=300)
+koi_b = solid.material@1(koi_b_s, color=[0.9, 0.88, 0.8], roughness=0.4, emissive=[0.1, 0.1, 0.09])
+output koi_white = koi_b
+
+let jarch = "function fy(x){ const q=(x-24)/13.4; return 0.15+2.3*(1-q*q); }; function strip(x0,x1,n,dy,zc,zh,th){ const f=[]; for(let i=0;i<=n;i++){ const x=x0+(x1-x0)*i/n,y=fy(x)+dy; f.push([m.vertex(x,y,zc-zh),m.vertex(x,y,zc+zh),m.vertex(x,y+th,zc+zh),m.vertex(x,y+th,zc-zh)]); } for(let i=0;i<n;i++){ const p=f[i],q=f[i+1]; m.face(p[3],p[2],q[2],q[3]); m.face(p[0],q[0],q[1],p[1]); m.face(p[0],p[3],q[3],q[0]); m.face(p[1],q[1],q[2],p[2]); } m.face(f[0][0],f[0][1],f[0][2],f[0][3]); m.face(f[n][0],f[n][3],f[n][2],f[n][1]); }; "
+bridge_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jcyl} ${jlathe} ${jarch} strip(10.6,37.4,60,0,-4,1.7,0.28); strip(10.6,37.4,60,0.85,-5.55,0.06,0.1); strip(10.6,37.4,60,0.85,-2.45,0.06,0.1); strip(10.6,37.4,60,0.45,-5.55,0.05,0.07); strip(10.6,37.4,60,0.45,-2.45,0.05,0.07); for(let x=11;x<37.5;x+=2.7){ for(const z of [-5.55,-2.45]){ cyl(x,z,fy(x)-0.05,fy(x)+1.15,0.09,0.08,8); lathe(x,z,[[fy(x)+1.15,0.1],[fy(x)+1.22,0.16],[fy(x)+1.36,0.13],[fy(x)+1.46,0.04]],8); } } for(let x=11.5;x<37;x+=0.52){ box(x-0.2,fy(x)+0.27,-5.7,x+0.2,fy(x)+0.33,-2.3); } m", budget=1500)
+bridge = solid.material@1(bridge_s, color=[0.6, 0.05, 0.03], roughness=0.32)
+output bridge = bridge
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# THE BAMBOO GROVE on the hills behind and to the west: each stalk is a tube with swollen nodes; the leaves are crossed cards near the top.
+let jbam = "const S=[]; let tries=0; while(S.length<260&&tries<4000){ tries++; let x=-90+rn()*180,z=40+rn()*50; if(rn()<0.35){ x=-92+rn()*38; z=-55+rn()*95; } const g=gh(x,z); if(g<2.2) continue; S.push([x,z,g]); } "
+let jbamf = "function stalk(q,mode){ const H=12+rn()*9,r=0.08+rn()*0.05,lx=(rn()-0.5)*2.2,lz=(rn()-0.5)*2.2; let px=q[0],py=q[2]-0.2,pz=q[1]; const N=26; for(let i=1;i<=N;i++){ const s=i/N,nx=q[0]+lx*s*s,ny=q[2]-0.2+H*s,nz=q[1]+lz*s*s; if(mode!==1){ tube(px,py,pz,nx,ny,nz,r*(i%4===0?1.2:1.0),r*(i%4===3?1.2:0.95),6); } if(mode!==0&&s>0.55&&i%2===0){ for(let c=0;c<5;c++){ const a=rn()*6.283,L=0.9+rn()*0.7,dx=Math.cos(a)*L,dz=Math.sin(a)*L; const wx=-Math.sin(a)*0.1,wz=Math.cos(a)*0.1; const a0=m.vertex(nx,ny,nz),a1=m.vertex(nx+dx*0.5+wx,ny+0.12,nz+dz*0.5+wz),a2=m.vertex(nx+dx*0.5-wx,ny+0.12,nz+dz*0.5-wz),a3=m.vertex(nx+dx,ny-0.35,nz+dz); m.face(a0,a1,a3,a2); m.face(a0,a2,a3,a1); } } px=nx; py=ny; pz=nz; } }; "
+bam1_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jtree} ${jbamf} stalk([0,0,0],2); m", seed=11, budget=800)
+bam1 = solid.material@1(bam1_s, color=[0.17, 0.3, 0.08], roughness=0.55)
+bam2_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jtube} ${jtree} ${jbamf} stalk([0,0,0],2); m", seed=23, budget=800)
+bam2 = solid.material@1(bam2_s, color=[0.2, 0.33, 0.09], roughness=0.55)
+# A grove: scatter a prototype over a rectangle, lift it above the hills and drop every copy onto the ground solid.
+def grove(tag, proto, count, w, d, cx, cz, seed, sp, off)
+  gv_{tag}_sc = inst.scatter@1(${proto}, count={count}, width={w}, depth={d}, min_spacing={sp}, seed={seed}, yaw_jitter=3.1, scale_jitter=0.3)
+  gv_{tag}_up = xform.move@1(gv_{tag}_sc, by=[{cx}, 40, {cz}])
+  gv_{tag}_dr = inst.drop@1(gv_{tag}_up, ground_solid, offset={off})
+  output {tag} = gv_{tag}_dr
+end
+grove("bamboo_w1", "bam1", 380, 34, 100, -77, 5, 1, 0.9, -0.25)
+grove("bamboo_w2", "bam2", 380, 34, 100, -77, 5, 2, 0.9, -0.25)
+grove("bamboo_b1", "bam1", 380, 120, 30, 0, 76, 3, 0.9, -0.25)
+grove("bamboo_b2", "bam2", 380, 120, 30, 0, 76, 4, 0.9, -0.25)
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# THE RAKED-GRAVEL GARDEN (karesansui) at (27, 24): rake lines and rings around the rocks, a low stone border, rock groups and moss mounds.
+gravel = solid.box@1(size=[18, 0.1, 14])
+gravel_m = solid.material@1(gravel, color=[1, 1, 1], roughness=0.95)
+gravel_t = solid.texture@1(gravel_m, program="a = expr(code=\"d1 = length(vec2(p.x - 0.3, p.y - 0.45)); d2 = length(vec2(p.x - 0.68, p.y - 0.58)); k1 = 1.0 - smoothstep(0.17, 0.21, d1); k2 = 1.0 - smoothstep(0.13, 0.17, d2); rings = sin(min(d1, d2) * 330.0); lines = sin(p.y * 360.0); r = mix(lines, rings, max(k1, k2)); out = vec3(0.7 + 0.07 * r) * mix(vec3(1.0, 0.97, 0.9), vec3(0.95, 0.95, 1.0), hash(vec2(floor(p.x * 300.0), floor(p.y * 300.0))))\")\nh = expr(code=\"d1 = length(vec2(p.x - 0.3, p.y - 0.45)); d2 = length(vec2(p.x - 0.68, p.y - 0.58)); k1 = 1.0 - smoothstep(0.17, 0.21, d1); k2 = 1.0 - smoothstep(0.13, 0.17, d2); r = mix(sin(p.y * 360.0), sin(min(d1, d2) * 330.0), max(k1, k2)); out = vec3(0.5 + 0.5 * r)\")\nalbedo = a\nheight = h", size="1024")
+gravel_p = xform.move@1(gravel_t, by=[27, 0.05, 24])
+output gravel = gravel_p
+garden_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jlathe} ${jgh} ${jtree} ${jrock} box(17.8,0,16.8,18.2,0.4,31.2); box(35.8,0,16.8,36.2,0.4,31.2); box(17.8,0,16.8,36.2,0.4,17.2); box(17.8,0,30.8,36.2,0.4,31.2); rock(24.4,22.6,1.3,1.2,0.0); rock(25.8,23.5,0.8,0.9,0.0); rock(23.4,24.2,0.6,0.8,0.0); rock(32.6,25.0,1.0,1.1,0.0); rock(31.6,25.9,0.6,0.8,0.0); rock(21,28,0.5,0.7,0.0); m", seed=9, budget=500)
+garden = solid.material@1(garden_s, color=[1, 1, 1], roughness=0.95)
+garden_t = solid.texture@1(garden, program="a = expr(code=\"n = fbm(vec2(p.x * 7.0 + p.y * 3.0, p.y * 7.0 - p.x * 2.0)); m = fbm(vec2(p.x * 25.0, p.y * 25.0)); out = mix(vec3(0.18, 0.18, 0.17), vec3(0.05, 0.11, 0.04), smoothstep(0.4, 0.65, n)) * (0.6 + 0.6 * m)\")\nalbedo = a", size="512", tile=3)
+output garden_stones = garden_t
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# GRASS on the hills, falling petals over the precinct and fireflies over the pond.
+tuft_s = poly.script@1(code="const m = new Mesh(); function rn(){ return Math.random(); }; for(let i=0;i<9;i++){ const a=rn()*6.283,bx=Math.cos(a)*0.1,bz=Math.sin(a)*0.1,h=0.4+rn()*0.35,lx=Math.cos(a+1)*0.16,lz=Math.sin(a+1)*0.16; const b0=m.vertex(bx-0.03,0,bz),b1=m.vertex(bx+0.03,0,bz),t0=m.vertex(bx+lx,h,bz+lz); m.face(b0,b1,t0); m.face(b0,t0,b1); } m", seed=4, budget=100)
+tuft = solid.material@1(tuft_s, color=[0.1, 0.18, 0.05], roughness=0.8)
+grove("grass_w", "tuft", 2400, 36, 184, -74, 0, 5, 0.5, -0.05)
+grove("grass_e", "tuft", 2400, 36, 184, 74, 0, 6, 0.5, -0.05)
+grove("grass_b", "tuft", 2000, 112, 34, 0, 75, 7, 0.5, -0.05)
+petal_src = solid.sphere@1(radius=0.05, segments=6)
+petals = fx.emitter@1(petal_src, name="petals", rate=140, lifetime=[10, 16], speed=[0.2, 0.8], direction=[0.25, -1, 0.15], cone=0.9, shape="box", extent=[40, 6, 40], max_particles=2600, size=[0.11, 0.1], colour=[1, 0.7, 0.8], colour_end=[0.9, 0.6, 0.7], alpha=[0.95, 0.9], glow=0.5, blend="alpha")
+petals_p = xform.move@1(petals, by=[0, 10, 8])
+output petals = petals_p
+fire_src = solid.sphere@1(radius=0.05, segments=6)
+flies = fx.emitter@1(fire_src, name="fireflies", rate=22, lifetime=[3, 6], speed=[0.1, 0.4], direction=[0, 0.3, 0], cone=1.4, shape="box", extent=[15, 1.2, 9], max_particles=300, size=[0.14, 0.12], colour=[1.4, 2.4, 0.4], colour_end=[0.8, 1.6, 0.2], alpha=[1, 0.4], glow=7, blend="additive")
+flies_p = xform.move@1(flies, by=[24, 1.4, -4])
+output fireflies = flies_p
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# SACRED DETAIL: a pair of guardian lions (komainu) either side of the steps, the shimenawa rope with paper streamers (shide) and a bell across the hall entrance,
+# the offering box, azalea hedges lining the avenue (green dome plus a pink flowering cap), and fallen petals on the ground.
+let jkom = "function komainu(){ box(-0.55,0,-0.55,0.55,0.75,0.55); lathe(0,-0.05,[[0.75,0.42],[1.0,0.5],[1.35,0.46],[1.7,0.3],[1.9,0.12]],10); blob(0,2.0,0.22,0.36); blob(0,2.2,0.12,0.28); for(let k=0;k<7;k++){ const a=k*0.9; blob(Math.cos(a)*0.32,2.0+Math.sin(a*1.7)*0.12,0.1+Math.sin(a)*0.18,0.2); } tube(-0.22,0.75,0.4,-0.22,1.55,0.42,0.1,0.08,6); tube(0.22,0.75,0.4,0.22,1.55,0.42,0.1,0.08,6); blob(0,1.0,-0.45,0.34); for(let k=0;k<5;k++){ blob(0,1.05+k*0.14,-0.62-k*0.04,0.2-0.02*k); } }; "
+kom_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jlathe} ${jtube} ${jblob} ${jkom} komainu(); m", budget=300)
+kom_m = solid.material@1(kom_s, color=[0.36, 0.36, 0.34], roughness=0.9)
+kom = inst.place@1(kom_m, at=[[-5.4, 0, 7.5], [5.4, 0, 7.5]], yaw_scale=[[170, 1.15], [190, 1.15]])
+output komainu = kom
+
+let jrope = "const Z=11.95; let pp=null; for(let i=0;i<=16;i++){ const x=-3.3+6.6*i/16,y=4.75-0.45*Math.sin(Math.PI*i/16); if(pp){ tube(pp[0],pp[1],Z,x,y,Z,0.11,0.11,7); } pp=[x,y]; } "
+let jshide = "for(let k=0;k<8;k++){ const x=-2.9+k*0.83,ry=4.75-0.45*Math.sin(Math.PI*(x+3.3)/6.6)-0.1; for(let s=0;s<4;s++){ const y0=ry-0.22*s,y1=ry-0.22*(s+1),o0=(s%2?0.1:-0.1),o1=(s%2?-0.1:0.1); const a=m.vertex(x+o0-0.11,y0,Z+0.02),b=m.vertex(x+o0+0.11,y0,Z+0.02),c=m.vertex(x+o1+0.11,y1,Z+0.02),d=m.vertex(x+o1-0.11,y1,Z+0.02); m.face(a,d,c,b); m.face(a,b,c,d); } } "
+rope_s = poly.script@1(code="const m = new Mesh(); ${jtube} ${jrope} m", budget=100)
+rope = solid.material@1(rope_s, color=[0.6, 0.48, 0.26], roughness=0.95)
+output shimenawa = rope
+shide_s = poly.script@1(code="const m = new Mesh(); const Z=11.95; ${jshide} m", budget=100)
+shide = solid.material@1(shide_s, color=[0.95, 0.95, 0.92], roughness=0.8, emissive=[0.25, 0.24, 0.22])
+output shide = shide
+bell_s = poly.script@1(code="const m = new Mesh(); ${jlathe} ${jcyl} ${jtube} lathe(0,11.95,[[3.0,0.05],[3.04,0.2],[3.2,0.28],[3.35,0.25],[3.45,0.1],[3.5,0.04]],12); tube(0,3.5,11.95,0,4.7,11.95,0.03,0.03,5); tube(0,3.0,11.95,0,2.1,11.95,0.05,0.05,6); m", budget=100)
+bell = solid.material@1(bell_s, color=[0.9, 0.66, 0.2], roughness=0.3, metallic=0.9)
+output bell = bell
+saisen_s = poly.script@1(code="const m = new Mesh(); ${jbox} box(-1.5,1.4,10.45,1.5,1.55,11.55); for(const x of [-1.45,1.35]){ for(const z of [10.5,11.4]){ box(x,1.55,z,x+0.1,2.3,z+0.1); } } for(let i=0;i<15;i++){ box(-1.45+i*0.2,2.25,10.5,-1.45+i*0.2+0.14,2.33,11.5); } box(-1.5,2.3,10.4,1.5,2.45,10.55); box(-1.5,2.3,11.45,1.5,2.45,11.6); box(-1.5,1.55,10.5,-1.4,2.3,11.5); box(1.4,1.55,10.5,1.5,2.3,11.5); m", budget=200)
+saisen = solid.material@1(saisen_s, color=[0.2, 0.11, 0.06], roughness=0.6)
+output offering_box = saisen
+
+azl_g = poly.script@1(code="const m = new Mesh(); ${jlathe} lathe(0,0,[[0,0.55],[0.2,0.62],[0.45,0.5],[0.62,0.3],[0.7,0.08]],10); m", budget=100)
+azl_gm = solid.material@1(azl_g, color=[0.05, 0.16, 0.05], roughness=0.85)
+azl_p = poly.script@1(code="const m = new Mesh(); ${jlathe} lathe(0,0,[[0.35,0.6],[0.45,0.56],[0.58,0.42],[0.68,0.22],[0.74,0.07]],10); m", budget=100)
+azl_pm = solid.material@1(azl_p, color=[0.62, 0.12, 0.3], roughness=0.9, emissive=[0.08, 0.01, 0.03])
+let az_at = join(i in 0..19, "[-5.7, 0, {-53 + i * 2.5}], [5.7, 0, {-53 + i * 2.5}], [-7.0, 0, {-51.8 + i * 2.5}], [7.0, 0, {-51.8 + i * 2.5}]")
+let az_ys = join(i in 0..19, "[{i * 37}, {0.85 + 0.3 * sin(i * 2.3)}], [{i * 53}, {0.9 + 0.3 * cos(i * 1.7)}], [{i * 71}, {0.8 + 0.25 * sin(i * 3.1)}], [{i * 29}, {0.85 + 0.3 * cos(i * 2.9)}]")
+azl_hg = inst.place@1(azl_gm, at=[${az_at}], yaw_scale=[${az_ys}])
+output azalea_green = azl_hg
+azl_hp = inst.place@1(azl_pm, at=[${az_at}], yaw_scale=[${az_ys}])
+output azalea_flowers = azl_hp
+
+petal_s = poly.script@1(code="const m = new Mesh(); function rn(){ return Math.random(); }; for(let k=0;k<4;k++){ const x=(rn()-0.5)*0.3,z=(rn()-0.5)*0.3,a=rn()*3.14,c=Math.cos(a)*0.06,s=Math.sin(a)*0.06; const p0=m.vertex(x-c,0.02,z-s),p1=m.vertex(x+c,0.02,z+s),p2=m.vertex(x+c-s*0.8,0.02,z+s+c*0.8),p3=m.vertex(x-c-s*0.8,0.02,z-s+c*0.8); m.face(p0,p3,p2,p1); } m", seed=2, budget=100)
+petal_m = solid.material@1(petal_s, color=[0.98, 0.7, 0.8], roughness=0.8, emissive=[0.25, 0.1, 0.13])
+grove("petals_a", "petal_m", 4000, 70, 100, 0, -8, 21, 0.35, 0.01)
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+# MACHiya STREET — six timber merchant houses beside the shrine avenue. Each uses a curved tiled roof,
+# exposed post-and-beam frame, lattice doors, noren curtains, shop signs, a serving counter and lanterns.
+# This gives the precinct an inhabited Japanese street edge instead of leaving the torii path isolated.
+let jtiles = "function tiles(cx,cy,cz,A,B,H,L,rf,k,dx,dz){ const hg=(x,z)=>{ const ax=Math.abs(x),az=Math.abs(z),mx=Math.min(A-ax,B-az),R=Math.min(A,B)*rf,u=Math.min(mx/R,1); let y=H*Math.pow(u,k)+L*Math.pow((ax/A)*(az/B),5); const ac=(A-ax)<(B-az)?z:x; y+=0.035*Math.cos(ac*17)*Math.min(1,mx*1.5); return y; }; for(let z=-B+dz/2;z<B;z+=dz){ for(let x=-A+dx/2;x<A;x+=dx){ const x0=x-dx*0.43,x1=x+dx*0.43,z0=z-dz*0.43,z1=z+dz*0.43; if(Math.abs(x1)>A||Math.abs(z1)>B) continue; const y0=cy+hg(x0,z0)+0.018,y1=cy+hg(x1,z0)+0.018,y2=cy+hg(x1,z1)+0.018,y3=cy+hg(x0,z1)+0.018,ym=cy+hg(x,z)+0.055; const a=m.vertex(cx+x0,y0,cz+z0),b=m.vertex(cx+x1,y1,cz+z0),c=m.vertex(cx+x1,y2,cz+z1),d=m.vertex(cx+x0,y3,cz+z1),e=m.vertex(cx+x,ym,cz+z); m.face(a,d,e); m.face(d,c,e); m.face(c,b,e); m.face(b,a,e); } } }; "
+let jmachiya = "function house(){ box(-4,0,-3.45,4,0.42,3.45); box(-3.65,0.42,-3.15,3.65,0.62,3.15); box(-3.55,0.62,-3.15,3.55,3.15,-3.0); box(-3.55,0.62,-3.0,-3.35,3.2,3.0); box(3.35,0.62,-3.0,3.55,3.2,3.0); box(-3.55,3.05,-3.0,3.55,3.3,3.0); for(let x=-3.5;x<=3.51;x+=1.75){ cyl(x,3.02,0.48,3.35,0.11,0.09,10); } box(-3.7,3.18,-3.2,3.7,3.42,3.25); box(-3.65,0.68,2.95,3.65,0.86,3.12); for(let x=-3.55;x<3.56;x+=0.88){ box(x,0.82,3.04,x+0.06,3.0,3.12); } for(let y=1.0;y<3.05;y+=0.55){ box(-3.55,y,3.04,3.55,y+0.045,3.12); } box(-3.55,0.62,3.05,3.55,0.72,3.16); box(-3.5,3.12,3.04,3.5,3.22,3.18); for(let x=-3.5;x<=3.51;x+=1.75){ box(x-0.12,3.3,2.85,x+0.12,3.62,3.25); } box(-4.1,3.55,-3.7,4.1,3.78,3.7); roof(0,3.55,0,5.15,4.05,1.2,0.62,0.29,0.86,48,36,1.18); box(-2.8,2.18,3.14,2.8,2.28,3.22); for(let x=-2.5;x<=2.51;x+=0.83){ box(x-0.37,1.55,3.18,x+0.37,2.15,3.25); } for(let x=-3.1;x<=3.11;x+=0.62){ box(x-0.22,2.38,3.23,x+0.22,3.28,3.31); } box(-3.2,2.3,3.18,3.2,2.4,3.28); box(-3.2,3.26,3.18,3.2,3.36,3.28); box(-3.2,2.3,3.18,-3.1,3.36,3.28); box(3.1,2.3,3.18,3.2,3.36,3.28); for(let x=-2.5;x<=2.51;x+=1.25){ box(x-0.07,0.9,3.36,x+0.07,1.5,3.42); box(x-0.46,0.88,3.36,x+0.46,0.97,3.42); } for(let x=-3.2;x<=3.21;x+=0.8){ box(x-0.05,3.35,3.4,x+0.05,3.55,3.48); } box(-3.5,3.58,3.0,3.5,3.68,3.85); box(-3.45,3.68,3.1,-3.35,4.3,3.75); box(3.35,3.68,3.1,3.45,4.3,3.75); }; "
+let jshoppos = "[-14.2,0,-49],[-14.2,0,-35],[-14.2,0,-21]"
+let jshopposr = "[14.2,0,-49],[14.2,0,-35],[14.2,0,-21]"
+let jshopyaw = "[90,1],[90,1],[90,1]"
+let jshopyawr = "[-90,1],[-90,1],[-90,1]"
+shop_shell_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jcyl} ${jlathe} ${jroof} ${jmachiya} house(); m", budget=6000)
+shop_shell_m = solid.material@1(shop_shell_s, color=[0.29, 0.13, 0.075], roughness=0.68, recipe="wood", texture_scale=2.4)
+shop_shell_l = inst.place@1(shop_shell_m, at=[${jshoppos}], yaw_scale=[${jshopyaw}])
+shop_shell_r = inst.place@1(shop_shell_m, at=[${jshopposr}], yaw_scale=[${jshopyawr}])
+output machiya_timber = shop_shell_l
+output machiya_timber_right = shop_shell_r
+
+# Separate ceramic cap tiles follow the same curved roof equation as the roof shell.
+shop_tiles_s = poly.script@1(code="const m = new Mesh(); ${jtiles} tiles(0,3.55,0,5.15,4.05,1.2,0.62,0.86,1.18,0.34,0.34); m", budget=9000)
+shop_tiles_m = solid.material@1(shop_tiles_s, color=[0.055, 0.068, 0.082], metallic=0.12, roughness=0.46)
+shop_tiles_l = inst.place@1(shop_tiles_m, at=[${jshoppos}], yaw_scale=[${jshopyaw}])
+shop_tiles_r = inst.place@1(shop_tiles_m, at=[${jshopposr}], yaw_scale=[${jshopyawr}])
+output machiya_kawara_tiles = shop_tiles_l
+output machiya_kawara_tiles_right = shop_tiles_r
+
+# Warm shoji panels sit behind a deep, fine-grained lattice; alternating panel sizes make each facade read as a shop.
+let jshop_shoji = "function shoji(){ for(let x=-3.2;x<3.21;x+=0.8){ box(x,0.9,3.18,x+0.74,2.95,3.23); for(let q=0;q<=4;q++){ const y=0.9+q*0.51; box(x,y,3.24,x+0.74,y+0.045,3.28); } for(let q=0;q<=3;q++){ const xx=x+q*0.24; box(xx,0.9,3.24,xx+0.04,2.95,3.28); } } }; "
+shop_shoji_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jshop_shoji} shoji(); m", budget=500)
+shop_shoji_m = solid.material@1(shop_shoji_s, color=[0.72, 0.66, 0.51], roughness=0.85, emissive=[0.26, 0.12, 0.035])
+shop_shoji_l = inst.place@1(shop_shoji_m, at=[${jshoppos}], yaw_scale=[${jshopyaw}])
+shop_shoji_r = inst.place@1(shop_shoji_m, at=[${jshopposr}], yaw_scale=[${jshopyawr}])
+output machiya_shoji = shop_shoji_l
+output machiya_shoji_right = shop_shoji_r
+
+# Indigo noren, red shop curtains, wood sign frames, ceramic sake jars, crates, and serving counters.
+let jshop_fabric = "function fabric(){ for(let x=-2.5;x<=2.51;x+=0.84){ const w=0.38+0.05*Math.sin(x*4); box(x-w/2,2.45,3.48,x+w/2,3.35,3.54); box(x-w/2,2.45,3.54,x+w/2,2.53,3.61); } }; "
+shop_fabric_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jshop_fabric} fabric(); m", budget=150)
+shop_indigo = solid.material@1(shop_fabric_s, color=[0.055, 0.11, 0.19], roughness=0.82)
+shop_vermilion = solid.material@1(shop_fabric_s, color=[0.48, 0.075, 0.035], roughness=0.82)
+shop_indigo_l = inst.place@1(shop_indigo, at=[${jshoppos}], yaw_scale=[${jshopyaw}])
+shop_red_r = inst.place@1(shop_vermilion, at=[${jshopposr}], yaw_scale=[${jshopyawr}])
+output indigo_noren = shop_indigo_l
+output vermilion_noren_right = shop_red_r
+
+let jshop_props = "function props(){ box(-2.3,0.72,3.0,2.3,0.84,3.65); box(-2.15,0.35,3.12,-2.0,0.72,3.25); box(2.0,0.35,3.12,2.15,0.72,3.25); for(const x of [-1.35,1.3]){ cyl(x,2.7,0.55,1.05,0.34,0.3,12); cyl(x,2.7,1.05,1.12,0.32,0.3,12); } for(let k=0;k<3;k++){ box(-3.0+k*0.42,0.55,3.7,-2.68+k*0.42,0.9,4.02); box(2.65+k*0.4,0.55,3.7,2.97+k*0.4,0.9,4.02); } }; "
+shop_props_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jcyl} ${jshop_props} props(); m", budget=250)
+shop_props_m = solid.material@1(shop_props_s, color=[0.36, 0.2, 0.105], roughness=0.78, recipe="wood", texture_scale=1.5)
+shop_props_l = inst.place@1(shop_props_m, at=[${jshoppos}], yaw_scale=[${jshopyaw}])
+shop_props_r = inst.place@1(shop_props_m, at=[${jshopposr}], yaw_scale=[${jshopyawr}])
+output machiya_counters_jars = shop_props_l
+output machiya_counters_jars_right = shop_props_r
+
+# Eave lanterns repeat along every shop front; warm material emission stays restrained against the blue-hour sky.
+shop_lantern_s = poly.script@1(code="const m = new Mesh(); ${jbox} ${jcyl} ${jlathe} box(-0.25,0,-0.18,0.25,0.72,0.18); for(let y=0.12;y<0.7;y+=0.12){ cyl(0,0,y,y+0.025,0.255,0.255,12); } box(-0.32,0.7,-0.24,0.32,0.78,0.24); m", budget=220)
+shop_lantern_glass = solid.material@1(shop_lantern_s, color=[0.74, 0.43, 0.18], emissive=[1.0, 0.38, 0.08], roughness=0.6)
+let jshoplampsl = join(i in 0..3, "[-17.0,2.8,{-49+i*14}],[-14.2,2.8,{-49+i*14}],[-11.5,2.8,{-49+i*14}]")
+let jshoplampsr = join(i in 0..3, "[11.5,2.8,{-49+i*14}],[14.2,2.8,{-49+i*14}],[17.0,2.8,{-49+i*14}]")
+shop_lamps_l = inst.place@1(shop_lantern_glass, at=[${jshoplampsl}], yaw_scale=[[90,1],[90,1],[90,1],[90,1],[90,1],[90,1],[90,1],[90,1],[90,1]])
+shop_lamps_r = inst.place@1(shop_lantern_glass, at=[${jshoplampsr}], yaw_scale=[[-90,1],[-90,1],[-90,1],[-90,1],[-90,1],[-90,1],[-90,1],[-90,1],[-90,1]])
+output machiya_lanterns = shop_lamps_l
+output machiya_lanterns_right = shop_lamps_r

@@ -16,6 +16,7 @@ mod field;
 mod mesh;
 mod mesh_ops;
 mod profile;
+mod skin;
 mod solid;
 mod subdivision;
 mod tangents;
@@ -31,6 +32,7 @@ pub use field::{
 pub use mesh::{Mesh, simplify};
 pub use mesh_ops::{EditedMesh, MeshOp, MeshSelection, PokeCenter, edit_mesh};
 pub use profile::Profile;
+pub use skin::{SkinJoint, SkinOptions, skin_graph};
 pub use solid::{Bounds, MAX_EXTENT, Solid};
 pub use subdivision::{
     CornerSharpness, Crease, SubdivisionChannels, SubdivisionMesh, subdivide_catmark,

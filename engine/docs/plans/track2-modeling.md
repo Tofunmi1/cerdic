@@ -655,8 +655,8 @@ adapter, and does not link current PMP into the evaluator while its exception/RT
 the engine C++ build. Maintainers decide whether to accept this amendment.
 
 Primary references (checked 2026-10-12; pin a commit during adoption):
-[vendored Manifold API](../../third_party/manifold/include/manifold/manifold.h) and
-[execution-context contract](../../third_party/manifold/include/manifold/common.h) (local APIs beat
+[vendored Manifold API](../../lib/manifold/include/manifold/manifold.h) and
+[execution-context contract](../../lib/manifold/include/manifold/common.h) (local APIs beat
 upstream assumptions; the safe wrapper exposes only a subset); [Curvo](https://github.com/mattatz/curvo)
 (MIT per Cargo.toml; README badge disagrees); [PMP](https://github.com/pmp-library/pmp-library);
 [OpenSubdiv FAR](https://www.opensubdiv.org/docs/far_overview.html) and its

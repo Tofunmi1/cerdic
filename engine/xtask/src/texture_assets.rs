@@ -5,7 +5,7 @@ use std::path::Path;
 type Failure = Box<dyn std::error::Error>;
 
 pub(crate) fn copy_assets() -> Result<(), Failure> {
-    const SOURCE: &str = "third_party/material-maker/addons/material_maker";
+    const SOURCE: &str = "lib/material-maker/addons/material_maker";
     const DEST: &str = "web/dist/texture-library";
     let mut names = Vec::new();
     let nodes = Path::new(SOURCE).join("nodes");

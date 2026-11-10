@@ -49,6 +49,9 @@ pub(crate) fn parts(output: &Output, value: &Value) -> Result<Vec<Part>, Fail> {
             let mut result = part(output, piece, placements, region);
             // A placed set carries its tracks too: every copy plays them in its own frame, shifted by the track's phase.
             result.animation.clone_from(&value.animation);
+            // Every material region of the shape is drawn in the same camera-distance band.
+            result.visible_range = prototype.visible_range;
+            result.visible_fade = prototype.visible_fade;
             result.volume = if whole.abs() > f64::EPSILON {
                 volume * piece.volume / whole
             } else {
@@ -73,10 +76,17 @@ fn part(
         uvs: value.uvs.clone(),
         baked: value.baked.clone(),
         occlusion: Vec::new(),
+        normals: crate::world_terrain::vertex_normals(value),
+        colors: if value.colors.len() == value.mesh.positions.len() {
+            value.colors.clone()
+        } else {
+            Vec::new()
+        },
         volume: value.volume,
         material: value.material.clone(),
         frames: value.frames.clone(),
         animation: value.animation.clone(),
+        state_machine: value.state_machine.clone(),
         behavior: if transforms.is_none() {
             value.behavior.clone()
         } else {
@@ -97,8 +107,38 @@ fn part(
         } else {
             None
         },
+        morph_targets: if transforms.is_none() {
+            value.morph_targets.clone()
+        } else {
+            Vec::new()
+        },
         ik: if transforms.is_none() {
             value.ik.clone()
+        } else {
+            None
+        },
+        fx: if transforms.is_none() {
+            value.fx.clone()
+        } else {
+            None
+        },
+        ragdoll: if transforms.is_none() {
+            value.ragdoll.clone()
+        } else {
+            None
+        },
+        cloth: if transforms.is_none() {
+            value.cloth.as_deref().cloned()
+        } else {
+            None
+        },
+        fluid: if transforms.is_none() {
+            value.fluid.as_deref().cloned()
+        } else {
+            None
+        },
+        sim: if transforms.is_none() {
+            value.sim.as_deref().cloned()
         } else {
             None
         },
@@ -108,6 +148,8 @@ fn part(
             None
         },
         transforms,
+        visible_range: value.visible_range,
+        visible_fade: value.visible_fade,
         instance_indices,
         region,
     }

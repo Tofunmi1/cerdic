@@ -1,0 +1,137 @@
+# A BALD EAGLE, soaring and flapping: about 2.2 m wingspan, 1 m long, metres, +y up, facing +z. It flaps and circles in the middle of the default (white) studio, like the ogre: open the world with no scene parameter.
+# Body, neck and head are skinned from a skeleton (poly.skin, subdivided); the head and the beak are ONE lofted surface (an eagle's forehead runs into its beak); the wings are layers of individual
+# feathers (lesser coverts, coverts, flight feathers) on a cambered airfoil arm, split at the wrist so the hand can lag the arm; the tail is a fan of nine feathers; the legs are feathered thighs, a yellow
+# tarsus and four toes, each with a curved black talon. Hierarchy: body (flies the circle) > inner wing (flaps at the shoulder) > outer wing (bends at the wrist).
+# kind: world
+# the same sky and light as the ogre and the person, so it sits in the default studio the same way
+sky = scene.sky@1(sun_elevation=40, sun_azimuth=-35, sun_intensity=3.4, turbidity=3, ground_color=[0.32, 0.3, 0.28], clouds=false, haze=0.08)
+env = scene.environment@1(sky_color=[0.78, 0.82, 0.9], ground_color=[0.45, 0.43, 0.4], intensity=1.0, reflection=0.3, bounce=0.6)
+output sky = sky
+output env = env
+
+# ---- the body: chest, belly, tail root, neck, head ----
+bd_s = poly.skin@1(joints="chest 0 0.0 0.05 0.135 0.135 root; belly 0 -0.01 -0.18 0.105 0.105; tailroot 0 0.0 -0.32 0.06 0.05; tailend 0 0.0 -0.39 0.035 0.03; neck 0 0.055 0.21 0.058 0.058; head 0 0.095 0.33 0.03 0.034; headtip 0 0.095 0.37 0.02 0.022", bones="chest-belly; belly-tailroot; tailroot-tailend; chest-neck; neck-head; head-headtip", symmetry="x")
+bd_d = poly.subdivide@1(bd_s, levels=3)
+bd_m = solid.material@1(bd_d, color=[0.19, 0.12, 0.08], roughness=0.8)
+
+# ---- the flight path, kept in the middle of the studio frame like the ogre: a circle of 0.4 m radius every 7 s, 1.1 m above the floor, heading along it, banked into the turn, bobbing; everything else is parented to the body so it comes along ----
+let circ = join(k in 0..9, "{k * 0.875}:{-0.4 * cos(k * 0.7853982)},{1.1 + 0.04 * sin(k * 1.5707963)},{0.4 * sin(k * 0.7853982)}", "; ")
+let head_keys = join(k in 0..9, "{k * 0.875}:0,{k * 45},-12", "; ")
+bd_r = anim.track@1(bd_m, property="rotation", keys="${head_keys}", interpolation="linear")
+bd_p = anim.track@1(bd_r, property="position", keys="${circ}", interpolation="bezier")
+output body = bd_p
+
+# ---- feathers: one routine, run per layer and per side ----
+# feather(bx, by, bz, dx, dz, L, w, lift, taper): a curved, ridged blade from (bx, by, bz) along (dx, dz), length L, half width w, drooping by `lift`, rounded at the tip, two-sided
+let fl = "const m = new Mesh(); function feather(bx, by, bz, dx, dz, L, w, lift, taper) { const px = -dz, pz = dx; const rows = []; for (let u = 0; u <= 8; u++) { const f = u / 8; const e = f < 0.7 ? 1 : Math.sqrt(Math.max(0.06, 1 - Math.pow((f - 0.7) / 0.3, 2))); const hw = w * (1 - taper * f * f) * e; const r = hw * 0.3; const cx = bx + dx * L * f, cz = bz + dz * L * f, cy = by - lift * L * f * f; rows.push([m.vertex(cx + px * hw, cy - r * 0.5, cz + pz * hw), m.vertex(cx, cy + r * (1 - 0.6 * f), cz), m.vertex(cx - px * hw, cy - r * 0.5, cz - pz * hw)]); } for (let u = 0; u < 8; u++) { for (let k = 0; k < 2; k++) { m.face(rows[u][k], rows[u][k + 1], rows[u + 1][k + 1], rows[u + 1][k]); m.face(rows[u][k], rows[u + 1][k], rows[u + 1][k + 1], rows[u][k + 1]); } } }"
+# the wing arm: a thick cambered airfoil between t = tA and tB of the wing (0 shoulder, 1 tip); s = +1 left, -1 right
+let arm = "function arm(s, tA, tB) { const m = new Mesh(); const N = 12, M = 10; const ids = []; for (let i = 0; i <= N; i++) { const t = tA + (tB - tA) * i / N; const x = s * (0.07 + 0.78 * t); const zle = 0.1 + 0.1 * t - 0.2 * t * t; const c = 0.34 * (1 - 0.6 * t); const th = 0.045 * (1 - 0.75 * t) + 0.006; const y0 = 0.05 + 0.02 * (1 - t) + 0.07 * t * t; const row = []; for (let j = 0; j < M; j++) { const p = j / M * 2 * Math.PI; const a = 0.5 + 0.5 * Math.cos(p); row.push(m.vertex(x, y0 + th * Math.sin(p) * (0.4 + 0.6 * Math.sin(Math.PI * Math.min(1, a * 1.15))), zle - c * a)); } ids.push(row); } for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) { const j2 = (j + 1) % M; if (s > 0) m.face(ids[i][j], ids[i + 1][j], ids[i + 1][j2], ids[i][j2]); else m.face(ids[i][j], ids[i][j2], ids[i + 1][j2], ids[i + 1][j]); } return m; }"
+# ring(s, n, l0, l1, w, a0, a1, off, lift, taper, i0, i1): feathers i0 to i1-1 of n along the wing of side s, length l0 at the shoulder to l1 at the tip, swept back a0 to a1 degrees, stacked `off` up, shingled, the outermost shortened
+let wing = "function ring(s, n, l0, l1, w, a0, a1, off, lift, taper, i0, i1) { for (let i = i0; i < i1; i++) { const t = i / (n - 1); const a = (a0 + (a1 - a0) * t) * Math.PI / 180; const dx = s * Math.sin(a), dz = -Math.cos(a); const bx = s * (0.1 + 0.8 * t), bz = 0.1 + 0.1 * t - 0.2 * t * t; feather(bx, 0.055 + off + 0.02 * t + 0.07 * t * t + 0.0007 * i, bz, dx, dz, (l0 + (l1 - l0) * t) * (1 - 0.4 * Math.pow(Math.max(0, (t - 0.86) / 0.14), 2)), w, lift, taper); } }"
+
+# a wing part: a script, a material and a barb texture (g0, g1: the dark and light end of the texture's colour ramp)
+def wpt(name, code, cr, cg, cb, g0, g1)
+  {name}_s = poly.script@1(code={code})
+  {name}_m = solid.material@1(${name}_s, color=[{cr}, {cg}, {cb}], roughness=0.78)
+  {name}_t = solid.texture@1(${name}_m, tile=0.5, size="512", program="g = fbm(scale_x=3, scale_y=60); albedo = colorize(g, gradient=[0:#${g0}, 1:#${g1}]); roughness = g; height = g")
+end
+
+# the flap: the arm turns about the shoulder (up, down, a held beat), the hand about the wrist, a little behind it; 1.4 s a beat, the left wing up when the right is up
+def wing_side(side, s, sk, wk, sx, wx)
+  wpt("ai_${side}", "${arm} arm(${s}, 0, 0.62)", 0.2, 0.125, 0.08, "3a2312", "6a4528")
+  wpt("ao_${side}", "${arm} arm(${s}, 0.62, 1)", 0.2, 0.125, 0.08, "3a2312", "6a4528")
+  wpt("fi_${side}", "${fl} ${wing} ring(${s}, 38, 0.34, 0.41, 0.05, -3, 42, 0, 0.12, 0.25, 0, 23); m", 0.15, 0.09, 0.06, "35200f", "7a5434")
+  wpt("fo_${side}", "${fl} ${wing} ring(${s}, 38, 0.34, 0.41, 0.05, -3, 42, 0, 0.12, 0.25, 23, 38); m", 0.15, 0.09, 0.06, "35200f", "7a5434")
+  wpt("ci_${side}", "${fl} ${wing} ring(${s}, 32, 0.17, 0.24, 0.048, -2, 34, 0.016, 0.1, 0.25, 0, 19); m", 0.27, 0.17, 0.1, "5a3a20", "8a5f38")
+  wpt("co_${side}", "${fl} ${wing} ring(${s}, 32, 0.17, 0.24, 0.048, -2, 34, 0.016, 0.1, 0.25, 19, 32); m", 0.27, 0.17, 0.1, "5a3a20", "8a5f38")
+  wpt("li_${side}", "${fl} ${wing} ring(${s}, 26, 0.09, 0.12, 0.044, 0, 26, 0.03, 0.08, 0.25, 0, 15); m", 0.33, 0.21, 0.13, "6a4528", "9a7448")
+  wpt("lo_${side}", "${fl} ${wing} ring(${s}, 26, 0.09, 0.12, 0.044, 0, 26, 0.03, 0.08, 0.25, 15, 26); m", 0.33, 0.21, 0.13, "6a4528", "9a7448")
+  # the inner arm turns about the shoulder and follows the body; the inner feathers follow the inner arm
+  ai_{side}_a = anim.track@1(ai_${side}_t, property="rotation", keys="${sk}", interpolation="bezier", pivot=[${sx}, 0.06, 0.05])
+  ai_{side}_p = anim.parent@1(ai_${side}_a, parent="body")
+  output wing_arm_in_{side} = ai_${side}_p
+  for [n, node] in [["flight_in", "fi"], ["covert_in", "ci"], ["lesser_in", "li"]]
+    {node}_{side}_p = anim.parent@1(${node}_${side}_t, parent="wing_arm_in_${side}")
+    output wing_{n}_{side} = ${node}_${side}_p
+  end
+  # the outer arm turns about the wrist and follows the inner arm; the outer feathers follow the outer arm
+  ao_{side}_a = anim.track@1(ao_${side}_t, property="rotation", keys="${wk}", interpolation="bezier", pivot=[${wx}, 0.07, 0.07])
+  ao_{side}_p = anim.parent@1(ao_${side}_a, parent="wing_arm_in_${side}")
+  output wing_arm_out_{side} = ao_${side}_p
+  for [n, node] in [["flight_out", "fo"], ["covert_out", "co"], ["lesser_out", "lo"]]
+    {node}_{side}_p = anim.parent@1(${node}_${side}_t, parent="wing_arm_out_${side}")
+    output wing_{n}_{side} = ${node}_${side}_p
+  end
+end
+# the left wing rises on a positive turn about z, the right on a negative one
+wing_side("l", 1, "0:0,0,-3; 0.35:0,0,22; 0.85:0,0,-20; 1.4:0,0,-3", "0:0,0,4; 0.35:0,0,-9; 0.85:0,0,12; 1.4:0,0,4", 0.07, 0.57)
+wing_side("r", -1, "0:0,0,3; 0.35:0,0,-22; 0.85:0,0,20; 1.4:0,0,3", "0:0,0,-4; 0.35:0,0,9; 0.85:0,0,-12; 1.4:0,0,-4", -0.07, -0.57)
+
+# ---- the tail: a fan of nine white feathers, twitching a little ----
+tail = poly.script@1(code="${fl} for (let i = 0; i < 9; i++) { const a = (-32 + i * 8) * Math.PI / 180; feather(0, 0.0, -0.32, Math.sin(a), -Math.cos(a), 0.25, 0.034, 0.04, 0.3); } m")
+tail_m = solid.material@1(tail, color=[0.93, 0.92, 0.88], roughness=0.8)
+tail_w = anim.wave@1(tail_m, property="rotation", amplitude=[3, 0, 0], period=1.4, pivot=[0, 0, -0.32])
+tail_p = anim.parent@1(tail_w, parent="body")
+output tail = tail_p
+
+# ---- the head and the beak are ONE lofted surface ----
+# oval sections along z whose top, bottom and half width follow key tables (z, top y, bottom y, half width): nape, crown, brow ridge (the top bulges over the eye), forehead, the cere where the beak starts, the hooked tip
+let hdk = "function head(zA, zB) { const K = [[0.27, 0.126, 0.062, 0.03], [0.3, 0.134, 0.062, 0.035], [0.335, 0.138, 0.066, 0.037], [0.37, 0.14, 0.07, 0.036], [0.395, 0.134, 0.07, 0.03], [0.42, 0.124, 0.066, 0.024], [0.44, 0.108, 0.062, 0.017], [0.457, 0.085, 0.056, 0.01], [0.468, 0.058, 0.05, 0.005], [0.474, 0.044, 0.042, 0.003]]; function at(z, c) { let i = 0; while (i < K.length - 2 && z > K[i + 1][0]) i++; const a = K[i], b = K[i + 1]; let t = Math.min(1, Math.max(0, (z - a[0]) / (b[0] - a[0]))); t = (1 - Math.cos(Math.PI * t)) / 2; return a[c] + (b[c] - a[c]) * t; } const m = new Mesh(); const N = 22, M = 16; const ids = []; for (let i = 0; i <= N; i++) { const z = zA + (zB - zA) * i / N; const top = at(z, 1), bot = at(z, 2), w = at(z, 3); const yc = (top + bot) / 2, h = (top - bot) / 2; const row = []; for (let j = 0; j < M; j++) { const p = j / M * 2 * Math.PI; const c = Math.cos(p), s = Math.sin(p); row.push(m.vertex(w * Math.sign(c) * Math.pow(Math.abs(c), 0.8), yc + h * Math.sign(s) * Math.pow(Math.abs(s), 0.9), z)); } ids.push(row); } for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) { const j2 = (j + 1) % M; m.face(ids[i][j], ids[i + 1][j], ids[i + 1][j2], ids[i][j2]); m.face(ids[i][j], ids[i][j2], ids[i + 1][j2], ids[i + 1][j]); } return m; }"
+hd_l = poly.script@1(code="${hdk} head(0.27, 0.395)")
+hd_m = solid.material@1(hd_l, color=[0.95, 0.94, 0.9], roughness=0.8)
+hd_p = anim.parent@1(hd_m, parent="body")
+output head = hd_p
+bku = poly.script@1(code="${hdk} head(0.395, 0.474)")
+bk_m = solid.material@1(bku, color=[0.95, 0.74, 0.1], roughness=0.4)
+bk_p = anim.parent@1(bk_m, parent="body")
+output beak = bk_p
+
+# the white neck under the hackles
+hd_s = solid.sphere@1(radius=1.0, segments=32)
+nk_e = xform.scale@1(hd_s, by=[0.048, 0.05, 0.108])
+nk_a = xform.move@1(nk_e, by=[0, 0.087, 0.28])
+nk_m = solid.material@1(nk_a, color=[0.95, 0.94, 0.9], roughness=0.8)
+nk_p = anim.parent@1(nk_m, parent="body")
+output neck = nk_p
+# shaggy hackles: five staggered rings of white feathers laid back over the neck, each a different length, width and sweep, the lower rings spreading out over the shoulders
+hk = poly.script@1(code="${fl} for (let k = 0; k < 5; k++) { const n = 20 + 2 * k; for (let i = 0; i < n; i++) { const th = (i + 0.5 * (k % 2)) / n * 2 * Math.PI; const j = Math.sin(i * 7.3 + k * 2.1), q = Math.sin(i * 3.9 + k * 5.7); const r = 0.044 + 0.005 * k; const bx = r * Math.sin(th), by = 0.082 + (0.047 + 0.004 * k) * Math.cos(th); feather(bx, by, 0.325 - 0.05 * k + 0.01 * j, 0.22 * Math.sin(th) + 0.12 * j + 0.05 * k * Math.sin(th), -1, 0.07 + 0.03 * Math.abs(q) + 0.012 * k, 0.011 + 0.004 * Math.abs(j), 0.4 + 0.15 * q, 0.5); } } m")
+hk_m = solid.material@1(hk, color=[0.97, 0.96, 0.92], roughness=0.85)
+hk_p = anim.parent@1(hk_m, parent="body")
+output hackles = hk_p
+# eyes: pale yellow with a black pupil, set under the brow ridge
+ey_s = solid.sphere@1(radius=0.009, segments=16)
+ey_l = xform.move@1(ey_s, by=[0.028, 0.108, 0.375])
+ey_mm = xform.mirror@1(ey_l, axis="x")
+ey_u = solid.union@1(ey_l, ey_mm)
+ey_m = solid.material@1(ey_u, color=[0.95, 0.8, 0.15], roughness=0.2)
+ey_p = anim.parent@1(ey_m, parent="body")
+output eyes = ey_p
+pp_s = solid.sphere@1(radius=0.0045, segments=12)
+pp_l = xform.move@1(pp_s, by=[0.034, 0.108, 0.381])
+pp_mm = xform.mirror@1(pp_l, axis="x")
+pp_u = solid.union@1(pp_l, pp_mm)
+pp_m = solid.material@1(pp_u, color=[0.02, 0.02, 0.02], roughness=0.1)
+pp_p = anim.parent@1(pp_m, parent="body")
+output pupils = pp_p
+
+# ---- the legs: feathered thighs, a yellow tarsus, four toes (three forward, one back) each with a curved black talon ----
+# tube(m, points, radii, sides): a round tube along a polyline, radius per point
+let tube = "function tube(m, pts, rad, sides) { const rings = []; for (let i = 0; i < pts.length; i++) { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)]; let d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; const dl = Math.hypot(d[0], d[1], d[2]) || 1; d = [d[0] / dl, d[1] / dl, d[2] / dl]; const u = Math.abs(d[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]; let r = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]]; const rl = Math.hypot(r[0], r[1], r[2]) || 1; r = [r[0] / rl, r[1] / rl, r[2] / rl]; const w = [d[1] * r[2] - d[2] * r[1], d[2] * r[0] - d[0] * r[2], d[0] * r[1] - d[1] * r[0]]; const row = []; for (let j = 0; j < sides; j++) { const p = j / sides * 2 * Math.PI, c = Math.cos(p) * rad[i], s = Math.sin(p) * rad[i]; row.push(m.vertex(pts[i][0] + r[0] * c + w[0] * s, pts[i][1] + r[1] * c + w[1] * s, pts[i][2] + r[2] * c + w[2] * s)); } rings.push(row); } for (let i = 0; i + 1 < pts.length; i++) for (let j = 0; j < sides; j++) { const j2 = (j + 1) % sides; m.face(rings[i][j], rings[i + 1][j], rings[i + 1][j2], rings[i][j2]); m.face(rings[i][j], rings[i][j2], rings[i + 1][j2], rings[i + 1][j]); } }"
+# foot(m, s, claws): the leg of side s; claws = 0 builds the yellow tarsus and toes, claws = 1 the black talons. A toe is [yaw degrees, length, pitch down degrees].
+let foot = "function foot(m, s, claws) { const hip = [s * 0.055, -0.09, -0.17], ank = [s * 0.055, -0.2, -0.215]; if (!claws) tube(m, [hip, [s * 0.055, -0.145, -0.19], ank], [0.018, 0.014, 0.013], 8); const toes = [[-26, 0.075, 22], [0, 0.098, 20], [26, 0.07, 22], [180, 0.05, 28]]; for (const t of toes) { const ya = t[0] * s * Math.PI / 180, pi = t[2] * Math.PI / 180; const d = [Math.sin(ya) * Math.cos(pi), -Math.sin(pi), Math.cos(ya) * Math.cos(pi)]; const P = (k) => [ank[0] + d[0] * t[1] * k, ank[1] + d[1] * t[1] * k, ank[2] + d[2] * t[1] * k]; if (!claws) tube(m, [P(0), P(0.35), P(0.7), P(1)], [0.0125, 0.011, 0.0095, 0.008], 6); else { const e = P(1), big = t[0] === 180 || t[0] === 0 ? 1.3 : 1; tube(m, [e, [e[0] + d[0] * 0.012 * big, e[1] - 0.004, e[2] + d[2] * 0.012 * big], [e[0] + d[0] * 0.02 * big, e[1] - 0.016 * big, e[2] + d[2] * 0.02 * big], [e[0] + d[0] * 0.018 * big, e[1] - 0.034 * big, e[2] + d[2] * 0.018 * big]], [0.0075, 0.0055, 0.003, 0.0008], 6); } } }"
+lg_s = poly.script@1(code="${tube} ${foot} const m = new Mesh(); foot(m, 1, 0); foot(m, -1, 0); m")
+lg_m = solid.material@1(lg_s, color=[0.95, 0.75, 0.12], roughness=0.5)
+lg_p = anim.parent@1(lg_m, parent="body")
+output legs = lg_p
+tl_s = poly.script@1(code="${tube} ${foot} const m = new Mesh(); foot(m, 1, 1); foot(m, -1, 1); m")
+tl_m = solid.material@1(tl_s, color=[0.06, 0.055, 0.05], roughness=0.35)
+tl_p = anim.parent@1(tl_m, parent="body")
+output talons = tl_p
+# thigh feathers ("trousers"): brown, down to the top of the tarsus
+th_e = xform.scale@1(hd_s, by=[0.04, 0.065, 0.055])
+th_l = xform.move@1(th_e, by=[0.058, -0.075, -0.165])
+th_mm = xform.mirror@1(th_l, axis="x")
+th_u = solid.union@1(th_l, th_mm)
+th_m = solid.material@1(th_u, color=[0.22, 0.14, 0.09], roughness=0.85)
+th_p = anim.parent@1(th_m, parent="body")
+output thighs = th_p

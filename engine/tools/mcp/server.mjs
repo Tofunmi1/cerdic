@@ -8,20 +8,39 @@
 //
 // For local testing only: it binds to 127.0.0.1, takes one page at a time and has no authentication.
 // stdout carries only MCP messages; everything else goes to stderr.
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { coreWithMenu, splitGuide, topicText } from './guide-topics.mjs';
+import { EXTRA_TOPICS } from './guide.mjs';
+import { TOOL_TOPICS } from './tool-reference.mjs';
+import { validateToolArguments } from '../../web/tool-arguments.js';
+import { CREATURES } from './guide-creatures.mjs';
+import { EFFECTS } from './guide-effects.mjs';
+import { SIM } from './guide-sim.mjs';
 import { fullSpecs, indexText, select } from './operator-index.mjs';
+import { helpField } from './help-field.mjs';
+import { LIMITS_TOPIC } from './guide-limits.mjs';
+import { callBatch } from './batch.mjs';
+import { buildImport } from './import-file.mjs';
+import { callRun } from './run.mjs';
+import { callRecipes, callStartFrom } from './reuse.mjs';
+import { createHints } from './hints.mjs';
+
+const hints = createHints();
+hints.reset();
+const pendingTips = [];
 
 const PORT = Number(process.env.VE_MCP_PORT ?? 8765);
 const TIMEOUT_MS = 90000;
+const GUIDE_ARG = process.argv.indexOf('--guide');
 let page = null;
 let counter = 0;
 const pending = new Map();
 
 const log = (...args) => console.error('[spatial-engine mcp]', ...args);
 
-Bun.serve({
+// (not started for `--guide`, which only prints text)
+const bridge = GUIDE_ARG >= 0 ? null : Bun.serve({
   hostname: '127.0.0.1',
   port: PORT,
   fetch(request, server) {
@@ -41,15 +60,18 @@ Bun.serve({
     },
   },
 });
-log(`bridge listening on ws://127.0.0.1:${PORT}`);
+if (bridge) log(`bridge listening on ws://127.0.0.1:${PORT}`);
 
 function callPage(method, params) {
   if (!page) {
     return Promise.resolve({ error: `No editor page is connected. Open the engine editor with ?mcp=1 (for example http://127.0.0.1:5173/?mcp=1) and try again.` });
   }
   const id = ++counter;
+  // A live aiming policy waits for each physical shot to settle (up to 40 s).
+  const timeout = method === 'playtest' && String(params?.policy).startsWith('aim:')
+    ? 60000 + String(params.policy).split(',').length * 14 * 45000 : TIMEOUT_MS;
   return new Promise((resolve) => {
-    const timer = setTimeout(() => { pending.delete(id); resolve({ error: `The page did not answer ${method} within ${TIMEOUT_MS / 1000} s.` }); }, TIMEOUT_MS);
+    const timer = setTimeout(() => { pending.delete(id); resolve({ error: `The page did not answer ${method} within ${timeout / 1000} s.` }); }, timeout);
     pending.set(id, { resolve, timer });
     page.send(JSON.stringify({ id, method, params }));
   });
@@ -75,12 +97,42 @@ Lengths are metres (suffixes mm and cm work); angles are degrees unless you writ
 angle=90deg or 1.57rad). Numbers, "text", true/false and [lists] are the only values. Lines starting
 with # are comments. Constants and arithmetic: "let w = 1.5" defines one, and {w * 2} (or {w / 2 + 0.1}) in
 any value is replaced by its number; units go after the brace ({w * 1000}mm). Functions: min, max, abs,
-sqrt, floor, ceil, round, clamp, sin, cos, radians; constants pi and tau. Values: value.number,
+sqrt, floor, ceil, round, clamp, sin, cos, radians; constants pi and tau. Text constants hold a string you
+reuse: let mirror = "u = 1.0 - abs(2.0 * p.x - 1.0);" and then \${mirror} inside any quoted value is replaced by it
+(a number constant works there too, \${grain}); a text constant may use earlier ones and carry escaped quotes, so a
+texture program or a long list is written once and parameterised. Loops repeat lines: "for i in 0..8" ... "end" runs the
+lines between once for each i = 0 to 7, and "for [x, z] in [[3, 1], [4, 2]]" takes a row of numbers each time. Inside, {i * 0.5}
+makes a number and {i} in a name makes a different node each time (post_{i} = ...; output post_{i} = post_{i}). Loops hold node,
+let and output lines, nest three deep, work inside a group, and may emit up to 2,000 statements, and a group cannot be declared
+inside a loop. A loop can also walk text: for [name, x] in [["alpha", 1], ["beta", 2]] binds name to quoted text; {name} inside a
+node name is the text itself (letters, digits, underscore only; f_{name}), anywhere else it is that text as a string
+(frame.add(b, name={name})), and \${name} inside a string is spliced (name="hand_\${name}"). To build a list or a keys string with a loop
+write a join: let pts = join(i in 0..24, "[{0.4 * cos(i * 0.5)}, {i * 0.06}, {0.4 * sin(i * 0.5)}]") then points=[\${pts}]; let keys =
+join(i in 0..5, "{i * 0.5}:0,{i * 90},0", "; ") then keys="\${keys}". The header is a loop header (a range, a [list], or [name, x] rows),
+the second argument is the template ({expression} is a number, \${name} a constant), the optional third is the separator (default ", ").
+\${name} is spliced as written inside or outside a string; a join is limited to 65,536 characters and errors name the iteration.
+Choices: "if i < 2" ... "else" ... "end" reads only the branch that holds (else is optional). A condition compares numbers (< <= > >= ==
+!=), compares text with == or != (side == "l"), joins with && and ||, negates with !, and may use parentheses; a lone number is true when
+it is not zero. It is decided from constants and loop variables while the text is read, never from the model. A let inside a branch stays
+inside it; a group cannot be declared inside an if.
+Macros: "def limb(tag, name, px)" ... "end" writes a block once; the line limb("arm_l", "upperarm01_l", 0.19) reads it again with the
+arguments bound (numbers, expressions, "text", or constants; "n\${i}" builds a text). In the body, {name} in a node name is the text itself, {name}
+elsewhere is that text quoted, \${name} is raw (an input: anim.track@1(\${prev}, ...)), and "output {out} = ..." takes a name. A body may hold
+nodes, let, for, if and calls of other macros, and sees the constants above the call; it may not hold group, expose, result or a def. A
+macro never calls itself (even through another). A def stands at the top level and before its first call. Statements still count towards
+the 2,000 cap. Errors name the macro and its arguments ("in iteration macro=limb, tag=\\"arm_l\\"") and point at the body line. Errors name the iteration ("in iteration i=3"). A batch holds up to 10,000 commands (a node costs
+one, each input link one, each output one). Without MCP: bun tools/mcp/server.mjs --guide [topic], cargo run -q -p
+ve-modeling --example ops -- [family|id|--search word] for the operators, bun tools/texture-nodes.ts [names] for the
+texture nodes, and cargo run -q -p ve-modeling --example eval_text -- program.txt to check a program (it prints the
+commands, triangles, texture programs and lights it costs). Values: value.number,
 value.math and value.size make numbers that you link into any number parameter by its name (a vector
 component as size.y), for example r = value.number@1(value=0.5), d = value.math@1(op="mul", a=r, b=2),
 ball = solid.sphere@1(radius=d), box = solid.box@1(size=[1, 1, 1], size.y=h). value.size@1(part,
 measure="height") measures a part (width, height, depth, longest, shortest, volume, area), so one part
-can be sized from another. Only operators from
+can be sized from another. value.point@1(part, at="head", axis="y") reads a place on a part as a number: at is head or tail
+for a bone (body.bone, rig.bone) or min, center, max of any part's bounding box, axis is x, y or z; link it one component at a time
+(hy = value.point@1(head_bone, at="head", axis="y"), hat = xform.move@1(cone, by=[0, 0, 0.03], by.y=hy)) so a hat or a sword is
+placed from the body's own bones and follows when its sliders change. value.math adds an offset. Only operators from
 list_operators (a one-line-each index; pass ids=["solid.box@1"] for full parameter docs) can be used. Y is up. Profiles live in the XY
 plane: solid.revolve spins one (x >= 0) about Y, solid.extrude stands one up from y=0.
 
@@ -130,6 +182,7 @@ output. Kits are text groups, so their construction stays editable in the same g
 Curved paths (initial bounded subset): curve.polyline@1(points=[[x,y,z], ...], closed=true) makes a
 periodic path; omit closed or set it to false for an open path. A repeated final point equal to the
 first is removed automatically for a closed polyline.
+curve.hang@1(from=[x,y,z], to=[x,y,z], slack=0.05, points=32) makes a catenary rope between two tie points.
 curve.bezier@1(points=[[p0x,p0y,p0z], [p1x,p1y,p1z], [p2x,p2y,p2z], [p3x,p3y,p3z]], steps=24)
 makes a sampled cubic path; with closed=true its final endpoint must equal the first. curve.circle@1(center=[x,y,z], radius=r, segments=48) makes a closed
 circle in the XZ plane. Sweep one convex closed profile loop along an open or closed path:
@@ -267,6 +320,80 @@ need to return to editing. Smooth an editable cage with poly.subdivide (levels 1
   cage = poly.from_solid@1(box)
   smooth = poly.subdivide@1(cage, levels=2, boundary="edges_and_corners")
   output smooth
+Whole-mesh cleanup (each takes a polygon mesh and acts on all of it): poly.recalc_normals (direction outward or inward; fixes inside-out
+faces after a script or boolean), poly.smooth (factor, iterations; evens out a lumpy surface, also shrinks open borders a little),
+poly.fill_holes (max_sides; closes boundary loops up to that size), poly.beautify (method area or angle; flips triangle-pair diagonals by
+Blender's measure), poly.planar_faces (iterations, factor; flattens bent quads), poly.join_triangles (face_angle, shape_angle in radians;
+turns triangles back into quads), poly.dissolve_degenerate (distance; removes tiny edges and sliver faces).
+Tools behind a selection: poly.split_edges (selection of edges, element=edge; disconnects the faces along them so each side has its own
+vertices, a hard seam), poly.rotate_edges (edges; direction; spins an edge between two faces to the other diagonal), poly.connect_vertices
+(selection of vertices, element=vertex, at least two on one face; adds edges between them and splits the face). Example, a cube whose faces
+can move apart: seams = poly.select@1(cube, element="edge", by="sharp"); apart = poly.split_edges@1(cube, seams).
+The deformers xform.bend, twist, taper, shear, wave, noise and lattice also take a polygon mesh: every vertex is moved as it is (no
+refinement), so give the mesh enough vertices for a strong bend (a denser poly.grid, poly.subdivide_edges); faces and UVs are kept. A flag:
+panel = poly.grid@1(width=1.2, height=2, columns=12, rows=24); curved = xform.bend@1(panel, angle=80) (angles in degrees, bend at most 90).
+Arrays: inst.along_curve@1(shape, path, count=22, align=true) puts shared copies evenly by length along a curve (open: one at each end;
+closed: all the way round), each turned so its +X axis follows the curve and +Y stays up, so build the shape lengthwise along X (a fence
+from a curve.expr path); inst.array@1(shape, count_x=5, spacing=[1.3, 0, 0], relative=true) reads the spacing as multiples of the shape's
+own size (1.3 leaves 0.3 of its width between copies).
+Sculpting and retopology: poly.sculpt@1(mesh, strokes="mask 0 1 0 0.3 1; draw 0 1 0 0.3 0.08; smooth 0 0.9 0 0.4 0.5; grab 0 1 0 0.3 0 0.1 0", symmetry="x", falloff="surface")
+applies brush strokes in order (brush, centre x y z, radius, strength; grab takes a move vector instead): draw, inflate, smooth, flatten,
+pinch, grab, mask and unmask. Masks persist in the \`sculpt_mask\` point attribute and protect later geometry strokes. Surface falloff follows
+connected mesh edges to avoid pulling through the back of a head or shell; sphere falloff keeps ordinary 3D distance. Both fade to nothing
+at the radius; at most 64 strokes; give it enough vertices (poly.subdivide, a denser grid). The centre must be near the surface.
+poly.remesh_quads@1(mesh, faces=700) rebuilds a smooth organic mesh (a field mesh, a boolean result) as even
+quads; it tries several seeds and refuses with the reason on hard-surface shapes with sharp edges (a box with a hole cut in it), so keep
+those as they are. UVs: poly.uv_transform@1(mesh, offset_u, offset_v, scale, rotate, pivot) moves or scales UVs, all of them or only the
+faces of a poly.select selection (an island); poly.uv_layout@1(mesh, size=1) makes the UV layout a flat mesh to look at (u right, v up).
+curve.fit@1(points=[[x, y, z], ...], tolerance=0.02, corner_angle, closed, steps) fits smooth Beziers through sketched points, keeping
+corners sharper than corner_angle; feed it to curve.tube.
+Volumes (clay-like booleans that cannot fail on a bad mesh): volume.from_mesh@1(closed_mesh, voxel_size=0.05, band=6) samples a closed solid
+or polygon mesh into a grid; volume.combine@1(a, b, operation="union" or "subtract" or "intersect", blend=0.1) joins grids of the same
+voxel_size (blend melts them together over that many metres); volume.smooth@1(v, iterations, factor) rounds it; volume.offset@1(v,
+distance) grows or shrinks it (at most about 0.9 times band times voxel_size); volume.to_mesh@1(v) makes the closed quad mesh, which is the
+only way to output a volume. A blob: va = volume.from_mesh@1(a, voxel_size=0.04); vb = volume.from_mesh@1(b, voxel_size=0.04); u =
+volume.combine@1(va, vb, blend=0.2); m = volume.to_mesh@1(u).
+Cloth: cloth.drape@1(panel, pins, with=body, seconds=3) drops a flat polygon panel (poly.grid, moved above the body) onto a closed mesh or volume
+and keeps the settled shape (a tunic, a sheet on a table); raise bend for folds, lower density for light cloth. cloth.sim@1(garment, pins,
+pin_bone="name", collide_bones="a,b", wind=[2,0,0], drag=0.5) makes a garment live cloth that moves while the scene runs (a cape behind a running
+figure, a banner): pins is a poly.select element=vertex selection held to the pin bone, collide_bones are rig.bone parts it cannot pass through;
+the garment must have no tracks of its own, up to 6000 points.
+Hair, liquids, breaking: the macro kits autorig_human and hair_cards (list_operators ids=["kit.autorig_human"]; paste the source once at the top).
+autorig_human: body = body.human@1(); human_rig("body", 1, ""); human_skin("body", "person", 1, 0.86, 0.66, 0.52) makes a rigged, skinned
+character (every bone its own part and output named like the bone); human_ik("l") adds reach targets; to animate one bone name it in the last
+argument of human_rig and write its three lines yourself. hair_cards("hair", "head", 0, 1.62, 0, 0.1, 0.35, 28, 0.045, 3) makes strips of hair
+that swing from the head bone. anim.retarget@1(target_bone, source_bone, scale=1.5, mirror=true, clips="walk") copies a bone's clips onto another
+rig (scaled, left to right). fluid.sim@1(min, max, spacing=0.05, bounds_min, bounds_max, viscosity=0.02) is a live liquid, 1000 to 8000 particles,
+its surface rebuilt every frame (put solid.material after it); collide_bones lets a moving bone stir it. poly.fracture@1(shape, pieces=8, piece=k,
+seed, voxel_size, gap) is piece k of a shape broken along a Voronoi pattern: loop over k, give each piece phys.body kind=dynamic shape=convex.
+Edge-loop tools (select the loop's edges with poly.select element=edge, for example by="height" for a ring at one height): poly.space_loops
+(factor, interpolation; even spacing along the ring), poly.relax_loops (iterations, interpolation, even_spacing; smooths it) and
+poly.circularize (factor, radius 0 to fit one, angle, flatten, regular; an oval hole becomes round). A tube mouth made round:
+top = poly.select@1(tube, element="edge", by="height", axis="y", height=1); round = poly.circularize@1(tube, top, factor=1).
+poly.program runs a short program once for every vertex (the same expression language as field.expr: out = ..., p position, n
+smoothed normal, uv, i vertex number, count, attr("layer") reads a per-vertex number layer, noises perlin/fbm/ridged/voronoi). mode says
+what out is: offset (vec3 added to p), position (vec3), along_normal (a number) or layer (a number stored as layer_name for a later
+program to read). Faces stay as they are; the result draws as a smooth surface. A rippled hill sheet (angles in the text language are degrees):
+  grid = poly.grid@1(width=8, height=8, columns=96, rows=96)
+  land = poly.program@1(grid, mode="offset", code="q = p.xy - vec2(0.0, 4.0); out = vec3(0.0, 0.0, 0.9 * fbm(vec3(q.x, q.y, 0.0) * 0.35, 4.0, 3.0))")
+  flat = xform.rotate@1(land, angles=[-90, 0, 0])
+A mistake names its line and column; a program of the wrong result type (vec3 wanted, float given) says both types.
+poly.script is the escape hatch for logic the nodes cannot express (a maze, a growth rule): sandboxed JavaScript that ends with a Mesh
+(const m = new Mesh(); const a = m.vertex(x, y, z); m.face(a, b, c); m), can read a linked mesh as input (points, faces), has seeded
+Math.random, no clock, files or network, a work budget, a memory cap and 200,000 points or faces at most; errors name line and column.
+Inside the script op(id, params, inputs) calls any other operator and returns its result as data (a mesh is points and faces, a curve is
+points and closed, a number is number): s = op('solid.difference@1', {}, {in: [a, b]}) where a and b came from earlier op calls; params are the
+node's parameters by name in metres and radians, an array under a port feeds a variadic port, at most 128 calls, and a script cannot call a script.
+Keep it on one line per statement group inside code="..." with single quotes, or use \n between lines. Prefer poly.program and the
+editing nodes first; use the script when a loop with state or a data structure is the natural way to say it.
+The same language writes shapes from scratch. curve.expr: a curve from t (0 to 1; also i, count), sampled samples times, closed=true
+for a loop; feed it to curve.tube. poly.surface_expr: a surface from u and v (0 to 1) over columns by rows quads; which side is the front
+follows from the formula, so set flip=true if it looks inside out. inst.program: copies placed by programs of i, count and f (0 to 1
+across the copies): code (vec3 place), scale_code (number above 0), yaw_code (degrees). A helix tube, a torus and a spiral of pillars:
+  helix = curve.expr@1(samples=160, code="a = t * 25.13; out = vec3(0.7 * cos(a), t * 2.5, 0.7 * sin(a))")
+  coil = curve.tube@1(helix, radius=0.07, sides=10)
+  torus = poly.surface_expr@1(columns=64, rows=32, flip=true, code="r = 1.0 + 0.35 * cos(v * 6.2832); out = vec3(r * cos(u * 6.2832), 0.35 * sin(v * 6.2832), r * sin(u * 6.2832))")
+  spiral = inst.program@1(pillar, count=40, code="out = vec3(cos(i * 0.45) * (0.5 + f * 2.5), 0.3, sin(i * 0.45) * (0.5 + f * 2.5))", scale_code="out = 1.0 - 0.5 * f", yaw_code="out = i * 25.8")
 poly.grid creates normalized corner UVs; subdivision carries paired F32 corner u/v UVs with seams and F32 point attributes (up to 8 channels) through
 the refined mesh. F64 point attributes, other corner/edge attributes and face hole tags have typed refusals.
 poly.select: element = face | edge | vertex | loop; by = all | normal (direction, angle) | box (box_min,
@@ -419,9 +546,16 @@ write the program string with escaped quotes (\" inside program="..."):
 Language: name = expression lines (newline or ;), the last must be out = float (grey), vec3 or vec4. Built in: p (uv 0..1), q (centred
 -1..1), t (0), PI, TAU; floats and vec2-vec4 with swizzles (.xy .rgb); + - * / %; sin cos tan asin acos atan abs sign floor ceil fract
 sqrt exp log pow min max clamp mix step smoothstep mod length distance dot cross normalize reflect; and hash(vec2), noise(vec2) 0..1,
-snoise(vec2) -1..1, fbm(vec2) 0..1, hsv(h, s, v), rot(vec2, angle). Loops: for i in 0..N { ... } with a whole-number N up to 64,
+snoise(vec2) -1..1, fbm(vec2) 0..1, hsv(h, s, v), rot(vec2, angle), voronoi(vec2) = vec2(nearest, second-nearest cell distance; unit cells:
+.x is a pore or a scale, .y - .x the wall between cells), stretch(vec2, angle, ratio) (noise of it runs in streaks along angle: fbm(stretch(p*20, 0.4, 6)) for skin
+creases), warp(vec2, amount) (bends straight or cellular patterns organic). Loops: for i in 0..N { ... } with a whole-number N up to 64,
 two deep at most (256 passes in all). No if, while, comparisons or texture reads (use step, mix and smoothstep). At most 600
 characters. Variables first set inside a loop stay inside it. A mistake names the line, column and the fix.
+Photographs: image(name="Concrete034_Color", repeat_x=4, repeat_y=6) is a node holding one map of a shipped CC0 material (ADR 0056), repeated over the texture; it composes with blend,
+colorize and the channels like any node, so the photograph carries the realism and expr nodes layer windows, grime and wear on top. Materials (ambientCG, CC0), each with _Color, _Roughness,
+_Normal: Concrete034, Concrete048, Bricks113A (sand stone blocks), Bricks106A, Plaster001, Tiles141, CorrugatedSteel009, Asphalt033, Road012A, PavingStones151. Use the normal map as the
+\`normal\` channel, the roughness map as \`roughness\`. blend(s1, s2, a, blend_type=normal|multiply, amount=1) layers s1 over s2 with node \`a\` as the opacity (make an \`a\` of 1 with
+expr(code="out = vec3(1.0)")). Whole-program form for artist-made clothes and hair: image(albedo="long01_diffuse", normal="..."). A worked example is tools/worlds/city_district.py.
 Cut-outs: solid.foliage@1(shape, alpha_cutoff=0.5, sway=0, flutter=0) after solid.material and solid.texture cuts the surface away
 where its albedo's alpha is under the cutoff, in the picture, in its shadow and in the exported glTF (alphaMode MASK), and draws it
 two-sided. End the expr code with a vec4 whose last number is the alpha to draw the shape: out = vec4(0.1, 0.5, 0.1, 1.0 - step(0.8,
@@ -443,7 +577,9 @@ Animation: anim.track@1(shape, property, keys, interpolation, loop, pivot) makes
 through unchanged. property is position (metres), rotation (degrees about X, Y, Z) or scale (factors);
 keys are "seconds:x,y,z" entries separated by semicolons, at least two, times increasing, every entry with
 all three values; interpolation is linear, smooth (default, eases in and out) or step; loop repeats (default)
-or holds the last key; pivot is the point, in the shape's own coordinates, that rotation and scale act about.
+or holds the last key; pivot is the point, in the shape's own coordinates, that rotation and scale act about. For a part that is a
+bone (body.bone or rig.bone) write pivot_at="head" instead of typing the joint: the track turns about the bone's own head (its joint);
+pivot_at="tail" uses the far end. anim.wave has it too. A part that is not a bone is refused.
 Chain several anim.track nodes to move and turn together. Examples:
   swing = anim.track@1(door, property="rotation", keys="0:0,0,0; 1.5:0,90,0", pivot=[-0.45, 0, 0], loop=false)
   output swing
@@ -471,6 +607,46 @@ bobbing, swaying, pulsing and flickering; use anim.track for one-off or timed mo
   sway = anim.wave@1(tree, property="rotation", amplitude=[0, 0, 3], period=4, pivot=[0, 0, 0])
 Rotation and scale waves act about pivot; scale and glow centre on 1 unless base is set. phase (0 to 1) offsets the
 start so two shapes can move in opposite phase.
+
+Clips and state machines (a character that does different things): give each motion a clip name with clip="walk" on its
+anim.track nodes (the clip is the set of tracks sharing that name on all parts; a track with no clip is the main clip, which plays
+all the time). Nothing chooses between named clips by itself: attach anim.machine@1(root_part, program="...") to the ROOT part of the
+hierarchy (the part the others follow with anim.parent; a plain solid with no tracks is fine) and it picks the clips and blends them
+by weight. The program is a few statements separated by semicolons (or newlines):
+  entry ground
+  state ground blend=speed idle@0 walk@1.5 run@4     (a blend space: the clip follows the number parameter speed)
+  state jump clip=jump once                          (one clip; once plays it a single time, loop is the default)
+  transition any -> jump when trigger:jump fade=0.1  (any state; a trigger is raised by the game or the page)
+  transition jump -> ground exit=0.9 when grounded=true
+Conditions are speed>0.5, speed<0.5, grounded=true and trigger:name, joined with &. fade is the crossfade in seconds; exit is the
+fraction of a one-shot clip that must have played. Parameters are named freely; the viewer sets speed from how fast the root part
+moves, a game rule raises a trigger with effect:anim:jump@tag:hero, and the page can set any parameter. A clip the machine plays
+that no track defines is reported as anim.machine.missing_clip.
+Layers and events in the same program: a LAYER plays a clip over the machine's own blend on some parts only, so a character can WAVE while it
+walks: layer wave clip=wave weight=waving mask=arm_l,arm_r fade=0.2 (weight is a number 0 to 1 or a float parameter, here "waving", which you or a
+game set with animation.set_float; the clip fades in and out over fade seconds and restarts each time; mask names output parts, each with
+everything that hangs from it, and no mask means every part the machine drives; add the word additive to ADD the clip's change from its first
+frame to the walk instead of replacing the masked parts' motion; the word once plays it a single time; speed=1.5 plays faster). A part with no
+track in the layer's clip is left alone. At most 4 layers. An EVENT is a named moment in a clip: event walk footstep at=0.25 (and at=0.75 for
+the other foot); every time a playing clip passes it the world reports the event "anim.footstep" with part (the machine's part) and clip,
+which a script hears with on("anim.footstep", fn): use it for footstep sounds, dust puffs (world fx.burst), hit frames and spawn points. A clip
+that is nearly faded out stays quiet. At most 64 events.
+CHECK MOTION YOURSELF: you cannot feel a walk, so look and measure. snapshot with times=[0,0.25,0.5,0.75] (or states=[{"speed":0},
+{"speed":1.5}] for a machine) shows the clip at those moments in one picture; check.motion@1(foot_part, feet="leg_a,leg_b",
+clip="walk", duration=1, speed=1.4) samples the clip and warns when a foot slides while it should be planted (a planted foot moves
+backwards at the speed the body moves forwards) or when the loop pops at its seam (make the last key equal the first and loop=true).
+Fix what it names, then look again.
+
+Scripts (behaviour you write): when no node says what you want, write it in JavaScript. Two ways. The script tool (action start, name,
+source) runs a script NOW against the running world and lasts until you stop it or the page reloads: use it to try something. The node
+script.js@1(source="...", name="bobbing") saves the same script IN THE DOCUMENT: it starts when the world loads, restarts when you edit
+its source (set_param), stops when you disable or remove it, and undo brings it back; use it for behaviour that belongs to the world. The
+source is the body of an async function with world, on, every, log, time, random (get_guide topic="script_api" lists them); in the
+node's string write newlines as \n and quotes as \". Scripts move parts through the world tool's components (a part's Transform is an
+offset from where it was built; a part with animation tracks or a parent has its Transform set by the animation, so script static parts),
+should send what they change every frame in ONE world.batch, and should keep their own state in variables. They hear the world with on("click", fn) or on("click:crate_left", fn) (also hover, unhover, press, release, grab, drop; e.part is the part's name) and a game rule's effect with on("game.message:name", fn); on a desktop the first click on the view locks the mouse (look mode, the centre dot picks, Esc releases), and only a released cursor hovers and clicks parts under it, so clicks in a headless test land on parts only while the cursor is free. A script can spawn visible things at run time with world.call("world.spawn_entity", {shape: {kind: "box", size: [0.1, 0.1, 0.1], color: [1, 0.5, 0]}, position: [x, y, z]}) (also kind sphere with radius, cylinder with radius and height; emissive, metallic, roughness, opacity) and remove them with world.despawn_entity: bullets, debris, markers; spawning is limited to 2000 live entities, so despawn what you finish with. world.call("animation.set_float", {part, name, value}), animation.set_bool and animation.trigger drive an animation state machine. A script runs in a worker
+with no network and is stopped if a frame takes over 250 ms. Look at the result (snapshot with times) and read the logs (script tool,
+action logs) before you say it works.
 
 Bendy things (skinning): a mesh that bends as bones move. A BONE is an ordinary part (a small box inside the mesh) with
 rig.bone@1(part, head=[x,y,z], tail=[x,y,z]) giving its rest segment (head = the joint it turns about, tail = its far end,
@@ -608,27 +784,70 @@ document unchanged and says why (for example constraint.min_wall with the measur
 // The guide is served in pieces: a short core every session reads, and topics asked for by name.
 const GUIDE_SPLIT = splitGuide(GUIDE);
 if (GUIDE_SPLIT.missing.length > 0) log(`guide topics not found in the guide text (left in the core): ${GUIDE_SPLIT.missing.join(', ')}`);
+// Topics written for the guide rather than cut out of its text: make_character, looks, and how to build any body.
+for (const [id, extra] of Object.entries({ ...EXTRA_TOPICS, ...TOOL_TOPICS, creatures: CREATURES, effects: EFFECTS, sim: SIM, limits: LIMITS_TOPIC })) {
+  GUIDE_SPLIT.sections.set(id, extra.text);
+  GUIDE_SPLIT.topics.push({ id, summary: extra.about });
+}
+
+// `bun tools/mcp/server.mjs --guide [topic]` prints the guide for a person or a model that has no MCP connection, and exits.
+if (GUIDE_ARG >= 0) {
+  const topic = (process.argv[GUIDE_ARG + 1] ?? '').trim().toLowerCase();
+  console.log(topic ? topicText(GUIDE_SPLIT, topic) : coreWithMenu(GUIDE_SPLIT));
+  process.exit(0);
+}
 
 const object = (properties, required = []) => ({ type: 'object', properties, required });
+const OPERATOR_SELECTION = object({ query: { type: 'string' }, family: { type: 'string' }, ids: { type: 'array', items: { type: 'string' } }, detail: { type: 'string', enum: ['index', 'full'] } });
+const CAMERA = object({ position: { type: 'array', items: { type: 'number' }, minItems: 3, maxItems: 3 }, target: { type: 'array', items: { type: 'number' }, minItems: 3, maxItems: 3 }, label: { type: 'string' } }, ['position', 'target']);
+const INSTRUCTIONS = `1. Build and edit interactive 3D scenes in the spatial-engine editor. Call get_guide once with topics (include core and relevant how-tos) and an operators selection (query, family or ids) to get the language and operator docs together. Read only what the task needs.
+2. Begin with start_from when the request resembles a template: list the templates, take a working skeleton, and edit it to fit. Write programs with pipes and loops; include topic compact in your guide request for syntax and limits.
+3. Use batch for any known sequence of tool calls; use run for loops or conditions and return only the results you need. Both call the same tools while keeping intermediate output out of the conversation.
+4. Use survey to plan cameras (position, target and label) or snapshot {tour:true} for a tour in labelled sheets with the previous view restored; get_guide topic="survey" explains coverage and options.
+5. Use edit by node label for small changes. Look again after edits, run check before you finish, and fix the problems it reports.`;
 const TOOLS = [
-  { name: 'get_guide', description: 'How the text language works, with an example. Read this first: it is short and ends with how to work. For a subject you need (curves, terrain, poly, groups, look, animation, rigging, behaviour) call it again with that topic; topic="all" returns the whole guide.', inputSchema: object({ topic: { type: 'string', description: 'curves, terrain, poly, groups, look, animation, rigging, behaviour, or all. Omit for the core guide and the topic list.' } }) },
-  { name: 'list_operators', description: 'The operators you may use. By default a compact index: one line per operator with its inputs, output, parameters (type, range, unit, default) and what it does, grouped by family, plus the ready-made kits. Narrow it with query (words in the id or help) or family (solid, poly, inst, xform, value ...). Pass ids=["solid.box@1", "kit.door"] to get the full documentation of just those (a kit returns its source), or detail="full" for everything (large).', inputSchema: object({ query: { type: 'string', description: 'Words that must appear in the operator id or help, for example "scatter surface".' }, family: { type: 'string', description: 'Only this family: the part of the id before the dot, such as poly or inst.' }, ids: { type: 'array', items: { type: 'string' }, description: 'Full specs of exactly these operator ids (for example solid.box@1) or kits (kit.door).' }, detail: { type: 'string', enum: ['index', 'full'], description: 'index (default) is one line per operator; full is every operator with all parameter documentation.' } }) },
-  { name: 'texture_nodes', description: 'Search the procedural texture node catalog with query, or describe one exact node with node. Use this before authoring a solid.texture@1 program.', inputSchema: object({ query: { type: 'string' }, node: { type: 'string' }, limit: { type: 'number' } }) },
-  { name: 'get_text', description: 'The current document as canonical text, and its revision.', inputSchema: object({}) },
-  { name: 'get_nodes', description: 'Every node with its id, label, operator, parameters, inputs, flags, the group it belongs to (nodes inside a group definition) or its instance data, plus the outputs and the groups. Use the ids in apply_commands.', inputSchema: object({}) },
-  { name: 'get_status', description: 'Revision, node count, evaluation state (last failure, timings) and the last projected geometry.', inputSchema: object({}) },
-  { name: 'measure', description: 'Measures the evaluated parts on screen, through the same geometry the viewer shows. By default a short text report per part: triangles, size, volume, watertight, thickness and the first problem with its fix. detail "full" gives the complete JSON report (topology, components, bounding shapes, symmetry, UVs). part names one output/part (default every part); checks (thickness, symmetry, uv, collision) limits which optional sections the full report keeps. A part that is not closed says where and what to do.', inputSchema: object({ part: { type: 'string' }, detail: { type: 'string', enum: ['summary', 'full'] }, checks: { type: 'array', items: { type: 'string', enum: ['thickness', 'symmetry', 'uv', 'collision'] } } }) },
-  { name: 'bake', description: "Bake a high-poly part's normals and ambient occlusion onto a low-poly part's UVs; the model must have unwrapped the low part with poly.unwrap_uv.", inputSchema: object({ low: { type: 'string' }, high: { type: 'string' }, size: { type: 'number', description: '64 to 2048; default 512.' }, maps: { type: 'array', items: { type: 'string', enum: ['normal', 'ao'] } }, cage: { type: 'number' }, max_distance: { type: 'number' }, rays: { type: 'number', description: '1 to 256; default 64.' }, bias: { type: 'number' } }, ['low', 'high']) },
-  { name: 'export_glb', description: 'Exports the model on screen as a binary glTF (.glb) file with PBR materials, shared instances, UVs, and embedded PNG maps for solid.texture programs. Give a path ending in .glb (relative paths are under the current directory); the file is written there. Baked textures require WebGL2 and EXT_color_buffer_float.', inputSchema: object({ path: { type: 'string' } }, ['path']) },
-  { name: 'apply_text', description: 'Adds the nodes described by a program in the text language to the document, evaluates it, and reports the outcome or the diagnostics (each with a line and column). Atomic: nothing changes unless all of it is valid. Limits: 256 KiB source text; translated batches allow 1,000 typed commands and 1 MiB.', inputSchema: object({ text: { type: 'string' }, label: { type: 'string' } }, ['text']) },
-  { name: 'make_character', description: 'Adds a whole animated character or creature to the document: one smooth body skinned to a skeleton, with walk (main clip), run and idle clips, toon shaded with outlines. Give a body `plan` ("biped", "quadruped" or "serpent") with optional `sliders` (size in metres 0.2 to 20; head, limbs, torso, legs, neck, tail as multipliers 0.5 to 2; color [r,g,b] 0 to 1; horns and wings for a quadruped), or a whole `creature` you write yourself: bones (name, parent, head, tail, radius [at head, at tail], role leg|arm|spine|neck|head|tail|wing|free, pair for left/right copies defined on +x, phase) and blobs (name, center, radii). The creature stands on y=0 and faces +z. A `name` keeps several characters apart. Errors say which bone or slider to change. Call frame_view afterwards.', inputSchema: object({ plan: { type: 'string', enum: ['biped', 'quadruped', 'serpent'] }, sliders: { type: 'object' }, creature: { type: 'object' }, name: { type: 'string' }, label: { type: 'string' } }) },
-  { name: 'apply_commands', description: 'Applies typed commands, for example [{"set_param":{"node":"n_abc12345","param":"segments","value":96}}]. Commands: add_node, remove_node, connect, disconnect, set_param, set_label, set_flags, set_output, and for groups set_instance_param, clear_instance_param, upgrade_group, expose_param, unexpose_param, set_group_output. Atomic. Limit: 1,000 commands and 1 MiB per transaction.', inputSchema: object({ commands: { type: 'array', items: { type: 'object' } }, label: { type: 'string' } }, ['commands']) },
-  { name: 'undo', description: 'Undoes the last committed edit.', inputSchema: object({}) },
-  { name: 'redo', description: 'Redoes the last undone edit.', inputSchema: object({}) },
-  { name: 'snapshot', description: 'Looks at the view: returns a small picture (JPEG, up to 512 px wide) of what the editor shows, plus what changed since the last snapshot with the same name (share of the view that changed, where, and a box around it). Take one after an edit to check it did what you meant; pass image=false to get only the comparison, the cheapest way to ask whether an edit changed anything on screen. Frame or set the view first so the same angle is compared.', inputSchema: object({ name: { type: 'string', description: 'Which earlier snapshot to compare with (default "last"); use different names to keep separate baselines.' }, image: { type: 'boolean', description: 'false returns only the comparison, without the picture.' }, width: { type: 'number', description: 'Picture width in pixels, 64 to 512 (default 512).' } }) },
-  { name: 'frame_view', description: 'Moves the editor camera so the whole model fills the view, from a three-quarter angle. Call it after building something so the person watching sees it.', inputSchema: object({}) },
-  { name: 'set_view', description: 'Moves the editor camera: position and target as [x, y, z] metres, so the person watching can see the result.', inputSchema: object({ position: { type: 'array', items: { type: 'number' } }, target: { type: 'array', items: { type: 'number' } } }, ['position', 'target']) },
+  {name: 'get_guide', description: 'Read once with topics and operators together. Omit topics for core and menu; topic selects one, all returns everything.', inputSchema: object({ topic: { type: 'string' }, topics: { type: 'array', items: { type: 'string' } }, operators: OPERATOR_SELECTION })},
+  {name: 'list_operators', description: 'Search the operator and kit index; ids requests full specs or kit source. See get_guide(topic="operator_reference").', inputSchema: OPERATOR_SELECTION},
+  {name: 'help_field', description: 'The exact documentation of one operator parameter, one operator or one family, by a dotted path: "solid.sweep.scale_end" (type, range, unit, default, options, full text), "solid.sweep" (inputs, output, every parameter), "solid" (the family), or a bare parameter name. A wrong path answers with the nearest real ones. Use it instead of reading a whole operator when you only need one setting.', inputSchema: object({ path: { type: 'string', description: 'For example solid.sweep.scale_end.' } }, ['path'])},
+  {"name":"texture_nodes","description":"Search the procedural texture node catalog with query, or describe one exact node with node. Use this before authoring a solid.texture@1 program.","inputSchema":{"type":"object","properties":{"query":{"type":"string"},"node":{"type":"string"},"limit":{"type":"number"}},"required":[]}},
+  {"name":"get_text","description":"The current document and revision as compact text by default, or canonical text with format=\"canonical\".","inputSchema":{"type":"object","properties":{"format":{"type":"string","enum":["compact","canonical"],"default":"compact"}},"required":[]}},
+  {"name":"get_nodes","description":"Every node with its id, label, operator, parameters, inputs, flags, the group it belongs to (nodes inside a group definition) or its instance data, plus the outputs and the groups. Use the ids in apply_commands.","inputSchema":{"type":"object","properties":{},"required":[]}},
+  {"name":"get_status","description":"Revision, node count, evaluation state (last failure, timings) and the last projected geometry.","inputSchema":{"type":"object","properties":{},"required":[]}},
+  {name: 'survey', description: 'Plan cameras and reachable surface coverage. See get_guide(topic="survey").', inputSchema: object({ mode: { type: 'string', enum: ['auto', 'walk', 'orbit'] }, eye_height: { type: 'number' }, spacing: { type: 'number' }, max_views: { type: 'integer' }, yaws: { type: 'integer' }, target_coverage: { type: 'number' } })},
+  {"name":"measure","description":"Measure evaluated parts; summary by default, full JSON on request. See get_guide(topic=\"measure_reference\").","inputSchema":{"type":"object","properties":{"part":{"type":"string"},"detail":{"type":"string","enum":["summary","full"]},"checks":{"type":"array","items":{"type":"string","enum":["thickness","symmetry","uv","collision"]}}},"required":[]}},
+  {"name":"bake","description":"Bake a high-poly part's normals and ambient occlusion onto a low-poly part's UVs; the model must have unwrapped the low part with poly.unwrap_uv.","inputSchema":{"type":"object","properties":{"low":{"type":"string"},"high":{"type":"string"},"size":{"type":"number","description":"64 to 2048; default 512."},"maps":{"type":"array","items":{"type":"string","enum":["normal","ao"]}},"cage":{"type":"number"},"max_distance":{"type":"number"},"rays":{"type":"number","description":"1 to 256; default 64."},"bias":{"type":"number"}},"required":["low","high"]}},
+  {"name":"export_glb","description":"Exports the model on screen as a binary glTF (.glb) file with PBR materials, shared instances, UVs, and embedded PNG maps for solid.texture programs. Give a path ending in .glb (relative paths are under the current directory); the file is written there. Baked textures require WebGL2 and EXT_color_buffer_float.","inputSchema":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}},
+  {"name":"import_file","description":"Brings your own mesh file into the document: reads a plain-text .obj, ascii .ply or ascii .stl from path (on the machine running this server) and adds it as an editable poly.import node, outputting it unless output is false. scale multiplies coordinates (0.001 for a file in millimetres), up is the file's up axis (z is turned to Y up). Nothing is fetched or bundled, and binary files are refused with the way out. Up to about 990,000 bytes.","inputSchema":{"type":"object","properties":{"path":{"type":"string"},"name":{"type":"string"},"format":{"type":"string","enum":["obj","ply","stl"]},"scale":{"type":"number"},"up":{"type":"string","enum":["y","z"]},"output":{"type":"boolean"}},"required":["path"]}},
+  {"name":"apply_text","description":"Atomically add a text program and evaluate it, returning diagnostics and a state delta. dry_run applies, measures and undoes. See get_guide(topic=\"apply_text_reference\") for limits and delta fields.","inputSchema":{"type":"object","properties":{"text":{"type":"string"},"label":{"type":"string"},"dry_run":{"type":"boolean"}},"required":["text"]}},
+  {"name":"scene_overview","description":"Scene parts, totals, bounds, evaluation time, warnings and provisional Quest budget. detail=\"full\" lists every part.","inputSchema":{"type":"object","properties":{"detail":{"type":"string","enum":["summary","full"]}},"required":[]}},
+  {"name":"inspect","description":"Why did this node give this? Without node: every node in run order with what it made. With node (a label or id): its operator and parameters, what fed it, what it produced (kind, size, counts), what it changed from its main input, and the chain of nodes upstream, nearest first. Use it when a size, a count or a selection is not what you expected.","inputSchema":{"type":"object","properties":{"node":{"type":"string"},"depth":{"type":"integer","minimum":1,"maximum":40},"kind":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200}},"required":[]}},
+  {"name":"find","description":"Find document nodes by query, family, or one label/id with its inputs and users. See get_guide(topic=\"find_reference\").","inputSchema":{"type":"object","properties":{"query":{"type":"string"},"family":{"type":"string"},"node":{"type":"string"},"limit":{"type":"number"}},"required":[]}},
+  {"name":"check","description":"Looks for problems you can repair and answers each as {id, severity, message, node, fix}: a failed evaluation, the provisional Quest budget (over or near), operator warnings, and game kinds that name a scene part that does not exist. ok is false when any error is found. Run it after a build and before you call the work done; apply the fix, then run it again.","inputSchema":{"type":"object","properties":{},"required":[]}},
+  {"name":"game_describe","description":"The game the document defines (nodes game.var, game.kind, game.spawn, game.input, game.rule, game.goal joined by game.collect and output as `output rules = ...`): a one-line summary, its rules as text, and what validation found. Says how to build one when there is none.","inputSchema":{"type":"object","properties":{},"required":[]}},
+  {"name":"playtest","description":"Play headless with a deterministic policy and seed; aim:<thing tag>:<target tag>[,<target tag>...] swings a hand-held tool live toward targets. See get_guide(topic=\"playtest_reference\").","inputSchema":{"type":"object","properties":{"policy":{"type":"string"},"seed":{"type":"number"},"steps":{"type":"number"}},"required":[]}},
+  {"name":"make_character","description":"Add an animated character from a body plan and sliders or custom creature. See get_guide(topic=\"character_reference\") for every field.","inputSchema":{"type":"object","properties":{"plan":{"type":"string","enum":["biped","quadruped","serpent"]},"sliders":{"type":"object"},"creature":{"type":"object"},"name":{"type":"string"},"label":{"type":"string"}},"required":[]}},
+  {"name":"apply_commands","description":"Atomically apply typed commands by node id or unique label, returning a state delta. dry_run measures and undoes. See get_guide(topic=\"command_reference\").","inputSchema":{"type":"object","properties":{"commands":{"type":"array","items":{"type":"object"}},"label":{"type":"string"},"dry_run":{"type":"boolean"}},"required":["commands"]}},
+  {"name":"edit","description":"Atomically edit nodes by unique label; returns the apply_text delta. Ops: set {node,params}, rename {node,to}, delete {node}, replace {node,text} (one replacement node line). See get_guide(topic=\"edit_diff\").","inputSchema":{"type":"object","properties":{"ops":{"type":"array","minItems":1,"items":{"type":"object","properties":{"op":{"type":"string","enum":["set","rename","delete","replace"]},"node":{"type":"string"},"params":{"type":"object"},"to":{"type":"string"},"text":{"type":"string"}},"required":["op","node"]}},"label":{"type":"string"},"dry_run":{"type":"boolean"}},"required":["ops"]}},
+  {"name":"diff","description":"Compact added/changed/removed node lines since a revision (default previous revision); at most 80 lines, with an omitted count. See get_guide(topic=\"edit_diff\").","inputSchema":{"type":"object","properties":{"since":{"type":"integer","minimum":0}},"required":[]}},
+  {"name":"undo","description":"Undoes the last committed edit.","inputSchema":{"type":"object","properties":{},"required":[]}},
+  {"name":"redo","description":"Redoes the last undone edit.","inputSchema":{"type":"object","properties":{},"required":[]}},
+  {"name":"batch","description":"Run up to 32 tool calls in order. Each step is {tool, args}; stop_on_error defaults to true and max_chars defaults to 3000 per step. batch and run cannot be nested.","inputSchema":{"type":"object","properties":{"steps":{"type":"array","items":{"type":"object"}},"stop_on_error":{"type":"boolean"},"max_chars":{"type":"integer"}},"required":["steps"]}},
+  {"name":"run","description":"Run an async JavaScript function body with tools.<name>(args), log(...), and return. Use loops and conditions; at most 200 tool calls and VE_RUN_TIMEOUT_MS (default 120000). No process, require, fetch, or Bun globals.","inputSchema":{"type":"object","properties":{"code":{"type":"string"}},"required":["code"]}},
+  {"name":"world","description":"Reads and changes the running world by component name, beyond what document nodes can do. Pass method and params; see get_guide(topic=\"world_api\") for all methods and their parameters.","inputSchema":{"type":"object","properties":{"method":{"type":"string","description":"For example world.parts or world.get_components."},"params":{"type":"object","description":"The method parameters."}},"required":["method"]}},
+  {"name":"script","description":"Start, stop, list or read logs of JavaScript behaviour in the running world. See get_guide(topic=\"script_api\") for the full API and execution limits.","inputSchema":{"type":"object","properties":{"action":{"type":"string","enum":["start","stop","list","logs"]},"name":{"type":"string"},"source":{"type":"string"}},"required":["action"]}},
+  {name: 'snapshot', description: 'Capture cameras, views, motion or a survey tour. See get_guide(topic="snapshot_modes").', inputSchema: { ...object({ tour: { type: ['boolean', 'object'], properties: { mode: { type: 'string', enum: ['auto', 'walk', 'orbit'] } } }, camera: { $ref: '#/$defs/camera' }, cameras: { type: 'array', minItems: 1, maxItems: 6, items: { $ref: '#/$defs/camera' } }, times: { type: 'array', items: { type: 'number' } }, states: { type: 'array', items: { type: 'object' } }, view: { type: 'string', enum: ['front', 'back', 'side', 'left', 'top', 'iso'] }, views: { type: 'array', items: { type: 'string', enum: ['front', 'back', 'side', 'left', 'top', 'iso'] } }, focus: { type: 'string' }, name: { type: 'string' }, image: { type: 'boolean' }, width: { type: 'number' } }), $defs: { camera: CAMERA } }},
+  {"name":"frame_view","description":"Moves the editor camera so the whole model fills the view, from a three-quarter angle. Call it after building something so the person watching sees it.","inputSchema":{"type":"object","properties":{},"required":[]}},
+  {"name":"set_view","description":"Moves the editor camera: position and target as [x, y, z] metres, so the person watching can see the result.","inputSchema":{"type":"object","properties":{"position":{"type":"array","items":{"type":"number"}},"target":{"type":"array","items":{"type":"number"}}},"required":["position","target"]}},
+  {"name":"start_from","description":"List working scene templates or return one to edit; apply=true sends it through apply_text.","inputSchema":{"type":"object","properties":{"template":{"type":"string"},"apply":{"type":"boolean"}},"required":[]}},
+  {"name":"recipes","description":"Save, list, show, or delete reusable groups. Show gives source and a pasteable call line.","inputSchema":{"type":"object","properties":{"action":{"type":"string","enum":["list","save","show","delete"]},"name":{"type":"string"},"text":{"type":"string"},"about":{"type":"string"}},"required":["action"]}},
 ];
+
+const TOOL_ORDER = [
+  'get_guide', 'list_operators', 'help_field', 'texture_nodes', 'get_text', 'get_nodes', 'get_status', 'survey', 'measure', 'bake', 'export_glb',
+  'import_file', 'apply_text', 'scene_overview', 'find', 'inspect', 'check', 'game_describe', 'playtest', 'make_character', 'apply_commands', 'edit',
+  'diff', 'undo', 'redo', 'batch', 'run', 'world', 'script', 'snapshot', 'frame_view', 'set_view', 'start_from', 'recipes',
+];
+TOOLS.sort((a, b) => TOOL_ORDER.indexOf(a.name) - TOOL_ORDER.indexOf(b.name));
 
 const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\n');
 const content = (value, isError = false) => ({ content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }], isError });
@@ -645,21 +864,86 @@ async function exportGlb({ path: target }) {
   return content({ exported: true, path: file, bytes: result.bytes, parts: result.parts, triangles: result.triangles });
 }
 
-async function callTool(name, args) {
-  if (name === 'get_guide') {
-    const topic = typeof args?.topic === 'string' ? args.topic.trim().toLowerCase() : '';
-    return content(topic ? topicText(GUIDE_SPLIT, topic) : coreWithMenu(GUIDE_SPLIT));
+async function callTool(name, args, attachTip = true) {
+  const reply = await dispatchTool(name, args);
+  const blocks = reply.content ?? [];
+  const texts = blocks.filter(block => block.type === 'text');
+  let failed = reply.isError === true;
+  if (name === 'apply_text') {
+    for (const block of texts) {
+      try {
+        const result = JSON.parse(block.text);
+        failed ||= result.failure != null || result.would_apply === false || (result.applied === false && result.dry_run !== true);
+      } catch { /* plain-text errors are already marked by the dispatcher */ }
+    }
   }
+  const tip = hints.note(name, args, failed);
+  if (tip) pendingTips.push(tip);
+  const structured = texts.some(block => /^[\s]*[\[{]/.test(block.text));
+  if (attachTip && name !== 'batch' && name !== 'run' && !structured && blocks.every(block => block.type === 'text') && texts.length && pendingTips.length) {
+    texts[texts.length - 1].text += `\n\n${pendingTips.shift()}`;
+  }
+  return reply;
+}
+
+async function dispatchTool(name, args) {
+  const invalid = validateToolArguments(name, args ?? {});
+  if (invalid) return content(invalid, true);
+  if (name === 'get_guide') {
+    if (args?.topics !== undefined && (!Array.isArray(args.topics) || args.topics.some(topic => typeof topic !== 'string'))) return content('topics must be a list of topic names', true);
+    if (args?.operators !== undefined && (!args.operators || typeof args.operators !== 'object' || Array.isArray(args.operators))) return content('operators must be an object with query, family, ids or detail', true);
+    const topics = args?.topics?.map(topic => topic.trim().toLowerCase());
+    const requested = topics ?? [typeof args?.topic === 'string' ? args.topic.trim().toLowerCase() || 'core' : 'core'];
+    const unknown = requested.find(topic => !['core', 'all'].includes(topic) && !GUIDE_SPLIT.sections.has(topic));
+    if (unknown !== undefined) return content(topicText(GUIDE_SPLIT, unknown), true);
+    let text = topics ? requested.map(topic => `## ${topic}\n\n${topicText(GUIDE_SPLIT, topic)}`).join('\n\n') : topicText(GUIDE_SPLIT, requested[0]);
+    if (args?.operators !== undefined) {
+      const reply = await dispatchTool('list_operators', args.operators);
+      text += `\n\n## operators\n\n${reply.content.map(block => block.text ?? '').join('\n')}`;
+    }
+    return content(text);
+  }
+  if (name === 'help_field') {
+    if (typeof args?.path !== 'string' || !args.path.trim()) return content('path is needed, for example "solid.sweep.scale_end", "solid.sweep" or "solid"', true);
+    const reply = await callPage('list_operators', {});
+    if (reply.error) return content(reply.error, true);
+    const answer = helpField(reply.result, args.path);
+    return content(answer.text, !answer.ok);
+  }
+  if (name === 'start_from') {
+    try {
+      const result = callStartFrom(args ?? {}, callPage);
+      if (result && typeof result.then === 'function') {
+        const reply = await result;
+        return reply?.error ? content(reply.error, true) : content(reply?.result ?? reply);
+      }
+      return content(result);
+    } catch (error) { return content(error.message, true); }
+  }
+  if (name === 'recipes') {
+    try { return content(callRecipes(args ?? {}, KITS.map(kit => kit.name))); }
+    catch (error) { return content(error.message, true); }
+  }
+  if (name === 'batch') return callBatch(args ?? {}, (tool, input) => callTool(tool, input, false));
+  if (name === 'run') return callRun(args ?? {}, (tool, input) => callTool(tool, input, false));
   if (!TOOLS.some((t) => t.name === name)) return content(`unknown tool ${name}`, true);
   if (name === 'export_glb') return exportGlb(args ?? {});
+  if (name === 'import_file') {
+    const built = buildImport(args ?? {});
+    if (built.error) return content(built.error, true);
+    return dispatchTool('apply_text', { text: built.text, label: `import ${built.name}` });
+  }
   const reply = await callPage(name, args ?? {});
   if (reply.error) return content(reply.error, true);
   if (name === 'snapshot') {
     // The picture goes back as an image block and everything else as text, so the model sees it instead of reading base64.
-    const { jpegBase64, ...rest } = reply.result ?? {};
-    const text = { type: 'text', text: JSON.stringify(rest, null, 2) };
-    return { content: jpegBase64 ? [{ type: 'image', data: jpegBase64, mimeType: 'image/jpeg' }, text] : [text], isError: rest.ok === false };
+    const { jpegBase64, sheets, ...rest } = reply.result ?? {};
+    const pictures = [jpegBase64];
+    if (Array.isArray(sheets)) rest.sheets = sheets.map(({ jpegBase64, ...sheet }) => { pictures.push(jpegBase64); return sheet; });
+    const images = pictures.filter(Boolean).slice(0, 2).map(data => ({ type: 'image', data, mimeType: 'image/jpeg' }));
+    return { content: [...images, { type: 'text', text: JSON.stringify(rest, null, 2) }], isError: rest.ok === false };
   }
+  if (name === 'survey') return content(reply.result, Boolean(reply.result?.error));
   if (name === 'bake') {
     const { maps = {}, ...summary } = reply.result ?? {};
     const images = Object.entries(maps).map(([, data]) => ({ type: 'image', data, mimeType: 'image/png' }));
@@ -668,7 +952,8 @@ async function callTool(name, args) {
   if (name === 'list_operators' && Array.isArray(reply.result)) {
     const kits = KITS.map(kit => ({
       id: `kit.${kit.name}`, readiness: 'ready', category: 'kit', doc: kit.doc,
-      source: kit.source, usage: `Paste source once, then call ${kit.name}()`,
+      source: kit.source,
+      usage: kit.source.startsWith('group ') ? `Paste source once, then call ${kit.name}()` : 'Paste source once at the top of the program, then call its macros; the header comments of the source show how',
     }));
     const everything = [...reply.result, ...kits];
     const { ids, detail, query, family } = args ?? {};
@@ -678,6 +963,18 @@ async function callTool(name, args) {
     }
     if (detail === 'full') return content(select(everything, { query, family }));
     return content(indexText(everything, { query, family }));
+  }
+  // A write answers with what changed, not with the whole document: every edit used to echo all of the scene text (tens of kilobytes for a big scene)
+  // and the lights and environment, which the model already knows. get_text reads the document when it is wanted; VE_MCP_ECHO=1 brings the old reply back.
+  if (['apply_text', 'edit', 'apply_commands'].includes(name) && process.env.VE_MCP_ECHO !== '1' && reply.result && typeof reply.result === 'object') {
+    const { text, stats, ...rest } = reply.result;
+    const slim = { ...rest };
+    if (typeof text === 'string') slim.text_omitted = `${text.length} characters of document text left out; call get_text to read it`;
+    if (stats && typeof stats === 'object') {
+      const { lights, environment, scripts, ...keep } = stats;
+      slim.stats = keep;
+    }
+    return content(slim);
   }
   return content(reply.result ?? {});
 }
@@ -695,7 +992,7 @@ process.stdin.on('data', async (chunk) => {
     try { message = JSON.parse(line); } catch { continue; }
     const { id, method, params } = message;
     if (method === 'initialize') {
-      send({ id, result: { protocolVersion: params?.protocolVersion ?? '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'spatial-engine', version: '0.1.0' } } });
+      send({ id, result: { protocolVersion: params?.protocolVersion ?? '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'spatial-engine', version: '0.1.0' }, instructions: INSTRUCTIONS } });
     } else if (method === 'tools/list') {
       send({ id, result: { tools: TOOLS } });
     } else if (method === 'tools/call') {

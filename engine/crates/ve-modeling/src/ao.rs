@@ -1,10 +1,13 @@
 //! Deterministic, scene-wide ambient visibility bake for render vertices.
 mod bvh;
 
-use crate::{Fail, Part, Quality, fail};
+use crate::{Fail, Part, Quality};
 use bvh::Bvh;
 
 const CACHE_LIMIT_BYTES: usize = 32 * 1024 * 1024;
+
+/// Rays the whole bake may cast before the count per vertex is lowered.
+const RAY_BUDGET: usize = 3_000_000;
 
 #[derive(Default)]
 pub(crate) struct Cache {
@@ -41,9 +44,11 @@ pub(crate) fn bake(parts: &mut [Part], quality: Quality, cache: &mut Cache) -> R
         .map(|part| part.indices.len() / 3)
         .sum::<usize>();
     if triangle_count > 1_000_000 {
-        return Err(fail(
+        return Err(crate::budget::exceeded_with(
             "budget.ao_triangles",
-            format!("ambient occlusion is limited to 1,000,000 triangles; got {triangle_count}"),
+            1_000_000,
+            triangle_count,
+            &crate::budget::heaviest_text(&crate::budget::part_counts(parts), 5),
         ));
     }
     // A lone planar sheet has no geometry above its surface to occlude its
@@ -58,6 +63,14 @@ pub(crate) fn bake(parts: &mut [Part], quality: Quality, cache: &mut Cache) -> R
         Quality::Preview => 8,
         Quality::Final => 32,
     };
+    // A big scene (a forest of grown trees is 400,000 vertices) would cost minutes at 32 rays each in the browser, so the rays per
+    // vertex shrink to keep the whole bake near a fixed number of rays; small scenes keep their full count.
+    let vertices = parts
+        .iter()
+        .map(|part| part.positions.len())
+        .sum::<usize>()
+        .max(1);
+    let rays = (RAY_BUDGET / vertices).clamp(4, rays);
     for part in parts.iter_mut() {
         part.occlusion = bvh.bake_vertices(&part.positions, &part.indices, rays);
     }
@@ -123,17 +136,28 @@ mod tests {
             indices: vec![0, 4, 1, 1, 4, 2, 2, 4, 3, 3, 4, 0],
             uvs: Vec::new(),
             occlusion: Vec::new(),
+            normals: Vec::new(),
+            colors: Vec::new(),
             volume: 0.0,
             material: None,
             frames: std::collections::BTreeMap::new(),
             animation: Vec::new(),
+            state_machine: None,
             behavior: None,
             parent: None,
             bone: None,
             skin: None,
+            morph_targets: Vec::new(),
             ik: None,
+            fx: None,
+            ragdoll: None,
+            cloth: None,
+            fluid: None,
+            sim: None,
             body: None,
             transforms: None,
+            visible_range: None,
+            visible_fade: 0.0,
             instance_indices: Vec::new(),
             region: 0,
             baked: None,
@@ -154,6 +178,37 @@ mod tests {
             scene[0].occlusion[4] < 0.3,
             "center visibility: {}",
             scene[0].occlusion[4]
+        );
+    }
+
+    /// The tree is only a way to go faster: every vertex must get exactly what testing every triangle gives, in a scene with
+    /// crowded and sparse parts, tall thin triangles and a mesh that surrounds the others.
+    #[test]
+    fn the_tree_gives_what_testing_every_triangle_gives() {
+        let mut scene = vec![
+            curved_grid(18),
+            panel(0.35, 0.6),
+            panel(-0.5, 2.0),
+            curved_grid(7),
+        ];
+        scene[3]
+            .positions
+            .iter_mut()
+            .for_each(|p| *p = [p[0] * 0.4 + 0.2, p[1] + 0.25, p[2] * 0.4 - 0.1]);
+        let tree = bvh::Bvh::from_parts(&scene);
+        for part in &scene {
+            for rays in [8, 32] {
+                let fast = tree.bake_vertices(&part.positions, &part.indices, rays);
+                let slow = tree.bake_vertices_linear(&part.positions, &part.indices, rays);
+                assert_eq!(fast, slow, "{rays} rays");
+            }
+        }
+        assert!(
+            scene.iter().any(|part| tree
+                .bake_vertices(&part.positions, &part.indices, 32)
+                .iter()
+                .any(|v| *v < 0.9)),
+            "the scene has some shadowed vertices, so the comparison means something"
         );
     }
 

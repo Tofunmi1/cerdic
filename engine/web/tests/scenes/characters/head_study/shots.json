@@ -1,0 +1,9 @@
+{
+  "views": [
+    { "name": "front", "position": [0, 1.64, 0.85], "target": [0, 1.64, 0], "fov": 45 },
+    { "name": "three-quarter-left", "position": [0.62, 1.64, 0.62], "target": [0, 1.64, 0], "fov": 45 },
+    { "name": "side", "position": [0.85, 1.64, 0], "target": [0, 1.64, 0], "fov": 45 },
+    { "name": "back", "position": [0, 1.64, -0.85], "target": [0, 1.64, 0], "fov": 45 },
+    { "name": "face-detail", "position": [0, 1.63, 0.48], "target": [0, 1.63, 0.08], "fov": 32 }
+  ]
+}

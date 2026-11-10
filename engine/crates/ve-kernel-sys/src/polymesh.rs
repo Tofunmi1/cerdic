@@ -47,6 +47,33 @@ pub struct VeBevelInput {
     pub profile: f32,
 }
 
+/// Input of the Skin modifier (a skeleton graph skinned into one surface); mirrors `ve_skin_input`.
+#[repr(C)]
+pub struct VeSkinInput {
+    /// Size of this struct.
+    pub struct_size: usize,
+    /// Joint positions, three floats per joint.
+    pub positions: *const f32,
+    /// Joint radii, two floats per joint (across and along the bone frame).
+    pub radii: *const f32,
+    /// One byte per joint (bit 0 root, bit 1 loose), or null.
+    pub flags: *const u8,
+    /// Number of joints.
+    pub vertex_count: usize,
+    /// Joint-index pairs, one per bone.
+    pub edges: *const u32,
+    /// Number of bones.
+    pub edge_count: usize,
+    /// Branch smoothing, 0..=1.
+    pub branch_smoothing: f32,
+    /// Symmetry axes, bit 0 x, bit 1 y, bit 2 z.
+    pub symmetry_axes: u32,
+    /// Non-zero for smooth shading flags.
+    pub smooth_shading: i32,
+    /// Non-zero to add joints along long bones.
+    pub subdivide: i32,
+}
+
 /// Input of a Blender mesh operator (`VE_MESH_OP_*` in `ve_kernel.h`).
 #[repr(C)]
 pub struct VeMeshOpInput {
@@ -129,6 +156,8 @@ unsafe extern "C" {
     pub fn ve_blender_ease(kind: i32, fraction: f32) -> f32;
     /// Bevels the given edges; null on failure with the reason in `status`.
     pub fn ve_bevel(input: *const VeBevelInput, status: *mut VeStatus) -> *mut VePolymesh;
+    /// Skins a skeleton graph into one surface; null on failure with the reason in `status`.
+    pub fn ve_skin(input: *const VeSkinInput, status: *mut VeStatus) -> *mut VePolymesh;
     /// Runs a Blender mesh operator; null on failure with the reason in `status`.
     pub fn ve_mesh_op(input: *const VeMeshOpInput, status: *mut VeStatus) -> *mut VePolymesh;
     /// Number of vertices.

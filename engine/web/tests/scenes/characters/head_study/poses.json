@@ -1,0 +1,12 @@
+{
+  "available": [
+    { "name": "neutral", "status": "available", "note": "current static head and forward gaze" }
+  ],
+  "required_later": [
+    { "name": "blink", "status": "missing" },
+    { "name": "jaw-open", "status": "missing" },
+    { "name": "smile", "status": "missing" },
+    { "name": "brow-raise", "status": "missing" },
+    { "name": "gaze-left-right", "status": "missing" }
+  ]
+}

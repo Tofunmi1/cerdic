@@ -404,6 +404,16 @@ and `poly_tunnel`. Remaining limits are in `docs/modeling/g6-report.md`.
 | G8-17 | Field regions | Deferred for G8: the current `LevelSet` adapter does not produce per-triangle primitive labels. Use separate `field.to_solid` outputs for separately coloured pieces; do not claim named field-region support. Decision recorded in ADR 0022. |
 | G8-18 | Field gallery models | `gallery.rs` evaluates repeated bent tubes and a creature built from smooth-blended ellipsoids, tube limbs/tail and separate eyes; `web/tests/gallery.mjs` captures six SwiftShader views for each through the real worker. At 0.026 m authored body spacing, the Preview render removes the prior sawtooth limb faceting. A regression test enforces the 200,000-triangle Preview cap, 12% volume tolerance and 0.06 m bounds tolerance against Final. Noise, regions and follow-up prompt edits are not covered. |
 
+## Character sculpting
+
+| ID | Input | Expected |
+|---|---|---|
+| CH-01 | Surface falloff on two nearby disconnected shells | Brush affects only the connected surface containing the nearest stroke point; the second shell remains byte-stable. `ve-modeling/tests/poly_sculpt.rs` |
+| CH-02 | Mask, sculpt, unmask, sculpt across chained nodes | `sculpt_mask` persists as a point float attribute; a fully masked vertex does not move, and unmask restores its response. `ve-modeling/tests/poly_sculpt.rs` |
+| CH-03 | Sculpt a human, then skin, grow hair and fit an outfit | Source vertex mapping survives the render-vertex/UV-seam to shared polygon-point conversion; all downstream character tools accept the edited body. `ve-modeling/tests/poly_sculpt_human.rs` |
+| CH-04 | Update head and eye landmarks from sculpted points | Scalp points are transformed back into grounded body space; eye centres and radii recalculate from their mapped vertices. `ve-modeling/src/human/rig.rs` unit test |
+| CH-05 | Blend and export a character shape key | `rig.morph` preserves the neutral mesh, applies the chosen weight, emits glTF POSITION deltas, and refuses mismatched topology. `ve-modeling/tests/rig_morph.rs`; browser export coverage |
+
 ## G9a: foundation fixes
 | ID | Input | Expected |
 |---|---|---|
@@ -458,7 +468,7 @@ and `poly_tunnel`. Remaining limits are in `docs/modeling/g6-report.md`.
 |---|---|---|
 | BX-1 | `MikkTSpace` tangents through the C ABI | A quad whose U follows X gets tangent +X and sign +1; swapping U and V gives +Y and sign -1; a UV sphere gets unit tangents perpendicular to its normals; the same input is bit-identical; mismatched lengths, a bad index count, an empty list, an out-of-range index and a NaN refuse with typed errors. `crates/ve-kernel/tests/tangents.rs` |
 | BX-2 | Native and WASI parity of the vendored Blender code | `tangents corners=N hash=...` over a carved mesh prints the same hash natively and under WASI (kernel corpus 23 lines). `crates/ve-kernel/examples/corpus.rs` |
-| BX-3 | Sanitizers and static analysis on vendored code | `cpp/tests/tangents_test.cpp` passes under ASan and UBSan and `cpp/src/tangents.cpp` passes clang-tidy; `third_party/mikktspace` is Apache-2.0 and unmodified (`VENDOR.md`). `cargo xtask cpp` |
+| BX-3 | Sanitizers and static analysis on vendored code | `cpp/tests/tangents_test.cpp` passes under ASan and UBSan and `cpp/src/tangents.cpp` passes clang-tidy; `lib/mikktspace` is Apache-2.0 and unmodified (`VENDOR.md`). `cargo xtask cpp` |
 
 ## G9b-8: deterministic composition and kits
 
@@ -539,3 +549,11 @@ impossible and ambiguous requests included; first-try, repaired and unsupported 
 **L8, L9:** per the plan; lists due before those gates are started.
 **G11, G12, V5-V7:** per the plan; lists due before those gates are started.
 **G13:** fuzz time, soak results, parity run, size report, migration fixtures, limitations matrix.
+
+## G12: close-view procedural building asset
+
+| ID | Input | Expected |
+|---|---|---|
+| G12-BA-1 | `building.asset@1` for masonry, glass, trim, roof and doors | Each material group has finite geometry and one UV per triangle corner; the same seed is deterministic, higher detail adds trim, all twelve grammar families and long/short footprints are covered, dimensions/styles outside the contract refuse, and the requested floor count controls the height. `crates/ve-modeling/tests/building_asset.rs`; all five material groups are included in native/WASI modeling corpus parity. `web/demos/architecture_gallery.txt` composes twelve differently proportioned examples with a road and street furniture. |
+| G12-SS-1 | `street.road@1` kit parts | Asphalt, lane markings, kerbs and pavement each produce finite UV-mapped geometry; cardinal axis and placement are tested; invalid dimensions refuse. `crates/ve-modeling/tests/streetscape.rs`; the four parts are in native/WASI parity. |
+| G12-SS-2 | `street.prop@1` reusable street-object kit | Body/accent geometry is finite and UV mapped for ten prop families; lights expose a lens group; incompatible parts, unknown kinds and invalid dimensions refuse. `crates/ve-modeling/tests/streetscape.rs`; representative props are in native/WASI parity. |

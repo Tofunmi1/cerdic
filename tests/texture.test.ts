@@ -5,7 +5,7 @@ import { loadHelpers, loadLibrary } from '../src/engine/texture/library';
 import { parseTextureProgram, TextureError } from '../src/engine/texture/program';
 import { boxChartUvs, cornerPositions } from '../src/engine/texture/uv';
 
-const root = new URL('../engine/third_party/material-maker/', import.meta.url).pathname;
+const root = new URL('../engine/lib/material-maker/', import.meta.url).pathname;
 const library = loadLibrary(root);
 const helpers = loadHelpers(root);
 
@@ -98,4 +98,15 @@ test('describe lists parameters with their ranges, defaults and choices', () => 
   const text = describe(library, 'fbm');
   expect(text).toContain('noise=value|perlin|cellular');
   expect(text).toMatch(/scale_x=1\.\.32\(2\)/);
+});
+
+test('an int literal next to an int variable stays an int: max(0, size) is not rewritten to max(0.0, size)', () => {
+  const graph = (type: string) => ({ nodes: [{ id: 's', type: 'bricks', params: {} }, { id: 'n', type, params: {}, inputs: { in: { node: 's' } } }], output: { node: 'n' } });
+  const kuwahara = compileTexture(library, graph('anisotropic_kuwahara'), helpers).source;
+  expect(kuwahara).toContain('int _KernelSize = max(0, size * 2);');
+  const warp = compileTexture(library, graph('multi_warp'), helpers).source;
+  expect(warp).toContain('iterations = max(1, iterations);');
+  const roman = compileTexture(library, { nodes: [{ id: 'n', type: 'roman_numerals', params: {} }], output: { node: 'n' } }, helpers).source;
+  expect(roman).toContain('n = clamp(n,0,40);');
+  expect(roman).not.toContain('clamp(n,0.0,40.0)');
 });

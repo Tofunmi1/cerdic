@@ -8,6 +8,7 @@
 // per instance sharing one mesh.
 import type { AnimationTrack, MeshPart, PartMaterial } from './worker-types';
 import { weld } from './gltf-mesh';
+import { cornerNormals } from './normals';
 import { sampleClip, sampleLook, type SampledClip } from './animation';
 import { Baker, encodePng } from './texture/bake';
 import { bakeMaterialMaps } from './texture/apply';
@@ -153,7 +154,13 @@ export function buildGlb(parts: MeshPart[], options: GlbOptions = {}): Uint8Arra
     }
     if (part.indices.length < 3 || part.positions.length < 9) continue;
     const pngs = options.textureImages?.get(partIndex);
-    const mesh = weld(part, crease, !!pngs?.normal, options.mikkTangents);
+    const morphTargets = part.morph_targets ?? [];
+    const basePositions = part.positions.slice();
+    for (const target of morphTargets) {
+      if (target.positions.length !== basePositions.length) throw new Error(`shape key ${target.name} does not match ${part.name || part.node}`);
+      for (let i = 0; i < basePositions.length; i++) basePositions[i] -= target.positions[i] * target.weight;
+    }
+    const mesh = weld(morphTargets.length ? { ...part, positions: basePositions } : part, crease, !!pngs?.normal, options.mikkTangents);
     const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
     for (let i = 0; i < mesh.positions.length; i += 3) {
       for (let k = 0; k < 3; k++) { min[k] = Math.min(min[k], mesh.positions[i + k]); max[k] = Math.max(max[k], mesh.positions[i + k]); }
@@ -234,9 +241,47 @@ export function buildGlb(parts: MeshPart[], options: GlbOptions = {}): Uint8Arra
       accessors.push({ bufferView: weightView, componentType: FLOAT, count, type: 'VEC4' });
       skinAttributes.WEIGHTS_0 = accessors.length - 1;
     }
+    const morphJson: Json[] = morphTargets.map(target => {
+      const deltas = new Float32Array(mesh.sources.length * 3);
+      for (let i = 0; i < mesh.sources.length; i++) {
+        const source = mesh.sources[i] * 3;
+        deltas.set(target.positions.subarray(source, source + 3), i * 3);
+      }
+      const view = push(new Uint8Array(deltas.buffer, deltas.byteOffset, deltas.byteLength), ARRAY_BUFFER);
+      const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+      for (let i = 0; i < deltas.length; i += 3) {
+        for (let axis = 0; axis < 3; axis++) {
+          min[axis] = Math.min(min[axis], deltas[i + axis]);
+          max[axis] = Math.max(max[axis], deltas[i + axis]);
+        }
+      }
+      accessors.push({ bufferView: view, componentType: FLOAT, count: deltas.length / 3, type: 'VEC3', min, max });
+      const targetPositions = basePositions.slice();
+      for (let i = 0; i < targetPositions.length; i++) targetPositions[i] += target.positions[i];
+      const cornerTargetNormals = cornerNormals(targetPositions, part.indices, crease);
+      const sums = new Float64Array(mesh.positions.length);
+      for (let corner = 0; corner < mesh.indices.length; corner++) {
+        const targetVertex = mesh.indices[corner] * 3;
+        sums[targetVertex] += cornerTargetNormals[corner * 3];
+        sums[targetVertex + 1] += cornerTargetNormals[corner * 3 + 1];
+        sums[targetVertex + 2] += cornerTargetNormals[corner * 3 + 2];
+      }
+      const normalDeltas = new Float32Array(mesh.positions.length);
+      for (let vertex = 0; vertex < mesh.positions.length / 3; vertex++) {
+        const at = vertex * 3;
+        const length = Math.hypot(sums[at], sums[at + 1], sums[at + 2]) || 1;
+        normalDeltas[at] = sums[at] / length - mesh.normals[at];
+        normalDeltas[at + 1] = sums[at + 1] / length - mesh.normals[at + 1];
+        normalDeltas[at + 2] = sums[at + 2] / length - mesh.normals[at + 2];
+      }
+      const normalView = push(new Uint8Array(normalDeltas.buffer, normalDeltas.byteOffset, normalDeltas.byteLength), ARRAY_BUFFER);
+      accessors.push({ bufferView: normalView, componentType: FLOAT, count: normalDeltas.length / 3, type: 'VEC3' });
+      return { POSITION: accessors.length - 2, NORMAL: accessors.length - 1 };
+    });
     meshes.push({
       name: part.name || part.node,
-      primitives: [{ attributes: { POSITION: positionAccessor, NORMAL: normalAccessor, TEXCOORD_0: uvAccessor, ...(colorAccessor === undefined ? {} : { COLOR_0: colorAccessor }), ...(tangentAccessor === undefined ? {} : { TANGENT: tangentAccessor }), ...skinAttributes }, indices: indexAccessor, material, mode: 4 }],
+      ...(morphTargets.length ? { weights: morphTargets.map(target => target.weight), extras: { targetNames: morphTargets.map(target => target.name) } } : {}),
+      primitives: [{ attributes: { POSITION: positionAccessor, NORMAL: normalAccessor, TEXCOORD_0: uvAccessor, ...(colorAccessor === undefined ? {} : { COLOR_0: colorAccessor }), ...(tangentAccessor === undefined ? {} : { TANGENT: tangentAccessor }), ...skinAttributes }, ...(morphJson.length ? { targets: morphJson } : {}), indices: indexAccessor, material, mode: 4 }],
     });
     const meshIndex = meshes.length - 1;
     if (part.transforms && part.transforms.length >= 16) {

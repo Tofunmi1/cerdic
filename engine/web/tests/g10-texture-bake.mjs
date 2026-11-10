@@ -8,7 +8,7 @@ import { loadHelpers, loadLibrary } from '../../../src/engine/texture/library.ts
 // G10: baking a 3D (object-space) texture onto a mesh through its UV layout. A sphere is drawn into UV
 // space with its positions as colour, the 3D shader reads those positions, and the picture is read back.
 // A 3D pattern is continuous across the UV seam, which is what a 2D pattern cannot do; the test checks it.
-const root = new URL('../../third_party/material-maker/', import.meta.url).pathname;
+const root = new URL('../../lib/material-maker/', import.meta.url).pathname;
 const reports = new URL('../../target/reports/g10/', import.meta.url).pathname;
 const library = loadLibrary(root);
 const helpers = loadHelpers(root);

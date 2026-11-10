@@ -5,7 +5,7 @@ use ve_graph::{Node, NodeId};
 
 pub(super) fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usize, Fail> {
     match node.op.family().as_str() {
-        "curve.polyline" | "curve.bezier" | "curve.circle" => {
+        "curve.polyline" | "curve.bezier" | "curve.circle" | "curve.hang" => {
             return Ok(crate::curves::estimate_curve(node));
         }
         family if crate::curves::is_tool(family) => {
@@ -28,7 +28,7 @@ pub(super) fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<u
                 .map(|r| sizes.get(&r.node).copied().unwrap_or(0))
                 .sum());
         }
-        "inst.drop" | "inst.scatter_on" => {
+        "inst.drop" | "inst.scatter_on" | "inst.vary" | "scatter.place" | "terrain.place" => {
             return Ok(node
                 .inputs
                 .get("in")
@@ -37,12 +37,76 @@ pub(super) fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<u
                 .map(|r| sizes.get(&r.node).copied().unwrap_or(0))
                 .sum());
         }
+        "body.human" => return Ok(crate::human::TRIANGLES),
+        "body.bone" => return Ok(12),
+        "body.garment" => return Ok(crate::human::TRIANGLES / 2),
+        "body.outfit" => return Ok(6_000),
+        "body.skin" => {
+            return Ok(node
+                .inputs
+                .get("in")
+                .into_iter()
+                .flatten()
+                .map(|r| sizes.get(&r.node).copied().unwrap_or(0))
+                .sum());
+        }
+        "body.skin_to" => {
+            return Ok(node
+                .inputs
+                .get("cloth")
+                .into_iter()
+                .flatten()
+                .map(|r| sizes.get(&r.node).copied().unwrap_or(0))
+                .sum());
+        }
+        "body.eye" => return Ok(crate::human_eye::TRIANGLES),
+        "body.hair" => return Ok(crate::human_hair::triangles(node)),
         "terrain.heightfield" => return Ok(crate::terrain::estimate(node)),
+        "terrain.tile" => return Ok(crate::world_terrain::estimate(node)),
+        "city.ground" | "city.buildings" | "building.asset" | "street.road" | "street.prop" => {
+            return Ok(crate::world_city::estimate(node));
+        }
+        "flora.tree" => return Ok(crate::world_flora::estimate(node)),
+        "terrain.mask" | "terrain.biomes" | "terrain.erode" | "terrain.flatten"
+        | "terrain.material" | "river.carve" | "river.water" | "water.fill" => {
+            return Ok(node
+                .inputs
+                .get("in")
+                .into_iter()
+                .flatten()
+                .map(|r| sizes.get(&r.node).copied().unwrap_or(0))
+                .sum());
+        }
         "water.surface" => return Ok(crate::terrain::water::estimate(node)),
         "solid.sweep" => return Ok(estimate_sweep(node, sizes)),
         "curve.tube" => return Ok(estimate_tube(node, sizes)),
         "solid.loft" => return Ok(estimate_loft(node, sizes)),
-        "poly.grid" => {
+        "curve.expr" => return Ok(count(node, "samples")),
+        // At most one Bézier per input segment, each sampled `steps` times.
+        "curve.fit" => {
+            let points = match node.params.get("points") {
+                Some(ve_graph::Value::List(points)) => points.len(),
+                _ => 0,
+            };
+            return Ok(points.saturating_mul(count(node, "steps").max(1)));
+        }
+        // A face line costs at least ~12 characters and makes up to two triangles.
+        "poly.import" => {
+            let length = match node.params.get("data") {
+                Some(ve_graph::Value::Str(text)) => text.len(),
+                _ => 0,
+            };
+            return Ok(length / 6);
+        }
+        // A skin measured 10 to 20 triangles per joint (a 35-joint human gave 680, a 100-joint body with five-digit hands about 1,060); 40 keeps a margin for long thin bones cut into many rings.
+        "poly.skin" => {
+            let joints = match node.params.get("joints") {
+                Some(ve_graph::Value::Str(text)) => text.matches(';').count() + 1,
+                _ => 2,
+            };
+            return Ok(joints.saturating_mul(40));
+        }
+        "poly.grid" | "poly.surface_expr" => {
             return Ok(2usize
                 .saturating_mul(count(node, "columns"))
                 .saturating_mul(count(node, "rows")));
@@ -51,8 +115,50 @@ pub(super) fn estimate(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<u
         // The evaluator enforces the measured kernel work cap and the final result's triangle cap.
         family if family.starts_with("field.") => return Ok(0),
         family if family.starts_with("light.") => return Ok(0),
+        // Rules and entities are data, not geometry.
+        family if family.starts_with("game.") => return Ok(0),
         // A number makes no triangles.
         family if family.starts_with("value.") => return Ok(0),
+        // A drape moves the panel's points and keeps its faces: the panel's triangles are the result's.
+        "cloth.drape" | "cloth.sim" => {
+            return Ok(node
+                .inputs
+                .get("in")
+                .into_iter()
+                .flatten()
+                .map(|r| sizes.get(&r.node).copied().unwrap_or(0))
+                .sum());
+        }
+        // Panels: at most 7 boxes of 12 triangles per plate (a plate and up to 6 slats). A sign: at most 35 lit pixels of 12 per character.
+        "detail.panels" => {
+            let n = |name: &str| {
+                node.params
+                    .get(name)
+                    .and_then(ve_graph::Value::as_f64)
+                    .unwrap_or(1.0)
+            };
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "the spec bounds both counts to 1..32"
+            )]
+            return Ok(n("cols") as usize * n("rows") as usize * 7 * 12);
+        }
+        // Rooms: at most 65 regions with a floor and four walls of 12 triangles each, and a door opening cut in some of them.
+        "rooms.plan" => return Ok(65 * 5 * 12 * 3),
+        "sign.text" => {
+            let characters = match node.params.get("text") {
+                Some(ve_graph::Value::Str(text)) => text.chars().count(),
+                _ => 0,
+            };
+            return Ok(characters * 35 * 12);
+        }
+        // A simulation draws four triangles per particle, at most MAX_PARTICLES of them.
+        "sim.program" => return Ok(crate::sim_program::MAX_PARTICLES * 4),
+        // A grid of distances makes none either; the mesh `volume.to_mesh` makes is checked against the budget when it is built.
+        family if family.starts_with("volume.") => return Ok(0),
+        // A piece of a fractured shape is meshed from a grid; its size is checked against the budget when it is built.
+        "poly.fracture" => return Ok(0),
         "scene.environment" | "scene.sky" => return Ok(0),
         family if family.starts_with("poly.") => return Ok(estimate_poly(node, sizes)),
         _ => {}
@@ -72,7 +178,8 @@ fn estimate_default(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usiz
         "profile.polygon" | "profile.offset" | "profile.difference" | "profile.smooth"
         | "profile.fillet" => profile_estimate(node, inputs.sum(), segments),
         "xform.mirror" => Ok(inputs.sum::<usize>().saturating_mul(2)),
-        "check.min_wall" => Ok(0),
+        "check.min_wall" | "check.attached" | "check.motion" | "script.js" => Ok(0),
+        "anim.machine" => Ok(0),
         "profile.rect" => Ok(4),
         "profile.circle" => Ok(segments),
         "solid.torus" => Ok(segments
@@ -114,7 +221,7 @@ fn estimate_default(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> Result<usiz
             .map(|r| sizes.get(&r.node).copied().unwrap_or(0))
             .sum()),
         "xform.move" | "xform.rotate" | "xform.scale" | "xform.align" | "frame.add"
-        | "solid.material" | "solid.texture" | "solid.toon" | "solid.style" | "solid.foliage" | "anim.track" | "anim.wave" | "phys.body" | "phys.joint" | "phys.world" | "rig.bone" | "rig.skin" | "rig.ik" | "anim.parent" | "behavior.on" | "inst.array" | "inst.radial" | "inst.repeat" | "inst.mirror"
+        | "solid.material" | "solid.texture" | "material.preset" | "solid.toon" | "solid.style" | "solid.foliage" | "solid.finish" | "anim.track" | "anim.drop" | "anim.wave" | "anim.retarget" | "anim.simplify" | "fluid.sim" | "phys.body" | "phys.joint" | "phys.world" | "rig.bone" | "rig.skin" | "rig.morph" | "rig.ik" | "rig.aim" | "rig.secondary" | "rig.gait" | "phys.ragdoll" | "fx.emitter" | "fx.force" | "fx.collide" | "fx.trail" | "fx.sub" | "anim.parent" | "behavior.on" | "inst.array" | "inst.radial" | "inst.repeat" | "inst.program" | "inst.along_curve" | "inst.place" | "inst.mirror"
         | "inst.scatter" | "inst.jitter"
         // These deform vertex positions without changing mesh topology.
         | "xform.twist" | "xform.taper" | "xform.bend" | "xform.shear" | "xform.wave" | "xform.noise" | "xform.lattice" => Ok(inputs.sum()),
@@ -268,6 +375,8 @@ fn estimate_poly(node: &Node, sizes: &BTreeMap<NodeId, usize>) -> usize {
             .saturating_mul(count(node, "steps").clamp(2, 256))
             .min(250_000),
         "poly.mirror" => input.saturating_mul(2),
+        // About the requested quads, two triangles each (plus the 10 percent the remesher may overshoot by).
+        "poly.remesh_quads" => count(node, "faces").saturating_mul(3),
         "poly.loop_cut" => input.saturating_mul(1 + count(node, "cuts").clamp(1, 32)),
         _ => input,
     }

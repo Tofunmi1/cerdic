@@ -7,9 +7,9 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
-bevy_app = { path = "../../third_party/bevy/crates/bevy_app" }
-bevy_ecs = { path = "../../third_party/bevy/crates/bevy_ecs" }
-bevy_math = { path = "../../third_party/bevy/crates/bevy_math" }
+bevy_app = { path = "../../lib/bevy/crates/bevy_app" }
+bevy_ecs = { path = "../../lib/bevy/crates/bevy_ecs" }
+bevy_math = { path = "../../lib/bevy/crates/bevy_math" }
 thiserror.workspace = true
 ve-interact = { path = "../ve-interact" }
 ve-render = { path = "../ve-render" }
@@ -17,8 +17,8 @@ ve-xr-math = { path = "../ve-xr-math" }
 
 # Browser glue; the pure frame logic above builds and is tested natively.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-bevy_camera = { path = "../../third_party/bevy/crates/bevy_camera" }
-bevy_render = { path = "../../third_party/bevy/crates/bevy_render", default-features = false, features = ["webgl"] }
+bevy_camera = { path = "../../lib/bevy/crates/bevy_camera" }
+bevy_render = { path = "../../lib/bevy/crates/bevy_render", default-features = false, features = ["webgl"] }
 js-sys.workspace = true
 wgpu = { version = "30", default-features = false, features = ["webgl"] }
 ve-platform-web = { path = "../ve-platform-web" }

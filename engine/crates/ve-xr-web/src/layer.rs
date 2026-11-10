@@ -1,7 +1,7 @@
 //! Connects the XR layer's framebuffer to the headset camera. Browser only.
 //!
 //! Real headsets hand out an opaque WebGL framebuffer that wgpu did not create. It is imported as a
-//! wgpu texture (through the patched wgpu-hal, see `third_party/PATCHES.md`), registered as a manual
+//! wgpu texture (through the patched wgpu-hal, see `lib/PATCHES.md`), registered as a manual
 //! texture view and set as the headset camera's render target. The framebuffer is not an sRGB view,
 //! so `ve-render` renders offscreen and its present pass encodes into it. Emulated runtimes have no
 //! framebuffer (they draw to the canvas), in which case the camera keeps rendering to the window.

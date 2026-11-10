@@ -11,28 +11,44 @@ use ready::READY;
 
 mod assembly;
 mod bake;
+mod city;
+mod cloth;
 mod curve_tools;
 mod curves;
 mod deformers;
 mod environment;
 mod fields;
+mod detail;
+mod fluid;
+mod sim;
+mod fracture;
+mod game;
 mod group_ops;
 mod hulls;
+mod human;
 mod instances;
 mod lights;
 mod modeling;
+mod patterns;
 mod physics;
 mod poly;
+mod poly_cleanup;
 mod poly_network;
 mod poly_network_whole;
 mod poly_output;
 mod poly_presets;
+mod poly_program;
+mod poly_skin;
 mod poly_select;
 mod ready;
+mod retarget;
 mod shapes;
 mod terrain;
 mod values;
+mod volume;
 mod water;
+mod world;
+mod world_pad;
 
 /// The largest size or offset accepted, in metres (the kernel's own extent limit).
 const EXTENT: f64 = 1.0e6;
@@ -104,6 +120,15 @@ fn variadic(name: &'static str, accepts: &'static [PortType]) -> PortSpec {
     }
 }
 
+/// A variadic port that takes a single link too, for operators where one input is simply that input.
+fn variadic_one_or_more(name: &'static str, accepts: &'static [PortType]) -> PortSpec {
+    PortSpec {
+        name,
+        accepts,
+        arity: Arity::Variadic { min: 1 },
+    }
+}
+
 fn single(name: &'static str, accepts: &'static [PortType]) -> PortSpec {
     PortSpec {
         name,
@@ -123,7 +148,13 @@ fn all_specs() -> Vec<Option<OperatorSpec>> {
     all.extend(curves::all());
     all.extend(curve_tools::all());
     all.extend(terrain::all());
+    all.extend(human::all());
+    all.extend(city::all());
     all.extend(water::all());
+    all.extend(world::all());
+    all.extend(world_pad::all());
+    all.extend(patterns::all());
+    all.extend(game::all());
     all.extend(physics::all());
     all.extend(shapes::all());
     all.extend(hulls::all());
@@ -138,6 +169,16 @@ fn all_specs() -> Vec<Option<OperatorSpec>> {
     all.extend(poly_presets::all());
     all.extend(poly_network::all());
     all.extend(poly_output::all());
+    all.extend(poly_program::all());
+    all.extend(poly_skin::all());
+    all.extend(poly_cleanup::all());
+    all.extend(volume::all());
+    all.extend(cloth::all());
+    all.extend(retarget::all());
+    all.extend(fluid::all());
+    all.extend(sim::all());
+    all.extend(detail::all());
+    all.extend(fracture::all());
     for spec in all.iter_mut().flatten() {
         if READY.contains(&spec.id.to_string().as_str()) {
             spec.readiness = Readiness::Ready;
@@ -188,8 +229,8 @@ fn booleans() -> Vec<Option<OperatorSpec>> {
     vec![
         spec(
             "solid.union@1",
-            "Joins solids into one.",
-            vec![variadic("in", SOLID)],
+            "Joins solids into one (a single solid joins to itself).",
+            vec![variadic_one_or_more("in", SOLID)],
             solid,
             vec![],
         ),

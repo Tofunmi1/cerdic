@@ -1,0 +1,58 @@
+# THE GRAND CANYON: a 5 km square of the Colorado plateau with a 1.1 km deep, winding gorge cut through its rock layers, a side canyon, and the river at the bottom.
+# The ground is written as a surface (poly.surface_expr: a program of u and v giving x, y, z), in four 2.5 km patches of 200 x 200 quads that meet exactly (the same function, offset by the patch). Its height is built the way
+# the canyon is: the distance from the river's winding centreline, stretched by noise so the walls bay in and out, is turned into a height by a PIECEWISE profile whose steep sections are the cliff-forming layers
+# (Redwall, Coconino, Kaibab) and whose gentle sections are the slope-forming ones (Bright Angel shale, Supai, Hermit). Ridged gully noise then erodes the walls.
+# Each patch is then cut into its ten rock layers by height (a poly.script that keeps the faces in a height band) and each layer gets its own colour, so the bands run along the walls at the right heights, as in the real canyon.
+# Layers, bottom to top, as heights in metres: Vishnu schist 0-66, Tapeats 66-110, Bright Angel 110-242, Muav 242-308, Redwall 308-495, Supai 495-704, Hermit 704-792, Coconino 792-902, Toroweap 902-968, Kaibab 968+.
+# Metres, +y up. The river runs roughly along z; a tributary joins from the east.
+# kind: world
+sky = scene.sky@1(sun_elevation=19, sun_azimuth=-58, sun_intensity=3.6, turbidity=1.5, ground_color=[0.45, 0.33, 0.24], clouds=true, cloud_cover=0.3, seed=5)
+env = scene.environment@1(sky_color=[0.72, 0.8, 0.95], ground_color=[0.6, 0.42, 0.3], intensity=1.1, reflection=0.3, bounce=0.7)
+output sky = sky
+output env = env
+
+# the shared centreline of the river (a function of z alone, so the water ribbon and the ground agree)
+let cl = "c = 380.0 * sin(z * 0.0014 + 1.0) + 170.0 * sin(z * 0.0041 + 2.3) + 120.0 * perlin(vec3(z * 0.0016, 3.0, 0.0), 1.0);"
+# the ground after x and z are known
+let ground = "q = vec3(x, z, 0.0); ${cl} d1 = abs(x - c); tc = 900.0 + 260.0 * sin(x * 0.0019) + 90.0 * perlin(vec3(x * 0.003, 7.0, 0.0), 2.0); d2 = abs(z - tc) * 1.9; pen = 6000.0 * (1.0 - smoothstep(0.0, 400.0, x - c)); d = min(d1, d2 + pen); t = d / 3000.0 * (1.0 + 0.35 * perlin(q * 0.0012, 3.0) + 0.2 * perlin(q * 0.0041, 4.0)); f = 0.06 * clamp(t / 0.04, 0.0, 1.0) + 0.04 * clamp((t - 0.04) / 0.03, 0.0, 1.0) + 0.12 * clamp((t - 0.07) / 0.13, 0.0, 1.0) + 0.06 * clamp((t - 0.2) / 0.015, 0.0, 1.0) + 0.17 * clamp((t - 0.215) / 0.02, 0.0, 1.0) + 0.19 * clamp((t - 0.235) / 0.185, 0.0, 1.0) + 0.08 * clamp((t - 0.42) / 0.08, 0.0, 1.0) + 0.1 * clamp((t - 0.5) / 0.005, 0.0, 1.0) + 0.06 * clamp((t - 0.505) / 0.055, 0.0, 1.0) + 0.12 * clamp((t - 0.56) / 0.015, 0.0, 1.0); m = f * (1.0 - f) * 4.0; g = 1.0 - abs(perlin(q * 0.006, 5.0)); far = smoothstep(10.0, 140.0, d); det = (60.0 * perlin(q * 0.0045, 6.0) + 22.0 * perlin(q * 0.013, 7.0) + 7.0 * perlin(q * 0.04, 8.0)) * (0.25 + m) * far; out = vec3(x, 1100.0 * f + det - m * 40.0 * g * g * far, z);"
+
+# one patch of the ground (ox, oz: its centre), cut into the ten layers, each coloured
+def patch(tag, ox, oz)
+  gp{tag} = poly.surface_expr@1(code="x = (u - 0.5) * 2500.0 + ${ox}; z = (v - 0.5) * 2500.0 + ${oz}; ${ground}", columns=200, rows=200, flip=true)
+  for [i, lo, hi] in [[0, 0, 66], [1, 66, 110], [2, 110, 242], [3, 242, 308], [4, 308, 495], [5, 495, 704], [6, 704, 792], [7, 792, 902], [8, 902, 968], [9, 968, 3000]]
+    gp{tag}_l{i} = poly.script@1(gp{tag}, budget=4000, code="const lo = ${lo}, hi = ${hi}; const P = input.points, F = input.faces; const keep = new Array(P.length).fill(-1); const m = new Mesh(); for (let k = 0; k < F.length; k++) { const f = F[k]; let y = 0; for (let j = 0; j < f.length; j++) y += P[f[j]][1]; y /= f.length; if (y < lo || y >= hi) continue; const ids = []; for (let j = 0; j < f.length; j++) { const a = f[j]; if (keep[a] < 0) keep[a] = m.vertex(P[a][0], P[a][1], P[a][2]); ids.push(keep[a]); } m.face(...ids); } m")
+  end
+  gp{tag}_m0 = solid.material@1(gp{tag}_l0, color=[0.2, 0.17, 0.2], roughness=0.9)
+  gp{tag}_m1 = solid.material@1(gp{tag}_l1, color=[0.36, 0.26, 0.2], roughness=0.9)
+  gp{tag}_m2 = solid.material@1(gp{tag}_l2, color=[0.46, 0.47, 0.36], roughness=0.95)
+  gp{tag}_m3 = solid.material@1(gp{tag}_l3, color=[0.64, 0.54, 0.4], roughness=0.9)
+  gp{tag}_m4 = solid.material@1(gp{tag}_l4, color=[0.68, 0.3, 0.18], roughness=0.9)
+  gp{tag}_m5 = solid.material@1(gp{tag}_l5, color=[0.56, 0.27, 0.19], roughness=0.92)
+  gp{tag}_m6 = solid.material@1(gp{tag}_l6, color=[0.63, 0.25, 0.16], roughness=0.92)
+  gp{tag}_m7 = solid.material@1(gp{tag}_l7, color=[0.92, 0.8, 0.6], roughness=0.85)
+  gp{tag}_m8 = solid.material@1(gp{tag}_l8, color=[0.73, 0.66, 0.54], roughness=0.9)
+  gp{tag}_m9 = solid.material@1(gp{tag}_l9, color=[0.82, 0.76, 0.64], roughness=0.88)
+  # rock grain: horizontal bedding lines (a noise stretched along the layer) with a little relief, repeating every 24 m in world space
+  gp{tag}_t0 = solid.texture@1(gp{tag}_m0, tile=24, size="512", program="grain = fbm(scale_x=4, scale_y=40); albedo = colorize(grain, gradient=[0:#2a2230, 1:#4a3d48]); roughness = grain; height = grain")
+  gp{tag}_t1 = solid.texture@1(gp{tag}_m1, tile=24, size="512", program="grain = fbm(scale_x=4, scale_y=40); albedo = colorize(grain, gradient=[0:#4a3326, 1:#7a5640]); roughness = grain; height = grain")
+  gp{tag}_t2 = solid.texture@1(gp{tag}_m2, tile=24, size="512", program="grain = fbm(scale_x=4, scale_y=40); albedo = colorize(grain, gradient=[0:#55583f, 1:#8a8d66]); roughness = grain; height = grain")
+  gp{tag}_t3 = solid.texture@1(gp{tag}_m3, tile=24, size="512", program="grain = fbm(scale_x=4, scale_y=40); albedo = colorize(grain, gradient=[0:#7a6446, 1:#b09670]); roughness = grain; height = grain")
+  gp{tag}_t4 = solid.texture@1(gp{tag}_m4, tile=24, size="512", program="grain = fbm(scale_x=4, scale_y=40); albedo = colorize(grain, gradient=[0:#7a2e18, 1:#c0522c]); roughness = grain; height = grain")
+  gp{tag}_t5 = solid.texture@1(gp{tag}_m5, tile=24, size="512", program="grain = fbm(scale_x=4, scale_y=40); albedo = colorize(grain, gradient=[0:#5e2a1c, 1:#a24a30]); roughness = grain; height = grain")
+  gp{tag}_t6 = solid.texture@1(gp{tag}_m6, tile=24, size="512", program="grain = fbm(scale_x=4, scale_y=40); albedo = colorize(grain, gradient=[0:#6e2414, 1:#b44a2a]); roughness = grain; height = grain")
+  gp{tag}_t7 = solid.texture@1(gp{tag}_m7, tile=24, size="512", program="grain = fbm(scale_x=4, scale_y=40); albedo = colorize(grain, gradient=[0:#b8a078, 1:#efe0b8]); roughness = grain; height = grain")
+  gp{tag}_t8 = solid.texture@1(gp{tag}_m8, tile=24, size="512", program="grain = fbm(scale_x=4, scale_y=40); albedo = colorize(grain, gradient=[0:#6a5e4e, 1:#a09480]); roughness = grain; height = grain")
+  gp{tag}_t9 = solid.texture@1(gp{tag}_m9, tile=24, size="512", program="grain = fbm(scale_x=4, scale_y=40); albedo = colorize(grain, gradient=[0:#5a5040, 1:#9a8a70]); roughness = grain; height = grain")
+  for i in 0..10
+    output {tag}_rock{i} = gp{tag}_t{i}
+  end
+end
+patch("a", -1250, -1250)
+patch("b", 1250, -1250)
+patch("c", -1250, 1250)
+patch("d", 1250, 1250)
+
+# the Colorado: a ribbon of water following the same centreline, a few metres above the gorge floor
+river = poly.surface_expr@1(code="z = (v - 0.5) * 5000.0; ${cl} w = 55.0 + 22.0 * perlin(vec3(z * 0.004, 1.0, 0.0), 9.0); out = vec3(c + (u - 0.5) * w, 3.0, z);", columns=8, rows=400)
+river_m = solid.material@1(river, color=[0.32, 0.4, 0.33], roughness=0.15, opacity=0.9)
+output river = river_m
