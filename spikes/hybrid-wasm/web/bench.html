@@ -1,7 +1,0 @@
-<!doctype html><meta charset="utf-8"><title>Engine stage benchmark</title><pre id="out">running…</pre>
-<script type="module">
-import { bench } from "./bench.mjs";
-try { window.__bench = { ok: true, ...(await bench(await (await fetch("./engine.opt.wasm")).arrayBuffer())) }; }
-catch (e) { window.__bench = { ok: false, error: String(e) }; }
-document.getElementById("out").textContent = JSON.stringify(window.__bench, null, 2);
-</script>

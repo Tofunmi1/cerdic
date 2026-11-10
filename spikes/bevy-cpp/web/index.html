@@ -1,9 +1,0 @@
-<!doctype html><meta charset=utf-8><title>bevy-cpp spike</title>
-<script type=module>
-import init, { boot } from "./bevy_cpp.js";
-const t0 = performance.now();
-await init();
-const msg = boot();
-window.__spike = { msg, ms: +(performance.now() - t0).toFixed(1) };
-document.body.textContent = JSON.stringify(window.__spike);
-</script>
