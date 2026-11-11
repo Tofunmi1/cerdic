@@ -1,4 +1,4 @@
-//! The typed command set (see `docs/modeling/commands.md`).
+//! The typed command set.
 
 use std::collections::BTreeMap;
 

@@ -1,7 +1,7 @@
 // G3 acceptance in the browser: the gallery programs go text -> staged commands -> worker -> scene,
 // the vase survives the create / widen / manual edit / undo / reload sequence, a wall-breaking edit
 // is refused with the document untouched, and every gallery piece is photographed from the fixed
-// review views (docs/modeling/fixtures.md) into target/reports/gallery/ for review by eye.
+// review views into target/reports/gallery/ for review by eye.
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { mkdir, readFile } from 'node:fs/promises';

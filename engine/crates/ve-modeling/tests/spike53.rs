@@ -1,5 +1,5 @@
 //! G3-21: every one of the 53 spike programs is classified, and the ones that translate run in the
-//! engine and agree with the spike evaluator's volume and size. See `docs/modeling/spike-classification.md`.
+//! engine and agree with the spike evaluator's volume and size.
 use serde_json::Value;
 use std::path::Path;
 use ve_graph::{CommandBatch, Outcome, Session, TransactionId, builtin_registry, parse_text};

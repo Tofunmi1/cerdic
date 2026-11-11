@@ -1,6 +1,5 @@
 //! G4b evaluation, part 1: a group instanced several times is evaluated once, overrides and definition
-//! edits behave as specified, and failures name the instance (cases G4b-E1 to G4b-E8 and G4b-11,
-//! `docs/modeling/cases.md`). Inputs, nesting and budgets are in `g4_eval_more.rs`.
+//! edits behave as specified, and failures name the instance (cases G4b-E1 to G4b-E8 and G4b-11). Inputs, nesting and budgets are in `g4_eval_more.rs`.
 
 #[path = "support/groups.rs"]
 mod support;

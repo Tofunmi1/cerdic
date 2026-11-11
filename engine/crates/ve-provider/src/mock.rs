@@ -4,7 +4,7 @@ use crate::{Patch, Provider, ProviderError, Request};
 use serde_json::json;
 use ve_graph::{Command, Document, NodeRef, Value, builtin_registry, parse_text};
 
-/// The frozen vase from `docs/modeling/commands.md`, written in the text form.
+/// The frozen vase fixture, written in the text form.
 pub const VASE_TEXT: &str = "\
 outer = profile.polygon@1(points=[[0, 0], [0.06, 0], [0.11, 0.12], [0.07, 0.26], [0.05, 0.3], [0, 0.3]])
 inner = profile.polygon@1(points=[[0, 0.01], [0.056, 0.01], [0.104, 0.12], [0.064, 0.26], [0.04, 0.31], [0, 0.31]])

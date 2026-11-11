@@ -1,4 +1,4 @@
-// Parses and type-checks a shader expression program (see engine/docs/handoff-codex-shader-expr.md for the language).
+// Parses and type-checks a shader expression program.
 import { MAX_IDENTIFIER, MAX_LOOP_BOUND, MAX_LOOP_DEPTH, MAX_LOOP_PRODUCT, MAX_NODES, MAX_SOURCE } from './limits';
 import { FUNCTIONS, nearest } from './signatures';
 import { RESERVED, tokenize, type Tok } from './tokens';

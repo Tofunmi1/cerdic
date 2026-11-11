@@ -1,4 +1,4 @@
-//! Overlay layers and clip events: a wave over a walk, footsteps at the right moments (plan W2, `docs/plans/engine-libraries-adoption.md`).
+//! Overlay layers and clip events: a wave over a walk, footsteps at the right moments.
 //!
 //! The idea and the two ways to combine (replace the masked parts' motion, or add the clip's change from its first frame) follow ozz-animation's
 //! `BlendingJob` layers with per-joint weights and its additive animation builder (MIT); the code is ours.

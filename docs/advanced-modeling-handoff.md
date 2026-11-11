@@ -6,7 +6,7 @@
 
 **Status:** research and proposed implementation plan. No libraries were installed, vendored, compiled or integrated for this document. Browser/WASM compatibility below distinguishes upstream evidence from untested integration proposals. Existing engine changes belong to another agent and were left untouched. The checkout was at `b0c2b75` during the final local inspection and remains under active development.
 
-This supplements the [earlier code audit and language handoff](research-handoff.md). That report covers reproduced bugs, transactions, XR and safety foundations; this report focuses on expanding actual modeling capability. Read [engine rules](../engine/AGENTS.md), [the node-language ADR](../engine/docs/adr/0002-node-graph-geometry-language.md), [the licensing ADR](../engine/docs/adr/0003-licensing-and-no-imported-assets.md), and [the runtime plan](../engine/docs/plans/track1-runtime.md) before implementation. Language/modeling expansion needs its own follow-on track rather than silently replacing the ongoing runtime milestones.
+This supplements the [earlier code audit and language handoff](research-handoff.md). That report covers reproduced bugs, transactions, XR and safety foundations; this report focuses on expanding actual modeling capability. Language/modeling expansion needs its own follow-on track rather than silently replacing the ongoing runtime milestones.
 
 ## 1. Recommendation
 

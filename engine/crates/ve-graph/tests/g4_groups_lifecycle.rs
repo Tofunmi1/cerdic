@@ -1,5 +1,5 @@
 //! G4b: groups and instances at the document level, part 2: upgrades, removal, undo, persistence,
-//! group inputs, nesting and limits (cases G4b-12 to G4b-20, `docs/modeling/cases.md`).
+//! group inputs, nesting and limits (cases G4b-12 to G4b-20).
 #[path = "support/groups.rs"]
 mod support;
 

@@ -1,6 +1,6 @@
 //! Analytic limb solvers: a two-bone chain (arm, leg) with pole vector, twist, soften and weight, and an aim solver (head, eye, turret).
 //!
-//! Plan W2, `docs/plans/engine-libraries-adoption.md`. The two-bone soften curve and the weight convention follow ozz-animation's
+//! The two-bone soften curve and the weight convention follow ozz-animation's
 //! `IKTwoBoneJob` (MIT, Guillaume Blanc); the soften curve differs (see `soften`). The geometry here is our own, in world space: the elbow position comes
 //! from the law of cosines, the pole picks the side, and rotations are derived from where the bones must end up.
 //!

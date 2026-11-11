@@ -1,4 +1,4 @@
-// The in-page agent loop (docs/plans/llm-pipeline-and-harness.md): a model that calls tools until it is done, with budgets, cancel, clean errors, bounded results and
+// The in-page agent loop: a model that calls tools until it is done, with budgets, cancel, clean errors, bounded results and
 // a request that stays small however long the run is. A scripted provider stands in for the model; no network. Written before the code; do not weaken.
 import { expect, test } from 'bun:test';
 import { formatToolResult, runAgent, type AgentEvent } from '../src/engine/agent/loop';

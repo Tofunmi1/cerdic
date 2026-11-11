@@ -9,7 +9,7 @@ The source is Anny (Apache-2.0 code) with MPFB2 and Face Units data (CC0). The o
     b"VEHUMAN\\x01" | u32 json_length | json header | binary payload
 
 The JSON header lists `sections` ({name: {offset, dtype, shape}}, offsets from the start of the payload), the label lists and the phenotype anchors, see
-docs/handoff-codex-human.md for what each section means. Axes are converted from Anny's (x right, y back, z up) to ours (x right, y up, z forward), metres.
+the header metadata for what each section means. Axes are converted from Anny's (x right, y back, z up) to ours (x right, y up, z forward), metres.
 """
 import json
 import struct

@@ -2,7 +2,7 @@
 //!
 //! One versioned document with stable IDs; every edit is a [`CommandBatch`] checked against a
 //! revision, applied atomically to a candidate copy, and recorded for undo. Engine-agnostic: no Bevy,
-//! no platform code. See `docs/modeling/` for the contracts this crate implements.
+//! no platform code.
 
 mod apply;
 mod builtin;

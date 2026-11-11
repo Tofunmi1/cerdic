@@ -1,4 +1,4 @@
-//! G4e: the text form for groups (cases G4e-01 and the error cases of `docs/modeling/cases.md`).
+//! G4e: the text form for groups (case G4e-01 and the error cases).
 #![expect(
     clippy::unwrap_used,
     clippy::panic,

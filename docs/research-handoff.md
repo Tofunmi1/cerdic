@@ -41,13 +41,6 @@ The engine browser run used Chromium/SwiftShader. Its boot result, approximately
 
 ## 2. Current architecture and authority
 
-Read these before implementing:
-
-- [ADR 0001: trimmed Bevy engine](../engine/docs/adr/0001-single-engine-bevy-fork.md).
-- [ADR 0002: textual geometry node graph](../engine/docs/adr/0002-node-graph-geometry-language.md).
-- [ADR 0003: licensing and generated assets](../engine/docs/adr/0003-licensing-and-no-imported-assets.md).
-- [Track 1 runtime plan](../engine/docs/plans/track1-runtime.md).
-
 Track 1 explicitly defers language growth, AI, solvers, and editor integration. The proposed language work below belongs in a follow-on plan. Record ADR amendments for decisions that change the accepted single-engine/artifact or text-authoring assumptions. Keep the existing prohibition on GPL engine dependencies, external asset generation/import, and unapproved publication/deployment.
 
 | Area | What exists | Assessment |

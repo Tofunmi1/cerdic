@@ -1,5 +1,5 @@
 //! Acceptance cases G1b-01 to G1b-09: saving, loading, migration and failure handling
-//! (see `docs/modeling/cases.md`). Cases 10 to 12 (the page bridge) are in `web/tests/document.mjs`.
+//!. Cases 10 to 12 (the page bridge) are in `web/tests/document.mjs`.
 #![expect(
     clippy::unwrap_used,
     reason = "test helpers sit outside #[test] functions; failing loudly is the point"

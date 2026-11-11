@@ -1,7 +1,6 @@
 // Runs a set of prose requests through a real model (the Claude CLI over the engine's MCP server, no API
 // key) and checks each result by measurement: did the document evaluate, were the expected operators
-// used, are the size and volume what the request implies. Needs a built web/dist (see
-// docs/modeling/mcp-test-provider.md).
+// used, are the size and volume what the request implies. Needs a built web/dist.
 //
 //   bun engine/tools/mcp/eval-prompts.mjs [--set blender-tools] [--model sonnet] [--parallel 3] [--only name,name]
 //

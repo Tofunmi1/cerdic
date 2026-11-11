@@ -1,4 +1,4 @@
-// Scene queries and ragdolls (plan W5, `docs/plans/engine-libraries-adoption.md`): ray casts and overlaps for the world API, and bone-part ragdolls that
+// Scene queries and ragdolls: ray casts and overlaps for the world API, and bone-part ragdolls that
 // take over a character's pose. Included into `physics`, so it shares that module's imports (`World` here is `ve_physics::World`).
 
 use ve_physics::ragdoll::{Bone, BoneJoint, RagdollDesc, bone_pose, rest_frame};

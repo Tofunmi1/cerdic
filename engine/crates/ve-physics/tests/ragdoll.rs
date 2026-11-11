@@ -1,4 +1,4 @@
-//! Ragdolls (plan W5, `docs/plans/engine-libraries-adoption.md`): a skeleton of capsule bones joined by ball and hinge joints with limits.
+//! Ragdolls: a skeleton of capsule bones joined by ball and hinge joints with limits.
 //! Written before the bodies. The checks are physical: it settles on the ground, joints do not tear apart, limits hold, nothing explodes.
 #![expect(
     clippy::unwrap_used,

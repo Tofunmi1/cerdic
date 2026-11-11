@@ -39,7 +39,7 @@ over its adjacent vertices and moves itself (see the library cloth). A write to 
 
 Library: sim.program(in, library="cloth", values="pin_height=1.45; collider_radius=0.2; collider_top=0,1.1,-0.08; collider_bottom=0,0.7,-0.08") is a cape:
 points above pin_height ride the bone named anchor; a capsule along the bone named body pushes the cloth out; params gravity damping relax pin_height collider_radius.
-Name your bone parts anchor and body (rig.bone) or copy the program text (the source is plain text, in docs/plans/sim-programs-spec.md) and rename the inputs.
+Name your bone parts anchor and body (rig.bone) or copy the plain-text program and rename the inputs.
 
 Physics, both ways. \`input bone crate\` reads any part, including one a phys.body moves (play mode): bone_point(crate, p) is where the body carries p now. \`output push crate push\`
 (push is a vec3 array) changes the speed of the dynamic body of the part crate by the SUM of the array each step, in metres per second: buoyancy, wind, a magnet,

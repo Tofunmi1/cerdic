@@ -1,5 +1,5 @@
 //! G4b: groups and instances at the document level, part 1: creating groups, instancing them,
-//! overriding, definition edits, recursion and versions (cases G4b-01 to G4b-10, `docs/modeling/cases.md`).
+//! overriding, definition edits, recursion and versions (cases G4b-01 to G4b-10).
 //! Upgrades, removal, history, persistence, inputs and limits are in `g4_groups_lifecycle.rs`; the
 //! evaluation of groups is tested in `ve-modeling` (G4b-E*).
 #[path = "support/groups.rs"]

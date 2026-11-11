@@ -1,5 +1,5 @@
 //! The node, output, material and editor refusals each carry a suggestion naming the limit or port
-//! to change (see `docs/modeling/diagnostics.md`).
+//! to change.
 #![expect(
     clippy::unwrap_used,
     clippy::panic,
