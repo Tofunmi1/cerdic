@@ -186,7 +186,12 @@ impl World {
     /// The surface a small sphere is touching, if it is: how far it sinks into it and the way out. Works for a point inside a solid too (pushed out the
     /// short way). A sphere of radius 0 is touching only when inside. `None` when nothing is within the radius, or the numbers are not finite.
     #[must_use]
-    pub fn nearest_surface(&mut self, centre: [f32; 3], radius: f32, mask: u32) -> Option<SurfaceHit> {
+    pub fn nearest_surface(
+        &mut self,
+        centre: [f32; 3],
+        radius: f32,
+        mask: u32,
+    ) -> Option<SurfaceHit> {
         if !centre.iter().all(|v| v.is_finite()) || !radius.is_finite() || radius < 0.0 {
             return None;
         }
@@ -199,9 +204,9 @@ impl World {
             ..QueryFilter::default()
         };
         let at = Point3::from(centre);
-        let (collider, projection) = self
-            .query
-            .project_point(&self.bodies, &self.colliders, &at, false, filter)?;
+        let (collider, projection) =
+            self.query
+                .project_point(&self.bodies, &self.colliders, &at, false, filter)?;
         let to_surface = projection.point - at;
         let distance = to_surface.norm();
         let (depth, direction) = if projection.is_inside {

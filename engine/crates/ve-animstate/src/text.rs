@@ -56,11 +56,13 @@ impl StateMachine {
             let words: Vec<&str> = body.split_whitespace().collect();
             match words.first().copied() {
                 Some("layer") => {
-                    crate::text_extras::parse_layer(&words[1..], &mut extras).map_err(|m| error(line, m))?;
+                    crate::text_extras::parse_layer(&words[1..], &mut extras)
+                        .map_err(|m| error(line, m))?;
                     continue;
                 }
                 Some("event") => {
-                    crate::text_extras::parse_event(&words[1..], &mut extras).map_err(|m| error(line, m))?;
+                    crate::text_extras::parse_event(&words[1..], &mut extras)
+                        .map_err(|m| error(line, m))?;
                     continue;
                 }
                 _ => {}

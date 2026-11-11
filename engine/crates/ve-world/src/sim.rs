@@ -7,19 +7,19 @@
 mod ast;
 mod grid;
 mod inputs;
-pub mod library;
 mod lexer;
+pub mod library;
 mod ops;
 mod parser;
 mod run;
-mod typing;
-mod wgsl;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod tests_gpu;
 #[cfg(test)]
 mod tests_inputs;
+mod typing;
+mod wgsl;
 
 use std::sync::Arc;
 
@@ -93,10 +93,16 @@ pub struct Value {
 
 impl Value {
     pub(crate) fn float(x: f32) -> Self {
-        Self { ty: Ty::Float, v: [x, 0.0, 0.0, 0.0] }
+        Self {
+            ty: Ty::Float,
+            v: [x, 0.0, 0.0, 0.0],
+        }
     }
     pub(crate) fn boolean(b: bool) -> Self {
-        Self { ty: Ty::Bool, v: [if b { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0] }
+        Self {
+            ty: Ty::Bool,
+            v: [if b { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0],
+        }
     }
 }
 
@@ -149,12 +155,22 @@ impl Program {
     /// Names of the `input bone` declarations: the bone parts whose poses the host must supply.
     #[must_use]
     pub fn bone_inputs(&self) -> Vec<&str> {
-        self.inner.inputs.iter().filter(|i| i.kind == ast::InputKind::Bone).map(|i| i.name.as_str()).collect()
+        self.inner
+            .inputs
+            .iter()
+            .filter(|i| i.kind == ast::InputKind::Bone)
+            .map(|i| i.name.as_str())
+            .collect()
     }
     /// Names of the `input mesh` declarations, in the order [`Sim::with_meshes`] takes them.
     #[must_use]
     pub fn mesh_inputs(&self) -> Vec<&str> {
-        self.inner.inputs.iter().filter(|i| i.kind == ast::InputKind::Mesh).map(|i| i.name.as_str()).collect()
+        self.inner
+            .inputs
+            .iter()
+            .filter(|i| i.kind == ast::InputKind::Mesh)
+            .map(|i| i.name.as_str())
+            .collect()
     }
     /// The `output push BODY array` declarations as (body part name, state name): each step the sum of the array's vec3s is a change of
     /// speed (metres per second) the host gives the physics body of that part.
@@ -163,7 +179,12 @@ impl Program {
         self.inner
             .outputs
             .iter()
-            .filter_map(|o| Some((o.target.as_deref()?, self.inner.states[o.state].name.as_str())))
+            .filter_map(|o| {
+                Some((
+                    o.target.as_deref()?,
+                    self.inner.states[o.state].name.as_str(),
+                ))
+            })
             .collect()
     }
     /// Declared outputs as (kind, state name).
@@ -219,26 +240,53 @@ impl Sim {
     ///
     /// # Errors
     /// As [`Sim::new`], and a wrong number of meshes.
-    pub fn with_meshes(program: Arc<Program>, seed: u32, meshes: Vec<Arc<MeshData>>) -> Result<Self, RunError> {
+    pub fn with_meshes(
+        program: Arc<Program>,
+        seed: u32,
+        meshes: Vec<Arc<MeshData>>,
+    ) -> Result<Self, RunError> {
         let wanted = program.mesh_inputs().len();
         if meshes.len() != wanted {
-            return Err(RunError { line: 0, message: format!("the program has {wanted} mesh inputs and {} meshes were given", meshes.len()) });
+            return Err(RunError {
+                line: 0,
+                message: format!(
+                    "the program has {wanted} mesh inputs and {} meshes were given",
+                    meshes.len()
+                ),
+            });
         }
         let params = program.inner.params.iter().map(|p| p.default).collect();
         let mut bound = meshes.into_iter();
         let mut inputs = inputs::Inputs::default();
         for decl in &program.inner.inputs {
             inputs.bones.push(IDENTITY);
-            inputs.meshes.push(if decl.kind == ast::InputKind::Mesh { bound.next() } else { None });
+            inputs.meshes.push(if decl.kind == ast::InputKind::Mesh {
+                bound.next()
+            } else {
+                None
+            });
         }
-        let mut sim = Self { program, state: Vec::new(), params, inputs, seed, steps: 0, time: 0.0 };
+        let mut sim = Self {
+            program,
+            state: Vec::new(),
+            params,
+            inputs,
+            seed,
+            steps: 0,
+            time: 0.0,
+        };
         sim.reset()?;
         Ok(sim)
     }
 
     /// Sets the pose (a column-major 4x4 matrix) of the bone input called `name`; false when the program has no such input.
     pub fn set_bone(&mut self, name: &str, pose: [f32; 16]) -> bool {
-        let at = self.program.inner.inputs.iter().position(|i| i.name == name && i.kind == ast::InputKind::Bone);
+        let at = self
+            .program
+            .inner
+            .inputs
+            .iter()
+            .position(|i| i.name == name && i.kind == ast::InputKind::Bone);
         at.is_some_and(|i| {
             self.inputs.bones[i] = pose;
             true
@@ -252,18 +300,29 @@ impl Sim {
     pub fn reset(&mut self) -> Result<(), RunError> {
         let mut bytes = 0_usize;
         let mut state = Vec::new();
-        let mesh_points: Vec<usize> = self.inputs.meshes.iter().map(|m| m.as_ref().map_or(0, |m| m.len())).collect();
+        let mesh_points: Vec<usize> = self
+            .inputs
+            .meshes
+            .iter()
+            .map(|m| m.as_ref().map_or(0, |m| m.len()))
+            .collect();
         for decl in &self.program.inner.states {
             let count = decl.count.resolve(&self.params, &mesh_points);
             if count == 0 || count > MAX_ELEMENTS {
                 return Err(RunError {
                     line: decl.line,
-                    message: format!("`{}` has {count} elements; allowed 1 to {MAX_ELEMENTS}", decl.name),
+                    message: format!(
+                        "`{}` has {count} elements; allowed 1 to {MAX_ELEMENTS}",
+                        decl.name
+                    ),
                 });
             }
             bytes += count * decl.ty.width() * 4;
             if bytes > MAX_STATE_BYTES {
-                return Err(RunError { line: decl.line, message: format!("the state is over {MAX_STATE_BYTES} bytes") });
+                return Err(RunError {
+                    line: decl.line,
+                    message: format!("the state is over {MAX_STATE_BYTES} bytes"),
+                });
             }
             state.push(vec![0.0; count * decl.ty.width()]);
         }
@@ -271,7 +330,19 @@ impl Sim {
         self.steps = 0;
         self.time = 0.0;
         if let Some(init) = self.program.inner.init {
-            run::kernel(&self.program.inner, &mut self.state, &self.params, &self.inputs, init, run::Clock { dt: 0.0, t: 0.0, step: 0.0, seed: self.seed })?;
+            run::kernel(
+                &self.program.inner,
+                &mut self.state,
+                &self.params,
+                &self.inputs,
+                init,
+                run::Clock {
+                    dt: 0.0,
+                    t: 0.0,
+                    step: 0.0,
+                    seed: self.seed,
+                },
+            )?;
         }
         Ok(())
     }
@@ -281,9 +352,24 @@ impl Sim {
     /// # Errors
     /// A failure inside a kernel (index out of range, too much work for one element).
     pub fn step(&mut self, dt: f32) -> Result<(), RunError> {
-        #[expect(clippy::cast_precision_loss, reason = "the step number is only a number the program can read")]
-        let clock = run::Clock { dt, t: self.time, step: self.steps as f32, seed: self.seed };
-        run::schedule(&self.program.inner, &mut self.state, &self.params, &self.inputs, &self.program.inner.schedule, clock)?;
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "the step number is only a number the program can read"
+        )]
+        let clock = run::Clock {
+            dt,
+            t: self.time,
+            step: self.steps as f32,
+            seed: self.seed,
+        };
+        run::schedule(
+            &self.program.inner,
+            &mut self.state,
+            &self.params,
+            &self.inputs,
+            &self.program.inner.schedule,
+            clock,
+        )?;
         self.steps += 1;
         self.time += dt;
         Ok(())
@@ -309,7 +395,12 @@ impl Sim {
     /// The numbers of a state array, element after element.
     #[must_use]
     pub fn state(&self, name: &str) -> Option<&[f32]> {
-        let at = self.program.inner.states.iter().position(|s| s.name == name)?;
+        let at = self
+            .program
+            .inner
+            .states
+            .iter()
+            .position(|s| s.name == name)?;
         self.state.get(at).map(Vec::as_slice)
     }
 
@@ -324,10 +415,20 @@ impl Sim {
             .params
             .iter()
             .position(|p| p.name == name)
-            .ok_or_else(|| RunError { line: 0, message: format!("no parameter `{name}`") })?;
+            .ok_or_else(|| RunError {
+                line: 0,
+                message: format!("no parameter `{name}`"),
+            })?;
         let ty = self.params[at].ty;
         if values.len() != ty.width() || values.iter().any(|x| !x.is_finite()) {
-            return Err(RunError { line: 0, message: format!("`{name}` is a {} and takes {} finite numbers", ty.name(), ty.width()) });
+            return Err(RunError {
+                line: 0,
+                message: format!(
+                    "`{name}` is a {} and takes {} finite numbers",
+                    ty.name(),
+                    ty.width()
+                ),
+            });
         }
         let mut v = [0.0; 4];
         v[..values.len()].copy_from_slice(values);

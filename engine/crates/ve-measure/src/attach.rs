@@ -107,12 +107,14 @@ pub const ATTACHMENT_WORK_BUDGET: usize = 600_000;
 type Bounds = ([f32; 3], [f32; 3]);
 
 fn bounds(positions: &[[f32; 3]]) -> Bounds {
-    positions.iter().fold(([f32::MAX; 3], [f32::MIN; 3]), |(lo, hi), p| {
-        (
-            [lo[0].min(p[0]), lo[1].min(p[1]), lo[2].min(p[2])],
-            [hi[0].max(p[0]), hi[1].max(p[1]), hi[2].max(p[2])],
-        )
-    })
+    positions
+        .iter()
+        .fold(([f32::MAX; 3], [f32::MIN; 3]), |(lo, hi), p| {
+            (
+                [lo[0].min(p[0]), lo[1].min(p[1]), lo[2].min(p[2])],
+                [hi[0].max(p[0]), hi[1].max(p[1]), hi[2].max(p[2])],
+            )
+        })
 }
 
 /// Distance between two boxes, zero when they overlap: no surface of one can be closer to the other than this.
@@ -144,17 +146,25 @@ pub fn attachments_within(
     budget: usize,
 ) -> Result<Vec<Attachment>, MeasureError> {
     if parts.len() > MAX_PARTS {
-        return Err(MeasureError::PartBudget { parts: parts.len(), limit: MAX_PARTS });
+        return Err(MeasureError::PartBudget {
+            parts: parts.len(),
+            limit: MAX_PARTS,
+        });
     }
     if !tolerance.is_finite() || tolerance < 0.0 {
-        return Err(MeasureError::Degenerate("tolerance must be finite and non-negative"));
+        return Err(MeasureError::Degenerate(
+            "tolerance must be finite and non-negative",
+        ));
     }
     let mut triangle_total = 0usize;
     let (mut trees, mut closed, mut boxes) = (Vec::new(), Vec::new(), Vec::new());
     for part in parts {
         triangle_total = triangle_total.saturating_add(part.mesh.validate()?);
         if triangle_total > MAX_ATTACHMENT_TRIANGLES {
-            return Err(MeasureError::TriangleBudget { triangles: triangle_total, limit: MAX_ATTACHMENT_TRIANGLES });
+            return Err(MeasureError::TriangleBudget {
+                triangles: triangle_total,
+                limit: MAX_ATTACHMENT_TRIANGLES,
+            });
         }
         trees.push(Bvh::build(&part.mesh)?);
         closed.push(Report::of(&part.mesh)?.watertight);
@@ -163,7 +173,10 @@ pub fn attachments_within(
     let mut spent = 0usize;
     let mut out = Vec::with_capacity(parts.len());
     for i in 0..parts.len() {
-        let mut others: Vec<(f32, usize)> = (0..parts.len()).filter(|j| *j != i).map(|j| (box_gap(&boxes[i], &boxes[j]), j)).collect();
+        let mut others: Vec<(f32, usize)> = (0..parts.len())
+            .filter(|j| *j != i)
+            .map(|j| (box_gap(&boxes[i], &boxes[j]), j))
+            .collect();
         others.sort_by(|a, b| a.0.total_cmp(&b.0));
         let (mut best, mut nearest) = (f32::INFINITY, "");
         for (lower_bound, j) in others {
@@ -201,7 +214,8 @@ fn pair_gap_within(
     tolerance: f32,
     (spent, budget): (&mut usize, usize),
 ) -> Result<f32, MeasureError> {
-    let gap = a.1.proximity(&a.0, b.1, &b.0, tolerance, (&mut *spent, budget))?;
+    let gap =
+        a.1.proximity(&a.0, b.1, &b.0, tolerance, (&mut *spent, budget))?;
     if gap <= tolerance {
         return Ok(gap);
     }
@@ -215,7 +229,11 @@ fn pair_gap_within(
         }
     }
     if boxes_overlap {
-        spend(spent, 3 * (a.0.indices.len() / 3 + b.0.indices.len() / 3), budget)?;
+        spend(
+            spent,
+            3 * (a.0.indices.len() / 3 + b.0.indices.len() / 3),
+            budget,
+        )?;
         if edges_intersect(a.0, b.0, b.1) || edges_intersect(b.0, a.0, a.1) {
             return Ok(0.0);
         }

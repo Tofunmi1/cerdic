@@ -165,11 +165,29 @@ fn a_live_map_is_replaced_in_place_without_disturbing_the_others() {
     let live = textures.live_generation();
     assert_eq!(textures.layer_version(first), 0);
     assert!(textures.set_layer(first, &map(256, 7)));
-    assert_eq!(textures.layer(first).unwrap().1, map(256, 7).as_slice(), "the pixels changed");
-    assert_eq!(textures.layer(second).unwrap().1, map(256, 2).as_slice(), "the other map did not");
-    assert_eq!(textures.generation(), generation, "images of other maps are kept");
+    assert_eq!(
+        textures.layer(first).unwrap().1,
+        map(256, 7).as_slice(),
+        "the pixels changed"
+    );
+    assert_eq!(
+        textures.layer(second).unwrap().1,
+        map(256, 2).as_slice(),
+        "the other map did not"
+    );
+    assert_eq!(
+        textures.generation(),
+        generation,
+        "images of other maps are kept"
+    );
     assert_eq!(textures.live_generation(), live + 1);
-    assert_eq!((textures.layer_version(first), textures.layer_version(second)), (1, 0));
+    assert_eq!(
+        (
+            textures.layer_version(first),
+            textures.layer_version(second)
+        ),
+        (1, 0)
+    );
     assert!(textures.set_layer(first, &map(256, 8)));
     assert_eq!(textures.layer_version(first), 2);
 }
@@ -181,7 +199,11 @@ fn a_live_map_refuses_a_missing_layer_and_a_picture_of_another_size() {
     assert!(!textures.set_layer(id, &map(512, 1)), "another size");
     assert!(!textures.set_layer(id + 1, &map(256, 1)), "no such layer");
     assert!(!textures.set_layer(-1, &map(256, 1)), "not a map id");
-    assert_eq!(textures.layer_version(id), 0, "a refused update changes nothing");
+    assert_eq!(
+        textures.layer_version(id),
+        0,
+        "a refused update changes nothing"
+    );
     textures.clear();
     assert!(!textures.set_layer(id, &map(256, 1)), "cleared");
 }

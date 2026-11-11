@@ -1,0 +1,49 @@
+/* Extra landing pieces: the stats band, the operator explorer, the pointer spotlight and a few motion touches. Tokens only (app.css). */
+
+/* ---- stats band ---- */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin: clamp(28px, 4vw, 48px) var(--gutter) 0; border-radius: var(--radius-xl); overflow: hidden;
+  background: var(--glass); border: 1px solid var(--glass-edge-soft); box-shadow: var(--shadow), inset 0 1px 0 var(--glass-shine);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(var(--saturate)); backdrop-filter: blur(var(--blur)) saturate(var(--saturate)); }
+.stat { position: relative; display: grid; gap: 2px; align-content: start; padding: var(--gap-5) var(--gap-5) var(--gap-4); border-left: 1px solid var(--glass-edge-soft); overflow: hidden; }
+.stat:first-child { border-left: 0; }
+.stat > * { position: relative; }
+.stat-n { font-size: clamp(34px, 4vw, 52px); line-height: 1; font-weight: 700; letter-spacing: -0.05em; font-variant-numeric: tabular-nums; }
+.stat-label { margin-top: var(--gap-2); font-weight: 600; letter-spacing: -0.01em; }
+.stat-sub { color: var(--text-3); font: var(--text-xs) var(--font-mono); }
+
+/* ---- the pointer spotlight on cards ---- */
+.tool-categories article, .stat { position: relative; overflow: hidden; }
+.tool-categories article > * { position: relative; }
+.tool-categories article::before, .stat::before { content: ''; position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease);
+  background: radial-gradient(260px circle at var(--mx, -999px) var(--my, -999px), color-mix(in srgb, var(--accent) 20%, transparent), transparent 70%); }
+.tool-categories article:hover::before, .stat:hover::before { opacity: 1; }
+
+/* ---- the operator explorer ---- */
+.explorer { margin-top: var(--gap-5); border-radius: var(--radius-lg); background: var(--glass); border: 1px solid var(--glass-edge-soft); overflow: hidden;
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(var(--saturate)); backdrop-filter: blur(var(--blur)) saturate(var(--saturate)); }
+.explorer-head { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-4); flex-wrap: wrap; padding: var(--gap-3) var(--gap-4); border-bottom: 1px solid var(--glass-edge-soft); }
+.explorer-search { display: flex; align-items: center; gap: var(--gap-2); flex: 1; min-width: 220px; color: var(--text-2); }
+.explorer-search input { flex: 1; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; }
+.explorer-search input::placeholder { color: var(--text-3); }
+.explorer-count { color: var(--text-3); font: var(--text-xs) var(--font-mono); }
+.explorer-count b { color: var(--accent); font-weight: 600; }
+.explorer-count button { margin-left: var(--gap-2); color: var(--accent); font: inherit; }
+.explorer-list { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: var(--gap-3) var(--gap-4); list-style: none; max-height: 250px; overflow-y: auto; }
+.explorer-list button { position: relative; display: inline-flex; align-items: baseline; padding: 3px 9px; border-radius: var(--radius-pill); background: var(--hover); font: var(--text-xs) var(--font-mono); transition: background var(--speed) var(--ease); }
+.explorer-list button:hover { background: var(--accent-soft); }
+.op-family { color: var(--text-3); }
+.op-name { color: var(--text); font-weight: 600; }
+.op-copied { display: inline-flex; align-items: center; gap: 3px; margin-left: var(--gap-2); color: var(--ok); }
+.explorer-empty { color: var(--text-3); padding: var(--gap-2); }
+
+/* ---- motion touches ---- */
+.scroll-progress { position: fixed; z-index: 30; top: 0; left: 0; right: 0; height: 2px; background: var(--accent); transform-origin: left; transform: scaleX(var(--scroll, 0)); pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .hero-art > img { animation: hero-drift 34s ease-in-out infinite alternate; transform-origin: 62% 55%; }
+  @keyframes hero-drift { from { transform: scale(1); } to { transform: scale(1.07); } }
+}
+
+@media (max-width: 560px) {
+  .stat { border-left: 0; border-top: 1px solid var(--glass-edge-soft); }
+  .stat:first-child { border-top: 0; }
+}

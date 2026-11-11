@@ -5,10 +5,8 @@
 #![expect(unsafe_code, reason = "this crate is the raw FFI boundary")]
 
 use core::ffi::c_int;
-mod polymesh;
 mod profiles;
 mod tangents;
-pub use polymesh::*;
 pub use profiles::*;
 pub use tangents::*;
 
@@ -383,6 +381,19 @@ unsafe extern "C" {
         index_count: usize,
         target_ratio: f64,
         target_error: f64,
+        out_indices: *mut u32,
+        out_capacity: usize,
+        out_count: *mut usize,
+    ) -> VeStatus;
+    /// Simplifies an indexed triangle mesh, optionally keeping the vertices on open edges where they are.
+    pub fn ve_simplify_border(
+        positions: *const f32,
+        vertex_count: usize,
+        indices: *const u32,
+        index_count: usize,
+        target_ratio: f64,
+        target_error: f64,
+        lock_border: i32,
         out_indices: *mut u32,
         out_capacity: usize,
         out_count: *mut usize,

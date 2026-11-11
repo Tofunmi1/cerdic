@@ -41,7 +41,14 @@ impl RoomSpec {
     /// A spec with the default cell, corridor width and door width.
     #[must_use]
     pub fn new(rooms: Vec<RoomReq>, links: Vec<(usize, usize)>, seed: u64) -> Self {
-        Self { rooms, links, seed, cell: 0.5, corridor_width: 1.6, door_width: 1.0 }
+        Self {
+            rooms,
+            links,
+            seed,
+            cell: 0.5,
+            corridor_width: 1.6,
+            door_width: 1.0,
+        }
     }
 }
 
@@ -161,13 +168,19 @@ impl Rng {
 }
 
 fn cells_up(metres: f64, cell: f64) -> i32 {
-    #[expect(clippy::cast_possible_truncation, reason = "sizes are checked small before this is called")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "sizes are checked small before this is called"
+    )]
     let n = (metres / cell - 1e-9).ceil() as i32;
     n.max(1)
 }
 
 fn cells_down(metres: f64, cell: f64) -> i32 {
-    #[expect(clippy::cast_possible_truncation, reason = "sizes are checked small before this is called")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "sizes are checked small before this is called"
+    )]
     let n = (metres / cell + 1e-9).floor() as i32;
     n.max(1)
 }
@@ -184,17 +197,28 @@ fn validate(spec: &RoomSpec) -> Result<(), RoomError> {
     if n > MAX_ROOMS {
         return Err(RoomError::TooManyRooms(n));
     }
-    for (name, value) in [("cell", spec.cell), ("corridor_width", spec.corridor_width), ("door_width", spec.door_width)] {
+    for (name, value) in [
+        ("cell", spec.cell),
+        ("corridor_width", spec.corridor_width),
+        ("door_width", spec.door_width),
+    ] {
         if !positive(value) {
             return Err(RoomError::BadSetting(name));
         }
     }
     for (i, room) in spec.rooms.iter().enumerate() {
         let sizes = room.min.iter().chain(&room.max);
-        if sizes.clone().any(|s| !positive(*s) || *s > 1000.0 * spec.cell.max(1.0)) || room.min[0] > room.max[0] || room.min[1] > room.max[1] {
+        if sizes
+            .clone()
+            .any(|s| !positive(*s) || *s > 1000.0 * spec.cell.max(1.0))
+            || room.min[0] > room.max[0]
+            || room.min[1] > room.max[1]
+        {
             return Err(RoomError::BadSize(i));
         }
-        if cells_down(room.max[0], spec.cell).min(cells_up(room.min[0], spec.cell)) < cells_up(spec.door_width, spec.cell) {
+        if cells_down(room.max[0], spec.cell).min(cells_up(room.min[0], spec.cell))
+            < cells_up(spec.door_width, spec.cell)
+        {
             return Err(RoomError::TooNarrowForDoor(i));
         }
     }
@@ -284,7 +308,14 @@ pub fn layout(spec: &RoomSpec) -> Result<Layout, RoomError> {
         .collect();
     if spec.rooms.len() == 1 {
         let (w, d) = sized[0];
-        return Ok(Layout { regions: vec![Region { kind: Kind::Room(0), rect: Rect { x: 0, z: 0, w, d } }], doors: Vec::new(), cell });
+        return Ok(Layout {
+            regions: vec![Region {
+                kind: Kind::Room(0),
+                rect: Rect { x: 0, z: 0, w, d },
+            }],
+            doors: Vec::new(),
+            cell,
+        });
     }
     // Rooms go on the side of the corridor that is shorter so far.
     let order = walk_order(&edges, &mut rng);
@@ -304,24 +335,54 @@ pub fn layout(spec: &RoomSpec) -> Result<Layout, RoomError> {
     let door = cells_up(spec.door_width, cell);
     let north_depth = north.iter().map(|&r| sized[r].1).max().unwrap_or(0);
     let length = north_len.max(south_len).max(wide);
-    let corridor = Rect { x: 0, z: north_depth, w: length, d: wide };
-    let mut regions = vec![Region { kind: Kind::Corridor, rect: corridor }];
+    let corridor = Rect {
+        x: 0,
+        z: north_depth,
+        w: length,
+        d: wide,
+    };
+    let mut regions = vec![Region {
+        kind: Kind::Corridor,
+        rect: corridor,
+    }];
     let mut doors = Vec::new();
     for (side, rooms) in [(true, &north), (false, &south)] {
         let mut x = 0;
         for &room in rooms {
             let (w, d) = sized[room];
-            let z = if side { north_depth - d } else { north_depth + wide };
+            let z = if side {
+                north_depth - d
+            } else {
+                north_depth + wide
+            };
             let rect = Rect { x, z, w, d };
             let at = u32::try_from(w - door).unwrap_or(0);
             let from = x + i32::try_from(rng.upto(at)).unwrap_or(0);
-            let line = if side { north_depth } else { north_depth + wide };
-            doors.push(Door { a: regions.len(), b: 0, axis: Axis::X, line, from, to: from + door });
-            regions.push(Region { kind: Kind::Room(room), rect });
+            let line = if side {
+                north_depth
+            } else {
+                north_depth + wide
+            };
+            doors.push(Door {
+                a: regions.len(),
+                b: 0,
+                axis: Axis::X,
+                line,
+                from,
+                to: from + door,
+            });
+            regions.push(Region {
+                kind: Kind::Room(room),
+                rect,
+            });
             x += w;
         }
     }
-    Ok(Layout { regions, doors, cell })
+    Ok(Layout {
+        regions,
+        doors,
+        cell,
+    })
 }
 
 #[cfg(test)]
@@ -329,12 +390,20 @@ mod tests {
     use super::*;
 
     fn room(min: f64, max: f64) -> RoomReq {
-        RoomReq { name: "r".to_owned(), min: [min, min], max: [max, max] }
+        RoomReq {
+            name: "r".to_owned(),
+            min: [min, min],
+            max: [max, max],
+        }
     }
 
     #[test]
     fn the_same_seed_gives_the_same_plan_and_every_room_has_a_door_to_the_corridor() {
-        let spec = RoomSpec::new((0..6).map(|_| room(3.0, 5.0)).collect(), (0..5).map(|i| (i, i + 1)).collect(), 4);
+        let spec = RoomSpec::new(
+            (0..6).map(|_| room(3.0, 5.0)).collect(),
+            (0..5).map(|i| (i, i + 1)).collect(),
+            4,
+        );
         let plan = layout(&spec).unwrap();
         assert_eq!(plan, layout(&spec).unwrap());
         assert_eq!(plan.regions.len(), 7);
@@ -344,7 +413,11 @@ mod tests {
 
     #[test]
     fn unconnected_links_name_the_room_that_cannot_be_reached() {
-        let spec = RoomSpec::new(vec![room(3.0, 4.0), room(3.0, 4.0), room(3.0, 4.0)], vec![(0, 1)], 1);
+        let spec = RoomSpec::new(
+            vec![room(3.0, 4.0), room(3.0, 4.0), room(3.0, 4.0)],
+            vec![(0, 1)],
+            1,
+        );
         assert_eq!(layout(&spec), Err(RoomError::NotConnected(2)));
     }
 

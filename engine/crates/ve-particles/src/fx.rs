@@ -348,4 +348,3 @@ impl World for Plane {
         })
     }
 }
-

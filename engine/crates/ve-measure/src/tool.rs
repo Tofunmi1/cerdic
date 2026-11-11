@@ -98,7 +98,9 @@ fn suggestion(error: &MeasureError) -> &'static str {
         MeasureError::UvLength { .. } => "uvs must hold one [u, v] per vertex, or none at all",
         MeasureError::TriangleBudget { .. } => "the mesh is too large to measure in one call",
         MeasureError::PartBudget { .. } => "the scene has too many parts to check at once",
-        MeasureError::WorkBudget { .. } => "the parts are too big to check in the browser: measure fewer or smaller parts",
+        MeasureError::WorkBudget { .. } => {
+            "the parts are too big to check in the browser: measure fewer or smaller parts"
+        }
         MeasureError::PointBudget { .. } => "the point set is too large to hull",
         MeasureError::MissingUv => {
             "the mesh has no uvs: unwrap it (poly.unwrap_uv) before measuring UVs"

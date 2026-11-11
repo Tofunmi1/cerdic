@@ -87,12 +87,20 @@ fn dot(a: V, b: V) -> f32 {
 }
 
 fn cross(a: V, b: V) -> V {
-    [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
 }
 
 fn unit(a: V) -> V {
     let length = dot(a, a).sqrt();
-    if length > 1.0e-9 { scale(a, 1.0 / length) } else { [0.0, 1.0, 0.0] }
+    if length > 1.0e-9 {
+        scale(a, 1.0 / length)
+    } else {
+        [0.0, 1.0, 0.0]
+    }
 }
 
 fn rotate(q: [f32; 4], v: V) -> V {
@@ -107,19 +115,39 @@ fn validate(desc: &VehicleDesc) -> Result<(), Error> {
     }
     let ok = |v: f32| v.is_finite();
     for wheel in &desc.wheels {
-        let numbers = [wheel.radius, wheel.suspension, wheel.stiffness, wheel.damping, wheel.grip];
+        let numbers = [
+            wheel.radius,
+            wheel.suspension,
+            wheel.stiffness,
+            wheel.damping,
+            wheel.grip,
+        ];
         if !(numbers.iter().all(|v| ok(*v)) && wheel.offset.iter().all(|v| ok(*v))) {
             return Err(Error::BadValue("wheel numbers must be finite"));
         }
-        if wheel.radius <= 0.0 || wheel.suspension <= 0.0 || wheel.stiffness < 0.0 || wheel.damping < 0.0 || wheel.grip < 0.0 {
-            return Err(Error::BadValue("a wheel needs a radius and suspension above 0 and stiffness, damping and grip not negative"));
+        if wheel.radius <= 0.0
+            || wheel.suspension <= 0.0
+            || wheel.stiffness < 0.0
+            || wheel.damping < 0.0
+            || wheel.grip < 0.0
+        {
+            return Err(Error::BadValue(
+                "a wheel needs a radius and suspension above 0 and stiffness, damping and grip not negative",
+            ));
         }
     }
-    if !(ok(desc.engine_force) && ok(desc.brake_force) && ok(desc.max_steer)) || desc.engine_force < 0.0 || desc.brake_force < 0.0 {
-        return Err(Error::BadValue("engine and brake force must be finite and not negative"));
+    if !(ok(desc.engine_force) && ok(desc.brake_force) && ok(desc.max_steer))
+        || desc.engine_force < 0.0
+        || desc.brake_force < 0.0
+    {
+        return Err(Error::BadValue(
+            "engine and brake force must be finite and not negative",
+        ));
     }
     if !(0.0..=1.0).contains(&desc.max_steer) {
-        return Err(Error::BadValue("the steering lock must be between 0 and 1 radian"));
+        return Err(Error::BadValue(
+            "the steering lock must be between 0 and 1 radian",
+        ));
     }
     Ok(())
 }
@@ -178,7 +206,9 @@ impl Vehicle {
         for (index, wheel) in self.desc.wheels.iter().enumerate() {
             let mount = add(pose.position, rotate(pose.rotation, wheel.offset));
             let reach = wheel.suspension + wheel.radius;
-            let Some(hit) = world.raycast_excluding(mount, scale(up, -1.0), reach, u32::MAX, chassis) else {
+            let Some(hit) =
+                world.raycast_excluding(mount, scale(up, -1.0), reach, u32::MAX, chassis)
+            else {
                 self.states[index] = WheelState::default();
                 continue;
             };
@@ -191,7 +221,11 @@ impl Vehicle {
             let load = (wheel.stiffness * compression + wheel.damping * closing).max(0.0);
             pending.push((scale(up, load * STEP), hit.point));
             // Tyre frame on the ground: forward (steered), and sideways.
-            let steer = if wheel.steers { self.steer * self.desc.max_steer } else { 0.0 };
+            let steer = if wheel.steers {
+                self.steer * self.desc.max_steer
+            } else {
+                0.0
+            };
             let heading = add(scale(forward, steer.cos()), scale(right, steer.sin()));
             let normal = unit(hit.normal);
             let along = unit(add(heading, scale(normal, -dot(heading, normal))));
@@ -206,15 +240,28 @@ impl Vehicle {
                 drive += if self.throttle == 0.0 {
                     // Engine braking slows the car but never reverses it: it stops at the speed it removes (a fixed push at zero speed
                     // would shove a parked car backwards every step).
-                    -speed_along.signum() * (self.desc.engine_force * ENGINE_BRAKING / driven).min(speed_along.abs() * share / STEP)
+                    -speed_along.signum()
+                        * (self.desc.engine_force * ENGINE_BRAKING / driven)
+                            .min(speed_along.abs() * share / STEP)
                 } else {
                     self.throttle * self.desc.engine_force / driven
                 };
             }
-            let resist = |max_force: f32| (-speed_along * share).clamp(-max_force * STEP, max_force * STEP);
-            let longitudinal = (drive * STEP + resist(self.brake * self.desc.brake_force / count) + resist(ROLLING * load)).clamp(-limit, limit);
+            let resist =
+                |max_force: f32| (-speed_along * share).clamp(-max_force * STEP, max_force * STEP);
+            let longitudinal = (drive * STEP
+                + resist(self.brake * self.desc.brake_force / count)
+                + resist(ROLLING * load))
+            .clamp(-limit, limit);
             // Applied at the height of the chassis centre so that cornering and braking do not tip it over.
-            let lift = dot([pose.position[0] - hit.point[0], pose.position[1] - hit.point[1], pose.position[2] - hit.point[2]], up);
+            let lift = dot(
+                [
+                    pose.position[0] - hit.point[0],
+                    pose.position[1] - hit.point[1],
+                    pose.position[2] - hit.point[2],
+                ],
+                up,
+            );
             let at = add(hit.point, scale(up, lift));
             pending.push((add(scale(along, longitudinal), scale(side, lateral)), at));
             self.states[index] = WheelState {

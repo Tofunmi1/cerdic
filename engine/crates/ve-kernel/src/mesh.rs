@@ -38,6 +38,14 @@ impl Mesh {
 /// [`KernelError::InvalidArgument`] for a ratio outside (0, 1], a negative or non-finite error, or an
 /// invalid mesh; [`KernelError::OutOfBounds`] for bad indices.
 pub fn simplify(mesh: &Mesh, target_ratio: f64, target_error: f64) -> Result<Mesh, KernelError> {
+    simplify_with(mesh, target_ratio, target_error, false)
+}
+
+/// As [`simplify`], and with `lock_border` the vertices on open edges stay where they are, so a cut mesh keeps its seam.
+///
+/// # Errors
+/// The same as [`simplify`].
+pub fn simplify_with(mesh: &Mesh, target_ratio: f64, target_error: f64, lock_border: bool) -> Result<Mesh, KernelError> {
     if !(target_ratio.is_finite() && target_ratio > 0.0 && target_ratio <= 1.0) {
         return Err(KernelError::InvalidArgument(
             "target ratio must be in (0, 1]",
@@ -64,7 +72,7 @@ pub fn simplify(mesh: &Mesh, target_ratio: f64, target_error: f64) -> Result<Mes
     {
         return Err(KernelError::OutOfBounds);
     }
-    let indices = ffi::simplify(&mesh.positions, &mesh.indices, target_ratio, target_error)?;
+    let indices = ffi::simplify(&mesh.positions, &mesh.indices, target_ratio, target_error, lock_border)?;
     Ok(Mesh {
         positions: mesh.positions.clone(),
         indices,

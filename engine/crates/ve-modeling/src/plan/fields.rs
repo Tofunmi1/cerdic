@@ -147,7 +147,9 @@ pub(super) fn complexity(
     }
     // A warp looks the input up at a moved point: about one and a half evaluations of it per sample.
     if matches!(family, "field.taper" | "field.twist" | "field.bend") {
-        value.instructions = value.instructions.saturating_add(value.instructions / 2 + 1);
+        value.instructions = value
+            .instructions
+            .saturating_add(value.instructions / 2 + 1);
     }
     if family == "field.noise" {
         let extra = match node.params.get("octaves") {

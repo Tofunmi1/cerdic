@@ -25,7 +25,10 @@ pub(crate) fn compass_yaw(viewer_yaw: f32) -> f64 {
 
 /// The viewer yaw that looks along a compass yaw.
 fn viewer_yaw(compass: f64) -> f32 {
-    #[expect(clippy::cast_possible_truncation, reason = "an angle in radians, well inside f32")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "an angle in radians, well inside f32"
+    )]
     {
         compass as f32 + PI
     }
@@ -36,7 +39,9 @@ fn target<'a>(world: &'a World, selector: &str) -> Option<&'a Entity> {
     let (class, name) = selector.split_once(':')?;
     world.entities().iter().find(|entity| match class {
         "kind" => entity.kind == name,
-        "tag" => world.kind(&entity.kind).is_some_and(|kind| kind.tags.iter().any(|tag| tag == name)),
+        "tag" => world
+            .kind(&entity.kind)
+            .is_some_and(|kind| kind.tags.iter().any(|tag| tag == name)),
         _ => false,
     })
 }
@@ -68,16 +73,26 @@ pub(crate) fn drive(cameras: &mut CameraRig, world: &World, viewer: &mut ViewerR
     };
     // The arm shortens against the game's own solid boxes; the hit distance is measured from the pivot toward the wanted eye.
     let pose = cameras.pose(&input, &|from, to| world.solid_hit(from, to));
-    #[expect(clippy::cast_possible_truncation, reason = "metres and radians, well inside f32")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "metres and radians, well inside f32"
+    )]
     {
-        viewer.set_view(Vec3::new(pose.eye[0] as f32, pose.eye[1] as f32, pose.eye[2] as f32), viewer_yaw(pose.yaw), pose.pitch as f32, orbit);
+        viewer.set_view(
+            Vec3::new(pose.eye[0] as f32, pose.eye[1] as f32, pose.eye[2] as f32),
+            viewer_yaw(pose.yaw),
+            pose.pitch as f32,
+            orbit,
+        );
     }
 }
 
 /// When the player switches into a first- or third-person camera, the look starts behind the hero (along the way it faces), a little
 /// downward for third person, instead of however the last fixed-angle camera happened to point.
 pub(crate) fn enter(cameras: &CameraRig, world: &World, viewer: &mut ViewerRig) {
-    let Some(def) = cameras.active_def() else { return };
+    let Some(def) = cameras.active_def() else {
+        return;
+    };
     let pitch = match def.mode.as_str() {
         "first" => 0.0,
         "third" => -0.18,

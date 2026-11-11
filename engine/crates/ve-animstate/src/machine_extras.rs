@@ -31,16 +31,32 @@ impl Runtime {
     }
 
     /// Moves every layer's weight towards its target (linearly, in `fade` seconds from 0 to 1) and runs the clocks of the layers that are on.
-    pub(crate) fn advance(&mut self, extras: &Extras, params: &Params, lengths: &HashMap<String, f32>, dt: f32) {
+    pub(crate) fn advance(
+        &mut self,
+        extras: &Extras,
+        params: &Params,
+        lengths: &HashMap<String, f32>,
+        dt: f32,
+    ) {
         for (index, layer) in extras.layers.iter().enumerate() {
             let target = match &layer.weight {
                 LayerWeight::Fixed(w) => *w,
-                LayerWeight::Parameter(name) => params.float(name).map_or(0.0, |v| if v.is_finite() { v.clamp(0.0, 1.0) } else { 0.0 }),
+                LayerWeight::Parameter(name) => params.float(name).map_or(0.0, |v| {
+                    if v.is_finite() {
+                        v.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    }
+                }),
             };
             let weight = &mut self.weights[index];
             *weight = if layer.fade > 0.0 {
                 let step = dt / layer.fade;
-                if target > *weight { (*weight + step).min(target) } else { (*weight - step).max(target) }
+                if target > *weight {
+                    (*weight + step).min(target)
+                } else {
+                    (*weight - step).max(target)
+                }
             } else {
                 target
             };
@@ -52,7 +68,11 @@ impl Runtime {
             }
             *time += dt * layer.speed;
             if let Some(len) = length(lengths, &layer.clip) {
-                *time = if layer.looping { wrap(*time, len) } else { time.clamp(0.0, len) };
+                *time = if layer.looping {
+                    wrap(*time, len)
+                } else {
+                    time.clamp(0.0, len)
+                };
             }
         }
     }
@@ -77,8 +97,21 @@ impl Runtime {
 }
 
 /// The events of one clip passed as its time went from `from` to `to` (raw, unwrapped seconds), each once.
-fn between(graph: &StateMachine, clip: &str, len: f32, from: f32, to: f32, looping: bool, fresh: bool) -> Vec<FiredEvent> {
-    let events: Vec<&crate::layers::ClipEvent> = graph.extras.events.iter().filter(|e| e.clip == clip).collect();
+fn between(
+    graph: &StateMachine,
+    clip: &str,
+    len: f32,
+    from: f32,
+    to: f32,
+    looping: bool,
+    fresh: bool,
+) -> Vec<FiredEvent> {
+    let events: Vec<&crate::layers::ClipEvent> = graph
+        .extras
+        .events
+        .iter()
+        .filter(|e| e.clip == clip)
+        .collect();
     if events.is_empty() {
         return Vec::new();
     }
@@ -97,7 +130,12 @@ fn between(graph: &StateMachine, clip: &str, len: f32, from: f32, to: f32, loopi
         return fired(crossed(&times, len, from, to, false));
     }
     let start = if fresh { -1.0 } else { wrap(from, len) };
-    let wraps = (to / len).floor() - if fresh { 0.0 } else { (from.max(0.0) / len).floor() };
+    let wraps = (to / len).floor()
+        - if fresh {
+            0.0
+        } else {
+            (from.max(0.0) / len).floor()
+        };
     #[expect(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
@@ -142,7 +180,11 @@ pub(crate) fn events(
             None => (true, 0.0),
         };
         match &state.motion {
-            Motion::Clip { clip, speed, looping } => {
+            Motion::Clip {
+                clip,
+                speed,
+                looping,
+            } => {
                 let Some(len) = length(lengths, clip) else {
                     continue;
                 };

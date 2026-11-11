@@ -15,7 +15,6 @@ use crate::KernelError;
 
 pub(crate) mod context;
 pub(crate) mod field;
-pub(crate) mod polymesh;
 pub(crate) mod profile;
 pub(crate) mod rigid;
 pub(crate) mod subdivision;
@@ -29,13 +28,6 @@ fn ensure_initialized() {
         // SAFETY: runs exactly once, before any other kernel call, on the only thread.
         INIT.call_once(|| unsafe { sys::__wasm_call_ctors() });
     }
-}
-
-/// Blender's easing curve of `kind` (0 back, 1 bounce, 2 elastic) at `fraction`.
-pub(crate) fn blender_ease(kind: i32, fraction: f32) -> f32 {
-    ensure_initialized();
-    // SAFETY: a pure function of two numbers; it takes and keeps no pointers.
-    unsafe { sys::ve_blender_ease(kind, fraction) }
 }
 
 /// Owning handle to a kernel solid.
@@ -351,6 +343,7 @@ pub(crate) fn simplify(
     indices: &[u32],
     target_ratio: f64,
     target_error: f64,
+    lock_border: bool,
 ) -> Result<Vec<u32>, KernelError> {
     ensure_initialized();
     let flat = positions.as_flattened();
@@ -359,13 +352,14 @@ pub(crate) fn simplify(
     // SAFETY: input slices are valid for their lengths; `out` has `indices.len()` slots, which is the
     // capacity passed; `count` is a valid out-pointer.
     let status = unsafe {
-        sys::ve_simplify(
+        sys::ve_simplify_border(
             flat.as_ptr(),
             positions.len(),
             indices.as_ptr(),
             indices.len(),
             target_ratio,
             target_error,
+            i32::from(lock_border),
             out.as_mut_ptr(),
             out.len(),
             &raw mut count,

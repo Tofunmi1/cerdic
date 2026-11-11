@@ -124,7 +124,11 @@ fn build(node: &Node, context: &ExecutionContext) -> Result<Value, Fail> {
         fork_blend: 0.5,
         // smoothing and the root flare cost triangles and are invisible far away: they thin out with the level of detail
         smooth: (param(node, "smooth")? as u32) >> level.min(3),
-        flare: if level < 2 { param(node, "flare")? as f32 } else { 0.0 },
+        flare: if level < 2 {
+            param(node, "flare")? as f32
+        } else {
+            0.0
+        },
     };
     let plant = mesh_plant(&skeleton, &meshing, &cancel).map_err(lod_error)?;
     tree_value(node, &plant)
@@ -144,12 +148,54 @@ struct LeafShape {
 
 fn leaf_shape(kind: &str) -> LeafShape {
     match kind {
-        "oak" => LeafShape { length: 0.17, width: 0.1, lobe: 0.24, lobes: 5.0, taper: 0.1, count: 44 },
-        "birch" => LeafShape { length: 0.15, width: 0.095, lobe: 0.05, lobes: 11.0, taper: 0.55, count: 52 },
-        "willow" => LeafShape { length: 0.3, width: 0.04, lobe: 0.0, lobes: 1.0, taper: 0.35, count: 56 },
-        "pine" => LeafShape { length: 0.27, width: 0.04, lobe: 0.0, lobes: 1.0, taper: 0.5, count: 64 },
-        "palm" => LeafShape { length: 0.46, width: 0.05, lobe: 0.0, lobes: 1.0, taper: 0.25, count: 18 },
-        _ => LeafShape { length: 0.15, width: 0.09, lobe: 0.1, lobes: 3.0, taper: 0.3, count: 44 },
+        "oak" => LeafShape {
+            length: 0.17,
+            width: 0.1,
+            lobe: 0.24,
+            lobes: 5.0,
+            taper: 0.1,
+            count: 44,
+        },
+        "birch" => LeafShape {
+            length: 0.15,
+            width: 0.095,
+            lobe: 0.05,
+            lobes: 11.0,
+            taper: 0.55,
+            count: 52,
+        },
+        "willow" => LeafShape {
+            length: 0.3,
+            width: 0.04,
+            lobe: 0.0,
+            lobes: 1.0,
+            taper: 0.35,
+            count: 56,
+        },
+        "pine" => LeafShape {
+            length: 0.27,
+            width: 0.04,
+            lobe: 0.0,
+            lobes: 1.0,
+            taper: 0.5,
+            count: 64,
+        },
+        "palm" => LeafShape {
+            length: 0.46,
+            width: 0.05,
+            lobe: 0.0,
+            lobes: 1.0,
+            taper: 0.25,
+            count: 18,
+        },
+        _ => LeafShape {
+            length: 0.15,
+            width: 0.09,
+            lobe: 0.1,
+            lobes: 3.0,
+            taper: 0.3,
+            count: 44,
+        },
     }
 }
 
@@ -162,12 +208,20 @@ fn leaf_program(kind: &str, colour: [f32; 3]) -> String {
     // The texture compiler allows 160 syntax nodes, 64 loop turns and spells the two-argument arctangent `atan`, so this is as much as one
     // expression holds: the lobe ripple (a sine of the position across the leaf) and the yellow shift are left out where a species has none.
     let wave = if shape.lobe > 0.0 {
-        format!(" * (1.0 + {} * sin(d.y * {} + hash(vec2(i, 6.1)) * 6.283))", shape.lobe, shape.lobes * 12.0)
+        format!(
+            " * (1.0 + {} * sin(d.y * {} + hash(vec2(i, 6.1)) * 6.283))",
+            shape.lobe,
+            shape.lobes * 12.0
+        )
     } else {
         String::new()
     };
     let (shift, red, green) = if shape.count <= 56 {
-        ("ylw = step(0.82, hash(vec2(i, 4.4))) * 0.22; ", " + ylw", " + ylw * 0.7")
+        (
+            "ylw = step(0.82, hash(vec2(i, 4.4))) * 0.22; ",
+            " + ylw",
+            " + ylw * 0.7",
+        )
     } else {
         ("", "", "")
     };
@@ -182,7 +236,9 @@ fn leaf_program(kind: &str, colour: [f32; 3]) -> String {
 
 /// The leaf colour for a time of year: the default green becomes the season's colour, any colour chosen by hand stays.
 fn seasonal(colour: [f32; 3], season: &str) -> [f32; 3] {
-    let is_default = (colour[0] - 0.2).abs() < 1.0e-3 && (colour[1] - 0.42).abs() < 1.0e-3 && (colour[2] - 0.12).abs() < 1.0e-3;
+    let is_default = (colour[0] - 0.2).abs() < 1.0e-3
+        && (colour[1] - 0.42).abs() < 1.0e-3
+        && (colour[2] - 0.12).abs() < 1.0e-3;
     if !is_default {
         return colour;
     }
@@ -263,10 +319,16 @@ fn tree_value(node: &Node, plant: &PlantMesh) -> Result<Value, Fail> {
     );
     value.uvs = uvs;
     let sway = param(node, "sway")? as f32;
-    let (bark_colour, leaf_colour) = (colour(node, "bark")?, seasonal(colour(node, "leaves")?, text(node, "season")));
+    let (bark_colour, leaf_colour) = (
+        colour(node, "bark")?,
+        seasonal(colour(node, "leaves")?, text(node, "season")),
+    );
     let kind = text(node, "kind");
     // the default bark colour means "the species' own"; any other colour recolours the pattern
-    let custom = ((bark_colour[0] - 0.3).abs() > 1.0e-3 || (bark_colour[1] - 0.2).abs() > 1.0e-3 || (bark_colour[2] - 0.13).abs() > 1.0e-3).then_some(bark_colour);
+    let custom = ((bark_colour[0] - 0.3).abs() > 1.0e-3
+        || (bark_colour[1] - 0.2).abs() > 1.0e-3
+        || (bark_colour[2] - 0.13).abs() > 1.0e-3)
+        .then_some(bark_colour);
     let bark = Material {
         color: [1.0; 3],
         roughness: 0.95,

@@ -4,7 +4,9 @@ use ve_graph::{CommandBatch, Outcome, Session, TransactionId, builtin_registry, 
 use ve_modeling::{Evaluation, Evaluator, Quality};
 
 fn evaluate(source: &str) -> Result<Evaluation, String> {
-    let commands = parse_text(&builtin_registry(), source).map_err(|e| format!("{e:?}"))?.commands;
+    let commands = parse_text(&builtin_registry(), source)
+        .map_err(|e| format!("{e:?}"))?
+        .commands;
     let mut session = Session::with_builtin(31);
     let applied = session.apply(&CommandBatch {
         doc: session.document().id.clone(),
@@ -16,7 +18,9 @@ fn evaluate(source: &str) -> Result<Evaluation, String> {
     if !matches!(applied, Outcome::Committed { .. }) {
         return Err(format!("{applied:?}"));
     }
-    Evaluator::default().evaluate(session.document(), Quality::Final).map_err(|e| format!("{e:?}"))
+    Evaluator::default()
+        .evaluate(session.document(), Quality::Final)
+        .map_err(|e| format!("{e:?}"))
 }
 
 fn plan(params: &str) -> Result<Evaluation, String> {
@@ -36,8 +40,17 @@ fn the_building_stands_on_the_floor_inside_its_footprint_with_walls_of_the_given
             hi[k] = hi[k].max(p[k]);
         }
     }
-    assert!((hi[1] - 2.8).abs() < 1e-3 && lo[1] > -0.11, "walls 2.8 m, floor 0.1 m thick: {} .. {}", lo[1], hi[1]);
-    assert!(lo[0] > -0.2 && lo[2] > -0.2, "the plan starts at the origin: {:?}", lo);
+    assert!(
+        (hi[1] - 2.8).abs() < 1e-3 && lo[1] > -0.11,
+        "walls 2.8 m, floor 0.1 m thick: {} .. {}",
+        lo[1],
+        hi[1]
+    );
+    assert!(
+        lo[0] > -0.2 && lo[2] > -0.2,
+        "the plan starts at the origin: {:?}",
+        lo
+    );
     assert!(part.volume > 5.0, "{}", part.volume);
 }
 
@@ -52,17 +65,38 @@ fn the_same_seed_repeats_and_another_seed_differs() {
 
 #[test]
 fn doors_are_cut_so_a_wider_door_leaves_less_wall() {
-    let narrow = plan(&format!("{CUSTOMS}, seed=1, door_width=0.7")).unwrap().parts[0].volume;
-    let wide = plan(&format!("{CUSTOMS}, seed=1, door_width=2.0")).unwrap().parts[0].volume;
-    assert!(wide < narrow, "wider doors remove more wall: {wide} against {narrow}");
+    let narrow = plan(&format!("{CUSTOMS}, seed=1, door_width=0.7"))
+        .unwrap()
+        .parts[0]
+        .volume;
+    let wide = plan(&format!("{CUSTOMS}, seed=1, door_width=2.0"))
+        .unwrap()
+        .parts[0]
+        .volume;
+    assert!(
+        wide < narrow,
+        "wider doors remove more wall: {wide} against {narrow}"
+    );
 }
 
 #[test]
 fn bad_plans_are_refused_with_a_reason() {
-    assert!(plan("rooms=\"a:3,3,4,4; b:3,3,4,4\", links=\"0-5\"").is_err(), "a link to a room that does not exist");
-    assert!(plan("rooms=\"a:3,3,4,4; b:3,3,4,4\", links=\"\"").is_err(), "rooms that no link connects");
-    assert!(plan("rooms=\"a:3,3\", links=\"\"").is_err(), "a room needs four numbers");
-    assert!(plan("rooms=\"a:3,3,4,4\", links=\"x\"").is_err(), "a link needs two numbers");
+    assert!(
+        plan("rooms=\"a:3,3,4,4; b:3,3,4,4\", links=\"0-5\"").is_err(),
+        "a link to a room that does not exist"
+    );
+    assert!(
+        plan("rooms=\"a:3,3,4,4; b:3,3,4,4\", links=\"\"").is_err(),
+        "rooms that no link connects"
+    );
+    assert!(
+        plan("rooms=\"a:3,3\", links=\"\"").is_err(),
+        "a room needs four numbers"
+    );
+    assert!(
+        plan("rooms=\"a:3,3,4,4\", links=\"x\"").is_err(),
+        "a link needs two numbers"
+    );
 }
 
 #[test]

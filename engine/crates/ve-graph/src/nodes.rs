@@ -100,25 +100,45 @@ fn build_params(
 }
 
 /// Rules between a node's parameters that no single parameter's range can say.
-fn relations(spec: &OperatorSpec, params: &BTreeMap<String, Value>, node: Option<&NodeId>) -> Result<(), Fail> {
+fn relations(
+    spec: &OperatorSpec,
+    params: &BTreeMap<String, Value>,
+    node: Option<&NodeId>,
+) -> Result<(), Fail> {
     let text = |name: &str| match params.get(name) {
         Some(Value::Str(s)) => s.as_str(),
         _ => "",
     };
     let number = |name: &str| params.get(name).and_then(Value::as_f64);
     let refuse = |param: &'static str, message: &str, suggestion: &str| -> Fail {
-        let mut diagnostic = Diagnostic::error("param.range", format!("{}: {message}", spec.id)).suggest(suggestion);
+        let mut diagnostic =
+            Diagnostic::error("param.range", format!("{}: {message}", spec.id)).suggest(suggestion);
         diagnostic.param = Some(param.to_owned());
         if let Some(node) = node {
             diagnostic.node = Some(node.clone());
         }
         Box::new(diagnostic)
     };
-    if matches!(spec.id.family().as_str(), "field.taper" | "field.twist" | "field.bend") && number("from") == number("to") {
-        return Err(refuse("to", "`to` must differ from `from`", "give the warp a range along the axis, for example from=-0.5, to=0.5"));
+    if matches!(
+        spec.id.family().as_str(),
+        "field.taper" | "field.twist" | "field.bend"
+    ) && number("from") == number("to")
+    {
+        return Err(refuse(
+            "to",
+            "`to` must differ from `from`",
+            "give the warp a range along the axis, for example from=-0.5, to=0.5",
+        ));
     }
-    if spec.id.family().as_str() == "field.bend" && text("toward") != "auto" && text("toward") == text("axis") {
-        return Err(refuse("toward", "`toward` must differ from `axis`: a bar cannot curve toward itself", "use another axis, or toward=\"auto\""));
+    if spec.id.family().as_str() == "field.bend"
+        && text("toward") != "auto"
+        && text("toward") == text("axis")
+    {
+        return Err(refuse(
+            "toward",
+            "`toward` must differ from `axis`: a bar cannot curve toward itself",
+            "use another axis, or toward=\"auto\"",
+        ));
     }
     Ok(())
 }

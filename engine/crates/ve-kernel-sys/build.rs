@@ -54,7 +54,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         build_dir.join("lib").display()
     );
     link_static_libraries();
-    link_blender_stubs(is_wasm);
     match &wasi {
         Some(sdk) => {
             let sysroot = sdk.join("share/wasi-sysroot/lib/wasm32-wasip1");
@@ -82,9 +81,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         "lib/clipper2",
         "lib/meshoptimizer",
         "lib/opensubdiv",
-        "lib/bl",
-        "lib/eigen",
-        "lib/fmt",
         "lib/mikktspace",
     ] {
         println!("cargo:rerun-if-changed={}", engine.join(path).display());
@@ -93,31 +89,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// The static libraries the `CMake` project produces. Dependents come before what they need: the kernel
-/// pulls in the Blender operators, which pull in bmesh and geometry, then Blender's core and the
-/// deterministic maths.
+/// The static libraries the `CMake` project produces. Dependents come before what they need.
 fn link_static_libraries() {
     for lib in [
         "ve_kernel",
-        "ve_blender_ops",
-        "ve_blender_bmesh",
-        "ve_blender_geometry",
-        "ve_blender_core",
-        "ve_blender_math",
         "manifold",
         "Clipper2",
         "ve_meshopt",
         "ve_opensubdiv",
     ] {
         println!("cargo:rustc-link-lib=static={lib}");
-    }
-}
-
-/// Trap stubs for the Blender functions we deliberately do not link. WebAssembly links get typed stubs
-/// from the linker instead (see `.cargo/config.toml`).
-fn link_blender_stubs(is_wasm: bool) {
-    if !is_wasm {
-        println!("cargo:rustc-link-lib=static=ve_blender_unresolved");
     }
 }
 

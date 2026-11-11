@@ -18,3 +18,4 @@ playwright-report/
 # engine workspace
 engine/target/
 engine/web/dist*/
+.vercel

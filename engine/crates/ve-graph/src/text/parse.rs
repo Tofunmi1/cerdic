@@ -295,11 +295,24 @@ impl Parser {
 /// Replaces every alias (`a = b`) by the node it names: later statements that read `a`, `output x = a` and a group's `result a` read
 /// `b` instead, and the alias statements disappear. Aliases may chain; one that names itself or loops is an error.
 fn resolve_aliases(statements: Vec<Stmt>) -> Result<Vec<Stmt>, Fail> {
-    let mut direct: std::collections::HashMap<String, (String, Span)> = std::collections::HashMap::new();
+    let mut direct: std::collections::HashMap<String, (String, Span)> =
+        std::collections::HashMap::new();
     for statement in &statements {
-        if let Stmt::Alias { name, name_span, target, target_span } = statement {
-            if direct.insert(name.clone(), (target.clone(), *target_span)).is_some() {
-                return Err(syntax(*name_span, "this alias name is already used by another alias"));
+        if let Stmt::Alias {
+            name,
+            name_span,
+            target,
+            target_span,
+        } = statement
+        {
+            if direct
+                .insert(name.clone(), (target.clone(), *target_span))
+                .is_some()
+            {
+                return Err(syntax(
+                    *name_span,
+                    "this alias name is already used by another alias",
+                ));
             }
         }
     }
@@ -307,10 +320,15 @@ fn resolve_aliases(statements: Vec<Stmt>) -> Result<Vec<Stmt>, Fail> {
         return Ok(statements);
     }
     for statement in &statements {
-        if let Stmt::Node { name, name_span, .. } = statement
+        if let Stmt::Node {
+            name, name_span, ..
+        } = statement
             && direct.contains_key(name)
         {
-            return Err(syntax(*name_span, "this name is already an alias of another node"));
+            return Err(syntax(
+                *name_span,
+                "this name is already an alias of another node",
+            ));
         }
     }
     let resolve = |name: &str| -> Result<String, Fail> {
@@ -321,35 +339,79 @@ fn resolve_aliases(statements: Vec<Stmt>) -> Result<Vec<Stmt>, Fail> {
                 None => return Ok(at),
             }
         }
-        let span = direct.get(name).map_or(Span { line: 1, col: 1, len: 1 }, |(_, span)| *span);
+        let span = direct.get(name).map_or(
+            Span {
+                line: 1,
+                col: 1,
+                len: 1,
+            },
+            |(_, span)| *span,
+        );
         Err(syntax(span, "aliases that name each other in a loop"))
     };
-    fn rewrite(statements: Vec<Stmt>, resolve: &dyn Fn(&str) -> Result<String, Fail>) -> Result<Vec<Stmt>, Fail> {
+    fn rewrite(
+        statements: Vec<Stmt>,
+        resolve: &dyn Fn(&str) -> Result<String, Fail>,
+    ) -> Result<Vec<Stmt>, Fail> {
         let mut out = Vec::with_capacity(statements.len());
         for statement in statements {
             out.push(match statement {
                 Stmt::Alias { .. } => continue,
-                Stmt::Node { name, name_span, op, op_span, mut args, piped } => {
+                Stmt::Node {
+                    name,
+                    name_span,
+                    op,
+                    op_span,
+                    mut args,
+                    piped,
+                } => {
                     for arg in &mut args {
                         if let Arg::Input { name, .. } = arg {
                             *name = resolve(name)?;
                         }
                     }
-                    Stmt::Node { name, name_span, op, op_span, args, piped }
+                    Stmt::Node {
+                        name,
+                        name_span,
+                        op,
+                        op_span,
+                        args,
+                        piped,
+                    }
                 }
-                Stmt::Output { name, name_span, node } => {
+                Stmt::Output {
+                    name,
+                    name_span,
+                    node,
+                } => {
                     let node = match node {
                         Some((target, span)) => Some((resolve(&target)?, span)),
                         None => None,
                     };
-                    Stmt::Output { name, name_span, node }
+                    Stmt::Output {
+                        name,
+                        name_span,
+                        node,
+                    }
                 }
-                Stmt::Group { name, name_span, body, exposes, result } => {
+                Stmt::Group {
+                    name,
+                    name_span,
+                    body,
+                    exposes,
+                    result,
+                } => {
                     let result = match result {
                         Some((target, span)) => Some((resolve(&target)?, span)),
                         None => None,
                     };
-                    Stmt::Group { name, name_span, body: rewrite(body, resolve)?, exposes, result }
+                    Stmt::Group {
+                        name,
+                        name_span,
+                        body: rewrite(body, resolve)?,
+                        exposes,
+                        result,
+                    }
                 }
             });
         }

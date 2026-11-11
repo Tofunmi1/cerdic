@@ -1,6 +1,6 @@
 //! Type rules of SimL: what operators and functions accept and return, swizzles, and the "did you mean" search.
-use super::ast::{Bin, Expr, Func};
 use super::Ty;
+use super::ast::{Bin, Expr, Func};
 
 pub(super) fn edit_distance(a: &str, b: &str) -> usize {
     let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
@@ -10,7 +10,9 @@ pub(super) fn edit_distance(a: &str, b: &str) -> usize {
         row[0] = i + 1;
         for (j, cb) in b.iter().enumerate() {
             let above = row[j + 1];
-            row[j + 1] = (above + 1).min(row[j] + 1).min(diagonal + usize::from(ca != cb));
+            row[j + 1] = (above + 1)
+                .min(row[j] + 1)
+                .min(diagonal + usize::from(ca != cb));
             diagonal = above;
         }
     }
@@ -20,21 +22,29 @@ pub(super) fn edit_distance(a: &str, b: &str) -> usize {
 /// The option closest to `name` when it is near enough to be a typo.
 pub(super) fn closest<'a>(name: &str, options: impl Iterator<Item = &'a str>) -> Option<&'a str> {
     let limit = (name.len() / 3).max(2);
-    options.map(|o| (edit_distance(name, o), o)).filter(|(d, _)| *d <= limit).min_by_key(|(d, _)| *d).map(|(_, o)| o)
+    options
+        .map(|o| (edit_distance(name, o), o))
+        .filter(|(d, _)| *d <= limit)
+        .min_by_key(|(d, _)| *d)
+        .map(|(_, o)| o)
 }
 
 pub(super) fn swizzle_indices(s: &str) -> Option<Vec<usize>> {
     if s.is_empty() || s.len() > 4 {
         return None;
     }
-    s.chars().map(|c| "xyzw".find(c).or_else(|| "rgba".find(c))).collect()
+    s.chars()
+        .map(|c| "xyzw".find(c).or_else(|| "rgba".find(c)))
+        .collect()
 }
 
 pub(super) fn binary_type(op: Bin, a: Ty, b: Ty) -> Option<Ty> {
     match op {
         Bin::Or | Bin::And => (a == Ty::Bool && b == Ty::Bool).then_some(Ty::Bool),
         Bin::Eq | Bin::Ne => (a == b && (a == Ty::Float || a == Ty::Bool)).then_some(Ty::Bool),
-        Bin::Lt | Bin::Le | Bin::Gt | Bin::Ge => (a == Ty::Float && b == Ty::Float).then_some(Ty::Bool),
+        Bin::Lt | Bin::Le | Bin::Gt | Bin::Ge => {
+            (a == Ty::Float && b == Ty::Float).then_some(Ty::Bool)
+        }
         _ => {
             if a == Ty::Bool || b == Ty::Bool {
                 None
@@ -68,10 +78,24 @@ fn numeric_common(args: &[Expr]) -> Result<Ty, String> {
 
 pub(super) fn func_type(f: Func, args: &[Expr]) -> Result<Ty, String> {
     let want = |n: usize| {
-        if args.len() == n { Ok(()) } else { Err(format!("takes {n} arguments, got {}", args.len())) }
+        if args.len() == n {
+            Ok(())
+        } else {
+            Err(format!("takes {n} arguments, got {}", args.len()))
+        }
     };
     match f {
-        Func::Abs | Func::Sign | Func::Floor | Func::Ceil | Func::Fract | Func::Sqrt | Func::Exp | Func::Log | Func::Sin | Func::Cos | Func::Normalize => {
+        Func::Abs
+        | Func::Sign
+        | Func::Floor
+        | Func::Ceil
+        | Func::Fract
+        | Func::Sqrt
+        | Func::Exp
+        | Func::Log
+        | Func::Sin
+        | Func::Cos
+        | Func::Normalize => {
             want(1)?;
             numeric_common(args)
         }

@@ -18,8 +18,8 @@ pub(super) struct Token {
 }
 
 const SYMS: [&str; 26] = [
-    "==", "!=", "<=", ">=", "&&", "||", "+=", "-=", "*=", "/=", "..", "(", ")", "[", "]", ",", ":", "=", "+", "-", "*", "/", "%", "<",
-    ">", ".",
+    "==", "!=", "<=", ">=", "&&", "||", "+=", "-=", "*=", "/=", "..", "(", ")", "[", "]", ",", ":",
+    "=", "+", "-", "*", "/", "%", "<", ">", ".",
 ];
 const SYMS_EXTRA: [&str; 4] = ["!", ";", "{", "}"];
 
@@ -45,7 +45,11 @@ pub(super) fn lex(source: &str) -> Result<Vec<Token>, Vec<Diagnostic>> {
         };
         if c == '\n' {
             if depth <= 0 {
-                out.push(Token { tok: Tok::Newline, line: start_line, col: start_col });
+                out.push(Token {
+                    tok: Tok::Newline,
+                    line: start_line,
+                    col: start_col,
+                });
             }
             at += 1;
             line += 1;
@@ -92,11 +96,29 @@ pub(super) fn lex(source: &str) -> Result<Vec<Token>, Vec<Diagnostic>> {
             }
             let text: String = chars[begin..at].iter().collect();
             let tok = if is_float {
-                text.parse::<f64>().map(Tok::Float).map_err(|_| vec![diag(start_line, start_col, "bad number", "write the number again")])?
+                text.parse::<f64>().map(Tok::Float).map_err(|_| {
+                    vec![diag(
+                        start_line,
+                        start_col,
+                        "bad number",
+                        "write the number again",
+                    )]
+                })?
             } else {
-                text.parse::<i64>().map(Tok::Int).map_err(|_| vec![diag(start_line, start_col, "integer too large", "use a smaller integer")])?
+                text.parse::<i64>().map(Tok::Int).map_err(|_| {
+                    vec![diag(
+                        start_line,
+                        start_col,
+                        "integer too large",
+                        "use a smaller integer",
+                    )]
+                })?
             };
-            out.push(Token { tok, line: start_line, col: start_col });
+            out.push(Token {
+                tok,
+                line: start_line,
+                col: start_col,
+            });
             continue;
         }
         if c.is_ascii_alphabetic() || c == '_' {
@@ -104,7 +126,11 @@ pub(super) fn lex(source: &str) -> Result<Vec<Token>, Vec<Diagnostic>> {
             while at < chars.len() && (chars[at].is_ascii_alphanumeric() || chars[at] == '_') {
                 take(1, &mut at, &mut col);
             }
-            out.push(Token { tok: Tok::Ident(chars[begin..at].iter().collect()), line: start_line, col: start_col });
+            out.push(Token {
+                tok: Tok::Ident(chars[begin..at].iter().collect()),
+                line: start_line,
+                col: start_col,
+            });
             continue;
         }
         let rest: String = chars[at..(at + 2).min(chars.len())].iter().collect();
@@ -114,16 +140,29 @@ pub(super) fn lex(source: &str) -> Result<Vec<Token>, Vec<Diagnostic>> {
             .find(|s| rest.starts_with(**s))
             .copied();
         let Some(sym) = sym else {
-            return Err(vec![diag(start_line, start_col, &format!("unexpected character {c:?}"), "remove it")]);
+            return Err(vec![diag(
+                start_line,
+                start_col,
+                &format!("unexpected character {c:?}"),
+                "remove it",
+            )]);
         };
         match sym {
             "(" | "[" => depth += 1,
             ")" | "]" => depth -= 1,
             _ => {}
         }
-        out.push(Token { tok: Tok::Sym(sym), line: start_line, col: start_col });
+        out.push(Token {
+            tok: Tok::Sym(sym),
+            line: start_line,
+            col: start_col,
+        });
         take(sym.len(), &mut at, &mut col);
     }
-    out.push(Token { tok: Tok::Newline, line, col });
+    out.push(Token {
+        tok: Tok::Newline,
+        line,
+        col,
+    });
     Ok(out)
 }

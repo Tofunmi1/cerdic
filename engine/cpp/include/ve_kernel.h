@@ -160,6 +160,13 @@ ve_status ve_simplify(const float* positions, size_t vertex_count, const uint32_
                       size_t index_count, double target_ratio, double target_error,
                       uint32_t* out_indices, size_t out_capacity, size_t* out_count);
 
+/* The same, and with `lock_border` non-zero the vertices on open edges are never moved or collapsed, so a
+ * cut mesh keeps its seam. */
+ve_status ve_simplify_border(const float* positions, size_t vertex_count, const uint32_t* indices,
+                             size_t index_count, double target_ratio, double target_error,
+                             int lock_border, uint32_t* out_indices, size_t out_capacity,
+                             size_t* out_count);
+
 /* Versioned input for uniform CPU Catmull-Clark. Crease endpoints are pairs of cage vertex
  * indices. Point channels are interleaved vertex-major floats. The optional FVar channel carries
  * `fvar_width` floats for each unique value and one value index per cage corner. */
@@ -211,195 +218,6 @@ ve_status ve_subdivision_copy_channels(const ve_subdivision* subdivision, float*
                                        size_t fvar_values_capacity, uint32_t* fvar_corner_values,
                                        size_t fvar_corner_capacity);
 void ve_subdivision_free(ve_subdivision* subdivision);
-
-/* Polygon meshes through Blender's bmesh (vendored Blender code, see lib/bl). The
- * input is an indexed polygon mesh: `face_sizes[i]` corners per face, `corners` holds vertex
- * indices face after face. Faces need at least 3 distinct corners; at most 1,000,000 vertices,
- * 1,000,000 faces and 4,000,000 corners. The result keeps provenance: a vertex's origin is the
- * input vertex it descends from and a face's parent is the input face it inherits attributes from,
- * or 0xFFFFFFFF when new. */
-typedef struct ve_polymesh ve_polymesh;
-typedef struct ve_polymesh_input {
-  size_t struct_size;
-  const float* positions;
-  size_t vertex_count;
-  const uint32_t* face_sizes;
-  size_t face_count;
-  const uint32_t* corners;
-  size_t corner_count;
-} ve_polymesh_input;
-size_t ve_polymesh_num_vertices(const ve_polymesh* mesh);
-size_t ve_polymesh_num_faces(const ve_polymesh* mesh);
-size_t ve_polymesh_num_corners(const ve_polymesh* mesh);
-ve_status ve_polymesh_copy(const ve_polymesh* mesh, float* positions, size_t position_capacity,
-                           uint32_t* face_sizes, size_t face_capacity, uint32_t* corners,
-                           size_t corner_capacity, uint32_t* vertex_origin, size_t vertex_capacity,
-                           uint32_t* face_parent, size_t parent_capacity);
-/* What an operator made each face: 0 not made or changed by it, 1 the inner face of an inset or the
- * moved cap of an extrusion, 2 a ring face of an inset or a side wall of an extrusion. One value
- * per face, in the face order of ve_polymesh_copy. */
-ve_status ve_polymesh_copy_roles(const ve_polymesh* mesh, uint32_t* roles, size_t capacity);
-void ve_polymesh_free(ve_polymesh* mesh);
-
-/* Edge bevel (Blender's bmesh bevel). `edges` holds vertex-index pairs, each an edge of the mesh
- * and manifold (two faces), else VE_ERR_NOT_MANIFOLD. `offset_type` is 0 offset, 1 width, 2 depth,
- * 3 percent; `width` > 0; `segments` 1..64; `profile` 0.1..1 (0.5 is a circular arc). The offset is
- * clamped so the bevel never overlaps itself. */
-typedef struct ve_bevel_input {
-  size_t struct_size;
-  ve_polymesh_input mesh;
-  const uint32_t* edges;
-  size_t edge_count;
-  float width;
-  int32_t segments;
-  int32_t offset_type;
-  float profile;
-} ve_bevel_input;
-ve_polymesh* ve_bevel(const ve_bevel_input* input, ve_status* status);
-
-/* Skin (Blender's Skin modifier, the B-Mesh algorithm): a skeleton graph becomes one closed surface of mostly quads. `positions` holds 3 floats per joint, `radii` 2 per
- * joint (the half extents of the cross-section across and along the bone frame, metres), `edges` pairs of joints, `flags` (may be NULL) one byte per joint: bit 0 marks a
- * root (one per connected piece, the joint the bone frames are oriented from; refused with VE_ERR_INVALID_ARG when a piece has none), bit 1 marks a branch joint "loose" (its
- * hull is not subdivided). `branch_smoothing` 0..1 relaxes the surface around branches, `symmetry_axes` (bits 0 x, 1 y, 2 z) keeps quads from crossing a mirror plane,
- * `subdivide` adds joints along long edges as Blender's modifier does. The result's vertex origin is the joint (index into the input) each vertex was made from. */
-typedef struct ve_skin_input {
-  size_t struct_size;
-  const float* positions;
-  const float* radii;
-  const uint8_t* flags;
-  size_t vertex_count;
-  const uint32_t* edges;
-  size_t edge_count;
-  float branch_smoothing;
-  uint32_t symmetry_axes;
-  int32_t smooth_shading;
-  int32_t subdivide;
-} ve_skin_input;
-ve_polymesh* ve_skin(const ve_skin_input* input, ve_status* status);
-
-/* Blender's bmesh operators on a polygon mesh, selected by faces or edges. Faces are indices into
- * the mesh's face list; edges are vertex-index pairs, each an edge of the mesh. An empty face
- * selection means "every face" where the operator allows it. `params` and `flags` by operator:
- *   INSET        faces; params[0] thickness > 0, params[1] depth; flags 1 even, 2 relative, 4
- * boundary, 8 outset, 16 edge rail. SOLIDIFY     faces (empty: all); params[0] thickness
- * (non-zero), moved along each face's normal. EXTRUDE      faces; params[0..2] offset vector the
- * new faces move by. DISSOLVE     the whole mesh; params[0] angle in radians, 0..pi (faces flatter
- * than this merge); flags 1 also dissolve boundaries. POKE         faces (empty: all); params[0]
- * offset; params[1] centre 0 median, 1 weighted, 2 bounds; flags 1 offset relative to the face
- * size. SUBDIVIDE    edges; params[0] cuts 1..8, params[1] smooth 0..1; flags 1 grid fill quads.
- *   WIREFRAME    faces (empty: all); params[0] thickness > 0, params[1] offset; flags 1 even,
- *                2 relative, 4 boundary, 8 replace the original faces.
- *   SYMMETRIZE   the whole mesh; params[0] direction 0..5 = -X -Y -Z +X +Y +Z (the side kept and
- *                mirrored onto the other), params[1] merge distance >= 0.
- *   DECIMATE     the whole mesh; params[0] ratio of faces to keep, 0 < ratio <= 1; params[1]
- * symmetry axis 0 x, 1 y, 2 z or -1 for none; flags 1 triangulate first (needed unless the mesh is
- * already triangles). Collapses edges that change the shape least: level of detail. UNSUBDIVIDE the
- * whole mesh; params[0] iterations 1..4. Reverses a subdivision, removing the vertices a regular
- * grid of quads could be rebuilt without. The result keeps provenance as for ve_bevel. */
-enum {
-  VE_MESH_OP_INSET = 0,
-  VE_MESH_OP_SOLIDIFY = 1,
-  VE_MESH_OP_EXTRUDE = 2,
-  VE_MESH_OP_DISSOLVE = 3,
-  VE_MESH_OP_POKE = 4,
-  VE_MESH_OP_SUBDIVIDE = 5,
-  VE_MESH_OP_WIREFRAME = 6,
-  VE_MESH_OP_SYMMETRIZE = 7,
-  VE_MESH_OP_DECIMATE = 8,
-  VE_MESH_OP_UNSUBDIVIDE = 9,
-  VE_MESH_OP_TRIANGULATE = 10,
-  VE_MESH_OP_REMOVE_DOUBLES = 11,
-  VE_MESH_OP_BISECT = 12,
-  VE_MESH_OP_SPIN = 13,
-  VE_MESH_OP_MIRROR = 14,
-  VE_MESH_OP_LOOP_CUT = 15,
-  /* Whole-mesh tools (every element is selected):
-   *   RECALC_NORMALS      flags 1 point the faces inward instead of outward.
-   *   SMOOTH              params[0] factor 0..1, params[1] iterations 1..50. Moves vertices toward their neighbours.
-   *   FILL_HOLES          params[0] most sides a hole may have (3..1000); larger holes stay open.
-   *   BEAUTIFY            params[0] 0 area, 1 angle. Rotates the edges of triangle pairs for more even triangles.
-   *   PLANAR_FACES        params[0] iterations 1..50, params[1] factor 0..1. Flattens each face.
-   *   JOIN_TRIANGLES      params[0] face-angle limit and params[1] shape-angle limit, radians 0..pi. Makes quads.
-   *   DISSOLVE_DEGENERATE params[0] distance (> 0) under which edges and faces count as degenerate. */
-  VE_MESH_OP_RECALC_NORMALS = 16,
-  VE_MESH_OP_SMOOTH = 17,
-  VE_MESH_OP_FILL_HOLES = 18,
-  VE_MESH_OP_BEAUTIFY = 19,
-  VE_MESH_OP_PLANAR_FACES = 20,
-  VE_MESH_OP_JOIN_TRIANGLES = 21,
-  VE_MESH_OP_DISSOLVE_DEGENERATE = 22,
-  /* Tools that need a selection:
-   *   SPLIT_EDGES      edges (required). Disconnects the faces along them, leaving a hard seam.
-   *   ROTATE_EDGES     edges (required); flags 1 counter-clockwise. Spins each edge to the other diagonal of its two faces.
-   *   CONNECT_VERTICES vertices (at least two, required); flags 1 refuse splits that overlap or intersect. Adds edges
-   *                    between the selected vertices of each face, splitting it. */
-  VE_MESH_OP_SPLIT_EDGES = 23,
-  VE_MESH_OP_ROTATE_EDGES = 24,
-  VE_MESH_OP_CONNECT_VERTICES = 25,
-  /* Edge-loop tools; all take edges (required), the edges of one or more loops:
-   *   SPACE_EDGE_LOOPS  params[0] factor 0..1; flags 1 linear instead of cubic interpolation. Moves the loop's vertices
-   *                     to even spacing along its own curve.
-   *   RELAX_EDGE_LOOPS  params[0] iterations 1..50; flags 1 linear, 2 even spacing. Smooths the loop.
-   *   CIRCULARIZE       params[0] factor 0..1, params[1] radius (0 fits one), params[2] angle in radians, params[3]
-   *                     flatten 0..1; flags 1 regular spacing. Reshapes the loop into a circle. */
-  VE_MESH_OP_SPACE_EDGE_LOOPS = 26,
-  VE_MESH_OP_RELAX_EDGE_LOOPS = 27,
-  VE_MESH_OP_CIRCULARIZE = 28,
-};
-typedef struct ve_mesh_op_input {
-  size_t struct_size;
-  ve_polymesh_input mesh;
-  int32_t op;
-  const uint32_t* faces;
-  size_t face_count;
-  const uint32_t* edges;
-  size_t edge_count;
-  const uint32_t* vertices;
-  size_t vertex_count;
-  double params[12]; /* Operator numbers; unused entries are zero (most operators read the first
-                        four). */
-  int32_t flags;
-} ve_mesh_op_input;
-ve_polymesh* ve_mesh_op(const ve_mesh_op_input* input, ve_status* status);
-
-/* UV unwrapping (Blender's LSCM / ABF++ parametrizer and island packer). `seams` holds vertex-index
- * pairs, each an edge of the mesh, that cut it into islands; every island is flattened on its own.
- * `method` is 0 for least-squares conformal maps or 1 for angle-based flattening (less angle
- * distortion, slower). With `pack` the islands are scaled into the unit square with `margin`
- * (0..0.5 of it) between them, optionally rotated; without it they are left overlapping near the
- * origin. Writes two floats per corner (u, v), corner after corner in the mesh's order, into `uvs`
- * (capacity in floats, 2 * corner_count needed). *failed_islands counts islands that could not be
- * flattened and keep their previous (zero) coordinates; it may be NULL. */
-typedef struct ve_uv_input {
-  size_t struct_size;
-  ve_polymesh_input mesh;
-  const uint32_t* seams;
-  size_t seam_count;
-  int32_t method;
-  int32_t pack;
-  int32_t rotate;
-  float margin;
-} ve_uv_input;
-ve_status ve_uv_unwrap(const ve_uv_input* input, float* uvs, size_t uv_capacity,
-                       uint32_t* failed_islands);
-/* Packs an existing corner UV map. UV seams are inferred from discontinuities. `shape` is 0 for
- * axis-aligned bounds and 1 for convex hulls; `keep_density` preserves island scale where possible.
- */
-typedef struct ve_uv_pack_input {
-  size_t struct_size;
-  ve_polymesh_input mesh;
-  const float* uvs;
-  int32_t rotate;
-  int32_t keep_density;
-  int32_t shape;
-  float margin;
-} ve_uv_pack_input;
-ve_status ve_uv_pack(const ve_uv_pack_input* input, float* uvs, size_t uv_capacity);
-
-/* Blender's easing curve (BLI_easing, "ease out", keyframe defaults) at `fraction` in 0..1, for
- * checking the engine's own copies. kind: 0 back, 1 bounce, 2 elastic; anything else returns
- * `fraction`. */
-float ve_blender_ease(int32_t kind, float fraction);
 
 void ve_solid_free(ve_solid* s);
 

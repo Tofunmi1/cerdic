@@ -1,6 +1,6 @@
 //! Edge bevel on polygon meshes, using Blender's bmesh bevel.
 
-use crate::{KernelError, ffi};
+use crate::KernelError;
 
 /// A borrowed indexed polygon mesh: faces of any size, vertex indices face after face.
 #[derive(Clone, Copy, Debug)]
@@ -100,5 +100,23 @@ pub fn bevel_edges(
     edges: &[[u32; 2]],
     options: &BevelOptions,
 ) -> Result<BeveledMesh, KernelError> {
-    ffi::polymesh::bevel(mesh, edges, options)
+    // A mesh shape the native bevel does not handle (a sector with several beveled edges and extra faces between them,
+    // winding that is not consistent, ...) is declined rather than guessed at.
+    let result = crate::native::bevel::bevel_edges(mesh, edges, options).unwrap_or(Err(KernelError::OperatorRefused));
+    // Two faces walking the same directed edge can never be a valid surface (the patches and strips disagree about
+    // their direction): refuse instead of handing back a corrupt mesh.
+    if let Ok(out) = &result {
+        let mut walked = std::collections::BTreeSet::<(u32, u32)>::new();
+        let mut at = 0;
+        for &size in &out.face_sizes {
+            let f = &out.corners[at..at + size as usize];
+            at += size as usize;
+            for i in 0..f.len() {
+                if !walked.insert((f[i], f[(i + 1) % f.len()])) {
+                    return Err(KernelError::OperatorRefused);
+                }
+            }
+        }
+    }
+    result
 }

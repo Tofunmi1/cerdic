@@ -11,7 +11,6 @@
     reason = "this is a CLI; stderr is its interface"
 )]
 
-mod blender_audit;
 mod command;
 mod cpp;
 mod parity;
@@ -168,14 +167,7 @@ fn lint_gates(report: &mut stamp::Report, no_cache: bool) -> Result<(), Failure>
         report,
         no_cache,
         "tests",
-        &[
-            "crates",
-            "cpp",
-            "lib",
-            "xtask",
-            "Cargo.toml",
-            "Cargo.lock"
-        ],
+        &["crates", "cpp", "lib", "xtask", "Cargo.toml", "Cargo.lock"],
         "cargo nextest run --workspace --no-tests=pass",
         || {
             if has("cargo-nextest") {

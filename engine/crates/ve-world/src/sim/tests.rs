@@ -31,8 +31,15 @@ fn particles_fall_as_semi_implicit_euler_says() {
     // y = 10 - g dt^2 n (n + 1) / 2 with n = 60 steps
     let want = 10.0 - 9.8 / 3600.0 * 1830.0;
     for i in 0..4 {
-        assert!((pos[i * 3 + 1] - want).abs() < 1e-3, "element {i}: {}", pos[i * 3 + 1]);
-        assert!((pos[i * 3] - i as f32).abs() < 1e-6, "x stays where init put it");
+        assert!(
+            (pos[i * 3 + 1] - want).abs() < 1e-3,
+            "element {i}: {}",
+            pos[i * 3 + 1]
+        );
+        assert!(
+            (pos[i * 3] - i as f32).abs() < 1e-6,
+            "x stays where init put it"
+        );
     }
     assert_eq!(s.program.outputs(), vec![("particles", "pos")]);
 }
@@ -69,37 +76,55 @@ fn parameters_can_be_set_and_are_checked() {
     let mut s = sim(FALL);
     s.set_param("g", &[0.0, 0.0, 0.0]).unwrap();
     s.run(10, 0.1).unwrap();
-    assert!((s.state("pos").unwrap()[1] - 10.0).abs() < 1e-6, "no gravity, no fall");
+    assert!(
+        (s.state("pos").unwrap()[1] - 10.0).abs() < 1e-6,
+        "no gravity, no fall"
+    );
     assert!(s.set_param("g", &[1.0]).is_err());
     assert!(s.set_param("nope", &[1.0]).is_err());
 }
 
 #[test]
 fn mistakes_are_refused_with_a_line_and_a_fix() {
-    let d = error_of("sim x\nstate pos: vec3[4]\nkernel k each i in pos {\n  pos[i] = psoition\n}\nschedule k\n");
+    let d = error_of(
+        "sim x\nstate pos: vec3[4]\nkernel k each i in pos {\n  pos[i] = psoition\n}\nschedule k\n",
+    );
     assert_eq!(d.line, 4);
     assert!(d.message.contains("psoition"), "{d:?}");
-    let d = error_of("sim x\nstate pos: vec3[4]\nkernel k each i in pos {\n  pos[i] = 1.0\n}\nschedule k\n");
+    let d = error_of(
+        "sim x\nstate pos: vec3[4]\nkernel k each i in pos {\n  pos[i] = 1.0\n}\nschedule k\n",
+    );
     assert_eq!(d.line, 4);
     assert!(d.message.contains("vec3"), "{d:?}");
-    let d = error_of("sim x\nstate pos: vec3[4]\nkernel k each i in pos {\n  for j in neighbors(pos, pos[i], 1.0) {\n  }\n}\nschedule k\n");
+    let d = error_of(
+        "sim x\nstate pos: vec3[4]\nkernel k each i in pos {\n  for j in neighbors(pos, pos[i], 1.0) {\n  }\n}\nschedule k\n",
+    );
     assert!(d.suggestion.contains("cap"), "{d:?}");
-    let d = error_of("sim x\nstate pos: vec3[4]\nkernel k each i in pos {\n  pos[i] = vec3(1.0, 2.0)\n}\nschedule k\n");
+    let d = error_of(
+        "sim x\nstate pos: vec3[4]\nkernel k each i in pos {\n  pos[i] = vec3(1.0, 2.0)\n}\nschedule k\n",
+    );
     assert!(d.message.contains("vec3 needs 3"), "{d:?}");
-    let d = error_of("sim x\nstate pos: vec3[4]\nkernel k each i in pos {\n  pos[i] = vec3(1.0)\n}\n");
+    let d =
+        error_of("sim x\nstate pos: vec3[4]\nkernel k each i in pos {\n  pos[i] = vec3(1.0)\n}\n");
     assert!(d.message.contains("schedule"), "{d:?}");
-    let d = error_of("sim x\nstate pos: vec3[4]\nkernel move each i in pos {\n  pos[i] = vec3(1.0)\n}\nschedule mvoe\n");
+    let d = error_of(
+        "sim x\nstate pos: vec3[4]\nkernel move each i in pos {\n  pos[i] = vec3(1.0)\n}\nschedule mvoe\n",
+    );
     assert!(d.suggestion.contains("move"), "{d:?}");
 }
 
 #[test]
 fn indices_and_writes_outside_the_element_are_runtime_errors() {
-    let mut s = sim("sim x\nstate a: f32[4]\nkernel k each i in a { a[i + 1] = 1.0 }\nschedule k\n");
+    let mut s =
+        sim("sim x\nstate a: f32[4]\nkernel k each i in a { a[i + 1] = 1.0 }\nschedule k\n");
     let e = s.step(0.1).unwrap_err();
     assert!(e.message.contains("own element"), "{e}");
-    let mut s = sim("sim x\nstate a: f32[4]\nkernel k each i in a { a[i] = a[i + 9] }\nschedule k\n");
+    let mut s =
+        sim("sim x\nstate a: f32[4]\nkernel k each i in a { a[i] = a[i + 9] }\nschedule k\n");
     assert!(s.step(0.1).unwrap_err().message.contains("outside"));
-    let mut s = sim("sim x\nstate a: f32[1]\nkernel k each i in a {\n for p in 0..4000 {\n for q in 0..4000 {\n a[i] += 1.0\n }\n }\n}\nschedule k\n");
+    let mut s = sim(
+        "sim x\nstate a: f32[1]\nkernel k each i in a {\n for p in 0..4000 {\n for q in 0..4000 {\n a[i] += 1.0\n }\n }\n}\nschedule k\n",
+    );
     assert!(s.step(0.1).unwrap_err().message.contains("statements"));
 }
 
@@ -127,10 +152,20 @@ schedule count
     let pos = s.state("pos").unwrap().to_vec();
     let cnt = s.state("cnt").unwrap();
     for (i, p) in pos.chunks(3).enumerate() {
-        let want = pos.chunks(3).filter(|q| (0..3).map(|k| (p[k] - q[k]).powi(2)).sum::<f32>() <= 16.0).count();
-        assert!((cnt[i] - want as f32).abs() < 1.5, "element {i}: grid {} vs all {want}", cnt[i]);
+        let want = pos
+            .chunks(3)
+            .filter(|q| (0..3).map(|k| (p[k] - q[k]).powi(2)).sum::<f32>() <= 16.0)
+            .count();
+        assert!(
+            (cnt[i] - want as f32).abs() < 1.5,
+            "element {i}: grid {} vs all {want}",
+            cnt[i]
+        );
     }
-    assert!(cnt.iter().any(|c| *c > 1.0), "some elements have neighbours");
+    assert!(
+        cnt.iter().any(|c| *c > 1.0),
+        "some elements have neighbours"
+    );
 }
 
 #[test]
@@ -139,7 +174,11 @@ fn a_big_flock_runs_fast_enough_because_of_the_grid() {
     let mut s = sim(&source);
     let start = std::time::Instant::now();
     s.run(5, 0.05).unwrap();
-    assert!(start.elapsed().as_secs_f32() < 20.0, "5 steps of 4000 birds took {:?}", start.elapsed());
+    assert!(
+        start.elapsed().as_secs_f32() < 20.0,
+        "5 steps of 4000 birds took {:?}",
+        start.elapsed()
+    );
 }
 
 pub(super) const MURMURATION: &str = "
@@ -207,7 +246,13 @@ fn a_flock_with_neighbour_rules_aligns_stays_finite_and_is_repeatable() {
     let before = polarisation(&s);
     s.run(400, 0.05).unwrap();
     let after = polarisation(&s);
-    assert!(s.state("pos").unwrap().iter().all(|x| x.is_finite() && x.abs() < 500.0), "nothing flew off");
+    assert!(
+        s.state("pos")
+            .unwrap()
+            .iter()
+            .all(|x| x.is_finite() && x.abs() < 500.0),
+        "nothing flew off"
+    );
     assert!(before < 0.2, "random headings at the start: {before}");
     assert!(after > 0.5, "the flock aligned: {before} -> {after}");
     let mut again = sim(MURMURATION);

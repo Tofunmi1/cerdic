@@ -24,7 +24,11 @@ pub fn doc_parse_text(document: &str, text: &str) -> String {
 /// `{"error": {message, line, column, stopped}}`. The page stops a script that must end sooner by ending the worker.
 #[wasm_bindgen]
 #[must_use]
-#[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "the page passes small whole numbers")]
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "the page passes small whole numbers"
+)]
 pub fn script_run(source: &str, seed: f64, polls: f64) -> String {
     use ve_modeling::script::{Limits, run};
     let mut limits = Limits::default();
@@ -90,12 +94,19 @@ pub fn eval_begin(document: &str, quality: &str) -> String {
 #[must_use]
 pub fn eval_trace(document: &str, quality: &str) -> String {
     if document.len() > ve_graph::MAX_DOCUMENT_BYTES {
-        return json!({"error":{"code":"budget.source","message":"document exceeds 2 MiB"}}).to_string();
+        return json!({"error":{"code":"budget.source","message":"document exceeds 2 MiB"}})
+            .to_string();
     }
-    let quality = if quality == "preview" { Quality::Preview } else { Quality::Final };
+    let quality = if quality == "preview" {
+        Quality::Preview
+    } else {
+        Quality::Final
+    };
     let doc = match serde_json::from_str::<ve_graph::Document>(document) {
         Ok(doc) => doc,
-        Err(error) => return json!({"error":{"code":"parse.syntax","message":error.to_string()}}).to_string(),
+        Err(error) => {
+            return json!({"error":{"code":"parse.syntax","message":error.to_string()}}).to_string();
+        }
     };
     match Evaluator::default().trace(&doc, quality) {
         Ok(nodes) => json!({"nodes": nodes}).to_string(),

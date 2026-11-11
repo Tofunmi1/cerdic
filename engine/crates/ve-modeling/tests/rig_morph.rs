@@ -36,8 +36,16 @@ fn a_sculpted_shape_key_blends_and_keeps_its_glb_delta() {
          output neutral = base\noutput half = half\n",
     )
     .unwrap();
-    let neutral = result.parts.iter().find(|part| part.name == "neutral").unwrap();
-    let half = result.parts.iter().find(|part| part.name == "half").unwrap();
+    let neutral = result
+        .parts
+        .iter()
+        .find(|part| part.name == "neutral")
+        .unwrap();
+    let half = result
+        .parts
+        .iter()
+        .find(|part| part.name == "half")
+        .unwrap();
     let target = half.morph_targets.first().expect("shape key metadata");
     assert_eq!(target.name, "brow_raise");
     assert_eq!(target.weight, 0.5);
@@ -48,7 +56,10 @@ fn a_sculpted_shape_key_blends_and_keeps_its_glb_delta() {
         .zip(&half.positions)
         .map(|(a, b)| (a[2] - b[2]).abs())
         .fold(0.0_f32, f32::max);
-    assert!(moved > 0.02, "the current key weight deforms the mesh: {moved}");
+    assert!(
+        moved > 0.02,
+        "the current key weight deforms the mesh: {moved}"
+    );
 }
 
 #[test]

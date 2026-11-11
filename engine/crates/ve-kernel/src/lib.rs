@@ -1,4 +1,5 @@
-//! Safe Rust API over the C++ geometry kernel.
+//! Safe Rust API over the C++ geometry kernel (solids, booleans, profiles, subdivision, tangents, fields) and the
+//! Rust mesh operators (bevel, mesh edits, skin, UV unwrap and pack, in `native`).
 //!
 //! A [`Solid`] is an immutable, closed, manifold volume. Operations return new solids and never
 //! mutate their inputs. All fallible operations return a typed [`KernelError`]; nothing panics.
@@ -15,6 +16,8 @@ mod ffi;
 mod field;
 mod mesh;
 mod mesh_ops;
+#[doc(hidden)]
+pub mod native;
 mod profile;
 mod skin;
 mod solid;
@@ -29,7 +32,7 @@ pub use field::{
     FIELD_MAX_CELLS, FIELD_MAX_INSTRUCTIONS, FIELD_MAX_OPERATIONS, FieldError, FieldInstruction,
     FieldOp, evaluate_tape,
 };
-pub use mesh::{Mesh, simplify};
+pub use mesh::{Mesh, simplify, simplify_with};
 pub use mesh_ops::{EditedMesh, MeshOp, MeshSelection, PokeCenter, edit_mesh};
 pub use profile::Profile;
 pub use skin::{SkinJoint, SkinOptions, skin_graph};
@@ -40,27 +43,3 @@ pub use subdivision::{
 };
 pub use tangents::tangents;
 pub use uv::{UnwrapOptions, UvLayout, UvMethod, UvPackOptions, UvPackShape, pack_uvs, unwrap_uvs};
-
-/// Blender's own easing curves (`BLI_easing`, "ease out", keyframe defaults), to check the engine's copies against.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum BlenderEase {
-    /// Overshoots the end and returns.
-    Back,
-    /// Bounces against the end.
-    Bounce,
-    /// Springs past the end and oscillates down.
-    Elastic,
-}
-
-/// Evaluates one of Blender's easing curves at `fraction` (0 to 1).
-#[must_use]
-pub fn blender_ease(curve: BlenderEase, fraction: f32) -> f32 {
-    ffi::blender_ease(
-        match curve {
-            BlenderEase::Back => 0,
-            BlenderEase::Bounce => 1,
-            BlenderEase::Elastic => 2,
-        },
-        fraction,
-    )
-}

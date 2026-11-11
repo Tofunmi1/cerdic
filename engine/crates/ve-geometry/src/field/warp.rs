@@ -10,7 +10,14 @@ pub(super) fn along(point: [f64; 3], axis: usize, from: f64, to: f64) -> f64 {
 }
 
 /// The scale (taper) or angle in degrees (twist) at a point: `start` at `from`, `end` at `to`.
-pub(super) fn value_at(point: [f64; 3], axis: usize, from: f64, to: f64, start: f64, end: f64) -> f64 {
+pub(super) fn value_at(
+    point: [f64; 3],
+    axis: usize,
+    from: f64,
+    to: f64,
+    start: f64,
+    end: f64,
+) -> f64 {
     start + (end - start) * along(point, axis, from, to)
 }
 
@@ -18,7 +25,14 @@ pub(super) fn value_at(point: [f64; 3], axis: usize, from: f64, to: f64, start: 
 /// `angle_degrees` between `from` and `to` (positive toward +`toward`); the point at `from` stays fixed. Before `from` the input is
 /// unchanged; past `to` the input continues straight along the end tangent (a rigid motion of the end). Beyond 180 degrees the bent shape
 /// overlaps itself and the inverse takes the nearer turn.
-pub(super) fn bend_inverse(point: [f64; 3], axis: usize, toward: usize, from: f64, to: f64, angle_degrees: f64) -> [f64; 3] {
+pub(super) fn bend_inverse(
+    point: [f64; 3],
+    axis: usize,
+    toward: usize,
+    from: f64,
+    to: f64,
+    angle_degrees: f64,
+) -> [f64; 3] {
     let theta = angle_degrees.to_radians();
     if theta == 0.0 {
         return point;
@@ -72,7 +86,10 @@ mod tests {
         // radius 1 / (pi / 2); the bar's end (s = 0.5, u = 0) sits at (0.137, 0.637) in (axis, toward) coordinates.
         let (s, u) = bend_forward(0.5, 0.0, -0.5, 0.5, 90.0);
         let radius = 1.0 / std::f64::consts::FRAC_PI_2;
-        assert!((s - (-0.5 + radius)).abs() < 1e-12 && (u - radius).abs() < 1e-12, "{s} {u}");
+        assert!(
+            (s - (-0.5 + radius)).abs() < 1e-12 && (u - radius).abs() < 1e-12,
+            "{s} {u}"
+        );
         assert!((s - 0.1366).abs() < 1e-3 && (u - 0.6366).abs() < 1e-3);
     }
 
@@ -86,7 +103,12 @@ mod tests {
                     let (fs, fu) = bend_forward(s, u, -0.5, 0.5, angle);
                     // lay the forward point out as a 3d point on axis 1 (y) and toward 0 (x)
                     let back = bend_inverse([fu, fs, 0.25], 1, 0, -0.5, 0.5, angle);
-                    assert!((back[1] - s).abs() < 1e-9 && (back[0] - u).abs() < 1e-9 && back[2] == 0.25, "angle {angle} ({s}, {u}) came back as ({}, {})", back[1], back[0]);
+                    assert!(
+                        (back[1] - s).abs() < 1e-9 && (back[0] - u).abs() < 1e-9 && back[2] == 0.25,
+                        "angle {angle} ({s}, {u}) came back as ({}, {})",
+                        back[1],
+                        back[0]
+                    );
                 }
             }
         }
@@ -103,7 +125,10 @@ mod tests {
         let (from, to) = (0.5, -0.5);
         // `from` stays fixed, so the point at s = 0.5 is not moved
         let back = bend_inverse([0.0, 0.5, 0.0], 1, 0, from, to, 90.0);
-        assert!((back[1] - 0.5).abs() < 1e-12 && back[0].abs() < 1e-12, "{back:?}");
+        assert!(
+            (back[1] - 0.5).abs() < 1e-12 && back[0].abs() < 1e-12,
+            "{back:?}"
+        );
     }
 
     #[test]

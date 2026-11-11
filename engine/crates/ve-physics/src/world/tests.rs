@@ -39,13 +39,18 @@ fn run(world: &mut World, tenths: u16) {
 fn a_push_changes_the_speed_without_touching_the_spin() {
     let mut world = World::new([0.0; 3]);
     let ball = cube(&mut world, [0.0, 5.0, 0.0]);
-    world.set_velocity(ball, [1.0, 0.0, 0.0], [0.0, 2.0, 0.0]).unwrap();
+    world
+        .set_velocity(ball, [1.0, 0.0, 0.0], [0.0, 2.0, 0.0])
+        .unwrap();
     world.push(ball, [0.0, 3.0, 0.0]).unwrap();
     assert_eq!(world.velocity(ball).unwrap(), [1.0, 3.0, 0.0]);
     assert!(world.push(ball, [f32::NAN, 0.0, 0.0]).is_err());
     assert!(world.push(BodyId(99), [0.0; 3]).is_err());
     run(&mut world, 5);
-    assert!(world.pose(ball).unwrap().position[1] > 6.0, "the push lifted it");
+    assert!(
+        world.pose(ball).unwrap().position[1] > 6.0,
+        "the push lifted it"
+    );
 }
 
 #[test]
@@ -73,7 +78,10 @@ fn a_removed_body_leaves_with_its_joints_and_the_other_ids_stay() {
     // The other bodies keep their ids and the world still runs: the kept cube falls to the floor and rests there.
     run(&mut world, 30);
     let at = world.pose(kept).unwrap().position;
-    assert!((at[1] - 0.5).abs() < 0.05, "kept cube rests on the floor: {at:?}");
+    assert!(
+        (at[1] - 0.5).abs() < 0.05,
+        "kept cube rests on the floor: {at:?}"
+    );
     assert!(world.pose(floor).is_ok());
     // A new body after a removal gets a fresh id.
     let fresh = cube(&mut world, [9.0, 3.0, 0.0]);

@@ -15,7 +15,12 @@ impl Parser {
         } else {
             // `name = other` alone on its line is another name for the node `other`
             if self.peek().is_none_or(|t| t.tok == Tok::Newline) {
-                return Ok(vec![Stmt::Alias { name, name_span: span, target: first, target_span: first_span }]);
+                return Ok(vec![Stmt::Alias {
+                    name,
+                    name_span: span,
+                    target: first,
+                    target_span: first_span,
+                }]);
             }
             previous = Some((first, first_span));
             if !self.peek().is_some_and(|t| t.tok == Tok::Pipe) {

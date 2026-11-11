@@ -1,0 +1,98 @@
+# RIDGE HOUSE — four-storey contemporary residence with a glazed garden façade and roof terrace.
+# Metres; Y up, front entry and balconies face south (-Z).
+sky = scene.sky@1(sun_elevation=37,sun_azimuth=-32,sun_intensity=1.75,turbidity=2.8,clouds=true,cloud_cover=0.2,haze=0.025,ground_color=[0.28,0.34,0.30],contact_shadows=true)
+output sky = sky
+env = scene.environment@1(sky_color=[0.61,0.73,0.83],ground_color=[0.26,0.32,0.27],intensity=0.72,reflection=0.24,bounce=0.32,bounce_color=[0.76,0.79,0.75])
+output environment = env
+
+def box_part(tag,sx,sy,sz,x,y,z,r,g,b,rough)
+  sh_{tag} = solid.box@1(size=[{sx},{sy},{sz}])
+  at_{tag} = xform.move@1(sh_{tag},by=[{x},{y},{z}])
+  mat_{tag} = solid.material@1(at_{tag},color=[{r},{g},{b}],roughness={rough})
+  output {tag} = mat_{tag}
+end
+
+# Stone garden plinth, entry walk, reflecting pool and four-level structure.
+box_part("garden_plinth",38,0.36,34,0,-0.18,0,0.31,0.36,0.30,0.96)
+ground_tex = solid.texture@1(mat_garden_plinth,tile=7,size="512",no_repeat=true,program="g = fbm(scale_x=4,scale_y=5,iterations=4); albedo = colorize(g,gradient=[0:#364437,0.5:#53624b,1:#718064])")
+output landscaped_ground = ground_tex
+box_part("entry_walk",5.0,0.12,9.0,-3.2,0.06,-10.6,0.60,0.58,0.53,0.82)
+box_part("reflecting_pool",8.0,0.34,4.0,-9.4,0.17,-8.0,0.22,0.27,0.27,0.35)
+box_part("pool_surface",7.55,0.025,3.55,-9.4,0.35,-8.0,0.12,0.35,0.40,0.18)
+box_part("garage_drive",8.0,0.12,7.0,8.0,0.06,-9.6,0.42,0.43,0.41,0.88)
+box_part("foundation",18.2,0.52,14.2,0,0.26,0.2,0.32,0.33,0.32,0.78)
+
+# Four floor slabs stack at 3.3 m intervals. Cantilevered balcony plates project over the garden.
+floor_slab = solid.box@1(size=[17.2,0.28,13.2])
+floor_set = inst.place@1(floor_slab,at=[[0,0.62,0.2],[0,3.9,0.2],[0,7.18,0.2],[0,10.46,0.2],[0,13.74,0.2]])
+floor_mat = solid.material@1(floor_set,color=[0.74,0.73,0.68],roughness=0.72)
+output stacked_floor_plates = floor_mat
+balcony_src = solid.box@1(size=[15.8,0.24,1.85])
+balcony_set = inst.place@1(balcony_src,at=[[0,3.8,-7.2],[0,7.08,-7.2],[0,10.36,-7.2],[0,13.64,-7.2]])
+balcony_mat = solid.material@1(balcony_set,color=[0.70,0.70,0.66],roughness=0.62)
+output cantilevered_balconies = balcony_mat
+
+# Warm limestone side and rear walls; the front is a continuous curtain wall.
+side_wall = solid.box@1(size=[0.28,3.02,13.0])
+side_walls = inst.place@1(side_wall,at=[[-8.45,2.22,0.2],[8.45,2.22,0.2],[-8.45,5.5,0.2],[8.45,5.5,0.2],[-8.45,8.78,0.2],[8.45,8.78,0.2],[-8.45,12.06,0.2],[8.45,12.06,0.2]])
+side_mat = solid.material@1(side_walls,color=[0.76,0.73,0.66],roughness=0.9)
+output limestone_wings = side_mat
+rear_wall = solid.box@1(size=[16.8,3.02,0.28])
+rear_walls = inst.place@1(rear_wall,at=[[0,2.22,6.66],[0,5.5,6.66],[0,8.78,6.66],[0,12.06,6.66]])
+rear_mat = solid.material@1(rear_walls,color=[0.72,0.70,0.65],roughness=0.9)
+output rear_walls = rear_mat
+# A full-height dark stone stair/elevator core anchors the asymmetrical façade.
+box_part("stair_core",4.1,13.0,12.8,5.55,6.82,0.25,0.28,0.30,0.30,0.76)
+box_part("stair_slot",0.10,11.8,0.20,3.45,6.78,-6.35,0.11,0.15,0.17,0.36)
+
+# Four broad glass levels with dark bronze mullions and deep floor-line shadow gaps.
+glass_band = solid.box@1(size=[16.35,2.55,0.08])
+glass_levels = inst.place@1(glass_band,at=[[0,2.22,-6.43],[0,5.50,-6.43],[0,8.78,-6.43],[0,12.06,-6.43]])
+glass_mat = solid.material@1(glass_levels,color=[0.23,0.43,0.51],roughness=0.17,metallic=0.12,opacity=0.40)
+output four_storey_glazing = glass_mat
+mullion = solid.box@1(size=[0.095,2.88,0.13])
+mullion_set = inst.place@1(mullion,at=[[-7.4,2.22,-6.48],[-5.3,2.22,-6.48],[-3.2,2.22,-6.48],[-1.1,2.22,-6.48],[1.0,2.22,-6.48],[3.1,2.22,-6.48],[-7.4,5.5,-6.48],[-5.3,5.5,-6.48],[-3.2,5.5,-6.48],[-1.1,5.5,-6.48],[1.0,5.5,-6.48],[3.1,5.5,-6.48],[-7.4,8.78,-6.48],[-5.3,8.78,-6.48],[-3.2,8.78,-6.48],[-1.1,8.78,-6.48],[1.0,8.78,-6.48],[3.1,8.78,-6.48],[-7.4,12.06,-6.48],[-5.3,12.06,-6.48],[-3.2,12.06,-6.48],[-1.1,12.06,-6.48],[1.0,12.06,-6.48],[3.1,12.06,-6.48]])
+mullion_mat = solid.material@1(mullion_set,color=[0.18,0.21,0.21],roughness=0.34,metallic=0.26)
+output bronze_window_grid = mullion_mat
+balcony_glass = solid.box@1(size=[3.85,1.05,0.07])
+rail_set = inst.place@1(balcony_glass,at=[[-5.95,4.44,-8.08],[-1.98,4.44,-8.08],[1.99,4.44,-8.08],[5.96,4.44,-8.08],[-5.95,7.72,-8.08],[-1.98,7.72,-8.08],[1.99,7.72,-8.08],[5.96,7.72,-8.08],[-5.95,11.0,-8.08],[-1.98,11.0,-8.08],[1.99,11.0,-8.08],[5.96,11.0,-8.08]])
+rail_mat = solid.material@1(rail_set,color=[0.49,0.68,0.72],roughness=0.16,metallic=0.12,opacity=0.34)
+output balcony_glass_rails = rail_mat
+balcony_post_src = solid.box@1(size=[0.07,1.15,0.08])
+balcony_posts = inst.place@1(balcony_post_src,at=[[-7.85,4.45,-8.08],[7.85,4.45,-8.08],[-7.85,7.73,-8.08],[7.85,7.73,-8.08],[-7.85,11.01,-8.08],[7.85,11.01,-8.08]])
+balcony_posts_mat = solid.material@1(balcony_posts,color=[0.23,0.25,0.25],roughness=0.42,metallic=0.2)
+output balcony_rail_posts = balcony_posts_mat
+
+# Vertical fins shade the west bay; a pergola and parapet define the roof terrace.
+fin_src = solid.box@1(size=[0.16,12.4,0.22])
+fin_set = inst.place@1(fin_src,at=[[-7.85,6.9,-6.05],[-6.95,6.9,-6.05],[-6.05,6.9,-6.05],[-5.15,6.9,-6.05]])
+fin_mat = solid.material@1(fin_set,color=[0.34,0.25,0.18],roughness=0.58)
+output solar_fins = fin_mat
+roof_rail = solid.box@1(size=[16.6,0.10,0.10])
+roof_rail_set = inst.place@1(roof_rail,at=[[0,14.35,-6.35],[0,14.35,6.55]])
+roof_rail_mat = solid.material@1(roof_rail_set,color=[0.22,0.24,0.24],roughness=0.34,metallic=0.22)
+output roof_terrace_edges = roof_rail_mat
+pergola_beam = solid.box@1(size=[0.16,0.18,8.0])
+pergola_set = inst.place@1(pergola_beam,at=[[-7,14.55,1.7],[-4.7,14.55,1.7],[-2.4,14.55,1.7],[0,14.55,1.7],[2.4,14.55,1.7],[4.7,14.55,1.7],[7,14.55,1.7]])
+pergola_mat = solid.material@1(pergola_set,color=[0.30,0.23,0.17],roughness=0.52)
+output roof_pergola = pergola_mat
+
+# Ground-floor garage and recessed front door.
+box_part("garage_portal",6.8,2.7,0.12,5.3,1.95,-6.53,0.16,0.18,0.18,0.56)
+box_part("entry_door",1.65,2.7,0.12,-5.15,1.95,-6.53,0.30,0.21,0.15,0.4)
+box_part("entry_canopy",4.2,0.18,1.5,-5.0,3.48,-7.15,0.22,0.24,0.24,0.38)
+# Paving lights and two garden trees stay beyond the building walls.
+tree = flora.tree@1(kind="birch",height=5.5,seed=32,lod=0)
+trees = inst.place@1(tree,at=[[-13.0,0.02,-4.0],[13.0,0.02,5.0]])
+tree_mat = solid.material@1(trees,color=[0.31,0.42,0.27],roughness=0.92)
+output garden_birches = tree_mat
+shrub = flora.tree@1(kind="shrub",height=1.25,seed=22,lod=0)
+shrubs = inst.place@1(shrub,at=[[-10.0,0.02,-5.0],[-11.1,0.02,-4.3],[10.2,0.02,7.5],[11.3,0.02,7.0]])
+shrub_mat = solid.material@1(shrubs,color=[0.24,0.35,0.22],roughness=0.94)
+output garden_shrubs = shrub_mat
+
+# Quiet practical lighting under balconies and at the entry.
+entry_light = light.point@1(position=[-5.0,3.0,-7.2],color=[1.0,0.78,0.53],intensity=18,range=9)
+output entry_light = entry_light
+terrace_light = light.point@1(position=[0,13.7,1.5],color=[1.0,0.85,0.68],intensity=16,range=10)
+output terrace_light = terrace_light

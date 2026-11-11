@@ -15,12 +15,27 @@ export const host = {
   runtime: null as Runtime | null,
   doc: null as ReturnType<typeof documentBridge> | null,
   evaluation: null as EvaluationHost | null,
+  mcpStatus: 'off' as 'off' | 'connecting' | 'connected',
   subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
   resources: { inputBindings: 0, workers: 0, polling: 0 },
 };
 declare global { interface Window { __spatial: typeof host; __loadSpatialRuntime(): Promise<Runtime>; } }
 window.__spatial = host;
 let boot: Promise<void> | undefined;
+let disconnectMcp: (() => void) | undefined;
+export function setMcpEnabled(enabled: boolean, port = 8765) {
+  disconnectMcp?.(); disconnectMcp = undefined;
+  const url = new URL(location.href);
+  if (enabled) url.searchParams.set('mcp', port === 8765 ? '1' : String(port));
+  else url.searchParams.delete('mcp');
+  history.replaceState(null, '', url);
+  if (enabled) disconnectMcp = connectMcpBridge(host, port, status => { host.mcpStatus = status; notify(); });
+}
+
+// This module owns the engine singleton and its subscriptions. Fast-refreshing
+// components around a replacement singleton can pair old project state with a
+// new empty runtime. Recreate the page lifecycle together in development.
+if (import.meta.hot) import.meta.hot.accept(() => location.reload());
 
 export function mountEngine(container: HTMLElement) {
   container.append(canvas);
@@ -43,16 +58,20 @@ async function start() {
       },
     });
     const mcp = params.get('mcp');
-    if (mcp) window.addEventListener('pagehide', connectMcpBridge(host, Number(mcp) > 1 ? Number(mcp) : 8765), { once: true });
+    if (mcp) setMcpEnabled(true, Number(mcp) > 1 ? Number(mcp) : 8765);
     host.doc = documentBridge(runtime, notify, () => host.evaluation?.request(), host.evaluation.text);
-    // The engine keeps the last document in the browser and opening restores it. A page that names a world to load starts empty instead, so the
-    // document that was saved last (another world) is neither shown while the world loads nor mixed into it.
+    // Studio's project controller owns restoration. Never briefly open the legacy
+    // default document before it loads the requested project (that can be a tractor
+    // or any unrelated saved scene). Explicit legacy document links still work.
     const docName = params.get('docname') ?? 'spatial-lab';
-    if (params.has('world')) runtime.doc_reset(docName, 1);
-    else { runtime.doc_open(docName, 1); host.evaluation.request(); }
+    const loadingProject = ['project', 'projects', 'world', 'example'].some(key => params.has(key));
+    if (loadingProject || (!params.has('editor') && !params.has('docname'))) runtime.doc_reset('cerdic-startup', 1);
+    else runtime.doc_open(docName, 1);
+    host.evaluation.request();
     const disposeInput = bindInput(canvas, runtime);
     host.resources.inputBindings = 8;
     const cleanup = () => {
+      disconnectMcp?.(); disconnectMcp = undefined;
       disposeInput(); host.resources.inputBindings = 0;
       host.evaluation?.dispose();
       clearInterval(poll); host.resources.polling = 0;

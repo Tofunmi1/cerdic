@@ -6,15 +6,22 @@ import {
   responseSchema,
 } from "../shared/commands";
 import { createAdapter } from "./adapters";
+import { LocalAssistant } from './assistant/session';
 
 const adapter = createAdapter(process.env);
 const root = resolve("dist");
-const server = Bun.serve({
+const server = Bun.serve<{ assistant?: LocalAssistant }>({
   hostname: "127.0.0.1",
   port: Number(process.env.PORT ?? 3001),
   maxRequestBodySize: 512 * 1024,
-  async fetch(request) {
+  async fetch(request): Promise<Response | undefined> {
     const path = new URL(request.url).pathname;
+    if (path === '/api/assistant/socket') {
+      const origin = request.headers.get('origin');
+      if (!origin || !['http://localhost:5173', 'http://127.0.0.1:5173', `http://localhost:${server.port}`, `http://127.0.0.1:${server.port}`].includes(origin)) return new Response('Origin rejected', { status: 403 });
+      return server.upgrade(request, { data: {} }) ? undefined : new Response('WebSocket required', { status: 426 });
+    }
+    if (path === '/api/assistant/status') return Response.json({ available: Boolean(Bun.which(process.env.CERDIC_CODEX_BIN ?? 'codex')), provider: 'local-codex' });
     if (path === "/api/status") return Response.json({ mode: adapter.mode });
     if (path === "/api/scene" && request.method === "POST") {
       // Same-origin requests only; this local development server is not a public deployment.
@@ -63,7 +70,16 @@ const server = Bun.serve({
           status: 404,
         });
   },
+  websocket: {
+    maxPayloadLength: 24 * 1024 * 1024,
+    open(socket) { socket.data.assistant = new LocalAssistant(event => { if (socket.readyState === 1) socket.send(JSON.stringify(event)); }); },
+    message(socket, raw) {
+      try { void socket.data.assistant?.receive(JSON.parse(String(raw))); }
+      catch { socket.send(JSON.stringify({ type: 'error', message: 'Invalid assistant message' })); }
+    },
+    close(socket) { socket.data.assistant?.close(); },
+  },
 });
 console.log(
-  `Spatial Lab API: http://localhost:${server.port} (${adapter.mode})`,
+  `Cerdic API: http://localhost:${server.port} (sidebar: local Codex; legacy scene adapter: ${adapter.mode})`,
 );

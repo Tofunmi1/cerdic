@@ -36,7 +36,11 @@ export const OVERLAYS = [
 ] as const;
 export type OverlayName = (typeof OVERLAYS)[number][0];
 export type Overlays = Record<OverlayName, boolean>;
-export const DEFAULT_OVERLAYS = Object.fromEntries(OVERLAYS.map(([name]) => [name, false])) as Overlays;
+/** On from the first visit: the box round the model, the ground grid, the world axes and the problem boxes. The rest are one tap away. */
+const OVERLAYS_ON: readonly OverlayName[] = ['bounds', 'problems', 'grid', 'axes'];
+export const DEFAULT_OVERLAYS = Object.fromEntries(OVERLAYS.map(([name]) => [name, OVERLAYS_ON.includes(name)])) as Overlays;
+// Bump when the defaults above change: a saved choice made under older defaults is dropped so the new ones show once.
+const OVERLAY_DEFAULTS = 2;
 
 export type View = {
   overlays: Overlays;
@@ -60,7 +64,7 @@ const KEY = 'studio-view';
 function load(): View {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<View>;
-    return { ...DEFAULT_VIEW, ...saved, effects: { ...DEFAULT_EFFECTS, ...saved.effects }, overlays: { ...DEFAULT_OVERLAYS, ...saved.overlays } };
+    return { ...DEFAULT_VIEW, ...saved, effects: { ...DEFAULT_EFFECTS, ...saved.effects }, overlays: (saved as { overlayDefaults?: number }).overlayDefaults === OVERLAY_DEFAULTS ? { ...DEFAULT_OVERLAYS, ...saved.overlays } : DEFAULT_OVERLAYS };
   } catch { return DEFAULT_VIEW; }
 }
 
@@ -111,7 +115,7 @@ export function useViewSettings() {
       const status = rt()?.grading_status();
       if (status) next = { ...next, exposure: (JSON.parse(status) as { exposure: number }).exposure };
     }
-    try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* storage may be blocked */ }
+    try { localStorage.setItem(KEY, JSON.stringify({ ...next, overlayDefaults: OVERLAY_DEFAULTS })); } catch { /* storage may be blocked */ }
     document.body.classList.toggle('split', next.stereo);
     latest.current = next;
     setView(next);

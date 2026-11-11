@@ -103,7 +103,15 @@ impl Effects {
 
     /// The names the page uses for each switch.
     pub const NAMES: [&'static str; 9] = [
-        "subsurface", "clearcoat", "translucency", "iridescence", "sheen", "relief", "wetness", "anisotropy", "maps",
+        "subsurface",
+        "clearcoat",
+        "translucency",
+        "iridescence",
+        "sheen",
+        "relief",
+        "wetness",
+        "anisotropy",
+        "maps",
     ];
 
     /// Turns the effect called `name` on or off; false when there is no such effect.
@@ -450,7 +458,10 @@ mod tests {
         assert!(effects.set("subsurface", false));
         assert!(effects.set("translucency", false));
         let shown = effects.filter(&finish);
-        assert_eq!((shown.subsurface, shown.translucency, shown.thickness), (0.0, 0.0, 0.0));
+        assert_eq!(
+            (shown.subsurface, shown.translucency, shown.thickness),
+            (0.0, 0.0, 0.0)
+        );
         assert_eq!((shown.clearcoat, shown.relief), (0.4, 0.8));
         assert_eq!(effects.get("subsurface"), Some(false));
         assert_eq!(effects.get("sheen"), Some(true));

@@ -49,16 +49,45 @@ fn main() -> ExitCode {
     };
     std::fs::create_dir_all(&directory).unwrap();
     let mut names: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut sidecar: Vec<serde_json::Value> = Vec::new();
     for part in &result.parts {
         if part.positions.is_empty() {
             continue;
         }
         let mut text = String::new();
-        for p in &part.positions {
-            writeln!(text, "v {} {} {}", p[0], p[1], p[2]).unwrap();
+        // By default a placed set is written once, untransformed. With VE_DUMP_INSTANCES set every placed copy is written where it stands (a picture of the
+        // scene wants the pillars, bolts and lugs in place); copies are capped so a scattered forest does not write gigabytes.
+        let identity = [
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ];
+        let copies: Vec<[f32; 16]> = match (&part.transforms, std::env::var_os("VE_DUMP_INSTANCES"))
+        {
+            (Some(placed), Some(_)) if placed.len() * part.positions.len() <= 4_000_000 => {
+                placed.clone()
+            }
+            _ => vec![identity],
+        };
+        for m in &copies {
+            for p in &part.positions {
+                // column-major: the translation is the last column
+                let x = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12];
+                let y = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13];
+                let z = m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14];
+                writeln!(text, "v {x} {y} {z}").unwrap();
+            }
         }
-        for t in part.indices.chunks_exact(3) {
-            writeln!(text, "f {} {} {}", t[0] + 1, t[1] + 1, t[2] + 1).unwrap();
+        for copy in 0..copies.len() {
+            let base = u32::try_from(copy * part.positions.len()).unwrap();
+            for t in part.indices.chunks_exact(3) {
+                writeln!(
+                    text,
+                    "f {} {} {}",
+                    base + t[0] + 1,
+                    base + t[1] + 1,
+                    base + t[2] + 1
+                )
+                .unwrap();
+            }
         }
         // several materials of one output are several parts with the same name: the later ones get `name__2.obj`, `name__3.obj`
         let seen = names.entry(part.name.clone()).or_insert(0);
@@ -69,11 +98,35 @@ fn main() -> ExitCode {
             format!("{directory}/{}__{}.obj", part.name, *seen)
         };
         std::fs::write(&path, text).unwrap();
+        // The sidecar a renderer needs to look like the scene and to play it: the surface, the tracks and the parent of each part.
+        let file = std::path::Path::new(&path)
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or_default()
+            .to_owned();
+        let material = part.material.as_ref().map(|m| {
+            serde_json::json!({
+                "color": m.color, "opacity": m.opacity, "metallic": m.metallic,
+                "roughness": m.roughness, "emissive": m.emissive,
+            })
+        });
+        sidecar.push(serde_json::json!({
+            "file": file,
+            "name": part.name,
+            "parent": part.parent,
+            "material": material,
+            "animation": serde_json::to_value(&part.animation).unwrap(),
+        }));
         println!(
             "{path}: {} vertices, {} triangles",
             part.positions.len(),
             part.indices.len() / 3
         );
     }
+    std::fs::write(
+        format!("{directory}/parts.json"),
+        serde_json::to_string(&sidecar).unwrap(),
+    )
+    .unwrap();
     ExitCode::SUCCESS
 }

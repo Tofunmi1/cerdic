@@ -12,7 +12,13 @@ pub(super) fn tree() -> Option<OperatorSpec> {
             doc: "The species: oak is broad, pine is a tall cone with drooping whorls, birch slender, willow long and drooping, shrub low with many stems, palm a curved trunk with fronds.",
         },
         number("height", Unit::Length, 8.0, 0.3, 80.0, "Height in metres."),
-        whole("seed", 0, 0, 2_147_483_647, "Picks a different tree of the same species."),
+        whole(
+            "seed",
+            0,
+            0,
+            2_147_483_647,
+            "Picks a different tree of the same species.",
+        ),
         whole(
             "sides",
             12,

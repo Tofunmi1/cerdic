@@ -9,7 +9,12 @@ impl World {
     pub(super) fn update_headings_and_status(&mut self, starting_positions: &[(u32, [f64; 3])]) {
         for entity in &mut self.entities {
             // a controller that turns at a set rate looks after its own heading
-            if self.def.controllers.iter().any(|c| c.kind == entity.kind && c.turn > 0.0) {
+            if self
+                .def
+                .controllers
+                .iter()
+                .any(|c| c.kind == entity.kind && c.turn > 0.0)
+            {
                 continue;
             }
             if let Some((_, start)) = starting_positions.iter().find(|(id, _)| *id == entity.id) {

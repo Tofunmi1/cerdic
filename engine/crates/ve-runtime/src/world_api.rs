@@ -223,7 +223,9 @@ fn handle(world: &mut World, method: &str, params: &str) -> Result<Value, String
         "physics.overlap" => physics_overlap(world, &params),
         "physics.ragdoll" => physics_ragdoll(world, &params),
         "water.disturb" | "water.height" | "water.status" => water_method(world, method, &params),
-        "sim.status" | "sim.step" | "sim.set_param" | "sim.reset" => crate::sim_api::method(world, method, &params),
+        "sim.status" | "sim.step" | "sim.set_param" | "sim.reset" => {
+            crate::sim_api::method(world, method, &params)
+        }
         "ground.sample" | "ground.profile" => ground_query(world, method, &params),
         "animation.set_float" | "animation.set_bool" | "animation.trigger" => {
             animation_method(method, &params)

@@ -1,7 +1,12 @@
 //! The geometry an effect is drawn with (plan W4): camera-facing soft sprites and ribbons along trails, as plain vertex arrays.
-#![expect(clippy::float_cmp, reason = "alpha and indices are exact by construction")]
+#![expect(
+    clippy::float_cmp,
+    reason = "alpha and indices are exact by construction"
+)]
 use ve_particles::fx::draw::{Batch, Camera, ribbons, sprites};
-use ve_particles::fx::{Blend, Burst, Effect, Emitter, Look, Plane, Render, Shape, Spawn, System, Trail};
+use ve_particles::fx::{
+    Blend, Burst, Effect, Emitter, Look, Plane, Render, Shape, Spawn, System, Trail,
+};
 
 const DT: f32 = 1.0 / 120.0;
 const FAR_BELOW: Plane = Plane { height: -1.0e6 };
@@ -46,7 +51,12 @@ fn check_indices(batch: &Batch) {
     assert_eq!(batch.positions.len(), batch.colours.len());
     assert_eq!(batch.positions.len(), batch.normals.len());
     assert_eq!(batch.indices.len() % 3, 0);
-    assert!(batch.indices.iter().all(|i| (*i as usize) < batch.positions.len()));
+    assert!(
+        batch
+            .indices
+            .iter()
+            .all(|i| (*i as usize) < batch.positions.len())
+    );
 }
 
 #[test]
@@ -96,11 +106,19 @@ fn a_sprites_rim_is_evenly_spaced_all_the_way_round() {
     for i in 0..8 {
         let (a, b) = (rim[i], rim[(i + 1) % 8]);
         let dot = a[0] * b[0] + a[1] * b[1];
-        assert!((dot - std::f32::consts::FRAC_1_SQRT_2).abs() < 1e-4, "vertices {i} and {} are not 45 degrees apart ({dot})", (i + 1) % 8);
+        assert!(
+            (dot - std::f32::consts::FRAC_1_SQRT_2).abs() < 1e-4,
+            "vertices {i} and {} are not 45 degrees apart ({dot})",
+            (i + 1) % 8
+        );
     }
     // Every triangle of the fan has the same winding (none is flipped or degenerate).
     let area = |t: &[u32]| {
-        let (p, q, r) = (batch.positions[t[0] as usize], batch.positions[t[1] as usize], batch.positions[t[2] as usize]);
+        let (p, q, r) = (
+            batch.positions[t[0] as usize],
+            batch.positions[t[1] as usize],
+            batch.positions[t[2] as usize],
+        );
         (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
     };
     assert!(batch.indices.chunks(3).all(|t| area(t) > 1e-6));
@@ -122,12 +140,28 @@ fn size_colour_and_alpha_follow_the_particles_age_and_glow_brightens_it() {
     };
     let (young, effect) = run(vec![emitter(look)], 0.05);
     let (old, _) = run(vec![emitter(look)], 0.5);
-    let (a, b) = (sprites(&young, &effect, 0, &camera()), sprites(&old, &effect, 0, &camera()));
-    assert!(radius(&b) > radius(&a) * 1.8, "grows with age: {} -> {}", radius(&a), radius(&b));
+    let (a, b) = (
+        sprites(&young, &effect, 0, &camera()),
+        sprites(&old, &effect, 0, &camera()),
+    );
+    assert!(
+        radius(&b) > radius(&a) * 1.8,
+        "grows with age: {} -> {}",
+        radius(&a),
+        radius(&b)
+    );
     assert!(a.colours[0][0] > a.colours[0][2], "young is red");
-    assert!(b.colours[0][2] > b.colours[0][0] * 0.5, "old has turned towards blue: {:?}", b.colours[0]);
+    assert!(
+        b.colours[0][2] > b.colours[0][0] * 0.5,
+        "old has turned towards blue: {:?}",
+        b.colours[0]
+    );
     assert!(b.colours[0][3] < a.colours[0][3], "fades");
-    assert!(a.colours[0][0] > 3.0, "glow multiplies the colour above 1: {}", a.colours[0][0]);
+    assert!(
+        a.colours[0][0] > 3.0,
+        "glow multiplies the colour above 1: {}",
+        a.colours[0][0]
+    );
 }
 
 #[test]
@@ -157,12 +191,18 @@ fn alpha_sprites_are_drawn_far_to_near_and_additive_ones_are_left_alone() {
     let batch = sprites(&system, &effect, 0, &camera());
     let d = distance_of_triangles(&batch);
     assert!(d.len() > 20);
-    assert!(d.windows(2).all(|w| w[0] >= w[1] - 1e-4), "far to near for alpha blending: {d:?}");
+    assert!(
+        d.windows(2).all(|w| w[0] >= w[1] - 1e-4),
+        "far to near for alpha blending: {d:?}"
+    );
     let mut additive = alpha;
     additive.look.blend = Blend::Additive;
     let (system, effect) = run(vec![additive], 0.5);
     let unsorted = distance_of_triangles(&sprites(&system, &effect, 0, &camera()));
-    assert!(!unsorted.windows(2).all(|w| w[0] >= w[1] - 1e-4), "additive order does not matter, so it is not paid for");
+    assert!(
+        !unsorted.windows(2).all(|w| w[0] >= w[1] - 1e-4),
+        "additive order does not matter, so it is not paid for"
+    );
 }
 
 #[test]
@@ -185,18 +225,40 @@ fn a_ribbon_follows_the_trail_tapers_to_the_tail_and_faces_the_camera() {
     check_indices(&batch);
     let points = system.trail(0, system.alive(0)[0].id).len();
     assert!(points >= 4, "{points}");
-    assert_eq!(batch.positions.len(), points * 2, "two vertices per trail point");
-    assert_eq!(batch.indices.len(), (points - 1) * 6, "two triangles per segment");
+    assert_eq!(
+        batch.positions.len(),
+        points * 2,
+        "two vertices per trail point"
+    );
+    assert_eq!(
+        batch.indices.len(),
+        (points - 1) * 6,
+        "two triangles per segment"
+    );
     // The head is opaque and the tail has faded; the width tapers to nothing at the tail.
-    let (tail_alpha, head_alpha) = (batch.colours[0][3], batch.colours[batch.colours.len() - 1][3]);
-    assert!(tail_alpha < 0.05 && head_alpha > 0.95, "{tail_alpha} {head_alpha}");
+    let (tail_alpha, head_alpha) = (
+        batch.colours[0][3],
+        batch.colours[batch.colours.len() - 1][3],
+    );
+    assert!(
+        tail_alpha < 0.05 && head_alpha > 0.95,
+        "{tail_alpha} {head_alpha}"
+    );
     let width = |i: usize| {
         let (a, b) = (batch.positions[2 * i], batch.positions[2 * i + 1]);
         ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt()
     };
-    assert!(width(0) < 0.05 && width(points - 1) > 0.3, "{} {}", width(0), width(points - 1));
+    assert!(
+        width(0) < 0.05 && width(points - 1) > 0.3,
+        "{} {}",
+        width(0),
+        width(points - 1)
+    );
     // The strip's sideways direction is perpendicular to both the path (+X) and the view (+Z): it spreads along Y.
-    let (a, b) = (batch.positions[2 * (points - 1)], batch.positions[2 * (points - 1) + 1]);
+    let (a, b) = (
+        batch.positions[2 * (points - 1)],
+        batch.positions[2 * (points - 1) + 1],
+    );
     assert!((a[0] - b[0]).abs() < 1e-4 && (a[2] - b[2]).abs() < 1e-4 && (a[1] - b[1]).abs() > 0.3);
 }
 
@@ -205,7 +267,10 @@ fn sprites_and_ribbons_carry_a_normal_per_vertex_facing_the_viewer() {
     let (system, effect) = run(vec![emitter(Look::default())], 0.1);
     let batch = sprites(&system, &effect, 0, &camera());
     assert_eq!(batch.normals.len(), batch.positions.len());
-    assert!(batch.normals.iter().all(|n| (n[2] - 1.0).abs() < 1e-5), "towards the camera at +Z");
+    assert!(
+        batch.normals.iter().all(|n| (n[2] - 1.0).abs() < 1e-5),
+        "towards the camera at +Z"
+    );
 }
 
 #[test]
@@ -222,7 +287,11 @@ fn a_cube_particle_is_a_lit_box_with_outward_normals_that_tumbles_with_age() {
     let (young, effect) = run(vec![emitter(look)], 0.1);
     let batch = cubes(&young, &effect, 0);
     check_indices(&batch);
-    assert_eq!(batch.positions.len(), 24, "four vertices on each of six faces");
+    assert_eq!(
+        batch.positions.len(),
+        24,
+        "four vertices on each of six faces"
+    );
     assert_eq!(batch.indices.len(), 36);
     assert_eq!(batch.normals.len(), 24);
     let centre = young.alive(0)[0].position;
@@ -230,12 +299,20 @@ fn a_cube_particle_is_a_lit_box_with_outward_normals_that_tumbles_with_age() {
         let length = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
         assert!((length - 1.0).abs() < 1e-4, "unit normals");
         let out = [p[0] - centre[0], p[1] - centre[1], p[2] - centre[2]];
-        assert!(out[0] * n[0] + out[1] * n[1] + out[2] * n[2] > 0.1, "a face's normal points away from the middle of the box");
+        assert!(
+            out[0] * n[0] + out[1] * n[1] + out[2] * n[2] > 0.1,
+            "a face's normal points away from the middle of the box"
+        );
         // Every corner of a 0.5 m box is 0.25 * sqrt(3) from its middle.
         let radius = (out[0] * out[0] + out[1] * out[1] + out[2] * out[2]).sqrt();
         assert!((radius - 0.25 * 3.0_f32.sqrt()).abs() < 1e-3, "{radius}");
     }
-    assert!(batch.colours.iter().all(|c| (c[0] - 0.8).abs() < 1e-5 && c[3] == 1.0));
+    assert!(
+        batch
+            .colours
+            .iter()
+            .all(|c| (c[0] - 0.8).abs() < 1e-5 && c[3] == 1.0)
+    );
     // The box has turned a little later in its life.
     let (old, _) = run(vec![emitter(look)], 0.4);
     let later = cubes(&old, &effect, 0);
@@ -245,7 +322,10 @@ fn a_cube_particle_is_a_lit_box_with_outward_normals_that_tumbles_with_age() {
         .zip(&later.positions)
         .map(|(a, b)| (a[0] - b[0]).abs() + (a[1] - b[1]).abs() + (a[2] - b[2]).abs())
         .fold(0.0_f32, f32::max);
-    assert!(moved > 0.2, "a spinning cube is oriented differently later: {moved}");
+    assert!(
+        moved > 0.2,
+        "a spinning cube is oriented differently later: {moved}"
+    );
     // Spin 0 keeps it still.
     let still = Look { spin: 0.0, ..look };
     let (a, still_effect) = run(vec![emitter(still)], 0.1);
@@ -271,7 +351,10 @@ fn nothing_alive_or_a_bad_camera_draws_nothing_and_cannot_panic() {
     assert!(system.alive(0).is_empty());
     assert!(sprites(&system, &effect, 0, &camera()).positions.is_empty());
     assert!(ribbons(&system, &effect, 0, &camera()).positions.is_empty());
-    assert!(sprites(&system, &effect, 9, &camera()).positions.is_empty(), "an unknown emitter");
+    assert!(
+        sprites(&system, &effect, 9, &camera()).positions.is_empty(),
+        "an unknown emitter"
+    );
     let (alive, effect) = run(vec![emitter(Look::default())], 0.1);
     let bad = Camera {
         position: [f32::NAN, 0.0, 0.0],
@@ -279,5 +362,11 @@ fn nothing_alive_or_a_bad_camera_draws_nothing_and_cannot_panic() {
         up: [0.0; 3],
     };
     let batch = sprites(&alive, &effect, 0, &bad);
-    assert!(batch.positions.iter().all(|p| p.iter().all(|c| c.is_finite())), "no NaN reaches the GPU");
+    assert!(
+        batch
+            .positions
+            .iter()
+            .all(|p| p.iter().all(|c| c.is_finite())),
+        "no NaN reaches the GPU"
+    );
 }

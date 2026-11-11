@@ -369,7 +369,9 @@ impl World {
         // the declared tree first, then whatever the scripts have set on top of it
         let mut elements = self.declared_ui_specs(aspect);
         if let Some(handle) = &self.script {
-            elements.extend(with_host(handle, |host| host.bridge.borrow().ui.clone()).unwrap_or_default());
+            elements.extend(
+                with_host(handle, |host| host.bridge.borrow().ui.clone()).unwrap_or_default(),
+            );
         }
         let mut frame = crate::ui::frame(&elements, aspect);
         // where the buttons are, so the page can turn a click into the press `ui:ID` without knowing the layout rules

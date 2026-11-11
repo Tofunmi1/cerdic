@@ -24,11 +24,19 @@ fn draw(seed: u64, plate: u64, purpose: u64) -> f64 {
 }
 
 fn number(node: &Node, name: &str) -> Result<f64, KernelError> {
-    node.params.get(name).and_then(Param::as_f64).ok_or(KernelError::InvalidArgument("a number parameter is missing"))
+    node.params
+        .get(name)
+        .and_then(Param::as_f64)
+        .ok_or(KernelError::InvalidArgument(
+            "a number parameter is missing",
+        ))
 }
 
 /// Joins any number of solids: batches of 64 through the kernel's batch union, then the results, until one is left.
-pub(crate) fn union_many(mut solids: Vec<Solid>, context: &ExecutionContext) -> Result<Solid, KernelError> {
+pub(crate) fn union_many(
+    mut solids: Vec<Solid>,
+    context: &ExecutionContext,
+) -> Result<Solid, KernelError> {
     while solids.len() > 1 {
         let mut next = Vec::with_capacity(solids.len() / 64 + 1);
         let mut rest = solids;
@@ -44,17 +52,27 @@ pub(crate) fn union_many(mut solids: Vec<Solid>, context: &ExecutionContext) -> 
         }
         solids = next;
     }
-    solids.pop().ok_or(KernelError::InvalidArgument("nothing to join"))
+    solids
+        .pop()
+        .ok_or(KernelError::InvalidArgument("nothing to join"))
 }
 
 /// A box from `lo` to `hi` (corners in world axes).
 pub(crate) fn cuboid(lo: [f64; 3], hi: [f64; 3]) -> Result<Solid, KernelError> {
     let size = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
-    Solid::cube(size, true)?.translate([(lo[0] + hi[0]) * 0.5, (lo[1] + hi[1]) * 0.5, (lo[2] + hi[2]) * 0.5])
+    Solid::cube(size, true)?.translate([
+        (lo[0] + hi[0]) * 0.5,
+        (lo[1] + hi[1]) * 0.5,
+        (lo[2] + hi[2]) * 0.5,
+    ])
 }
 
 /// The plates for `node` on the face of `base`.
-pub(crate) fn build(node: &Node, base: &Solid, context: &ExecutionContext) -> Result<Solid, KernelError> {
+pub(crate) fn build(
+    node: &Node,
+    base: &Solid,
+    context: &ExecutionContext,
+) -> Result<Solid, KernelError> {
     let face = match node.params.get("face") {
         Some(Param::Str(face)) => face.as_str(),
         _ => "+z",
@@ -66,7 +84,11 @@ pub(crate) fn build(node: &Node, base: &Solid, context: &ExecutionContext) -> Re
         "-y" => (1, -1.0),
         "+z" => (2, 1.0),
         "-z" => (2, -1.0),
-        _ => return Err(KernelError::InvalidArgument("face must be +x, -x, +y, -y, +z or -z")),
+        _ => {
+            return Err(KernelError::InvalidArgument(
+                "face must be +x, -x, +y, -y, +z or -z",
+            ));
+        }
     };
     let (u_axis, v_axis) = match axis {
         0 => (2, 1),
@@ -76,41 +98,58 @@ pub(crate) fn build(node: &Node, base: &Solid, context: &ExecutionContext) -> Re
     let (cols, rows) = (number(node, "cols")?, number(node, "rows")?);
     let (gap, depth) = (number(node, "gap")?, number(node, "depth")?);
     let (raised, vents) = (number(node, "raised")?, number(node, "vents")?);
-    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "the spec bounds the seed to 31 bits")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "the spec bounds the seed to 31 bits"
+    )]
     let seed = number(node, "seed")? as u64;
-    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "the spec bounds both counts to 1..32")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "the spec bounds both counts to 1..32"
+    )]
     let (cols, rows) = (cols as usize, rows as usize);
     if base.is_empty() {
-        return Err(KernelError::InvalidArgument("detail.panels needs a solid with a face to cover"));
+        return Err(KernelError::InvalidArgument(
+            "detail.panels needs a solid with a face to cover",
+        ));
     }
     let bounds = base.bounds()?;
     let (u0, u1) = (bounds.min[u_axis], bounds.max[u_axis]);
     let (v0, v1) = (bounds.min[v_axis], bounds.max[v_axis]);
-    let plane = if sign > 0.0 { bounds.max[axis] } else { bounds.min[axis] };
+    let plane = if sign > 0.0 {
+        bounds.max[axis]
+    } else {
+        bounds.min[axis]
+    };
     #[expect(clippy::cast_precision_loss, reason = "at most 32 cells")]
     let (cell_u, cell_v) = ((u1 - u0) / cols as f64, (v1 - v0) / rows as f64);
     if gap >= cell_u.min(cell_v) - 1e-6 {
-        return Err(KernelError::InvalidArgument("the gap leaves no plate: make it narrower than a plate"));
+        return Err(KernelError::InvalidArgument(
+            "the gap leaves no plate: make it narrower than a plate",
+        ));
     }
     if cols * rows * 7 > MAX_BOXES * 2 {
         return Err(KernelError::InvalidArgument("too many plates for one node"));
     }
     // A box from `a` to `b` along the face's directions and from height `z0` to `z1` out of the face.
-    let plate_box = |ua: f64, ub: f64, va: f64, vb: f64, z0: f64, z1: f64| -> Result<Solid, KernelError> {
-        let (mut lo, mut hi) = ([0.0; 3], [0.0; 3]);
-        lo[u_axis] = ua;
-        hi[u_axis] = ub;
-        lo[v_axis] = va;
-        hi[v_axis] = vb;
-        if sign > 0.0 {
-            lo[axis] = plane + z0;
-            hi[axis] = plane + z1;
-        } else {
-            lo[axis] = plane - z1;
-            hi[axis] = plane - z0;
-        }
-        cuboid(lo, hi)
-    };
+    let plate_box =
+        |ua: f64, ub: f64, va: f64, vb: f64, z0: f64, z1: f64| -> Result<Solid, KernelError> {
+            let (mut lo, mut hi) = ([0.0; 3], [0.0; 3]);
+            lo[u_axis] = ua;
+            hi[u_axis] = ub;
+            lo[v_axis] = va;
+            hi[v_axis] = vb;
+            if sign > 0.0 {
+                lo[axis] = plane + z0;
+                hi[axis] = plane + z1;
+            } else {
+                lo[axis] = plane - z1;
+                hi[axis] = plane - z0;
+            }
+            cuboid(lo, hi)
+        };
     let mut boxes = Vec::new();
     for j in 0..rows {
         for i in 0..cols {
@@ -124,10 +163,18 @@ pub(crate) fn build(node: &Node, base: &Solid, context: &ExecutionContext) -> Re
             );
             let vented = draw(seed, plate, 1) < vents;
             let stands = !vented && draw(seed, plate, 2) < raised;
-            let thick = if stands { depth * (1.5 + 1.5 * draw(seed, plate, 3)) } else { depth };
+            let thick = if stands {
+                depth * (1.5 + 1.5 * draw(seed, plate, 3))
+            } else {
+                depth
+            };
             boxes.push(plate_box(pu0, pu1, pv0, pv1, 0.0, thick)?);
             if vented {
-                #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "a draw in [0, 1) times three")]
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss,
+                    reason = "a draw in [0, 1) times three"
+                )]
                 let slats = 4 + (draw(seed, plate, 4) * 3.0) as usize;
                 let (width, height) = (pu1 - pu0, pv1 - pv0);
                 #[expect(clippy::cast_precision_loss, reason = "at most six slats")]
@@ -136,11 +183,20 @@ pub(crate) fn build(node: &Node, base: &Solid, context: &ExecutionContext) -> Re
                     let half = height * 0.25 / slats as f64;
                     // a slat stands up to `depth` above the flat plate, starting inside the plate so the two fuse
                     let up = depth * (0.25 + 0.75 * draw(seed, plate, 5 + k as u64));
-                    boxes.push(plate_box(pu0 + width * 0.1, pu1 - width * 0.1, centre - half, centre + half, thick * 0.5, thick + up)?);
+                    boxes.push(plate_box(
+                        pu0 + width * 0.1,
+                        pu1 - width * 0.1,
+                        centre - half,
+                        centre + half,
+                        thick * 0.5,
+                        thick + up,
+                    )?);
                 }
             }
             if boxes.len() > MAX_BOXES {
-                return Err(KernelError::InvalidArgument("too many plates and slats for one node"));
+                return Err(KernelError::InvalidArgument(
+                    "too many plates and slats for one node",
+                ));
             }
         }
     }

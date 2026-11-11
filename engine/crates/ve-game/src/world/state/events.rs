@@ -67,7 +67,12 @@ impl World {
             let state_then = self.flow.state.clone();
             for rule_index in 0..self.def.rules.len() {
                 let rule = &self.def.rules[rule_index];
-                if rule.state.as_ref().is_some_and(|state| *state != state_then) || !self.rule_matches(rule, &event) {
+                if rule
+                    .state
+                    .as_ref()
+                    .is_some_and(|state| *state != state_then)
+                    || !self.rule_matches(rule, &event)
+                {
                     continue;
                 }
                 if let Some(expr) = &rule.expr

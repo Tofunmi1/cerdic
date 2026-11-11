@@ -13,18 +13,30 @@ impl World {
         }
         let mut nearest: Option<f64> = None;
         for entity in &self.entities {
-            let Some(extents) = self.def.kinds.iter().find(|kind| kind.name == entity.kind).and_then(|kind| kind.solid) else {
+            let Some(extents) = self
+                .def
+                .kinds
+                .iter()
+                .find(|kind| kind.name == entity.kind)
+                .and_then(|kind| kind.solid)
+            else {
                 continue;
             };
             let (mut enter, mut leave) = (0.0_f64, 1.0_f64);
             let mut inside = true;
             for axis in 0..3 {
-                let (low, high) = (entity.position[axis] - extents[axis] / 2.0, entity.position[axis] + extents[axis] / 2.0);
+                let (low, high) = (
+                    entity.position[axis] - extents[axis] / 2.0,
+                    entity.position[axis] + extents[axis] / 2.0,
+                );
                 if delta[axis].abs() < 1e-12 {
                     inside &= from[axis] >= low && from[axis] <= high;
                     continue;
                 }
-                let (a, b) = ((low - from[axis]) / delta[axis], (high - from[axis]) / delta[axis]);
+                let (a, b) = (
+                    (low - from[axis]) / delta[axis],
+                    (high - from[axis]) / delta[axis],
+                );
                 enter = enter.max(a.min(b));
                 leave = leave.min(a.max(b));
             }

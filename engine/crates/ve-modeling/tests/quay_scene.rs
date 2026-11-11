@@ -5,7 +5,10 @@ use ve_modeling::{Evaluator, Quality};
 
 #[test]
 fn the_quay_scene_evaluates() {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../web/tests/scenes/harbour/quay.txt");
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../web/tests/scenes/harbour/quay.txt"
+    );
     let source = std::fs::read_to_string(path).unwrap();
     let commands = match parse_text(&builtin_registry(), &source) {
         Ok(parsed) => parsed.commands,
@@ -19,11 +22,18 @@ fn the_quay_scene_evaluates() {
         label: None,
         commands,
     });
-    assert!(matches!(applied, Outcome::Committed { .. }), "apply: {applied:?}");
+    assert!(
+        matches!(applied, Outcome::Committed { .. }),
+        "apply: {applied:?}"
+    );
     let ev = match Evaluator::default().evaluate(session.document(), Quality::Final) {
         Ok(ev) => ev,
         Err(e) => panic!("evaluate: {} {}", e.code, e.message),
     };
-    assert!(ev.parts.len() >= 50, "the scene has about fifty parts, got {}", ev.parts.len());
+    assert!(
+        ev.parts.len() >= 50,
+        "the scene has about fifty parts, got {}",
+        ev.parts.len()
+    );
     assert!(ev.warnings.is_empty(), "no warnings: {:?}", ev.warnings);
 }

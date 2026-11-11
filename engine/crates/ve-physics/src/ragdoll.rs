@@ -79,32 +79,53 @@ fn validate(desc: &RagdollDesc) -> Result<(), Error> {
     if desc.bones.is_empty() || desc.bones.len() > MAX_BONES {
         return Err(Error::BadValue("a ragdoll needs 1 to 64 bones"));
     }
-    if !(finite(&[desc.density, desc.friction, desc.joint_damping]) && desc.density > 0.0 && desc.friction >= 0.0 && desc.joint_damping >= 0.0) {
-        return Err(Error::BadValue("density must be above 0; friction and damping not negative"));
+    if !(finite(&[desc.density, desc.friction, desc.joint_damping])
+        && desc.density > 0.0
+        && desc.friction >= 0.0
+        && desc.joint_damping >= 0.0)
+    {
+        return Err(Error::BadValue(
+            "density must be above 0; friction and damping not negative",
+        ));
     }
     for (index, bone) in desc.bones.iter().enumerate() {
         if !(finite(&bone.head) && finite(&bone.tail) && finite(&[bone.radius])) {
             return Err(Error::BadValue("bone numbers must be finite"));
         }
         if bone.radius <= 0.0 || bone.radius > 5.0 {
-            return Err(Error::BadValue("a bone needs a radius above 0 and at most 5 m"));
+            return Err(Error::BadValue(
+                "a bone needs a radius above 0 and at most 5 m",
+            ));
         }
-        let along = [bone.tail[0] - bone.head[0], bone.tail[1] - bone.head[1], bone.tail[2] - bone.head[2]];
+        let along = [
+            bone.tail[0] - bone.head[0],
+            bone.tail[1] - bone.head[1],
+            bone.tail[2] - bone.head[2],
+        ];
         if length(along) < 1.0e-3 {
             return Err(Error::BadValue("a bone needs a length of at least 1 mm"));
         }
         if bone.parent.is_some_and(|parent| parent >= index) {
-            return Err(Error::BadValue("a bone's parent must come before it in the list"));
+            return Err(Error::BadValue(
+                "a bone's parent must come before it in the list",
+            ));
         }
         if let BoneJoint::Hinge { axis, limits } = bone.joint
-            && (!finite(&axis) || !finite(&limits) || length(axis) < 1.0e-6 || limits[0] > limits[1])
+            && (!finite(&axis)
+                || !finite(&limits)
+                || length(axis) < 1.0e-6
+                || limits[0] > limits[1])
         {
-            return Err(Error::BadValue("a hinge needs a non-zero axis and limits from low to high"));
+            return Err(Error::BadValue(
+                "a hinge needs a non-zero axis and limits from low to high",
+            ));
         }
         if let BoneJoint::Ball { swing, twist } = bone.joint
             && (!finite(&[swing, twist[0], twist[1]]) || swing < 0.0 || twist[0] > twist[1])
         {
-            return Err(Error::BadValue("a ball joint needs a swing of 0 or more and twist limits from low to high"));
+            return Err(Error::BadValue(
+                "a ball joint needs a swing of 0 or more and twist limits from low to high",
+            ));
         }
     }
     Ok(())
@@ -113,9 +134,16 @@ fn validate(desc: &RagdollDesc) -> Result<(), Error> {
 /// Where a bone's body starts: its centre (the middle of the bone) and its rotation (+Y along the bone).
 #[must_use]
 pub fn rest_frame(bone: &Bone) -> ([f32; 3], [f32; 4]) {
-    let along = [bone.tail[0] - bone.head[0], bone.tail[1] - bone.head[1], bone.tail[2] - bone.head[2]];
+    let along = [
+        bone.tail[0] - bone.head[0],
+        bone.tail[1] - bone.head[1],
+        bone.tail[2] - bone.head[2],
+    ];
     let total = length(along).max(1.0e-9);
-    ([0, 1, 2].map(|a| (bone.head[a] + bone.tail[a]) * 0.5), y_to(along.map(|c| c / total)))
+    (
+        [0, 1, 2].map(|a| (bone.head[a] + bone.tail[a]) * 0.5),
+        y_to(along.map(|c| c / total)),
+    )
 }
 
 fn multiply(a: [f32; 4], b: [f32; 4]) -> [f32; 4] {
@@ -130,19 +158,43 @@ fn multiply(a: [f32; 4], b: [f32; 4]) -> [f32; 4] {
 /// The pose (column-major 4x4) of a bone part whose body has moved from `(rest_position, rest_rotation)` to `(position, rotation)`: the motion
 /// that carries the part's authored mesh along with its body (turn about the bone's middle, then move). The identity when the body has not moved.
 #[must_use]
-pub fn bone_pose(rest_position: [f32; 3], rest_rotation: [f32; 4], position: [f32; 3], rotation: [f32; 4]) -> [f32; 16] {
-    let rest_inverse = [-rest_rotation[0], -rest_rotation[1], -rest_rotation[2], rest_rotation[3]];
+pub fn bone_pose(
+    rest_position: [f32; 3],
+    rest_rotation: [f32; 4],
+    position: [f32; 3],
+    rotation: [f32; 4],
+) -> [f32; 16] {
+    let rest_inverse = [
+        -rest_rotation[0],
+        -rest_rotation[1],
+        -rest_rotation[2],
+        rest_rotation[3],
+    ];
     let turn = multiply(rotation, rest_inverse);
     let norm = turn.iter().map(|c| c * c).sum::<f32>().sqrt().max(1.0e-9);
     let [x, y, z, w] = turn.map(|c| c / norm);
     // Rotation matrix columns, then the translation that turns about the rest centre and lands on the new one.
-    let c0 = [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y + z * w), 2.0 * (x * z - y * w)];
-    let c1 = [2.0 * (x * y - z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z + x * w)];
-    let c2 = [2.0 * (x * z + y * w), 2.0 * (y * z - x * w), 1.0 - 2.0 * (x * x + y * y)];
-    let turned = [0, 1, 2].map(|r| c0[r] * rest_position[0] + c1[r] * rest_position[1] + c2[r] * rest_position[2]);
+    let c0 = [
+        1.0 - 2.0 * (y * y + z * z),
+        2.0 * (x * y + z * w),
+        2.0 * (x * z - y * w),
+    ];
+    let c1 = [
+        2.0 * (x * y - z * w),
+        1.0 - 2.0 * (x * x + z * z),
+        2.0 * (y * z + x * w),
+    ];
+    let c2 = [
+        2.0 * (x * z + y * w),
+        2.0 * (y * z - x * w),
+        1.0 - 2.0 * (x * x + y * y),
+    ];
+    let turned = [0, 1, 2]
+        .map(|r| c0[r] * rest_position[0] + c1[r] * rest_position[1] + c2[r] * rest_position[2]);
     let shift = [0, 1, 2].map(|a| position[a] - turned[a]);
     [
-        c0[0], c0[1], c0[2], 0.0, c1[0], c1[1], c1[2], 0.0, c2[0], c2[1], c2[2], 0.0, shift[0], shift[1], shift[2], 1.0,
+        c0[0], c0[1], c0[2], 0.0, c1[0], c1[1], c1[2], 0.0, c2[0], c2[1], c2[2], 0.0, shift[0],
+        shift[1], shift[2], 1.0,
     ]
 }
 
@@ -167,11 +219,19 @@ pub fn build(world: &mut World, desc: &RagdollDesc) -> Result<Ragdoll, Error> {
     validate(desc)?;
     let group = Layers {
         member: RAGDOLL_GROUP,
-        mask: if desc.self_collide { u32::MAX } else { !RAGDOLL_GROUP },
+        mask: if desc.self_collide {
+            u32::MAX
+        } else {
+            !RAGDOLL_GROUP
+        },
     };
     let mut bodies = Vec::with_capacity(desc.bones.len());
     for bone in &desc.bones {
-        let along = [bone.tail[0] - bone.head[0], bone.tail[1] - bone.head[1], bone.tail[2] - bone.head[2]];
+        let along = [
+            bone.tail[0] - bone.head[0],
+            bone.tail[1] - bone.head[1],
+            bone.tail[2] - bone.head[2],
+        ];
         let total = length(along);
         let direction = along.map(|c| c / total);
         let id = world.add(&BodyDesc {
@@ -196,7 +256,11 @@ pub fn build(world: &mut World, desc: &RagdollDesc) -> Result<Ragdoll, Error> {
         let Some(parent) = bone.parent else {
             continue;
         };
-        let along = [bone.tail[0] - bone.head[0], bone.tail[1] - bone.head[1], bone.tail[2] - bone.head[2]];
+        let along = [
+            bone.tail[0] - bone.head[0],
+            bone.tail[1] - bone.head[1],
+            bone.tail[2] - bone.head[2],
+        ];
         let base = JointDesc {
             a: bodies[parent],
             b: Some(bodies[index]),

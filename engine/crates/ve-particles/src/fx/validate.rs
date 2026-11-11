@@ -1,6 +1,7 @@
 //! Checks on an effect before it runs: every number in range, sub-emitters pointing at real emitters and never in a loop.
 use super::{
-    Effect, Emitter, FxError, MAX_CHILDREN, MAX_EMITTERS, MAX_PARTICLES, MAX_TRAIL, Reaction, Shape, forces,
+    Effect, Emitter, FxError, MAX_CHILDREN, MAX_EMITTERS, MAX_PARTICLES, MAX_TRAIL, Reaction,
+    Shape, forces,
 };
 
 fn invalid(field: &'static str, why: &'static str) -> FxError {
@@ -15,7 +16,9 @@ fn shape_ok(shape: &Shape) -> bool {
     match shape {
         Shape::Point => true,
         Shape::Sphere { radius } | Shape::Disc { radius } => radius.is_finite() && *radius >= 0.0,
-        Shape::Box { half_extents } => finite(half_extents) && half_extents.iter().all(|h| *h >= 0.0),
+        Shape::Box { half_extents } => {
+            finite(half_extents) && half_extents.iter().all(|h| *h >= 0.0)
+        }
         Shape::Line { length } => length.is_finite() && *length >= 0.0,
     }
 }
@@ -23,7 +26,10 @@ fn shape_ok(shape: &Shape) -> bool {
 impl Emitter {
     fn validate(&self, own: usize, count: usize) -> Result<(), FxError> {
         let s = &self.spawn;
-        if !(finite(&[s.rate, s.delay, s.duration]) && s.rate >= 0.0 && s.delay >= 0.0 && s.duration >= 0.0)
+        if !(finite(&[s.rate, s.delay, s.duration])
+            && s.rate >= 0.0
+            && s.delay >= 0.0
+            && s.duration >= 0.0)
             || (s.looping && s.duration <= 0.0)
             || s.bursts.iter().any(|b| !b.time.is_finite() || b.time < 0.0)
         {
@@ -32,20 +38,32 @@ impl Emitter {
                 "rate, delay, duration and burst times must be finite and not negative; looping needs a duration above 0",
             ));
         }
-        if !(finite(&self.lifetime) && self.lifetime[0] > 0.0 && self.lifetime[0] <= self.lifetime[1]) {
+        if !(finite(&self.lifetime)
+            && self.lifetime[0] > 0.0
+            && self.lifetime[0] <= self.lifetime[1])
+        {
             return Err(invalid("lifetime", "use 0 < min <= max seconds"));
         }
         if !(finite(&self.speed) && self.speed[0] >= 0.0 && self.speed[0] <= self.speed[1]) {
             return Err(invalid("speed", "use 0 <= min <= max, finite"));
         }
         if !(finite(&self.direction) && self.direction.iter().any(|d| *d != 0.0)) {
-            return Err(invalid("direction", "use a finite direction that is not all zero"));
+            return Err(invalid(
+                "direction",
+                "use a finite direction that is not all zero",
+            ));
         }
         if !((0.0..=1.5).contains(&self.cone) && finite(&self.origin)) {
-            return Err(invalid("cone", "use a cone from 0 to 1.5 radians and a finite origin"));
+            return Err(invalid(
+                "cone",
+                "use a cone from 0 to 1.5 radians and a finite origin",
+            ));
         }
         if !shape_ok(&self.shape) {
-            return Err(invalid("shape", "shape sizes must be finite and not negative"));
+            return Err(invalid(
+                "shape",
+                "shape sizes must be finite and not negative",
+            ));
         }
         if !(1..=MAX_PARTICLES).contains(&self.max_particles) {
             return Err(invalid("max_particles", "use 1 to 100000"));
@@ -88,7 +106,10 @@ impl Emitter {
         if let Some(t) = &self.trail
             && !((2..=MAX_TRAIL).contains(&t.points) && t.min_step.is_finite() && t.min_step > 0.0)
         {
-            return Err(invalid("trail", "use 2 to 64 points and a min_step above 0"));
+            return Err(invalid(
+                "trail",
+                "use 2 to 64 points and a min_step above 0",
+            ));
         }
         for sub in &self.sub {
             if sub.emitter >= count || sub.emitter == own || sub.count > MAX_CHILDREN {
@@ -121,7 +142,10 @@ impl Effect {
             while let Some(at) = stack.pop() {
                 steps += 1;
                 if steps > MAX_EMITTERS * MAX_EMITTERS {
-                    return Err(invalid("sub", "sub-emitters must not spawn each other in a loop"));
+                    return Err(invalid(
+                        "sub",
+                        "sub-emitters must not spawn each other in a loop",
+                    ));
                 }
                 stack.extend(self.emitters[at].sub.iter().map(|s| s.emitter));
             }

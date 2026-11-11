@@ -9,7 +9,9 @@ use bevy_color::Color;
 use bevy_core_pipeline::prepass::NormalPrepass;
 use bevy_ecs::prelude::*;
 use bevy_light::atmosphere::{Atmosphere, ScatteringMedium};
-use bevy_light::{DirectionalLight, DirectionalLightShadowMap, FogVolume, VolumetricFog, VolumetricLight};
+use bevy_light::{
+    DirectionalLight, DirectionalLightShadowMap, FogVolume, VolumetricFog, VolumetricLight,
+};
 use bevy_math::Vec3;
 use bevy_pbr::{AtmosphereSettings, ContactShadows, DistanceFog, FogFalloff};
 use bevy_post_process::bloom::Bloom;
@@ -70,7 +72,11 @@ fn map_haze(
         let haze = sky.haze.clamp(0.0, 1.0);
         let tint = (haze * 3.0).min(1.0);
         let [hr, hg, hb] = sky.haze_color;
-        let (r, g, b) = (r + (hr - r) * tint, g + (hg - g) * tint, b + (hb - b) * tint);
+        let (r, g, b) = (
+            r + (hr - r) * tint,
+            g + (hg - g) * tint,
+            b + (hb - b) * tint,
+        );
         commands.entity(entity).insert(DistanceFog {
             color: Color::srgb(r, g, b),
             directional_light_color: Color::srgba(1.0, 0.78, 0.55, 0.55),
@@ -88,7 +94,15 @@ fn map_haze(
 fn map_camera_fx(
     mut commands: Commands,
     sky: Res<SkyBackground>,
-    cameras: Query<(Entity, Has<DepthOfField>, Has<MotionBlur>, Has<ContactShadows>), With<Camera3d>>,
+    cameras: Query<
+        (
+            Entity,
+            Has<DepthOfField>,
+            Has<MotionBlur>,
+            Has<ContactShadows>,
+        ),
+        With<Camera3d>,
+    >,
     added: Query<Entity, Added<Camera3d>>,
 ) {
     if !sky.is_changed() && added.is_empty() {
@@ -179,9 +193,17 @@ fn map_volumetric(
     }
     if wanted {
         // A wide box hugging the ground: as tall as the haze (or tall enough to carry the rays), as dense as the document says.
-        let height = if sky.haze_height > 0.0 { sky.haze_height } else { 200.0 };
+        let height = if sky.haze_height > 0.0 {
+            sky.haze_height
+        } else {
+            200.0
+        };
         let density = sky.shafts.clamp(0.0, 1.0) * 0.03
-            + if sky.haze_height > 0.0 { sky.haze.clamp(0.0, 1.0) * 0.08 } else { 0.0 };
+            + if sky.haze_height > 0.0 {
+                sky.haze.clamp(0.0, 1.0) * 0.08
+            } else {
+                0.0
+            };
         let [r, g, b] = sky.haze_color;
         commands.spawn((
             HazeVolume,
@@ -190,7 +212,8 @@ fn map_volumetric(
                 density_factor: density,
                 ..FogVolume::default()
             },
-            Transform::from_xyz(0.0, height * 0.5, 0.0).with_scale(Vec3::new(1600.0, height, 1600.0)),
+            Transform::from_xyz(0.0, height * 0.5, 0.0)
+                .with_scale(Vec3::new(1600.0, height, 1600.0)),
         ));
     }
 }

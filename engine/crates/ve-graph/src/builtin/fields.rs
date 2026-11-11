@@ -200,7 +200,11 @@ fn primitives() -> Vec<Option<OperatorSpec>> {
                 ),
                 ParamSpec {
                     name: "rounding",
-                    ty: ParamType::Num { unit: Unit::Length, min: 0.0, max: EXTENT },
+                    ty: ParamType::Num {
+                        unit: Unit::Length,
+                        min: 0.0,
+                        max: EXTENT,
+                    },
                     default: Some(Value::Num(0.0)),
                     doc: "Corner radius in metres; 0 gives sharp corners.",
                 },

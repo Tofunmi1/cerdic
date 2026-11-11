@@ -74,7 +74,11 @@ fn run(world: &mut World, vehicle: &mut Vehicle, seconds: f32) {
 fn forward(world: &World, id: BodyId) -> [f32; 3] {
     let q = world.pose(id).unwrap().rotation;
     // Rotate +Z by q.
-    [2.0 * (q[0] * q[2] + q[3] * q[1]), 2.0 * (q[1] * q[2] - q[3] * q[0]), 1.0 - 2.0 * (q[0] * q[0] + q[1] * q[1])]
+    [
+        2.0 * (q[0] * q[2] + q[3] * q[1]),
+        2.0 * (q[1] * q[2] - q[3] * q[0]),
+        1.0 - 2.0 * (q[0] * q[0] + q[1] * q[1]),
+    ]
 }
 
 fn up_y(world: &World, id: BodyId) -> f32 {
@@ -100,7 +104,10 @@ fn a_car_settles_on_its_springs_at_a_ride_height_set_by_its_weight() {
     let compression = weight / (4.0 * 30_000.0);
     // Wheel hub rests 0.15 under the chassis centre; the wheel's bottom is `suspension + radius - compression` below the connection point.
     let expected = 0.35 + 0.35 - compression + 0.15;
-    assert!((y - expected).abs() < 0.06, "ride height {y}, expected about {expected}");
+    assert!(
+        (y - expected).abs() < 0.06,
+        "ride height {y}, expected about {expected}"
+    );
     for i in 0..4 {
         assert!(vehicle.wheel(i).in_contact, "wheel {i} is on the ground");
     }
@@ -110,10 +117,20 @@ fn a_car_settles_on_its_springs_at_a_ride_height_set_by_its_weight() {
     let before = world.pose(chassis).unwrap().position;
     run(&mut world, &mut vehicle, 1.0);
     let after = world.pose(chassis).unwrap().position;
-    let moved = [after[0] - before[0], after[1] - before[1], after[2] - before[2]];
-    assert!(moved.iter().all(|c| c.abs() < 0.005), "it moved by {moved:?} in a second");
+    let moved = [
+        after[0] - before[0],
+        after[1] - before[1],
+        after[2] - before[2],
+    ];
+    assert!(
+        moved.iter().all(|c| c.abs() < 0.005),
+        "it moved by {moved:?} in a second"
+    );
     let v = world.velocity(chassis).unwrap();
-    assert!(v[0].abs() < 0.02 && v[2].abs() < 0.02 && v[1].abs() < 0.1, "at rest: {v:?}");
+    assert!(
+        v[0].abs() < 0.02 && v[2].abs() < 0.02 && v[1].abs() < 0.1,
+        "at rest: {v:?}"
+    );
     assert!(up_y(&world, chassis) > 0.99, "level");
 }
 
@@ -129,7 +146,10 @@ fn throttle_drives_it_forward_to_a_sensible_speed_and_no_throttle_coasts_to_a_st
     let heading = forward(&world, chassis);
     let speed = speed_along(&world, chassis, heading);
     // 5 kN on 1.2 t is about 4 m/s^2 before drag and rolling resistance: about 12 m/s after 3 s, well below 20.
-    assert!(speed > 6.0 && speed < 20.0, "speed after 3 s of throttle: {speed}");
+    assert!(
+        speed > 6.0 && speed < 20.0,
+        "speed after 3 s of throttle: {speed}"
+    );
     let z = world.pose(chassis).unwrap().position[2];
     assert!(z > 8.0, "it travelled forward: z = {z}");
     vehicle.drive(0.0, 0.0, 0.0);
@@ -186,9 +206,15 @@ fn steering_turns_it_without_sliding_sideways_or_rolling_over() {
     // Positive steer turns towards +X (right when facing +Z).
     let turned = before[2] * after[2] + before[0] * after[0];
     assert!(turned < 0.7, "the heading changed: dot {turned}");
-    assert!(after[0] > before[0] + 0.3, "it turned towards the steered side: {before:?} -> {after:?}");
+    assert!(
+        after[0] > before[0] + 0.3,
+        "it turned towards the steered side: {before:?} -> {after:?}"
+    );
     assert!(lowest_up > 0.85, "it did not roll: up {lowest_up}");
-    assert!(worst_slide < 0.35, "the tyres grip: sideways speed was {worst_slide} of forward");
+    assert!(
+        worst_slide < 0.35,
+        "the tyres grip: sideways speed was {worst_slide} of forward"
+    );
 }
 
 #[test]
@@ -218,7 +244,11 @@ fn the_same_drive_gives_the_same_car_every_time() {
         vehicle.drive(1.0, 0.5, 0.0);
         run(&mut world, &mut vehicle, 3.0);
         let p = world.pose(chassis).unwrap();
-        p.position.iter().chain(&p.rotation).map(|v| v.to_bits()).collect::<Vec<u32>>()
+        p.position
+            .iter()
+            .chain(&p.rotation)
+            .map(|v| v.to_bits())
+            .collect::<Vec<u32>>()
     };
     assert_eq!(run_once(), run_once());
 }
@@ -233,14 +263,62 @@ fn bad_vehicles_are_refused_with_a_reason() {
         edit(&mut d);
         Vehicle::new(world, &d).err().unwrap()
     };
-    assert!(matches!(refuse(&mut world, &|d| d.wheels.clear()), Error::BadValue(_)), "no wheels");
-    assert!(matches!(refuse(&mut world, &|d| d.wheels = vec![d.wheels[0]; 9]), Error::BadValue(_)), "too many wheels");
-    assert!(matches!(refuse(&mut world, &|d| d.wheels[0].radius = 0.0), Error::BadValue(_)), "radius");
-    assert!(matches!(refuse(&mut world, &|d| d.wheels[1].stiffness = -1.0), Error::BadValue(_)), "stiffness");
-    assert!(matches!(refuse(&mut world, &|d| d.wheels[2].suspension = f32::NAN), Error::BadValue(_)), "finite");
-    assert!(matches!(refuse(&mut world, &|d| d.engine_force = -5.0), Error::BadValue(_)), "engine");
-    assert!(matches!(refuse(&mut world, &|d| d.max_steer = 2.0), Error::BadValue(_)), "steering angle");
-    assert!(matches!(refuse(&mut world, &|d| d.chassis = BodyId(99)), Error::NoSuchBody), "chassis must exist");
+    assert!(
+        matches!(
+            refuse(&mut world, &|d| d.wheels.clear()),
+            Error::BadValue(_)
+        ),
+        "no wheels"
+    );
+    assert!(
+        matches!(
+            refuse(&mut world, &|d| d.wheels = vec![d.wheels[0]; 9]),
+            Error::BadValue(_)
+        ),
+        "too many wheels"
+    );
+    assert!(
+        matches!(
+            refuse(&mut world, &|d| d.wheels[0].radius = 0.0),
+            Error::BadValue(_)
+        ),
+        "radius"
+    );
+    assert!(
+        matches!(
+            refuse(&mut world, &|d| d.wheels[1].stiffness = -1.0),
+            Error::BadValue(_)
+        ),
+        "stiffness"
+    );
+    assert!(
+        matches!(
+            refuse(&mut world, &|d| d.wheels[2].suspension = f32::NAN),
+            Error::BadValue(_)
+        ),
+        "finite"
+    );
+    assert!(
+        matches!(
+            refuse(&mut world, &|d| d.engine_force = -5.0),
+            Error::BadValue(_)
+        ),
+        "engine"
+    );
+    assert!(
+        matches!(
+            refuse(&mut world, &|d| d.max_steer = 2.0),
+            Error::BadValue(_)
+        ),
+        "steering angle"
+    );
+    assert!(
+        matches!(
+            refuse(&mut world, &|d| d.chassis = BodyId(99)),
+            Error::NoSuchBody
+        ),
+        "chassis must exist"
+    );
     // Inputs outside their range are clamped, not refused: a joystick can overshoot.
     let mut vehicle = Vehicle::new(&mut world, &good).unwrap();
     vehicle.drive(5.0, -9.0, 3.0);

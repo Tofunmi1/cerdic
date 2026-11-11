@@ -34,13 +34,19 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
             },
             ParamSpec {
                 name: "branch_smoothing",
-                ty: ParamType::Num { unit: Unit::Ratio, min: 0.0, max: 1.0 },
+                ty: ParamType::Num {
+                    unit: Unit::Ratio,
+                    min: 0.0,
+                    max: 1.0,
+                },
                 default: Some(Value::Num(0.0)),
                 doc: "Relaxes the surface around branches (0 none, 1 full). Rounds hips and shoulders; costs a little detail.",
             },
             ParamSpec {
                 name: "symmetry",
-                ty: ParamType::Choice { options: &["none", "x", "y", "z", "xy", "xz", "yz", "xyz"] },
+                ty: ParamType::Choice {
+                    options: &["none", "x", "y", "z", "xy", "xz", "yz", "xyz"],
+                },
                 default: Some(Value::Str("none".to_owned())),
                 doc: "Axes of mirror symmetry in the skeleton; keeps quads from crossing the mirror plane so a symmetric figure skins symmetrically. Use `x` for a body.",
             },

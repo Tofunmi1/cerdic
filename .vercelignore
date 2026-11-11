@@ -1,0 +1,25 @@
+# What a Vercel deploy does not need to upload. The build uses engine/web (panels, demos, tool helpers) and engine/tools/mcp; everything below is source or build output
+# that the static site never reads, and some of it is hundreds of megabytes.
+node_modules
+dist
+target
+public/engine
+docs
+spikes
+engine/lib
+engine/crates
+engine/cpp
+engine/docs
+engine/xtask
+engine/target
+engine/packs
+engine/assets
+engine/web/dist
+engine/web/dist-*
+engine/web/node_modules
+engine/web/tests
+engine/web/target
+engine/tools/worlds
+engine/tools/cc0
+engine/tools/human-pack
+engine/tools/blender

@@ -9,7 +9,10 @@ use crate::mesh::Mesh;
 
 /// Squared distance between two nodes' boxes (zero when they overlap).
 fn box_dist2(a: &Node, b: &Node) -> f32 {
-    (a.min - b.max).max(b.min - a.max).max(Vec3::ZERO).length_squared()
+    (a.min - b.max)
+        .max(b.min - a.max)
+        .max(Vec3::ZERO)
+        .length_squared()
 }
 
 impl Bvh {
@@ -68,8 +71,13 @@ impl Bvh {
             } else {
                 [(na, b.left), (na, b.right)]
             };
-            let key = |p: &(u32, u32)| box_dist2(&self.nodes[p.0 as usize], &other.nodes[p.1 as usize]);
-            let (near, far) = if key(&pairs[0]) <= key(&pairs[1]) { (pairs[0], pairs[1]) } else { (pairs[1], pairs[0]) };
+            let key =
+                |p: &(u32, u32)| box_dist2(&self.nodes[p.0 as usize], &other.nodes[p.1 as usize]);
+            let (near, far) = if key(&pairs[0]) <= key(&pairs[1]) {
+                (pairs[0], pairs[1])
+            } else {
+                (pairs[1], pairs[0])
+            };
             stack.push(far);
             stack.push(near);
         }

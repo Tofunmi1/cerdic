@@ -16,8 +16,13 @@ fn evaluate(source: &str) -> Result<ve_modeling::Evaluation, (String, String)> {
         label: None,
         commands,
     });
-    assert!(matches!(applied, Outcome::Committed { .. }), "apply: {applied:?}");
-    Evaluator::default().evaluate(session.document(), Quality::Final).map_err(|e| (e.code.to_string(), e.message.to_string()))
+    assert!(
+        matches!(applied, Outcome::Committed { .. }),
+        "apply: {applied:?}"
+    );
+    Evaluator::default()
+        .evaluate(session.document(), Quality::Final)
+        .map_err(|e| (e.code.to_string(), e.message.to_string()))
 }
 
 const FIGURE: &str = "joints=\"pelvis 0 0.95 0 0.16 0.1 root; chest 0 1.3 0 0.16 0.1; neck 0 1.5 0 0.05 0.05; head 0 1.68 0.02 0.09 0.1; \
@@ -27,21 +32,39 @@ const BONES: &str = "bones=\"pelvis-chest; chest-neck; neck-head; pelvis-hip; hi
 
 #[test]
 fn a_one_sided_figure_skins_into_a_closed_quad_surface() {
-    let ev = evaluate(&format!("s = poly.skin@1({FIGURE}, {BONES})\noutput body = s\n")).unwrap();
+    let ev = evaluate(&format!(
+        "s = poly.skin@1({FIGURE}, {BONES})\noutput body = s\n"
+    ))
+    .unwrap();
     let body = ev.parts.iter().find(|p| p.name == "body").unwrap();
-    assert!(!body.positions.is_empty() && body.indices.len() % 3 == 0, "the skin has triangles");
+    assert!(
+        !body.positions.is_empty() && body.indices.len() % 3 == 0,
+        "the skin has triangles"
+    );
     let top = body.positions.iter().map(|p| p[1]).fold(f32::MIN, f32::max);
     let bottom = body.positions.iter().map(|p| p[1]).fold(f32::MAX, f32::min);
-    assert!((1.66..1.72).contains(&top), "the head joint is the top: {top}");
-    assert!(bottom > -0.01 && bottom < 0.06, "the toe is the bottom: {bottom}");
+    assert!(
+        (1.66..1.72).contains(&top),
+        "the head joint is the top: {top}"
+    );
+    assert!(
+        bottom > -0.01 && bottom < 0.06,
+        "the toe is the bottom: {bottom}"
+    );
 }
 
 #[test]
 fn the_skin_feeds_subdivision_and_materials() {
-    let source = format!("s = poly.skin@1({FIGURE}, {BONES})\nsmooth = poly.subdivide@1(s, levels=2)\nm = solid.material@1(smooth, color=[0.8, 0.6, 0.5], roughness=0.5)\noutput body = m\n");
+    let source = format!(
+        "s = poly.skin@1({FIGURE}, {BONES})\nsmooth = poly.subdivide@1(s, levels=2)\nm = solid.material@1(smooth, color=[0.8, 0.6, 0.5], roughness=0.5)\noutput body = m\n"
+    );
     let ev = evaluate(&source).unwrap();
     let body = ev.parts.iter().find(|p| p.name == "body").unwrap();
-    assert!(body.indices.len() / 3 > 2000, "subdividing the skin gives a dense surface: {} triangles", body.indices.len() / 3);
+    assert!(
+        body.indices.len() / 3 > 2000,
+        "subdividing the skin gives a dense surface: {} triangles",
+        body.indices.len() / 3
+    );
 }
 
 #[test]
@@ -50,6 +73,9 @@ fn mistakes_are_refused_with_the_fix() {
     assert_eq!(no_root.0, "skin.no_root", "{no_root:?}");
     let unknown = evaluate("s = poly.skin@1(joints=\"a 0 0 0 0.1 0.1 root; b 0 1 0 0.1 0.1\", bones=\"a-c\")\noutput o = s\n").unwrap_err();
     assert_eq!(unknown.0, "skin.bone_unknown_joint", "{unknown:?}");
-    let syntax = evaluate("s = poly.skin@1(joints=\"a 0 0 root; b 0 1 0 0.1 0.1\", bones=\"a-b\")\noutput o = s\n").unwrap_err();
+    let syntax = evaluate(
+        "s = poly.skin@1(joints=\"a 0 0 root; b 0 1 0 0.1 0.1\", bones=\"a-b\")\noutput o = s\n",
+    )
+    .unwrap_err();
     assert_eq!(syntax.0, "skin.joint_syntax", "{syntax:?}");
 }

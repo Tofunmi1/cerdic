@@ -99,7 +99,10 @@ pub(super) enum Kind {
     Local(usize),
     Param(usize),
     Builtin(Builtin),
-    Elem { arr: usize, idx: Box<Expr> },
+    Elem {
+        arr: usize,
+        idx: Box<Expr>,
+    },
     Swizzle(Box<Expr>, Vec<usize>),
     Neg(Box<Expr>),
     Not(Box<Expr>),
@@ -107,9 +110,16 @@ pub(super) enum Kind {
     Call(Func, Vec<Expr>),
     Vector(Vec<Expr>),
     /// A point (or, with `vector`, a direction) carried from a bone's own space to the world by the bone's pose.
-    Bone { input: usize, vector: bool, v: Box<Expr> },
+    Bone {
+        input: usize,
+        vector: bool,
+        v: Box<Expr>,
+    },
     /// Where vertex `idx` of a mesh input was at rest.
-    Rest { input: usize, idx: Box<Expr> },
+    Rest {
+        input: usize,
+        idx: Box<Expr>,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -122,13 +132,44 @@ pub(super) struct Expr {
 #[derive(Clone, Debug)]
 pub(super) enum Stmt {
     Let(usize, Expr),
-    SetLocal { slot: usize, op: Option<Bin>, value: Expr },
-    SetElem { arr: usize, idx: Expr, comp: Option<usize>, op: Option<Bin>, value: Expr, line: usize },
+    SetLocal {
+        slot: usize,
+        op: Option<Bin>,
+        value: Expr,
+    },
+    SetElem {
+        arr: usize,
+        idx: Expr,
+        comp: Option<usize>,
+        op: Option<Bin>,
+        value: Expr,
+        line: usize,
+    },
     If(Expr, Vec<Stmt>, Vec<Stmt>),
-    Repeat { slot: usize, from: i32, to: i32, body: Vec<Stmt> },
-    Neighbors { slot: usize, arr: usize, centre: Expr, radius: Expr, cap: u32, body: Vec<Stmt>, line: usize },
+    Repeat {
+        slot: usize,
+        from: i32,
+        to: i32,
+        body: Vec<Stmt>,
+    },
+    Neighbors {
+        slot: usize,
+        arr: usize,
+        centre: Expr,
+        radius: Expr,
+        cap: u32,
+        body: Vec<Stmt>,
+        line: usize,
+    },
     /// Runs the body for each vertex joined by an edge to `of`, with the neighbour's number and the edge's rest length.
-    Adjacent { vertex: usize, length: usize, input: usize, of: Expr, body: Vec<Stmt>, line: usize },
+    Adjacent {
+        vertex: usize,
+        length: usize,
+        input: usize,
+        of: Expr,
+        body: Vec<Stmt>,
+        line: usize,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -184,7 +225,11 @@ impl Count {
             Self::Param(p) => {
                 let x = params[*p].v[0];
                 if x.is_finite() && x >= 0.0 {
-                    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "checked finite and non-negative; huge values saturate and are refused by the cap")]
+                    #[expect(
+                        clippy::cast_possible_truncation,
+                        clippy::cast_sign_loss,
+                        reason = "checked finite and non-negative; huge values saturate and are refused by the cap"
+                    )]
                     let n = x as usize;
                     n
                 } else {

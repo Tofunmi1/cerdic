@@ -2,7 +2,7 @@
   "name": "autorig_human",
   "version": "1.0.0",
   "description": "Rigs a body.human in three lines: human_rig makes every bone a part with its parent link and output, human_skin skins it with the pack's weights, human_ik adds reach targets; the fingers carry fist and point clips.",
-  "license": "GPL-2.0-or-later",
+  "license": "UNLICENSED",
   "requires": {
     "operators": [
       "anim.parent@1",

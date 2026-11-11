@@ -18,6 +18,7 @@ mod inset_face;
 mod merge_coplanar;
 mod overlap;
 mod pack_uv;
+mod triangulate;
 mod unwrap_uv;
 mod uv_quality;
 mod weld;
@@ -41,6 +42,7 @@ pub use individual::{
 pub use inset_face::inset_face;
 pub use merge_coplanar::{MAX_MERGES, merge_coplanar, merge_coplanar_keeping_holes};
 pub use pack_uv::pack_uv;
+pub use triangulate::triangulate;
 pub use unwrap_uv::{UvMethod, UvUnwrap, unwrap_uv};
 pub use uv_quality::{UvQuality, uv_quality};
 pub use weld::{WeldResult, weld};

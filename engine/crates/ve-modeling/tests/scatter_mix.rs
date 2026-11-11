@@ -6,7 +6,9 @@ use ve_graph::{CommandBatch, Outcome, Session, TransactionId, builtin_registry, 
 use ve_modeling::{Evaluation, Evaluator, Quality};
 
 fn evaluate(source: &str) -> Result<Evaluation, String> {
-    let commands = parse_text(&builtin_registry(), source).map_err(|e| format!("{e:?}"))?.commands;
+    let commands = parse_text(&builtin_registry(), source)
+        .map_err(|e| format!("{e:?}"))?
+        .commands;
     let mut session = Session::with_builtin(9);
     let applied = session.apply(&CommandBatch {
         doc: session.document().id.clone(),
@@ -18,11 +20,15 @@ fn evaluate(source: &str) -> Result<Evaluation, String> {
     if !matches!(applied, Outcome::Committed { .. }) {
         return Err(format!("{applied:?}"));
     }
-    Evaluator::default().evaluate(session.document(), Quality::Final).map_err(|e| format!("{e:?}"))
+    Evaluator::default()
+        .evaluate(session.document(), Quality::Final)
+        .map_err(|e| format!("{e:?}"))
 }
 
 fn plantings(mixes: &[(&str, u32)]) -> Vec<Vec<[i32; 3]>> {
-    let mut text = String::from("t = terrain.tile@1(size=[96, 96], cell=2, seed=4, height=40, scale=160)\nb = solid.box@1(size=[0.5, 1, 0.5])\n");
+    let mut text = String::from(
+        "t = terrain.tile@1(size=[96, 96], cell=2, seed=4, height=40, scale=160)\nb = solid.box@1(size=[0.5, 1, 0.5])\n",
+    );
     for (index, (mix, pick)) in mixes.iter().enumerate() {
         text.push_str(&format!("f{index} = scatter.place@1(b, t, radius=3, seed=7, mix=\"{mix}\", pick={pick})\noutput f{index} = f{index}\n"));
     }
@@ -34,7 +40,17 @@ fn plantings(mixes: &[(&str, u32)]) -> Vec<Vec<[i32; 3]>> {
                 .iter()
                 .find(|p| p.name == name)
                 .and_then(|p| p.transforms.as_ref())
-                .map(|list| list.iter().map(|m| [(m[12] * 100.0) as i32, (m[13] * 100.0) as i32, (m[14] * 100.0) as i32]).collect())
+                .map(|list| {
+                    list.iter()
+                        .map(|m| {
+                            [
+                                (m[12] * 100.0) as i32,
+                                (m[13] * 100.0) as i32,
+                                (m[14] * 100.0) as i32,
+                            ]
+                        })
+                        .collect()
+                })
                 .unwrap_or_default()
         })
         .collect()
@@ -45,15 +61,28 @@ fn the_shares_of_a_mix_split_one_planting_without_overlap_or_loss() {
     let whole = &plantings(&[("1", 0)])[0];
     let parts = plantings(&[("5, 3, 2", 0), ("5, 3, 2", 1), ("5, 3, 2", 2)]);
     let total: usize = parts.iter().map(Vec::len).sum();
-    assert_eq!(total, whole.len(), "every plant goes to exactly one variant");
+    assert_eq!(
+        total,
+        whole.len(),
+        "every plant goes to exactly one variant"
+    );
     let everything: BTreeSet<[i32; 3]> = parts.iter().flatten().copied().collect();
     assert_eq!(everything.len(), total, "no plant is in two variants");
     let expected: BTreeSet<[i32; 3]> = whole.iter().copied().collect();
-    assert_eq!(everything, expected, "the variants together are the whole planting");
+    assert_eq!(
+        everything, expected,
+        "the variants together are the whole planting"
+    );
     // the shares follow the weights, within the noise of a few hundred plants
-    let fractions: Vec<f64> = parts.iter().map(|p| p.len() as f64 / total as f64).collect();
+    let fractions: Vec<f64> = parts
+        .iter()
+        .map(|p| p.len() as f64 / total as f64)
+        .collect();
     for (got, want) in fractions.iter().zip([0.5, 0.3, 0.2]) {
-        assert!((got - want).abs() < 0.12, "shares {fractions:?} against 0.5, 0.3, 0.2");
+        assert!(
+            (got - want).abs() < 0.12,
+            "shares {fractions:?} against 0.5, 0.3, 0.2"
+        );
     }
 }
 

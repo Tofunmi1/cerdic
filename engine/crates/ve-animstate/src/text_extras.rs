@@ -19,7 +19,9 @@ pub(crate) fn parse_layer(words: &[&str], extras: &mut Extras) -> Result<(), Str
         return Err("write `layer NAME clip=CLIP ...`".to_owned());
     };
     if !plain_name(name) {
-        return Err(format!("bad layer name {name:?}; use letters, digits, _, - or ."));
+        return Err(format!(
+            "bad layer name {name:?}; use letters, digits, _, - or ."
+        ));
     }
     if extras.layers.iter().any(|layer| layer.name == *name) {
         return Err(format!("repeated layer {name:?}; layer names are unique"));
@@ -43,17 +45,35 @@ pub(crate) fn parse_layer(words: &[&str], extras: &mut Extras) -> Result<(), Str
             if value.is_empty() || value.chars().any(char::is_whitespace) {
                 return Err("layer clip= needs a clip name".to_owned());
             }
-            layer.clip = if value == "\"\"" { String::new() } else { value.to_owned() };
+            layer.clip = if value == "\"\"" {
+                String::new()
+            } else {
+                value.to_owned()
+            };
             has_clip = true;
         } else if let Some(value) = option.strip_prefix("weight=") {
             layer.weight = match value.parse::<f32>() {
-                Ok(number) if number.is_finite() && (0.0..=1.0).contains(&number) => LayerWeight::Fixed(number),
-                Ok(_) => return Err("layer weight must be a number from 0 to 1, or a parameter name".to_owned()),
+                Ok(number) if number.is_finite() && (0.0..=1.0).contains(&number) => {
+                    LayerWeight::Fixed(number)
+                }
+                Ok(_) => {
+                    return Err(
+                        "layer weight must be a number from 0 to 1, or a parameter name".to_owned(),
+                    );
+                }
                 Err(_) if plain_name(value) => LayerWeight::Parameter(value.to_owned()),
-                Err(_) => return Err(format!("bad layer weight {value:?}; write a number from 0 to 1 or a parameter name")),
+                Err(_) => {
+                    return Err(format!(
+                        "bad layer weight {value:?}; write a number from 0 to 1 or a parameter name"
+                    ));
+                }
             };
         } else if let Some(value) = option.strip_prefix("mask=") {
-            layer.mask = value.split(',').filter(|part| !part.is_empty()).map(str::to_owned).collect();
+            layer.mask = value
+                .split(',')
+                .filter(|part| !part.is_empty())
+                .map(str::to_owned)
+                .collect();
             if layer.mask.is_empty() {
                 return Err("layer mask= needs part names separated by commas".to_owned());
             }
@@ -74,7 +94,9 @@ pub(crate) fn parse_layer(words: &[&str], extras: &mut Extras) -> Result<(), Str
         } else if *option == "loop" {
             layer.looping = true;
         } else {
-            return Err(format!("unknown layer option {option:?}; use clip=, weight=, mask=, speed=, fade=, additive or once"));
+            return Err(format!(
+                "unknown layer option {option:?}; use clip=, weight=, mask=, speed=, fade=, additive or once"
+            ));
         }
     }
     if !has_clip {
@@ -93,7 +115,9 @@ pub(crate) fn parse_event(words: &[&str], extras: &mut Extras) -> Result<(), Str
         return Err("an event needs its time: `event CLIP NAME at=SECONDS`".to_owned());
     };
     if !plain_name(name) {
-        return Err(format!("bad event name {name:?}; use letters, digits, _, - or ."));
+        return Err(format!(
+            "bad event name {name:?}; use letters, digits, _, - or ."
+        ));
     }
     let time = float(time, "event time (at=)")?;
     if time < 0.0 {
@@ -103,7 +127,11 @@ pub(crate) fn parse_event(words: &[&str], extras: &mut Extras) -> Result<(), Str
         return Err(format!("more than {MAX_EVENTS} events"));
     }
     extras.events.push(ClipEvent {
-        clip: if *clip == "\"\"" { String::new() } else { (*clip).to_owned() },
+        clip: if *clip == "\"\"" {
+            String::new()
+        } else {
+            (*clip).to_owned()
+        },
         name: (*name).to_owned(),
         time,
     });
@@ -111,7 +139,11 @@ pub(crate) fn parse_event(words: &[&str], extras: &mut Extras) -> Result<(), Str
 }
 
 fn clip_token(clip: &str) -> String {
-    if clip.is_empty() { "\"\"".to_owned() } else { clip.to_owned() }
+    if clip.is_empty() {
+        "\"\"".to_owned()
+    } else {
+        clip.to_owned()
+    }
 }
 
 /// The text of `extras`, one statement per line, to follow the states and transitions.
@@ -119,7 +151,13 @@ pub(crate) fn write(extras: &Extras, out: &mut String) {
     use std::fmt::Write;
     // Writing to a String cannot fail.
     for event in &extras.events {
-        let _ = writeln!(out, "event {} {} at={}", clip_token(&event.clip), event.name, event.time);
+        let _ = writeln!(
+            out,
+            "event {} {} at={}",
+            clip_token(&event.clip),
+            event.name,
+            event.time
+        );
     }
     for layer in &extras.layers {
         let _ = write!(out, "layer {} clip={}", layer.name, clip_token(&layer.clip));

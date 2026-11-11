@@ -1,7 +1,7 @@
-//! Blender's bmesh operators on polygon meshes: inset, solidify, extrude, dissolve, poke, subdivide,
-//! wireframe, symmetrize and bisect.
+//! Mesh operators on polygon meshes: inset, solidify, extrude, dissolve, poke, subdivide, wireframe, symmetrize,
+//! bisect and the rest, implemented in Rust (see `native/`).
 
-use crate::{BeveledMesh, KernelError, PolygonMesh, ffi};
+use crate::{BeveledMesh, KernelError, PolygonMesh};
 
 /// The result of a mesh operator: the same layout and provenance as [`bevel_edges`](crate::bevel_edges).
 pub type EditedMesh = BeveledMesh;
@@ -28,7 +28,7 @@ pub enum PokeCenter {
     Bounds,
 }
 
-/// One of Blender's mesh operators, with its parameters.
+/// One of the mesh operators, with its parameters.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MeshOp {
     /// Shrinks each selected face region inward, leaving a ring of faces around it.
@@ -120,7 +120,7 @@ pub enum MeshOp {
         /// Vertices closer than this to the plane (or to their mirror) are merged.
         distance: f64,
     },
-    /// Splits every selected polygon into triangles using Blender's beauty triangulation.
+    /// Splits every selected polygon into triangles.
     Triangulate,
     /// Merges selected vertices within a bounded distance.
     RemoveDoubles {
@@ -261,225 +261,24 @@ pub enum MeshOp {
     },
 }
 
-impl MeshOp {
-    /// The operator code, parameters and flags in the layout `ve_kernel.h` documents.
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one flat match over every operator keeps the ABI layout in a single place"
-    )]
-    fn encode(&self) -> (i32, [f64; 4], i32) {
-        let bits =
-            |pairs: &[(bool, i32)]| pairs.iter().filter(|(on, _)| *on).map(|(_, bit)| bit).sum();
-        match *self {
-            Self::Inset {
-                thickness,
-                depth,
-                even,
-                relative,
-                boundary,
-                outset,
-            } => (
-                0,
-                [thickness, depth, 0.0, 0.0],
-                bits(&[(even, 1), (relative, 2), (boundary, 4), (outset, 8)]),
-            ),
-            Self::Solidify { thickness } => (1, [thickness, 0.0, 0.0, 0.0], 0),
-            Self::Extrude { offset } => (2, [offset[0], offset[1], offset[2], 0.0], 0),
-            Self::Dissolve { angle, boundaries } => {
-                (3, [angle, 0.0, 0.0, 0.0], bits(&[(boundaries, 1)]))
-            }
-            Self::Poke {
-                offset,
-                center,
-                relative,
-            } => (
-                4,
-                [
-                    offset,
-                    match center {
-                        PokeCenter::Median => 0.0,
-                        PokeCenter::Weighted => 1.0,
-                        PokeCenter::Bounds => 2.0,
-                    },
-                    0.0,
-                    0.0,
-                ],
-                bits(&[(relative, 1)]),
-            ),
-            Self::Subdivide {
-                cuts,
-                smooth,
-                grid_fill,
-            } => (
-                5,
-                [f64::from(cuts), smooth, 0.0, 0.0],
-                bits(&[(grid_fill, 1)]),
-            ),
-            Self::Wireframe {
-                thickness,
-                offset,
-                even,
-                relative,
-                boundary,
-                replace,
-            } => (
-                6,
-                [thickness, offset, 0.0, 0.0],
-                bits(&[(even, 1), (relative, 2), (boundary, 4), (replace, 8)]),
-            ),
-            Self::Decimate {
-                ratio,
-                symmetry,
-                triangulate,
-            } => (
-                8,
-                [
-                    ratio,
-                    symmetry.map_or(-1.0, |axis| f64::from(axis.min(2))),
-                    0.0,
-                    0.0,
-                ],
-                bits(&[(triangulate, 1)]),
-            ),
-            Self::Unsubdivide { iterations } => (9, [f64::from(iterations), 0.0, 0.0, 0.0], 0),
-            Self::Symmetrize {
-                axis,
-                keep_positive,
-                distance,
-            } => (
-                7,
-                [
-                    f64::from(axis.min(2)) + if keep_positive { 3.0 } else { 0.0 },
-                    distance,
-                    0.0,
-                    0.0,
-                ],
-                0,
-            ),
-            Self::Triangulate => (10, [0.0; 4], 0),
-            Self::RemoveDoubles { distance } => (11, [distance, 0.0, 0.0, 0.0], 0),
-            Self::Bisect { .. } => (12, [0.0; 4], 0),
-            Self::Spin { .. } => (13, [0.0; 4], 0),
-            Self::Mirror { .. } => (14, [0.0; 4], 0),
-            Self::LoopCut { .. } => (15, [0.0; 4], 0),
-            Self::RecalcNormals { inside } => (16, [0.0; 4], bits(&[(inside, 1)])),
-            Self::Smooth { factor, iterations } => {
-                (17, [factor, f64::from(iterations), 0.0, 0.0], 0)
-            }
-            Self::FillHoles { sides } => (18, [f64::from(sides), 0.0, 0.0, 0.0], 0),
-            Self::Beautify { by_angle } => (19, [if by_angle { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0], 0),
-            Self::PlanarFaces { iterations, factor } => {
-                (20, [f64::from(iterations), factor, 0.0, 0.0], 0)
-            }
-            Self::JoinTriangles {
-                face_angle,
-                shape_angle,
-            } => (21, [face_angle, shape_angle, 0.0, 0.0], 0),
-            Self::DissolveDegenerate { distance } => (22, [distance, 0.0, 0.0, 0.0], 0),
-            Self::SplitEdges => (23, [0.0; 4], 0),
-            Self::RotateEdges { counter_clockwise } => {
-                (24, [0.0; 4], bits(&[(counter_clockwise, 1)]))
-            }
-            Self::ConnectVertices { check_degenerate } => {
-                (25, [0.0; 4], bits(&[(check_degenerate, 1)]))
-            }
-            Self::SpaceEdgeLoops { factor, linear } => {
-                (26, [factor, 0.0, 0.0, 0.0], bits(&[(linear, 1)]))
-            }
-            Self::RelaxEdgeLoops {
-                iterations,
-                linear,
-                even_spacing,
-            } => (
-                27,
-                [f64::from(iterations), 0.0, 0.0, 0.0],
-                bits(&[(linear, 1), (even_spacing, 2)]),
-            ),
-            Self::Circularize {
-                factor,
-                radius,
-                angle,
-                flatten,
-                regular,
-            } => (
-                28,
-                [factor, radius, angle, flatten],
-                bits(&[(regular, 1)]),
-            ),
-        }
-    }
-}
-
-/// Runs a Blender mesh operator.
+/// Runs a mesh operator.
 ///
 /// Inset, extrude, poke, wireframe and solidify take faces (poke, wireframe and solidify treat an empty
-/// selection as every face); subdivide takes edges; dissolve and symmetrize take the whole mesh. Meshes
-/// are limited to 250,000 faces for these operators.
+/// selection as every face); subdivide takes edges; dissolve and symmetrize take the whole mesh.
 ///
 /// # Errors
 /// [`KernelError::InvalidArgument`] for a bad parameter, a malformed face, a missing selection or an
 /// edge that is not in the mesh; [`KernelError::OutOfBounds`] for an index past the faces or vertices;
 /// [`KernelError::NonFinite`] for a NaN or huge number; [`KernelError::TooLarge`] past the size limits;
-/// [`KernelError::OperatorRefused`] when Blender declines the mesh (for example solidify on a mesh it
-/// cannot offset).
+/// [`KernelError::OperatorRefused`] when the operator declines the mesh (for example solidify on a mesh it
+/// cannot offset, or a symmetry axis for decimate).
 pub fn edit_mesh(
     mesh: &PolygonMesh<'_>,
     selection: &MeshSelection<'_>,
     op: &MeshOp,
 ) -> Result<EditedMesh, KernelError> {
-    let (code, params, flags) = op.encode();
-    // Most operators use the first four numbers; the interface carries twelve for those that need more (a plane, a transform).
-    let mut wide = [0.0; 12];
-    wide[..4].copy_from_slice(&params);
-    let (code, flags) = if let MeshOp::Spin {
-        center,
-        axis,
-        angle,
-        steps,
-        merge,
-        distance,
-    } = *op
-    {
-        wide[0..3].copy_from_slice(&center);
-        wide[3..6].copy_from_slice(&axis);
-        wide[6] = angle;
-        wide[7] = f64::from(steps);
-        wide[8] = distance;
-        (13, i32::from(merge))
-    } else if let MeshOp::Bisect {
-        point,
-        normal,
-        distance,
-        clear_inner,
-        clear_outer,
-        fill,
-    } = *op
-    {
-        wide[0..3].copy_from_slice(&point);
-        wide[3..6].copy_from_slice(&normal);
-        wide[6] = distance;
-        (
-            12,
-            i32::from(clear_inner) | (i32::from(clear_outer) << 1) | (i32::from(fill) << 2),
-        )
-    } else if let MeshOp::Mirror {
-        point,
-        normal,
-        distance,
-        merge,
-    } = *op
-    {
-        wide[..3].copy_from_slice(&point);
-        wide[3..6].copy_from_slice(&normal);
-        wide[6] = distance;
-        (14, i32::from(merge))
-    } else if let MeshOp::LoopCut { at, cuts, smooth } = *op {
-        wide[..3].copy_from_slice(&at);
-        wide[3] = f64::from(cuts);
-        wide[4] = smooth;
-        (15, 0)
-    } else {
-        (code, flags)
-    };
-    ffi::polymesh::mesh_op(mesh, selection, code, wide, flags)
+    crate::native::shape::edit(mesh, selection, op)
+        .or_else(|| crate::native::basic::edit(mesh, selection, op))
+        .or_else(|| crate::native::more::edit(mesh, selection, op))
+        .unwrap_or(Err(KernelError::OperatorRefused))
 }

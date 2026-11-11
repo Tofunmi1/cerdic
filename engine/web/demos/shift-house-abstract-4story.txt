@@ -1,0 +1,106 @@
+# SHIFT HOUSE — four offset ring floors orbit a planted central void.
+# Abstract contemporary residence; each occupied level is 3.35 m high. Y up.
+sky = scene.sky@1(sun_elevation=40,sun_azimuth=-28,sun_intensity=1.65,turbidity=2.7,clouds=true,cloud_cover=0.17,haze=0.02,ground_color=[0.28,0.33,0.30],contact_shadows=true)
+output sky = sky
+env = scene.environment@1(sky_color=[0.60,0.72,0.83],ground_color=[0.27,0.31,0.28],intensity=0.70,reflection=0.24,bounce=0.30,bounce_color=[0.78,0.77,0.72])
+output environment = env
+
+def box_part(tag,sx,sy,sz,x,y,z,r,g,b,rough)
+  sh_{tag} = solid.box@1(size=[{sx},{sy},{sz}])
+  at_{tag} = xform.move@1(sh_{tag},by=[{x},{y},{z}])
+  mat_{tag} = solid.material@1(at_{tag},color=[{r},{g},{b}],roughness={rough})
+  output {tag} = mat_{tag}
+end
+
+# Landscaped base, central rain court and a long reflecting pool.
+box_part("site",42,0.34,38,0,-0.17,0,0.29,0.34,0.30,0.96)
+site_tex = solid.texture@1(mat_site,tile=7,size="512",no_repeat=true,program="g = fbm(scale_x=4,scale_y=5,iterations=4); albedo = colorize(g,gradient=[0:#354238,0.5:#52614b,1:#788269])")
+output garden_site = site_tex
+box_part("arrival_terrace",15,0.14,9,-2,0.07,-13,0.58,0.56,0.51,0.82)
+box_part("reflecting_pool",11,0.42,4,10,0.21,-10,0.18,0.23,0.24,0.36)
+box_part("pool_water",10.5,0.025,3.5,10,0.43,-10,0.10,0.34,0.39,0.18)
+
+# Five rotated ring plates form four occupied storeys and a roof terrace.
+floor_blank = solid.box@1(size=[19,0.34,14])
+void_cut = solid.box@1(size=[5.2,0.48,4.5])
+floor_ring = solid.difference@1(floor_blank,void_cut)
+floor_stack = inst.place@1(floor_ring,at=[[0,0.40,0],[1.2,3.75,-0.45],[-0.9,7.10,0.55],[1.0,10.45,1.05],[0.1,13.8,1.35]],yaw_scale=[[0,1],[16,1],[-17,1],[28,1],[0,1]])
+floor_stack_mat = solid.material@1(floor_stack,color=[0.73,0.72,0.67],roughness=0.64)
+output rotating_ring_floors = floor_stack_mat
+
+# Four glazed ribbons follow the rotated plates; solid living pods alternate around the void.
+glass_ribbon = solid.box@1(size=[14.2,2.55,0.09])
+glass_set = inst.place@1(glass_ribbon,at=[[0,2.05,-6.55],[1.2,5.40,-7.0],[-0.9,8.75,-6.0],[1.0,12.1,-5.5]],yaw_scale=[[0,1],[16,1],[-17,1],[28,1]])
+glass_mat = solid.material@1(glass_set,color=[0.20,0.42,0.50],roughness=0.16,metallic=0.12,opacity=0.38)
+output orbiting_glass_bands = glass_mat
+pod = solid.box@1(size=[6.0,2.9,4.8])
+pod_set = inst.place@1(pod,at=[[-5.2,2.05,3.8],[5.3,5.4,3.3],[-5.0,8.75,4.1],[5.1,12.1,4.7]],yaw_scale=[[0,1],[16,1],[-17,1],[28,1]])
+pod_mat = solid.material@1(pod_set,color=[0.69,0.66,0.58],roughness=0.84)
+output limestone_living_pods = pod_mat
+accent_pod = solid.box@1(size=[5.2,2.85,4.2])
+accent_set = inst.place@1(accent_pod,at=[[5.4,2.05,3.5],[-5.1,5.4,4.1],[5.0,8.75,4.6],[-5.0,12.1,4.8]],yaw_scale=[[0,1],[16,1],[-17,1],[28,1]])
+accent_mat = solid.material@1(accent_set,color=[0.31,0.27,0.22],roughness=0.58)
+output graphite_rooms = accent_mat
+
+# Dark bronze exoskeleton: four leaning masts and a diagonal ribbon brace.
+mast = solid.box@1(size=[0.30,14.2,0.30])
+mast_tilt = xform.rotate@1(mast,angles=[0,0,11])
+mast_set = inst.place@1(mast_tilt,at=[[-8.0,7.0,-5.2],[8.0,7.0,-5.2],[-8.0,7.0,5.0],[8.0,7.0,5.0]],yaw_scale=[[0,1],[0,1],[0,1],[0,1]])
+mast_mat = solid.material@1(mast_set,color=[0.20,0.23,0.23],roughness=0.36,metallic=0.32)
+output leaning_masts = mast_mat
+brace = solid.box@1(size=[0.24,16.8,0.24])
+brace_turn = xform.rotate@1(brace,angles=[0,0,28])
+brace_set = inst.place@1(brace_turn,at=[[-7.4,7.1,0],[7.4,7.1,0]],yaw_scale=[[0,1],[180,1]])
+brace_mat = solid.material@1(brace_set,color=[0.31,0.22,0.15],roughness=0.42,metallic=0.24)
+output cross_braces = brace_mat
+
+# Offset sunshades, slender façade blades, and glass terrace guards.
+shade = solid.box@1(size=[15.3,0.18,2.3])
+shade_set = inst.place@1(shade,at=[[-1.3,3.42,-7.3],[1.1,6.77,-7.0],[-1.0,10.12,-6.1],[1.0,13.47,-5.5]],yaw_scale=[[0,1],[16,1],[-17,1],[28,1]])
+shade_mat = solid.material@1(shade_set,color=[0.25,0.28,0.27],roughness=0.44,metallic=0.18)
+output cantilever_sunshades = shade_mat
+blade = solid.box@1(size=[0.14,2.8,0.18])
+blade_set = inst.place@1(blade,at=[[-6.2,2.05,-6.6],[-3.8,2.05,-6.6],[-1.4,2.05,-6.6],[1.0,2.05,-6.6],[3.4,2.05,-6.6],[-6.0,8.75,-6.0],[-3.6,8.75,-6.0],[-1.2,8.75,-6.0],[1.2,8.75,-6.0],[3.6,8.75,-6.0]])
+blade_mat = solid.material@1(blade_set,color=[0.34,0.25,0.17],roughness=0.5)
+output timber_baffles = blade_mat
+terrace_glass = solid.box@1(size=[4.4,1.05,0.07])
+terrace_rail = inst.place@1(terrace_glass,at=[[-6.1,14.5,-6.4],[-1.55,14.5,-6.4],[3.0,14.5,-6.4],[7.0,14.5,-3.8]],yaw_scale=[[0,1],[0,1],[0,1],[90,1]])
+terrace_mat = solid.material@1(terrace_rail,color=[0.46,0.67,0.72],roughness=0.16,opacity=0.32)
+output roof_terrace_glass = terrace_mat
+pergola = solid.box@1(size=[0.16,0.18,8.5])
+pergola_set = inst.place@1(pergola,at=[[-6.6,15.1,1.8],[-4.4,15.1,1.8],[-2.2,15.1,1.8],[0,15.1,1.8],[2.2,15.1,1.8],[4.4,15.1,1.8],[6.6,15.1,1.8]])
+pergola_mat = solid.material@1(pergola_set,color=[0.25,0.23,0.19],roughness=0.48)
+output roof_pergola = pergola_mat
+
+# Vertical glass lantern rises from the open centre court; the void remains walkable at ground level.
+atrium_glass = solid.cylinder@1(radius=2.05,height=12.8,segments=48)
+atrium_at = xform.move@1(atrium_glass,by=[0.25,6.55,0.18])
+atrium_mat = solid.material@1(atrium_at,color=[0.28,0.46,0.52],roughness=0.15,metallic=0.08,opacity=0.22)
+output atrium_lantern = atrium_mat
+atrium_rib = solid.box@1(size=[0.11,13.0,0.11])
+atrium_ribs = inst.place@1(atrium_rib,at=[[-1.72,6.6,-1.72],[1.72,6.6,-1.72],[-1.72,6.6,1.72],[1.72,6.6,1.72]])
+atrium_rib_mat = solid.material@1(atrium_ribs,color=[0.24,0.28,0.28],roughness=0.35,metallic=0.2)
+output atrium_ribs = atrium_rib_mat
+box_part("rain_court_basin",4.2,0.24,3.8,0,0.55,0,0.25,0.29,0.28,0.34)
+box_part("rain_court_water",3.7,0.025,3.3,0,0.69,0,0.10,0.34,0.40,0.17)
+
+# A long stair-ramp slab cuts across the eastern façade as a circulation ribbon.
+ramp = solid.box@1(size=[2.2,0.24,12.0])
+ramp_turn = xform.rotate@1(ramp,angles=[-24,0,0])
+ramp_at = xform.move@1(ramp_turn,by=[7.6,7.2,0.2])
+ramp_mat = solid.material@1(ramp_at,color=[0.57,0.52,0.43],roughness=0.56)
+output exterior_ramp = ramp_mat
+ramp_rail_src = solid.box@1(size=[0.09,1.0,12.0])
+ramp_rail_turn = xform.rotate@1(ramp_rail_src,angles=[-24,0,0])
+ramp_rail_at = xform.move@1(ramp_rail_turn,by=[8.7,7.7,0.2])
+ramp_rail_mat = solid.material@1(ramp_rail_at,color=[0.22,0.25,0.25],roughness=0.32,metallic=0.28)
+output ramp_guard = ramp_rail_mat
+
+# Arrival court, low water garden and a warm sheltered entry.
+box_part("arrival_path",5.5,0.12,9.0,-2.0,0.06,-12.0,0.56,0.53,0.47,0.82)
+box_part("entry_portal",4.2,3.2,0.18,-2.0,1.8,-6.9,0.24,0.26,0.25,0.46)
+box_part("entry_door",1.4,2.6,0.10,-2.0,1.55,-7.02,0.36,0.23,0.15,0.4)
+entry_light = light.point@1(position=[-2.0,2.7,-7.4],color=[1.0,0.79,0.56],intensity=16,range=9)
+output entry_light = entry_light
+terrace_light = light.point@1(position=[0,13.8,1.8],color=[1.0,0.85,0.70],intensity=14,range=10)
+output terrace_light = terrace_light

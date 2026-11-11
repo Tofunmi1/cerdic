@@ -39,13 +39,13 @@ mod validate;
 
 pub use blend::{ClipWeight, Pose};
 pub use events::crossed;
-pub use layers::{
-    ClipEvent, EVENT_WEIGHT, Extras, FiredEvent, Layer, LayerWeight, MAX_EVENTS, MAX_OVERLAYS,
-    OverlayWeight, plain_name,
-};
 pub use graph::{
     BlendPoint, Condition, Error, MAX_BLEND_POINTS, MAX_LAYERS, MAX_STATES, MAX_TRANSITIONS,
     Motion, State, StateMachine, Transition,
+};
+pub use layers::{
+    ClipEvent, EVENT_WEIGHT, Extras, FiredEvent, Layer, LayerWeight, MAX_EVENTS, MAX_OVERLAYS,
+    OverlayWeight, plain_name,
 };
 pub use machine::{MAX_STEP, Machine};
 pub use params::Params;

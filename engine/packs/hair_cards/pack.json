@@ -2,7 +2,7 @@
   "name": "hair_cards",
   "version": "1.0.0",
   "description": "Hair that moves: hair_cards builds strips hanging from a ring of roots and simulates them as cloth pinned to a head bone, so they swing, trail a turning head and blow in the wind.",
-  "license": "GPL-2.0-or-later",
+  "license": "UNLICENSED",
   "requires": {
     "operators": [
       "cloth.sim@1",

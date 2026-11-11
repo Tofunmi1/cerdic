@@ -55,7 +55,9 @@ fn one_node_equals_select_then_bevel() {
         b.volume
     );
     assert_eq!(a.indices.len(), b.indices.len());
-    assert!((b.volume - 0.973_285_987_320_342).abs() < 1.0e-12);
+    // The native bevel's corner caps differ from the earlier build's (0.973285987) by 0.011%.
+    assert!((b.volume - 0.973_285_987_320_342).abs() < 2.0e-4);
+    assert!((b.volume - 0.973_391_177_476_906_3).abs() < 1.0e-9);
 }
 
 #[test]

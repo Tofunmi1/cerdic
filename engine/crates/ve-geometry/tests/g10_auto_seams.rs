@@ -123,10 +123,14 @@ fn a_smooth_closed_sphere_gets_a_cut_that_lets_it_unwrap() {
     let result = unwrap_uv(&sphere, &seams, &unwrap_options(), &context).unwrap();
     uvs_in_unit_square(&result);
     let cut = uv_quality(&result).unwrap();
-    let uncut = uv_quality(&unwrap_uv(&sphere, &[], &unwrap_options(), &context).unwrap());
-    // Without seams the unwrap leaves no usable layout at all; with charts it is nearly even.
+    // Without seams the unwrap leaves no usable layout at all (it refuses, or hands back one with no quality to
+    // measure); with charts it is nearly even.
+    let uncut = unwrap_uv(&sphere, &[], &unwrap_options(), &context);
     assert!(
-        uncut.is_none(),
+        match &uncut {
+            Err(_) => true,
+            Ok(layout) => uv_quality(layout).is_none(),
+        },
         "an uncut closed sphere has no usable UVs: {uncut:?}"
     );
     assert_eq!(

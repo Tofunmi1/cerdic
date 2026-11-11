@@ -89,7 +89,11 @@ fn windows(from: f32, to: f32, duration: f32, looping: bool) -> Vec<(f32, f32)> 
     }
     if !looping {
         let end = to.min(duration);
-        return if end > start { vec![(start, end)] } else { Vec::new() };
+        return if end > start {
+            vec![(start, end)]
+        } else {
+            Vec::new()
+        };
     }
     let mut out = Vec::new();
     #[expect(clippy::cast_possible_truncation, reason = "a cycle index is small")]
@@ -113,7 +117,11 @@ fn dot(a: [f32; 3], b: [f32; 3]) -> f32 {
 }
 
 fn distance(a: [f32; 3], b: [f32; 3]) -> f32 {
-    dot([a[0] - b[0], a[1] - b[1], a[2] - b[2]], [a[0] - b[0], a[1] - b[1], a[2] - b[2]]).sqrt()
+    dot(
+        [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+        [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+    )
+    .sqrt()
 }
 
 impl System {
@@ -154,7 +162,11 @@ impl System {
         } else {
             [0.0, 0.0, 0.0, 1.0]
         };
-        let position = if position.iter().all(|c| c.is_finite()) { position } else { [0.0; 3] };
+        let position = if position.iter().all(|c| c.is_finite()) {
+            position
+        } else {
+            [0.0; 3]
+        };
         self.placement = (position, rotation);
     }
 
@@ -176,7 +188,13 @@ impl System {
     pub fn alive(&self, emitter: usize) -> Vec<Particle> {
         self.states
             .get(emitter)
-            .map(|s| s.slots.iter().filter(|slot| slot.alive).map(|slot| slot.particle).collect())
+            .map(|s| {
+                s.slots
+                    .iter()
+                    .filter(|slot| slot.alive)
+                    .map(|slot| slot.particle)
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -201,11 +219,11 @@ impl System {
     /// A particle's recent path, oldest first, ending at the particle itself. Empty for an unknown or dead particle.
     #[must_use]
     pub fn trail(&self, emitter: usize, id: u32) -> Vec<[f32; 3]> {
-        let Some(slot) = self
-            .states
-            .get(emitter)
-            .and_then(|s| s.slots.iter().find(|slot| slot.alive && slot.particle.id == id))
-        else {
+        let Some(slot) = self.states.get(emitter).and_then(|s| {
+            s.slots
+                .iter()
+                .find(|slot| slot.alive && slot.particle.id == id)
+        }) else {
             return Vec::new();
         };
         let mut points = slot.trail.clone();
@@ -254,7 +272,11 @@ impl System {
         }
         let whole = state.credit.floor();
         state.credit -= whole;
-        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "credit is a small non-negative count")]
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "credit is a small non-negative count"
+        )]
         let whole = whole as u32;
         births = births.saturating_add(whole);
         let at = self.placement.0;
@@ -277,12 +299,18 @@ impl System {
         let speed = self.rng.between(emitter.speed);
         let turn = self.placement.1;
         let offset = emit::offset(&emitter.shape, &mut self.rng);
-        let offset = rotate(turn, [
-            emitter.origin[0] + offset[0],
-            emitter.origin[1] + offset[1],
-            emitter.origin[2] + offset[2],
-        ]);
-        let direction = rotate(turn, emit::direction(emitter.direction, emitter.cone, &mut self.rng));
+        let offset = rotate(
+            turn,
+            [
+                emitter.origin[0] + offset[0],
+                emitter.origin[1] + offset[1],
+                emitter.origin[2] + offset[2],
+            ],
+        );
+        let direction = rotate(
+            turn,
+            emit::direction(emitter.direction, emitter.cone, &mut self.rng),
+        );
         let position = [at[0] + offset[0], at[1] + offset[1], at[2] + offset[2]];
         let particle = Particle {
             id: state.next_id,
@@ -295,7 +323,11 @@ impl System {
         let slot = Slot {
             particle,
             alive: true,
-            trail: if emitter.trail.is_some() { vec![position] } else { Vec::new() },
+            trail: if emitter.trail.is_some() {
+                vec![position]
+            } else {
+                Vec::new()
+            },
         };
         match free {
             Some(i) => state.slots[i] = slot,
@@ -411,7 +443,10 @@ fn record_trail(slot: &mut Slot, emitter: &Emitter) {
     let Some(trail) = emitter.trail else {
         return;
     };
-    let moved = slot.trail.last().is_none_or(|last| distance(*last, slot.particle.position) >= trail.min_step);
+    let moved = slot
+        .trail
+        .last()
+        .is_none_or(|last| distance(*last, slot.particle.position) >= trail.min_step);
     if moved {
         slot.trail.push(slot.particle.position);
         if slot.trail.len() > trail.points - 1 {

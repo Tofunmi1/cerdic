@@ -26,11 +26,11 @@ use ve_render::VeMaterial;
 use crate::{
     animation::{Animated, IkTarget, InstancePlacement, MachineDrive},
     cloth_live::{ClothData, ClothLive, Shared},
-    physics::Body,
-    sim_live::SimLive,
     game::GameRuntime,
     game_view::render_position,
+    physics::Body,
     projection::Authored,
+    sim_live::SimLive,
     skinning::{SkinData, Skinned},
 };
 
@@ -159,7 +159,10 @@ pub(crate) fn sync(
     mut meshes: ResMut<Assets<Mesh>>,
     sources: Sources,
     bodies: Query<&Body>,
-    mut clones: Query<(&ModelPart, &mut Transform), (With<ModelPart>, Without<Animated>, Without<Body>)>,
+    mut clones: Query<
+        (&ModelPart, &mut Transform),
+        (With<ModelPart>, Without<Animated>, Without<Body>),
+    >,
     alive: Query<(), With<Authored>>,
 ) {
     let Some(world) = runtime.world.as_ref() else {
@@ -210,7 +213,9 @@ pub(crate) fn sync(
         // A simulation program belongs to the model whose bones it reads (a cape on the chest, hair on the head).
         let sims: Vec<String> = sources
             .iter()
-            .filter(|(.., sim)| sim.is_some_and(|sim| sim.shared.bone_parts().any(|bone| members.contains(bone))))
+            .filter(|(.., sim)| {
+                sim.is_some_and(|sim| sim.shared.bone_parts().any(|bone| members.contains(bone)))
+            })
             .map(|(_, authored, ..)| authored.name().to_owned())
             .collect();
         members.extend(sims);
@@ -263,8 +268,21 @@ pub(crate) fn sync(
             let mut skins = 0;
             // One renamed skin per source skin, shared by its chunks, so a copy's chunks share one set of joints.
             let mut renamed: HashMap<usize, Arc<SkinData>> = HashMap::new();
-            for (source, authored, mesh, material, transform, animated, machine, ik, _, _, skin, cloth, sim) in
-                &sources
+            for (
+                source,
+                authored,
+                mesh,
+                material,
+                transform,
+                animated,
+                machine,
+                ik,
+                _,
+                _,
+                skin,
+                cloth,
+                sim,
+            ) in &sources
             {
                 if !members.contains(authored.name()) {
                     continue;
@@ -272,7 +290,10 @@ pub(crate) fn sync(
                 let name = suffixed(authored.name(), entity.id);
                 if let Some(sim) = sim {
                     // Each copy runs its own program instance on its own mesh, reading the bones of this copy.
-                    let own = meshes.get(&mesh.0).cloned().map(|rest| Mesh3d(meshes.add(rest)));
+                    let own = meshes
+                        .get(&mesh.0)
+                        .cloned()
+                        .map(|rest| Mesh3d(meshes.add(rest)));
                     let clone = commands.spawn((
                         own.unwrap_or_else(|| mesh.clone()),
                         *material,
@@ -300,7 +321,10 @@ pub(crate) fn sync(
                         rest: data.rest.clone(),
                         corners: data.corners.clone(),
                     });
-                    let own = meshes.get(&mesh.0).cloned().map(|rest| Mesh3d(meshes.add(rest)));
+                    let own = meshes
+                        .get(&mesh.0)
+                        .cloned()
+                        .map(|rest| Mesh3d(meshes.add(rest)));
                     let clone = commands.spawn((
                         own.unwrap_or_else(|| mesh.clone()),
                         *material,

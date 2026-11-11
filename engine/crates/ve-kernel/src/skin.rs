@@ -1,7 +1,7 @@
 //! The Skin modifier (Blender's B-Mesh implementation): a skeleton graph with a pair of radii per joint becomes one closed surface of mostly quads.
 
 use crate::bevel::BeveledMesh;
-use crate::{KernelError, ffi};
+use crate::KernelError;
 
 /// One joint of a skeleton graph.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -29,7 +29,11 @@ pub struct SkinOptions {
 
 impl Default for SkinOptions {
     fn default() -> Self {
-        Self { branch_smoothing: 0.0, symmetry_axes: 0, subdivide: true }
+        Self {
+            branch_smoothing: 0.0,
+            symmetry_axes: 0,
+            subdivide: true,
+        }
     }
 }
 
@@ -42,6 +46,12 @@ impl Default for SkinOptions {
 /// [`KernelError::InvalidArgument`] for a bad radius, a bone joining a joint to itself, or a connected piece with no root;
 /// [`KernelError::OutOfBounds`] for a bone to a missing joint; [`KernelError::NonFinite`] for a NaN or infinite position;
 /// [`KernelError::TooLarge`] past 4,096 joints or 200,000 output vertices.
-pub fn skin_graph(joints: &[SkinJoint], bones: &[[u32; 2]], options: &SkinOptions) -> Result<BeveledMesh, KernelError> {
-    ffi::polymesh::skin(joints, bones, options)
+pub fn skin_graph(
+    joints: &[SkinJoint],
+    bones: &[[u32; 2]],
+    options: &SkinOptions,
+) -> Result<BeveledMesh, KernelError> {
+    // A skeleton the native skin does not take (a whole-body rig of more than 64 joints, a pinched or flat ring, a
+    // closed loop of bones, a junction that leaves faces too thin to triangulate) is declined.
+    crate::native::skin::skin_graph(joints, bones, options).unwrap_or(Err(KernelError::OperatorRefused))
 }

@@ -4,6 +4,7 @@
   "installCommand": "bun install",
   "buildCommand": "bun run build:web",
   "outputDirectory": "dist",
+  "rewrites": [{ "source": "/studio", "destination": "/index.html" }],
   "headers": [
     {
       "source": "/assets/(.*)",

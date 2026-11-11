@@ -119,7 +119,14 @@ impl Machine {
             self.fire(index);
         }
         let mut pose = self.pose();
-        pose.events = crate::machine_extras::events(&self.graph, &self.lengths, &before, &self.times, &self.weights, dt);
+        pose.events = crate::machine_extras::events(
+            &self.graph,
+            &self.lengths,
+            &before,
+            &self.times,
+            &self.weights,
+            dt,
+        );
         self.extras_runtime
             .advance(&self.graph.extras, &self.params, &self.lengths, dt);
         pose.overlays = self.extras_runtime.overlays(&self.graph.extras);

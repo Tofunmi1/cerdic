@@ -4,7 +4,7 @@ import { validateToolArguments } from '../../engine/web/tool-arguments.js';
 /** Widest picture kept, in pixels: enough to judge a shape, small enough to diff in a few milliseconds and to cost a model little to read. */
 const DEFAULT_WIDTH = 512;
 /** The widest a caller may ask for with `width` (a close-up of detail needs more than the default; the default stays small). */
-const MAX_WIDTH = 1280;
+const MAX_WIDTH = 2560;
 /** JPEG quality of the picture handed to the model (the comparison never uses it: it works on raw pixels). */
 const JPEG_QUALITY = 0.8;
 

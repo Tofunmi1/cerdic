@@ -32,24 +32,28 @@ type Host = McpHost;
 type Call = { id: number; method: string; params: Record<string, unknown> };
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export function connectMcpBridge(host: Host, port: number) {
+export function connectMcpBridge(host: Host, port: number, onStatus: (status: 'connecting' | 'connected' | 'off') => void = () => {}) {
   let socket: WebSocket | null = null;
   let stopped = false;
+  let retry: ReturnType<typeof setTimeout> | undefined;
   const open = () => {
     if (stopped) return;
+    onStatus('connecting');
     socket = new WebSocket(`ws://127.0.0.1:${port}`);
+    const current = socket;
+    socket.onopen = () => { if (!stopped) onStatus('connected'); };
     socket.onmessage = async event => {
       const call = JSON.parse(String(event.data)) as Call;
       let reply: { id: number; result?: unknown; error?: string };
       try { reply = { id: call.id, result: await run(host, call.method, call.params) }; }
       catch (error) { reply = { id: call.id, error: String(error) }; }
-      socket?.send(JSON.stringify(reply));
+      if (current.readyState === WebSocket.OPEN) current.send(JSON.stringify(reply));
     };
-    socket.onclose = () => { socket = null; if (!stopped) setTimeout(open, 2000); };
+    socket.onclose = () => { socket = null; if (!stopped) { onStatus('connecting'); retry = setTimeout(open, 2000); } };
     socket.onerror = () => socket?.close();
   };
   open();
-  return () => { stopped = true; socket?.close(); };
+  return () => { stopped = true; clearTimeout(retry); socket?.close(); onStatus('off'); };
 }
 
 // Waits until the staged edit has been evaluated: the worker is idle and either the new revision was

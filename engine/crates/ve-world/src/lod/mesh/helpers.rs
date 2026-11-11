@@ -163,7 +163,14 @@ fn append_ring(
             math::scale(binormal, sine),
         ));
         // root flare: five lobes that fade out with height above the soil
-        let swell = 1.0 + sample.flare * (0.55 + 0.45 * math::sin_cos(5.0 * core::f32::consts::TAU * side_fraction + sample.phase).1);
+        let swell = 1.0
+            + sample.flare
+                * (0.55
+                    + 0.45
+                        * math::sin_cos(
+                            5.0 * core::f32::consts::TAU * side_fraction + sample.phase,
+                        )
+                        .1);
         let position = math::add(
             sample.position,
             math::scale(normal, (sample.radius * swell).max(0.0001)),
@@ -241,7 +248,11 @@ fn tube_samples(skeleton: &Skeleton, line: &[u32], params: &Meshing) -> Vec<Samp
     let phase = skeleton.phase.first().copied().unwrap_or(0.0) * core::f32::consts::TAU;
     // only limbs are worth curving: a twig is a few pixels wide, and there are tens of thousands of them
     // (the first node of a branch's line is where it forks off its parent, so it carries the parent's radius and is left out)
-    let thickest = line.iter().skip(1).map(|&node| skeleton.radius[node as usize]).fold(0.0_f32, f32::max);
+    let thickest = line
+        .iter()
+        .skip(1)
+        .map(|&node| skeleton.radius[node as usize])
+        .fold(0.0_f32, f32::max);
     let smooth = if thickest >= 0.05 { params.smooth } else { 0 };
     let mut samples = Vec::new();
     for (index, pair) in line.windows(2).enumerate() {
@@ -249,8 +260,14 @@ fn tube_samples(skeleton: &Skeleton, line: &[u32], params: &Meshing) -> Vec<Samp
         let to = pair[1] as usize;
         let (a, b) = (skeleton.position[from], skeleton.position[to]);
         // the neighbours on either side, for a curve that passes through the nodes with a continuous direction (the ends repeat themselves)
-        let before = if index == 0 { math::sub(math::scale(a, 2.0), b) } else { position(line[index - 1]) };
-        let after = line.get(index + 2).map_or_else(|| math::sub(math::scale(b, 2.0), a), |&node| position(node));
+        let before = if index == 0 {
+            math::sub(math::scale(a, 2.0), b)
+        } else {
+            position(line[index - 1])
+        };
+        let after = line
+            .get(index + 2)
+            .map_or_else(|| math::sub(math::scale(b, 2.0), a), |&node| position(node));
         let length = math::length(math::sub(b, a));
         let mut longest = params.max_segment_length;
         if trunk && params.flare > 0.0 && a[1] - base_height < 5.0 * flare_height {
@@ -263,7 +280,11 @@ fn tube_samples(skeleton: &Skeleton, line: &[u32], params: &Meshing) -> Vec<Samp
         }
         for part in 0..divisions {
             let t = part as f32 / divisions as f32;
-            let point = if smooth > 0 { catmull_rom(before, a, b, after, t) } else { math::add(a, math::scale(math::sub(b, a), t)) };
+            let point = if smooth > 0 {
+                catmull_rom(before, a, b, after, t)
+            } else {
+                math::add(a, math::scale(math::sub(b, a), t))
+            };
             samples.push(Sample {
                 position: point,
                 radius: skeleton.radius[from] + (skeleton.radius[to] - skeleton.radius[from]) * t,

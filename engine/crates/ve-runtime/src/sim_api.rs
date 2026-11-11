@@ -51,23 +51,36 @@ pub(crate) fn method(world: &mut World, method: &str, params: &Value) -> Result<
     match method {
         "sim.status" => Ok(report(&rows)),
         "sim.step" => {
-            let steps = params.get("steps").and_then(Value::as_u64).ok_or("sim.step needs steps: a whole number")?;
+            let steps = params
+                .get("steps")
+                .and_then(Value::as_u64)
+                .ok_or("sim.step needs steps: a whole number")?;
             let steps = u32::try_from(steps).map_err(|_| "steps is too large")?;
-            let poses = world.get_resource::<PartPoses>().ok_or("the animation poses are not ready")?;
+            let poses = world
+                .get_resource::<PartPoses>()
+                .ok_or("the animation poses are not ready")?;
             for (name, shared) in &rows {
                 sim_live::step_now(shared, poses, steps).map_err(|e| format!("{name}: {e}"))?;
             }
             Ok(report(&rows))
         }
         "sim.set_param" => {
-            let name = params.get("name").and_then(Value::as_str).ok_or("sim.set_param needs a name")?;
+            let name = params
+                .get("name")
+                .and_then(Value::as_str)
+                .ok_or("sim.set_param needs a name")?;
             let values: Vec<f32> = match params.get("values") {
-                Some(Value::Array(items)) => items.iter().filter_map(Value::as_f64).map(|v| v as f32).collect(),
+                Some(Value::Array(items)) => items
+                    .iter()
+                    .filter_map(Value::as_f64)
+                    .map(|v| v as f32)
+                    .collect(),
                 Some(v) => v.as_f64().map(|n| vec![n as f32]).unwrap_or_default(),
                 None => Vec::new(),
             };
             for (part_name, shared) in &rows {
-                sim_live::set_param(shared, name, &values).map_err(|e| format!("{part_name}: {e}"))?;
+                sim_live::set_param(shared, name, &values)
+                    .map_err(|e| format!("{part_name}: {e}"))?;
             }
             Ok(report(&rows))
         }
@@ -77,6 +90,8 @@ pub(crate) fn method(world: &mut World, method: &str, params: &Value) -> Result<
             }
             Ok(report(&rows))
         }
-        other => Err(format!("unknown method {other:?}; use sim.status, sim.step, sim.set_param or sim.reset")),
+        other => Err(format!(
+            "unknown method {other:?}; use sim.status, sim.step, sim.set_param or sim.reset"
+        )),
     }
 }

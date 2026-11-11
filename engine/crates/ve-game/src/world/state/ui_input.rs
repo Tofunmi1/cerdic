@@ -62,22 +62,40 @@ impl World {
     }
 
     /// Reads the host's UI presses from `pressed`: focus moves, a button is accepted or clicked.
-    pub(super) fn ui_input(&mut self, pressed: &[String], queue: &mut Vec<Event>, effects: &mut Vec<Effect>) -> Result<(), GameError> {
+    pub(super) fn ui_input(
+        &mut self,
+        pressed: &[String],
+        queue: &mut Vec<Event>,
+        effects: &mut Vec<Effect>,
+    ) -> Result<(), GameError> {
         if self.def.ui.is_empty() {
             return Ok(());
         }
         for name in pressed {
-            let buttons: Vec<String> = self.with_ui_context(16.0 / 9.0, |cx| layout::visible_buttons(&self.def, cx).iter().map(|b| b.id.clone()).collect());
+            let buttons: Vec<String> = self.with_ui_context(16.0 / 9.0, |cx| {
+                layout::visible_buttons(&self.def, cx)
+                    .iter()
+                    .map(|b| b.id.clone())
+                    .collect()
+            });
             if buttons.is_empty() {
                 continue;
             }
             let at = self
-                .with_ui_context(16.0 / 9.0, |cx| layout::effective_focus(&self.def, cx, &self.flow.focus))
+                .with_ui_context(16.0 / 9.0, |cx| {
+                    layout::effective_focus(&self.def, cx, &self.flow.focus)
+                })
                 .and_then(|id| buttons.iter().position(|b| *b == id))
                 .unwrap_or(0);
             match name.as_str() {
-                "ui_next" => self.flow.focus.clone_from(&buttons[(at + 1) % buttons.len()]),
-                "ui_prev" => self.flow.focus.clone_from(&buttons[(at + buttons.len() - 1) % buttons.len()]),
+                "ui_next" => self
+                    .flow
+                    .focus
+                    .clone_from(&buttons[(at + 1) % buttons.len()]),
+                "ui_prev" => self
+                    .flow
+                    .focus
+                    .clone_from(&buttons[(at + buttons.len() - 1) % buttons.len()]),
                 "ui_accept" => self.press_button(&buttons[at].clone(), queue, effects)?,
                 other => {
                     if let Some(id) = other.strip_prefix("ui:")
@@ -91,11 +109,27 @@ impl World {
         Ok(())
     }
 
-    fn press_button(&mut self, id: &str, queue: &mut Vec<Event>, effects: &mut Vec<Effect>) -> Result<(), GameError> {
+    fn press_button(
+        &mut self,
+        id: &str,
+        queue: &mut Vec<Event>,
+        effects: &mut Vec<Effect>,
+    ) -> Result<(), GameError> {
         id.clone_into(&mut self.flow.focus);
-        let event = Event { name: format!("ui:{id}"), a: None, b: None, depth: 0 };
+        let event = Event {
+            name: format!("ui:{id}"),
+            a: None,
+            b: None,
+            depth: 0,
+        };
         queue.push(event.clone());
-        let actions = self.def.ui.iter().find(|item| item.id == id).map(crate::UiDef::actions).unwrap_or_default();
+        let actions = self
+            .def
+            .ui
+            .iter()
+            .find(|item| item.id == id)
+            .map(crate::UiDef::actions)
+            .unwrap_or_default();
         for action in actions {
             self.action(&action, &event, queue, effects)?;
         }
@@ -104,5 +138,9 @@ impl World {
 }
 
 fn sanitise(aspect: f64) -> f64 {
-    if aspect.is_finite() && aspect > 0.2 { aspect } else { 16.0 / 9.0 }
+    if aspect.is_finite() && aspect > 0.2 {
+        aspect
+    } else {
+        16.0 / 9.0
+    }
 }

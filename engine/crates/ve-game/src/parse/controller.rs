@@ -47,15 +47,31 @@ pub struct ControllerDef {
 
 const MODES: [&str; 3] = ["walk", "platformer", "top_down"];
 
-fn number(fields: &BTreeMap<String, String>, key: &str, default: f64, zero: bool) -> Result<f64, String> {
-    let value = fields.get(key).map_or(Ok(default), |text| text.parse::<f64>()).map_err(|_| format!("{key} must be a finite number"))?;
+fn number(
+    fields: &BTreeMap<String, String>,
+    key: &str,
+    default: f64,
+    zero: bool,
+) -> Result<f64, String> {
+    let value = fields
+        .get(key)
+        .map_or(Ok(default), |text| text.parse::<f64>())
+        .map_err(|_| format!("{key} must be a finite number"))?;
     if !value.is_finite() || value < 0.0 || (!zero && value == 0.0) {
-        return Err(format!("{key} must be finite and {}", if zero { "nonnegative" } else { "positive" }));
+        return Err(format!(
+            "{key} must be finite and {}",
+            if zero { "nonnegative" } else { "positive" }
+        ));
     }
     Ok(value)
 }
 
-fn word(fields: &BTreeMap<String, String>, key: &str, default: &str, allowed: &[&str]) -> Result<String, String> {
+fn word(
+    fields: &BTreeMap<String, String>,
+    key: &str,
+    default: &str,
+    allowed: &[&str],
+) -> Result<String, String> {
     let value = fields.get(key).map_or(default, String::as_str);
     if allowed.contains(&value) {
         Ok(value.to_owned())
@@ -64,7 +80,11 @@ fn word(fields: &BTreeMap<String, String>, key: &str, default: &str, allowed: &[
     }
 }
 
-pub(super) fn parse_controller(def: &mut GameDef, kind: Option<&str>, fields: &BTreeMap<String, String>) -> Result<(), String> {
+pub(super) fn parse_controller(
+    def: &mut GameDef,
+    kind: Option<&str>,
+    fields: &BTreeMap<String, String>,
+) -> Result<(), String> {
     let kind = kind.ok_or("controller needs a kind")?;
     let Some(declared) = def.kinds.iter().find(|entry| entry.name == kind) else {
         return Err(format!("unknown controller kind '{kind}'"));
@@ -73,7 +93,16 @@ pub(super) fn parse_controller(def: &mut GameDef, kind: Option<&str>, fields: &B
         return Err(format!("duplicate controller kind '{kind}'"));
     }
     let mode = word(fields, "mode", "walk", &MODES)?;
-    let speed = number(fields, "speed", if declared.speed > 0.0 { declared.speed } else { 4.0 }, false)?;
+    let speed = number(
+        fields,
+        "speed",
+        if declared.speed > 0.0 {
+            declared.speed
+        } else {
+            4.0
+        },
+        false,
+    )?;
     let accel = number(fields, "accel", speed * 10.0, false)?;
     let platformer = mode == "platformer";
     let top_down = mode == "top_down";
@@ -89,7 +118,10 @@ pub(super) fn parse_controller(def: &mut GameDef, kind: Option<&str>, fields: &B
     let cut = number(fields, "cut", 0.5, true)?;
     let air = number(fields, "air", 0.6, true)?;
     if cut > 1.0 || air > 1.0 {
-        return Err(format!("{} must be between 0 and 1", if cut > 1.0 { "cut" } else { "air" }));
+        return Err(format!(
+            "{} must be between 0 and 1",
+            if cut > 1.0 { "cut" } else { "air" }
+        ));
     }
     let controller = ControllerDef {
         kind: kind.to_owned(),
@@ -98,11 +130,23 @@ pub(super) fn parse_controller(def: &mut GameDef, kind: Option<&str>, fields: &B
         accel,
         decel: number(fields, "decel", accel, false)?,
         air,
-        jump: if top_down { 0.0 } else { number(fields, "jump", 0.0, true)? },
-        gravity: if top_down { 0.0 } else { number(fields, "gravity", 20.0, true)? },
+        jump: if top_down {
+            0.0
+        } else {
+            number(fields, "jump", 0.0, true)?
+        },
+        gravity: if top_down {
+            0.0
+        } else {
+            number(fields, "gravity", 20.0, true)?
+        },
         coyote: number(fields, "coyote", 0.1, true)?,
         buffer: number(fields, "buffer", 0.1, true)?,
-        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "checked to be a whole number from 0 to 5")]
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "checked to be a whole number from 0 to 5"
+        )]
         extra_jumps: extra_jumps as u32,
         cut,
         turn: number(fields, "turn", 0.0, true)?,
@@ -110,11 +154,19 @@ pub(super) fn parse_controller(def: &mut GameDef, kind: Option<&str>, fields: &B
         relative: word(fields, "relative", "world", &["world", "camera"])?,
         lock: lock.to_owned(),
         fall_limit: match fields.get("fall_limit") {
-            Some(text) => Some(text.parse::<f64>().ok().filter(|v| v.is_finite()).ok_or("fall_limit must be a finite number (a height in metres)")?),
+            Some(text) => Some(
+                text.parse::<f64>()
+                    .ok()
+                    .filter(|v| v.is_finite())
+                    .ok_or("fall_limit must be a finite number (a height in metres)")?,
+            ),
             None => None,
         },
         movement: fields.get("move").cloned().unwrap_or_else(|| "move".into()),
-        jump_input: fields.get("jump_input").cloned().unwrap_or_else(|| "jump".into()),
+        jump_input: fields
+            .get("jump_input")
+            .cloned()
+            .unwrap_or_else(|| "jump".into()),
     };
     def.controllers.push(controller);
     Ok(())
@@ -126,7 +178,12 @@ pub(super) fn error_column(raw: &str, message: &str) -> Option<usize> {
     }
     raw.split_whitespace().find_map(|token| {
         let key = token.split_once('=').map_or(token, |(key, _)| key);
-        (message.contains(key) && key != "controller").then(|| raw.find(token).map(|index| raw[..index].chars().count() + 1)).flatten()
+        (message.contains(key) && key != "controller")
+            .then(|| {
+                raw.find(token)
+                    .map(|index| raw[..index].chars().count() + 1)
+            })
+            .flatten()
     })
 }
 
@@ -134,7 +191,21 @@ impl ControllerDef {
     pub(crate) fn to_text(&self) -> String {
         let mut line = format!(
             "controller {} mode={} speed={} accel={} decel={} air={} jump={} gravity={} coyote={} buffer={} extra_jumps={} cut={} turn={} step={} relative={}",
-            self.kind, self.mode, self.speed, self.accel, self.decel, self.air, self.jump, self.gravity, self.coyote, self.buffer, self.extra_jumps, self.cut, self.turn, self.step, self.relative
+            self.kind,
+            self.mode,
+            self.speed,
+            self.accel,
+            self.decel,
+            self.air,
+            self.jump,
+            self.gravity,
+            self.coyote,
+            self.buffer,
+            self.extra_jumps,
+            self.cut,
+            self.turn,
+            self.step,
+            self.relative
         );
         if !self.lock.is_empty() {
             let _ = write!(line, " lock={}", self.lock);

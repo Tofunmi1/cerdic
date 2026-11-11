@@ -15,7 +15,9 @@ use bevy_ecs::{
 };
 use bevy_mesh::{Mesh, Mesh3d};
 use bevy_time::{Real, Time};
-use ve_modeling::sim_program::{MAX_MESH_POINTS, MAX_PARTICLES, SimSpec, TETRA_CORNERS, TETRA_FACES};
+use ve_modeling::sim_program::{
+    MAX_MESH_POINTS, MAX_PARTICLES, SimSpec, TETRA_CORNERS, TETRA_FACES,
+};
 use ve_world::sim::{IDENTITY, MeshData, Program, Sim, compile};
 
 use crate::animation::PartPoses;
@@ -52,7 +54,13 @@ struct State {
 }
 
 fn fresh() -> Mutex<State> {
-    Mutex::new(State { sim: None, carry: 0.0, points: Vec::new(), normals: Vec::new(), failed: None })
+    Mutex::new(State {
+        sim: None,
+        carry: 0.0,
+        points: Vec::new(),
+        normals: Vec::new(),
+        failed: None,
+    })
 }
 
 impl Shared {
@@ -70,18 +78,39 @@ impl Shared {
         let bound = match (is_mesh, mesh) {
             (true, Some((points, corners))) => {
                 let n = points.len();
-                if n > MAX_MESH_POINTS || corners.len() % 3 != 0 || corners.iter().any(|&c| c as usize >= n) || spec.count as usize != n {
+                if n > MAX_MESH_POINTS
+                    || corners.len() % 3 != 0
+                    || corners.iter().any(|&c| c as usize >= n)
+                    || spec.count as usize != n
+                {
                     return None;
                 }
-                let edges: Vec<(u32, u32)> = corners.chunks_exact(3).flat_map(|t| [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])]).collect();
-                Some(Bound { data: MeshData::new(points, &edges), corners })
+                let edges: Vec<(u32, u32)> = corners
+                    .chunks_exact(3)
+                    .flat_map(|t| [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])])
+                    .collect();
+                Some(Bound {
+                    data: MeshData::new(points, &edges),
+                    corners,
+                })
             }
             (true, None) => return None,
             (false, _) => None,
         };
         let bones = spec.bones.iter().map(|b| (b.clone(), b.clone())).collect();
-        let pushes = program.pushes().into_iter().map(|(body, state)| (state.to_owned(), body.to_owned())).collect();
-        Some(Arc::new(Self { spec, program, mesh: bound, bones, pushes, state: fresh() }))
+        let pushes = program
+            .pushes()
+            .into_iter()
+            .map(|(body, state)| (state.to_owned(), body.to_owned()))
+            .collect();
+        Some(Arc::new(Self {
+            spec,
+            program,
+            mesh: bound,
+            bones,
+            pushes,
+            state: fresh(),
+        }))
     }
 
     /// A new instance of the same program with its own state, reading the bones that `rename` maps the originals to (one more copy of a
@@ -90,9 +119,20 @@ impl Shared {
         Arc::new(Self {
             spec: self.spec.clone(),
             program: Arc::clone(&self.program),
-            mesh: self.mesh.as_ref().map(|m| Bound { data: Arc::clone(&m.data), corners: m.corners.clone() }),
-            bones: self.bones.iter().map(|(program, part)| (program.clone(), rename(part))).collect(),
-            pushes: self.pushes.iter().map(|(state, part)| (state.clone(), rename(part))).collect(),
+            mesh: self.mesh.as_ref().map(|m| Bound {
+                data: Arc::clone(&m.data),
+                corners: m.corners.clone(),
+            }),
+            bones: self
+                .bones
+                .iter()
+                .map(|(program, part)| (program.clone(), rename(part)))
+                .collect(),
+            pushes: self
+                .pushes
+                .iter()
+                .map(|(state, part)| (state.clone(), rename(part)))
+                .collect(),
             state: fresh(),
         })
     }
@@ -125,9 +165,20 @@ pub(crate) fn published() -> String {
 fn vertex_normals(points: &[[f32; 3]], corners: &[u32]) -> Vec<[f32; 3]> {
     let mut sums = vec![[0.0_f32; 3]; points.len()];
     for t in corners.chunks_exact(3) {
-        let (a, b, c) = (points[t[0] as usize], points[t[1] as usize], points[t[2] as usize]);
-        let (u, v) = ([b[0] - a[0], b[1] - a[1], b[2] - a[2]], [c[0] - a[0], c[1] - a[1], c[2] - a[2]]);
-        let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+        let (a, b, c) = (
+            points[t[0] as usize],
+            points[t[1] as usize],
+            points[t[2] as usize],
+        );
+        let (u, v) = (
+            [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+            [c[0] - a[0], c[1] - a[1], c[2] - a[2]],
+        );
+        let n = [
+            u[1] * v[2] - u[2] * v[1],
+            u[2] * v[0] - u[0] * v[2],
+            u[0] * v[1] - u[1] * v[0],
+        ];
         for &i in t {
             for k in 0..3 {
                 sums[i as usize][k] += n[k];
@@ -136,7 +187,11 @@ fn vertex_normals(points: &[[f32; 3]], corners: &[u32]) -> Vec<[f32; 3]> {
     }
     for n in &mut sums {
         let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
-        *n = if len > 1.0e-12 { [n[0] / len, n[1] / len, n[2] / len] } else { [0.0, 1.0, 0.0] };
+        *n = if len > 1.0e-12 {
+            [n[0] / len, n[1] / len, n[2] / len]
+        } else {
+            [0.0, 1.0, 0.0]
+        };
     }
     sums
 }
@@ -148,7 +203,11 @@ fn prepare(shared: &Shared, state: &mut State, poses: &PartPoses) -> bool {
     }
     if state.sim.is_none() {
         let made = match &shared.mesh {
-            Some(bound) => Sim::with_meshes(Arc::clone(&shared.program), shared.spec.seed, vec![Arc::clone(&bound.data)]),
+            Some(bound) => Sim::with_meshes(
+                Arc::clone(&shared.program),
+                shared.spec.seed,
+                vec![Arc::clone(&bound.data)],
+            ),
             None => Sim::new(Arc::clone(&shared.program), shared.spec.seed),
         };
         let made = made.and_then(|mut sim| {
@@ -170,7 +229,9 @@ fn prepare(shared: &Shared, state: &mut State, poses: &PartPoses) -> bool {
         for (program_name, part) in &shared.bones {
             // A part a physics body moves (its pose is the truth: the animation pass lists the part with an identity pose), else a part
             // posed by an animation, else a part that stands where it was built.
-            let pose = crate::physics::body_matrix(part).or_else(|| poses.matrix_of(part)).unwrap_or(IDENTITY);
+            let pose = crate::physics::body_matrix(part)
+                .or_else(|| poses.matrix_of(part))
+                .unwrap_or(IDENTITY);
             sim.set_bone(program_name, pose);
         }
     }
@@ -191,7 +252,9 @@ fn run_steps(shared: &Shared, state: &mut State, steps: u32) {
         // What the program asks of physics bodies: the sum of each push array is a change of speed for the body of the named part.
         for (array, part) in &shared.pushes {
             if let Some(numbers) = sim.state(array) {
-                let sum = numbers.chunks_exact(3).fold([0.0_f32; 3], |s, c| [s[0] + c[0], s[1] + c[1], s[2] + c[2]]);
+                let sum = numbers
+                    .chunks_exact(3)
+                    .fold([0.0_f32; 3], |s, c| [s[0] + c[0], s[1] + c[1], s[2] + c[2]]);
                 crate::physics::queue_push(part, sum);
             }
         }
@@ -200,12 +263,18 @@ fn run_steps(shared: &Shared, state: &mut State, steps: u32) {
 
 /// Advances an instance by `steps` steps now, whatever the frame clock says (for tools and tests); returns the steps taken so far.
 pub(crate) fn step_now(shared: &Shared, poses: &PartPoses, steps: u32) -> Result<u64, String> {
-    let mut state = shared.state.lock().map_err(|_| "the simulation is locked".to_owned())?;
+    let mut state = shared
+        .state
+        .lock()
+        .map_err(|_| "the simulation is locked".to_owned())?;
     if prepare(shared, &mut state, poses) {
         run_steps(shared, &mut state, steps.min(10_000));
         refresh(shared, &mut state);
     }
-    state.failed.clone().map_or_else(|| Ok(state.sim.as_ref().map_or(0, Sim::steps)), Err)
+    state
+        .failed
+        .clone()
+        .map_or_else(|| Ok(state.sim.as_ref().map_or(0, Sim::steps)), Err)
 }
 
 /// Starts the instance again from its initial state (the next frame builds it afresh).
@@ -219,7 +288,10 @@ pub(crate) fn reset(shared: &Shared) {
 
 /// Sets one parameter of the running instance.
 pub(crate) fn set_param(shared: &Shared, name: &str, values: &[f32]) -> Result<(), String> {
-    let mut state = shared.state.lock().map_err(|_| "the simulation is locked".to_owned())?;
+    let mut state = shared
+        .state
+        .lock()
+        .map_err(|_| "the simulation is locked".to_owned())?;
     match state.sim.as_mut() {
         Some(sim) => sim.set_param(name, values).map_err(|e| e.message),
         None => Err("the simulation has not started yet; step it once first".to_owned()),
@@ -275,7 +347,12 @@ fn advance(shared: &Shared, poses: &PartPoses, dt: f32) {
 
 /// Copies the drawn state into points (and normals) and publishes the instance's numbers.
 fn refresh(shared: &Shared, state: &mut State) {
-    let State { sim, points, normals, .. } = &mut *state;
+    let State {
+        sim,
+        points,
+        normals,
+        ..
+    } = &mut *state;
     if let Some(sim) = sim.as_ref()
         && let Some(numbers) = sim.state(&shared.spec.particles)
     {
@@ -293,8 +370,15 @@ fn refresh(shared: &Shared, state: &mut State) {
         }
     }
     let steps = state.sim.as_ref().map_or(0, Sim::steps);
-    let error = state.failed.as_ref().map_or_else(|| "null".to_owned(), |e| format!("{e:?}"));
-    let text = format!("{{\"mode\":\"{}\",\"particles\":{},\"steps\":{steps},\"min\":{lo:?},\"max\":{hi:?},\"error\":{error}}}", shared.spec.mode, state.points.len());
+    let error = state
+        .failed
+        .as_ref()
+        .map_or_else(|| "null".to_owned(), |e| format!("{e:?}"));
+    let text = format!(
+        "{{\"mode\":\"{}\",\"particles\":{},\"steps\":{steps},\"min\":{lo:?},\"max\":{hi:?},\"error\":{error}}}",
+        shared.spec.mode,
+        state.points.len()
+    );
     PUBLISHED.with(|list| list.borrow_mut().push(text));
 }
 
@@ -330,7 +414,13 @@ pub(crate) fn simulate(
                     break;
                 };
                 positions.push(state.points[vertex as usize]);
-                normals.push(state.normals.get(vertex as usize).copied().unwrap_or([0.0, 1.0, 0.0]));
+                normals.push(
+                    state
+                        .normals
+                        .get(vertex as usize)
+                        .copied()
+                        .unwrap_or([0.0, 1.0, 0.0]),
+                );
             }
             if positions.len() == count {
                 mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);

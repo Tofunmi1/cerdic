@@ -2,14 +2,14 @@
 use crate::{Diagnostic, expr::Expr};
 use std::{collections::BTreeMap, fmt::Write as _};
 pub(crate) mod agent;
-pub(crate) mod controller;
-mod format;
 pub(crate) mod bindings;
 pub(crate) mod combat;
+pub(crate) mod controller;
 pub(crate) mod flow;
+mod format;
 pub(crate) mod helpers;
-pub(crate) mod party;
 mod hud;
+pub(crate) mod party;
 mod reader;
 pub(crate) mod rolling;
 mod script;
@@ -292,7 +292,11 @@ impl GameDef {
             lines.push(terrain.to_text());
         }
         lines.extend(self.agents.iter().map(agent::AgentDef::to_text));
-        lines.extend(self.controllers.iter().map(controller::ControllerDef::to_text));
+        lines.extend(
+            self.controllers
+                .iter()
+                .map(controller::ControllerDef::to_text),
+        );
         lines.extend(self.cameras.iter().map(crate::CameraDef::to_text));
         if let Some(nav) = self.nav() {
             lines.push(nav.to_text());

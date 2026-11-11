@@ -65,7 +65,10 @@ const TEXT_SIZE: f64 = 0.03;
 const TIP_SIZE: f64 = 0.022;
 
 fn num(item: &UiDef, key: &str, default: f64) -> f64 {
-    item.fields.get(key).and_then(|v| v.parse().ok()).unwrap_or(default)
+    item.fields
+        .get(key)
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
 }
 
 fn pair(item: &UiDef, key: &str) -> Option<[f64; 2]> {
@@ -81,11 +84,19 @@ fn count(n: usize) -> f64 {
 
 /// A grid's column count (validated as a whole number of at least 1 when the game is read).
 fn columns(item: &UiDef) -> usize {
-    item.fields.get("cols").and_then(|c| c.parse().ok()).unwrap_or(3).max(1)
+    item.fields
+        .get("cols")
+        .and_then(|c| c.parse().ok())
+        .unwrap_or(3)
+        .max(1)
 }
 
 fn show_number(value: f64) -> String {
-    if value.fract() == 0.0 && value.abs() < 1e15 { format!("{value:.0}") } else { value.to_string() }
+    if value.fract() == 0.0 && value.abs() < 1e15 {
+        format!("{value:.0}")
+    } else {
+        value.to_string()
+    }
 }
 
 /// A number a binding names: a variable, or `KIND.prop` / `TAG.prop` for the first entity of that kind or tag (`hero.health`).
@@ -96,7 +107,11 @@ fn lookup(name: &str, cx: &Context) -> Option<f64> {
     let (who, prop) = name.rsplit_once('.')?;
     if who == "targeted" {
         // the leader's current target, whoever it is
-        return cx.entities.iter().find(|e| e.props.get("targeted").is_some_and(|t| *t > 0.0)).and_then(|e| e.props.get(prop).copied());
+        return cx
+            .entities
+            .iter()
+            .find(|e| e.props.get("targeted").is_some_and(|t| *t > 0.0))
+            .and_then(|e| e.props.get(prop).copied());
     }
     let tag = format!("tag:{who}");
     cx.entities
@@ -110,7 +125,9 @@ fn interpolate(text: &str, cx: &Context) -> String {
     let mut out = String::new();
     let mut rest = text;
     while let Some(open) = rest.find('{') {
-        let Some(close) = rest[open..].find('}') else { break };
+        let Some(close) = rest[open..].find('}') else {
+            break;
+        };
         out.push_str(&rest[..open]);
         let name = &rest[open + 1..open + close];
         match name.strip_prefix("key:") {
@@ -125,12 +142,23 @@ fn interpolate(text: &str, cx: &Context) -> String {
 
 fn shown(def: &GameDef, item: &UiDef, cx: &Context) -> bool {
     let (show, state) = (item.list("show"), cx.state);
-    let in_state = (show.is_empty() || show.contains(&state)) && !item.list("hide").contains(&state) && !cx.hidden.contains(&item.id);
-    in_state && item.fields.get("parent").is_none_or(|parent| def.ui.iter().find(|p| p.id == *parent).is_some_and(|p| shown(def, p, cx)))
+    let in_state = (show.is_empty() || show.contains(&state))
+        && !item.list("hide").contains(&state)
+        && !cx.hidden.contains(&item.id);
+    in_state
+        && item.fields.get("parent").is_none_or(|parent| {
+            def.ui
+                .iter()
+                .find(|p| p.id == *parent)
+                .is_some_and(|p| shown(def, p, cx))
+        })
 }
 
 fn children<'a>(def: &'a GameDef, parent: &UiDef, cx: &Context) -> Vec<&'a UiDef> {
-    def.ui.iter().filter(|c| c.fields.get("parent") == Some(&parent.id) && shown(def, c, cx)).collect()
+    def.ui
+        .iter()
+        .filter(|c| c.fields.get("parent") == Some(&parent.id) && shown(def, c, cx))
+        .collect()
 }
 
 /// The elements whose `when=` expression is false right now (they and their children are not shown).
@@ -138,24 +166,39 @@ pub(crate) fn hidden_by_when(def: &GameDef, cx: &Context) -> BTreeSet<String> {
     def.ui
         .iter()
         .filter(|item| !item.field("when").is_empty())
-        .filter(|item| crate::expr::Expr::parse(item.field("when")).is_ok_and(|expr| expr.eval(&|name| lookup(name, cx).unwrap_or(0.0)) == 0.0))
+        .filter(|item| {
+            crate::expr::Expr::parse(item.field("when"))
+                .is_ok_and(|expr| expr.eval(&|name| lookup(name, cx).unwrap_or(0.0)) == 0.0)
+        })
         .map(|item| item.id.clone())
         .collect()
 }
 
 /// The visible buttons in focus order (declaration order).
 pub(crate) fn visible_buttons<'a>(def: &'a GameDef, cx: &Context) -> Vec<&'a UiDef> {
-    def.ui.iter().filter(|item| item.kind == "button" && shown(def, item, cx)).collect()
+    def.ui
+        .iter()
+        .filter(|item| item.kind == "button" && shown(def, item, cx))
+        .collect()
 }
 
 /// The button that has the focus: the remembered one while it is visible, otherwise the first visible button.
 pub(crate) fn effective_focus(def: &GameDef, cx: &Context, remembered: &str) -> Option<String> {
     let buttons = visible_buttons(def, cx);
-    buttons.iter().find(|b| b.id == remembered).or(buttons.first()).map(|b| b.id.clone())
+    buttons
+        .iter()
+        .find(|b| b.id == remembered)
+        .or(buttons.first())
+        .map(|b| b.id.clone())
 }
 
 fn text_size(item: &UiDef) -> f64 {
-    if item.kind == "button" { num(item, "text_size", TEXT_SIZE) } else { num(item, "size", TEXT_SIZE) }.clamp(0.005, 1.0)
+    if item.kind == "button" {
+        num(item, "text_size", TEXT_SIZE)
+    } else {
+        num(item, "size", TEXT_SIZE)
+    }
+    .clamp(0.005, 1.0)
 }
 
 fn text_width(item: &UiDef, words: &str, size: f64) -> f64 {
@@ -170,40 +213,83 @@ fn size_of(def: &GameDef, item: &UiDef, cx: &Context) -> [f64; 2] {
     match item.kind.as_str() {
         "text" => {
             let size = text_size(item);
-            let plate = if item.field("plate") == "true" { size } else { 0.0 };
-            [text_width(item, &interpolate(item.field("text"), cx), size) + plate, size + plate]
+            let plate = if item.field("plate") == "true" {
+                size
+            } else {
+                0.0
+            };
+            [
+                text_width(item, &interpolate(item.field("text"), cx), size) + plate,
+                size + plate,
+            ]
         }
         "bar" => pair(item, "size").unwrap_or([0.3, 0.025]),
         "panel" | "minimap" => pair(item, "size").unwrap_or([0.3, 0.2]),
         "slot" | "portrait" => pair(item, "size").unwrap_or([0.07, 0.07]),
         "button" => pair(item, "size").unwrap_or_else(|| {
             let size = text_size(item);
-            [text_width(item, &interpolate(item.field("text"), cx), size) + 1.2 * size, 2.2 * size]
+            [
+                text_width(item, &interpolate(item.field("text"), cx), size) + 1.2 * size,
+                2.2 * size,
+            ]
         }),
         "stack" => {
-            let kids: Vec<[f64; 2]> = children(def, item, cx).iter().map(|c| size_of(def, c, cx)).collect();
+            let kids: Vec<[f64; 2]> = children(def, item, cx)
+                .iter()
+                .map(|c| size_of(def, c, cx))
+                .collect();
             let (gap, pad) = (num(item, "gap", 0.01), num(item, "pad", 0.015));
             let gaps = gap * count(kids.len().saturating_sub(1));
             let (along, across) = if item.field("dir") == "right" {
-                (kids.iter().map(|k| k[0]).sum::<f64>(), kids.iter().map(|k| k[1]).fold(0.0, f64::max))
+                (
+                    kids.iter().map(|k| k[0]).sum::<f64>(),
+                    kids.iter().map(|k| k[1]).fold(0.0, f64::max),
+                )
             } else {
-                (kids.iter().map(|k| k[1]).sum::<f64>(), kids.iter().map(|k| k[0]).fold(0.0, f64::max))
+                (
+                    kids.iter().map(|k| k[1]).sum::<f64>(),
+                    kids.iter().map(|k| k[0]).fold(0.0, f64::max),
+                )
             };
-            if item.field("dir") == "right" { [along + gaps + 2.0 * pad, across + 2.0 * pad] } else { [across + 2.0 * pad, along + gaps + 2.0 * pad] }
+            if item.field("dir") == "right" {
+                [along + gaps + 2.0 * pad, across + 2.0 * pad]
+            } else {
+                [across + 2.0 * pad, along + gaps + 2.0 * pad]
+            }
         }
         "grid" => {
             let items = children(def, item, cx).len();
             let cols = columns(item);
             let rows = items.div_ceil(cols);
-            let (cell, gap, pad) = (pair(item, "cell").unwrap_or([0.1, 0.1]), num(item, "gap", 0.01), num(item, "pad", 0.01));
-            let span = |n: usize, cell: f64| if n > 0 { count(n) * cell + count(n - 1) * gap } else { 0.0 };
-            [span(cols.min(items), cell[0]) + 2.0 * pad, span(rows, cell[1]) + 2.0 * pad]
+            let (cell, gap, pad) = (
+                pair(item, "cell").unwrap_or([0.1, 0.1]),
+                num(item, "gap", 0.01),
+                num(item, "pad", 0.01),
+            );
+            let span = |n: usize, cell: f64| {
+                if n > 0 {
+                    count(n) * cell + count(n - 1) * gap
+                } else {
+                    0.0
+                }
+            };
+            [
+                span(cols.min(items), cell[0]) + 2.0 * pad,
+                span(rows, cell[1]) + 2.0 * pad,
+            ]
         }
         _ => [0.0, 0.0],
     }
 }
 
-fn place(def: &GameDef, item: &UiDef, cx: &Context, at: [f64; 2], focus: Option<&str>, out: &mut Vec<UiBox>) {
+fn place(
+    def: &GameDef,
+    item: &UiDef,
+    cx: &Context,
+    at: [f64; 2],
+    focus: Option<&str>,
+    out: &mut Vec<UiBox>,
+) {
     let size = size_of(def, item, cx);
     let mut laid = UiBox {
         id: item.id.clone(),
@@ -215,9 +301,12 @@ fn place(def: &GameDef, item: &UiDef, cx: &Context, at: [f64; 2], focus: Option<
         dots: Vec::new(),
         label: String::new(),
     };
-    let read =|key: &str, default: f64| {
+    let read = |key: &str, default: f64| {
         let text = item.field(key);
-        text.parse().ok().or_else(|| lookup(text, cx)).unwrap_or(default)
+        text.parse()
+            .ok()
+            .or_else(|| lookup(text, cx))
+            .unwrap_or(default)
     };
     match item.kind.as_str() {
         "text" | "button" | "portrait" => laid.text = interpolate(item.field("text"), cx),
@@ -234,7 +323,11 @@ fn place(def: &GameDef, item: &UiDef, cx: &Context, at: [f64; 2], focus: Option<
         }
         "minimap" => laid.dots = minimap_dots(def, item, cx, laid.rect),
         "floaters" => {
-            out.extend(cx.floaters.iter().filter_map(|floater| floater_box(&item.id, floater, cx)));
+            out.extend(
+                cx.floaters
+                    .iter()
+                    .filter_map(|floater| floater_box(&item.id, floater, cx)),
+            );
             return;
         }
         _ => {}
@@ -247,22 +340,41 @@ fn place(def: &GameDef, item: &UiDef, cx: &Context, at: [f64; 2], focus: Option<
             let (mut x, mut y) = (at[0] + pad, at[1] + pad);
             for child in children(def, item, cx) {
                 let kid = size_of(def, child, cx);
-                let (room, used) = if right { (size[1] - 2.0 * pad, kid[1]) } else { (size[0] - 2.0 * pad, kid[0]) };
+                let (room, used) = if right {
+                    (size[1] - 2.0 * pad, kid[1])
+                } else {
+                    (size[0] - 2.0 * pad, kid[0])
+                };
                 let shift = match item.field("align") {
                     "center" => (room - used) / 2.0,
                     "end" => room - used,
                     _ => 0.0,
                 };
-                let corner = if right { [x, y + shift] } else { [x + shift, y] };
+                let corner = if right {
+                    [x, y + shift]
+                } else {
+                    [x + shift, y]
+                };
                 place(def, child, cx, corner, focus, out);
-                if right { x += kid[0] + gap } else { y += kid[1] + gap }
+                if right {
+                    x += kid[0] + gap
+                } else {
+                    y += kid[1] + gap
+                }
             }
         }
         "grid" => {
             let cols = columns(item);
-            let (cell, gap, pad) = (pair(item, "cell").unwrap_or([0.1, 0.1]), num(item, "gap", 0.01), num(item, "pad", 0.01));
+            let (cell, gap, pad) = (
+                pair(item, "cell").unwrap_or([0.1, 0.1]),
+                num(item, "gap", 0.01),
+                num(item, "pad", 0.01),
+            );
             for (index, child) in children(def, item, cx).into_iter().enumerate() {
-                let corner = [at[0] + pad + count(index % cols) * (cell[0] + gap), at[1] + pad + count(index / cols) * (cell[1] + gap)];
+                let corner = [
+                    at[0] + pad + count(index % cols) * (cell[0] + gap),
+                    at[1] + pad + count(index / cols) * (cell[1] + gap),
+                ];
                 place(def, child, cx, corner, focus, out);
             }
         }
@@ -271,13 +383,32 @@ fn place(def: &GameDef, item: &UiDef, cx: &Context, at: [f64; 2], focus: Option<
 }
 
 /// A point in the world as a position on the screen (in screen heights, y down), for the camera the host reported; `None` behind the camera.
-pub(crate) fn project(point: [f64; 3], camera: &BTreeMap<String, f64>, aspect: f64) -> Option<[f64; 2]> {
+pub(crate) fn project(
+    point: [f64; 3],
+    camera: &BTreeMap<String, f64>,
+    aspect: f64,
+) -> Option<[f64; 2]> {
     let get = |name: &str| camera.get(name).copied();
-    let (eye, yaw, pitch) = ([get("camera.x")?, get("camera.y")?, get("camera.z")?], get("camera.yaw")?, get("camera.pitch")?);
-    let fov = get("camera.fov").unwrap_or(60.0).clamp(10.0, 170.0).to_radians();
-    let forward = [pitch.cos() * yaw.sin(), pitch.sin(), pitch.cos() * yaw.cos()];
+    let (eye, yaw, pitch) = (
+        [get("camera.x")?, get("camera.y")?, get("camera.z")?],
+        get("camera.yaw")?,
+        get("camera.pitch")?,
+    );
+    let fov = get("camera.fov")
+        .unwrap_or(60.0)
+        .clamp(10.0, 170.0)
+        .to_radians();
+    let forward = [
+        pitch.cos() * yaw.sin(),
+        pitch.sin(),
+        pitch.cos() * yaw.cos(),
+    ];
     let right = [-yaw.cos(), 0.0, yaw.sin()];
-    let up = [right[1] * forward[2] - right[2] * forward[1], right[2] * forward[0] - right[0] * forward[2], right[0] * forward[1] - right[1] * forward[0]];
+    let up = [
+        right[1] * forward[2] - right[2] * forward[1],
+        right[2] * forward[0] - right[0] * forward[2],
+        right[0] * forward[1] - right[1] * forward[0],
+    ];
     let to = [point[0] - eye[0], point[1] - eye[1], point[2] - eye[2]];
     let dot = |a: [f64; 3], b: [f64; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     let depth = dot(to, forward);
@@ -285,7 +416,10 @@ pub(crate) fn project(point: [f64; 3], camera: &BTreeMap<String, f64>, aspect: f
         return None;
     }
     let half = (fov / 2.0).tan();
-    Some([aspect * (0.5 + dot(to, right) / (depth * half * aspect) * 0.5), 0.5 - dot(to, up) / (depth * half) * 0.5])
+    Some([
+        aspect * (0.5 + dot(to, right) / (depth * half * aspect) * 0.5),
+        0.5 - dot(to, up) / (depth * half) * 0.5,
+    ])
 }
 
 /// One floating number as a box on the screen: it starts over the place it happened and rises as it ages.
@@ -308,16 +442,35 @@ fn floater_box(id: &str, floater: &Floater, cx: &Context) -> Option<UiBox> {
 
 fn minimap_dots(def: &GameDef, item: &UiDef, cx: &Context, rect: [f64; 4]) -> Vec<[f64; 2]> {
     let radius = num(item, "radius", 20.0).max(1e-6);
-    let centre = item.fields.get("follow").and_then(|selector| cx.entities.iter().find(|e| crate::world::matches_selector(def, selector, e)));
-    let Some(centre) = centre else { return Vec::new() };
+    let centre = item.fields.get("follow").and_then(|selector| {
+        cx.entities
+            .iter()
+            .find(|e| crate::world::matches_selector(def, selector, e))
+    });
+    let Some(centre) = centre else {
+        return Vec::new();
+    };
     let tags = item.list("tags");
     let kinds = item.list("kinds");
     cx.entities
         .iter()
-        .filter(|e| kinds.contains(&e.kind.as_str()) || tags.iter().any(|tag| crate::world::matches_selector(def, &format!("tag:{tag}"), e)))
+        .filter(|e| {
+            kinds.contains(&e.kind.as_str())
+                || tags
+                    .iter()
+                    .any(|tag| crate::world::matches_selector(def, &format!("tag:{tag}"), e))
+        })
         .filter_map(|e| {
-            let (dx, dz) = (e.position[0] - centre.position[0], e.position[2] - centre.position[2]);
-            (dx.abs() <= radius && dz.abs() <= radius).then(|| [rect[0] + rect[2] / 2.0 + dx / radius * rect[2] / 2.0, rect[1] + rect[3] / 2.0 - dz / radius * rect[3] / 2.0])
+            let (dx, dz) = (
+                e.position[0] - centre.position[0],
+                e.position[2] - centre.position[2],
+            );
+            (dx.abs() <= radius && dz.abs() <= radius).then(|| {
+                [
+                    rect[0] + rect[2] / 2.0 + dx / radius * rect[2] / 2.0,
+                    rect[1] + rect[3] / 2.0 - dz / radius * rect[3] / 2.0,
+                ]
+            })
         })
         .collect()
 }
@@ -340,18 +493,51 @@ fn origin(item: &UiDef, size: [f64; 2], aspect: f64) -> [f64; 2] {
 pub(crate) fn layout(def: &GameDef, cx: &Context, aspect: f64) -> Vec<UiBox> {
     let focus = effective_focus(def, cx, cx.focus);
     let mut out = Vec::new();
-    for item in def.ui.iter().filter(|item| !item.fields.contains_key("parent") && shown(def, item, cx)) {
-        let size = size_of(def, item, cx);
-        place(def, item, cx, origin(item, size, aspect), focus.as_deref(), &mut out);
-    }
-    if let Some(button) = focus.as_deref().and_then(|id| out.iter().find(|b| b.id == id)).cloned()
-        && let Some(tip) = def.ui.iter().find(|i| i.id == button.id).map(|i| interpolate(i.field("tip"), cx)).filter(|t| !t.is_empty())
+    for item in def
+        .ui
+        .iter()
+        .filter(|item| !item.fields.contains_key("parent") && shown(def, item, cx))
     {
-        let width = text_width(&UiDef { id: String::new(), kind: "text".into(), fields: BTreeMap::new(), line: 0 }, &tip, TIP_SIZE) + TIP_SIZE;
+        let size = size_of(def, item, cx);
+        place(
+            def,
+            item,
+            cx,
+            origin(item, size, aspect),
+            focus.as_deref(),
+            &mut out,
+        );
+    }
+    if let Some(button) = focus
+        .as_deref()
+        .and_then(|id| out.iter().find(|b| b.id == id))
+        .cloned()
+        && let Some(tip) = def
+            .ui
+            .iter()
+            .find(|i| i.id == button.id)
+            .map(|i| interpolate(i.field("tip"), cx))
+            .filter(|t| !t.is_empty())
+    {
+        let width = text_width(
+            &UiDef {
+                id: String::new(),
+                kind: "text".into(),
+                fields: BTreeMap::new(),
+                line: 0,
+            },
+            &tip,
+            TIP_SIZE,
+        ) + TIP_SIZE;
         out.push(UiBox {
             id: "tooltip".into(),
             kind: "tooltip".into(),
-            rect: [button.rect[0], button.rect[1] + button.rect[3] + 0.01, width, TIP_SIZE * 2.0],
+            rect: [
+                button.rect[0],
+                button.rect[1] + button.rect[3] + 0.01,
+                width,
+                TIP_SIZE * 2.0,
+            ],
             text: tip,
             focused: false,
             fraction: 0.0,
@@ -364,7 +550,17 @@ pub(crate) fn layout(def: &GameDef, cx: &Context, aspect: f64) -> Vec<UiBox> {
 
 /// The button under a point, if any (the topmost).
 pub(crate) fn hit(boxes: &[UiBox], x: f64, y: f64) -> Option<String> {
-    boxes.iter().rev().find(|b| b.kind == "button" && x >= b.rect[0] && x <= b.rect[0] + b.rect[2] && y >= b.rect[1] && y <= b.rect[1] + b.rect[3]).map(|b| b.id.clone())
+    boxes
+        .iter()
+        .rev()
+        .find(|b| {
+            b.kind == "button"
+                && x >= b.rect[0]
+                && x <= b.rect[0] + b.rect[2]
+                && y >= b.rect[1]
+                && y <= b.rect[1] + b.rect[3]
+        })
+        .map(|b| b.id.clone())
 }
 
 fn to_value(text: &str) -> Value {
@@ -377,10 +573,28 @@ fn to_value(text: &str) -> Value {
         _ => {}
     }
     let parts: Vec<f64> = text.split(',').filter_map(|p| p.parse().ok()).collect();
-    if parts.len() == text.split(',').count() && parts.len() > 1 { json!(parts) } else { json!(text) }
+    if parts.len() == text.split(',').count() && parts.len() > 1 {
+        json!(parts)
+    } else {
+        json!(text)
+    }
 }
 
-const VISUAL: [&str; 13] = ["font", "color", "fill", "border", "border_w", "back", "label_color", "plate", "plate_color", "shadow", "shadow_color", "trail", "trail_color"];
+const VISUAL: [&str; 13] = [
+    "font",
+    "color",
+    "fill",
+    "border",
+    "border_w",
+    "back",
+    "label_color",
+    "plate",
+    "plate_color",
+    "shadow",
+    "shadow_color",
+    "trail",
+    "trail_color",
+];
 
 fn styled(item: &UiDef, mut spec: Value) -> Value {
     for key in VISUAL {
@@ -398,7 +612,8 @@ fn styled(item: &UiDef, mut spec: Value) -> Value {
 
 /// A panel spec covering a box, with extra keys merged in.
 fn panel(b: &UiBox, extra: Value) -> Value {
-    let mut spec = json!({ "t": "panel", "abs": [b.rect[0], b.rect[1]], "size": [b.rect[2], b.rect[3]] });
+    let mut spec =
+        json!({ "t": "panel", "abs": [b.rect[0], b.rect[1]], "size": [b.rect[2], b.rect[3]] });
     if let (Some(map), Value::Object(more)) = (spec.as_object_mut(), extra) {
         map.extend(more);
     }

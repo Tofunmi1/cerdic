@@ -13,7 +13,7 @@ use std::fmt::Write;
 use prelude::{PRELUDE, bone_helper, float_lit, helpers, mesh_helper, splat, tag, wty};
 
 use super::Ty;
-use super::ast::{Bin, Builtin, Count, Expr, Func, InputKind, Kind, Kernel, Program, Stmt, Step};
+use super::ast::{Bin, Builtin, Count, Expr, Func, InputKind, Kernel, Kind, Program, Step, Stmt};
 
 /// What the host needs to run one kernel.
 #[derive(Debug)]
@@ -119,7 +119,11 @@ impl Gen<'_> {
             Bin::Mul => "*",
             Bin::Div | Bin::Rem => {
                 let (x, y) = (splat(a, at, rt), splat(b, bt, rt));
-                return format!("{}_{}({x}, {y})", if op == Bin::Div { "div" } else { "rem" }, tag(rt));
+                return format!(
+                    "{}_{}({x}, {y})",
+                    if op == Bin::Div { "div" } else { "rem" },
+                    tag(rt)
+                );
             }
         };
         if rt == Ty::Bool || matches!(op, Bin::Or | Bin::And) {
@@ -138,9 +142,20 @@ impl Gen<'_> {
                 let ty = e.ty;
                 if w == 1 {
                     let v = format!("params[{at}]");
-                    if ty == Ty::Bool { format!("({v} != 0.0)") } else { v }
+                    if ty == Ty::Bool {
+                        format!("({v} != 0.0)")
+                    } else {
+                        v
+                    }
                 } else {
-                    format!("{}({})", wty(ty), (0..w).map(|k| format!("params[{}]", at + k)).collect::<Vec<_>>().join(", "))
+                    format!(
+                        "{}({})",
+                        wty(ty),
+                        (0..w)
+                            .map(|k| format!("params[{}]", at + k))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
                 }
             }
             Kind::Builtin(b) => match b {
@@ -165,13 +180,18 @@ impl Gen<'_> {
                 Self::bin(*op, &a, l.ty, &b, r.ty, e.ty)
             }
             Kind::Vector(parts) => {
-                let args: Result<Vec<String>, String> = parts.iter().map(|p| self.expr(p)).collect();
+                let args: Result<Vec<String>, String> =
+                    parts.iter().map(|p| self.expr(p)).collect();
                 format!("{}({})", wty(e.ty), args?.join(", "))
             }
             Kind::Call(f, args) => self.call(*f, args, e.ty)?,
             Kind::Bone { input, vector, v } => {
                 self.bones = true;
-                format!("bone_xf({input}u, {}, {})", self.expr(v)?, if *vector { "0.0" } else { "1.0" })
+                format!(
+                    "bone_xf({input}u, {}, {})",
+                    self.expr(v)?,
+                    if *vector { "0.0" } else { "1.0" }
+                )
             }
             Kind::Rest { input, idx } => {
                 self.meshes.insert(*input);
@@ -184,7 +204,11 @@ impl Gen<'_> {
         let a: Result<Vec<String>, String> = args.iter().map(|x| self.expr(x)).collect();
         let a = a?;
         let at = |i: usize| splat(&a[i], args[i].ty, ty);
-        let zero = if ty == Ty::Float { "0.0".to_owned() } else { format!("{}(0.0)", wty(ty)) };
+        let zero = if ty == Ty::Float {
+            "0.0".to_owned()
+        } else {
+            format!("{}(0.0)", wty(ty))
+        };
         Ok(match f {
             Func::Abs => format!("abs({})", a[0]),
             Func::Sign => format!("sign({})", a[0]),
@@ -193,12 +217,20 @@ impl Gen<'_> {
             Func::Fract => format!("({0} - floor({0}))", a[0]),
             Func::Sqrt => format!("sqrt(max({}, {zero}))", a[0]),
             Func::Exp => format!("exp(min({}, {}))", a[0], splat("88.0", Ty::Float, ty)),
-            Func::Log => format!("select(log(max({0}, {1})), {zero}, {0} <= {zero})", a[0], splat("1e-30", Ty::Float, ty)),
+            Func::Log => format!(
+                "select(log(max({0}, {1})), {zero}, {0} <= {zero})",
+                a[0],
+                splat("1e-30", Ty::Float, ty)
+            ),
             Func::Sin => format!("sin({})", a[0]),
             Func::Cos => format!("cos({})", a[0]),
             Func::Min => format!("min({}, {})", at(0), at(1)),
             Func::Max => format!("max({}, {})", at(0), at(1)),
-            Func::Pow => format!("select(pow(max({0}, {zero}), {1}), {zero}, {0} <= {zero})", at(0), at(1)),
+            Func::Pow => format!(
+                "select(pow(max({0}, {zero}), {1}), {zero}, {0} <= {zero})",
+                at(0),
+                at(1)
+            ),
             Func::Atan2 => format!("atan2({}, {})", at(0), at(1)),
             Func::Step => format!("step({}, {})", at(0), at(1)),
             Func::Clamp => format!("min(max({}, {}), {})", at(0), at(1), at(2)),
@@ -207,14 +239,27 @@ impl Gen<'_> {
             Func::Length => format!("length({})", a[0]),
             Func::Distance => format!("distance({}, {})", a[0], a[1]),
             Func::Dot => {
-                if args[0].ty == Ty::Float { format!("({} * {})", a[0], a[1]) } else { format!("dot({}, {})", a[0], a[1]) }
+                if args[0].ty == Ty::Float {
+                    format!("({} * {})", a[0], a[1])
+                } else {
+                    format!("dot({}, {})", a[0], a[1])
+                }
             }
             Func::Cross => format!("cross({}, {})", a[0], a[1]),
             Func::Normalize => format!("nrm_{}({})", tag(ty), a[0]),
             Func::Select => format!("select({}, {}, {})", a[2], a[1], a[0]),
-            Func::Hash => format!("f32(hash_u32(to_u({}), to_u({}), clock.seed) >> 8u)", a[0], a[1]),
-            Func::Rand => format!("(f32(hash_u32(to_u({}), to_u({}), clock.seed) >> 8u) / 16777216.0)", a[0], a[1]),
-            Func::SdfCapsule => format!("(length({0} - closest_seg({0}, {1}, {2})) - {3})", a[0], a[1], a[2], a[3]),
+            Func::Hash => format!(
+                "f32(hash_u32(to_u({}), to_u({}), clock.seed) >> 8u)",
+                a[0], a[1]
+            ),
+            Func::Rand => format!(
+                "(f32(hash_u32(to_u({}), to_u({}), clock.seed) >> 8u) / 16777216.0)",
+                a[0], a[1]
+            ),
+            Func::SdfCapsule => format!(
+                "(length({0} - closest_seg({0}, {1}, {2})) - {3})",
+                a[0], a[1], a[2], a[3]
+            ),
             Func::ClosestSegment => format!("closest_seg({}, {}, {})", a[0], a[1], a[2]),
             Func::Pull => format!("pull_move({}, {}, {})", a[0], a[1], a[2]),
         })
@@ -244,7 +289,14 @@ impl Gen<'_> {
                 };
                 let _ = writeln!(out, "{pad}l{slot} = {new};");
             }
-            Stmt::SetElem { arr, idx, comp, op, value, .. } => {
+            Stmt::SetElem {
+                arr,
+                idx,
+                comp,
+                op,
+                value,
+                ..
+            } => {
                 self.used.entry(*arr).or_default().1 = true;
                 let ix = self.expr(idx)?;
                 let v = self.expr(value)?;
@@ -254,20 +306,39 @@ impl Gen<'_> {
                 let _ = writeln!(out, "{pad}  let ix = to_u({ix});");
                 let _ = writeln!(out, "{pad}  if (elem == 0xffffffffu || ix == elem) {{");
                 let value_code = match (op, comp) {
-                    (Some(op), Some(c)) => Self::bin(*op, &format!("S{arr}[ix * {width}u + {c}u]"), Ty::Float, &v, value.ty, Ty::Float),
-                    (Some(op), None) => Self::bin(*op, &format!("rdl{arr}(ix)"), ty, &v, value.ty, ty),
+                    (Some(op), Some(c)) => Self::bin(
+                        *op,
+                        &format!("S{arr}[ix * {width}u + {c}u]"),
+                        Ty::Float,
+                        &v,
+                        value.ty,
+                        Ty::Float,
+                    ),
+                    (Some(op), None) => {
+                        Self::bin(*op, &format!("rdl{arr}(ix)"), ty, &v, value.ty, ty)
+                    }
                     (None, _) => v,
                 };
                 match comp {
                     Some(c) => {
-                        let _ = writeln!(out, "{pad}    S{arr}[ix * {width}u + {c}u] = {value_code};");
+                        let _ =
+                            writeln!(out, "{pad}    S{arr}[ix * {width}u + {c}u] = {value_code};");
                     }
                     None => {
                         let _ = writeln!(out, "{pad}    let nv = {value_code};");
                         for k in 0..width {
-                            let part = if width == 1 { "nv".to_owned() } else { format!("nv[{k}]") };
-                            let part = if ty == Ty::Bool { format!("select(0.0, 1.0, {part})") } else { part };
-                            let _ = writeln!(out, "{pad}    S{arr}[ix * {width}u + {k}u] = {part};");
+                            let part = if width == 1 {
+                                "nv".to_owned()
+                            } else {
+                                format!("nv[{k}]")
+                            };
+                            let part = if ty == Ty::Bool {
+                                format!("select(0.0, 1.0, {part})")
+                            } else {
+                                part
+                            };
+                            let _ =
+                                writeln!(out, "{pad}    S{arr}[ix * {width}u + {k}u] = {part};");
                         }
                     }
                 }
@@ -285,35 +356,76 @@ impl Gen<'_> {
                     let _ = writeln!(out, "{pad}}}");
                 }
             }
-            Stmt::Repeat { slot, from, to, body } => {
+            Stmt::Repeat {
+                slot,
+                from,
+                to,
+                body,
+            } => {
                 self.locals.insert(*slot, Ty::Float);
-                let _ = writeln!(out, "{pad}for (var k{slot}: i32 = {from}; k{slot} < {to}; k{slot} = k{slot} + 1) {{");
+                let _ = writeln!(
+                    out,
+                    "{pad}for (var k{slot}: i32 = {from}; k{slot} < {to}; k{slot} = k{slot} + 1) {{"
+                );
                 let _ = writeln!(out, "{pad}  var l{slot}: f32 = f32(k{slot});");
                 self.block(body, out, depth + 1)?;
                 let _ = writeln!(out, "{pad}}}");
             }
-            Stmt::Neighbors { slot, arr, centre, radius, cap, body, .. } => {
+            Stmt::Neighbors {
+                slot,
+                arr,
+                centre,
+                radius,
+                cap,
+                body,
+                ..
+            } => {
                 self.used.entry(*arr).or_default().0 = true;
                 self.locals.insert(*slot, Ty::Float);
                 let (c, r) = (self.expr(centre)?, self.expr(radius)?);
-                let _ = writeln!(out, "{pad}{{\n{pad}  let c = {c}; let r = {r}; var visited: u32 = 0u;");
+                let _ = writeln!(
+                    out,
+                    "{pad}{{\n{pad}  let c = {c}; let r = {r}; var visited: u32 = 0u;"
+                );
                 let _ = writeln!(out, "{pad}  let len = arrayLength(&S{arr}) / 3u;");
                 let _ = writeln!(out, "{pad}  for (var j: u32 = 0u; j < len; j = j + 1u) {{");
                 let _ = writeln!(out, "{pad}    let p = rd{arr}(j, elem); let d = p - c;");
                 let _ = writeln!(out, "{pad}    if (dot(d, d) > r * r) {{ continue; }}");
                 let _ = writeln!(out, "{pad}    var l{slot}: f32 = f32(j);");
                 self.block(body, out, depth + 2)?;
-                let _ = writeln!(out, "{pad}    visited = visited + 1u;\n{pad}    if (visited >= {cap}u) {{ break; }}\n{pad}  }}\n{pad}}}");
+                let _ = writeln!(
+                    out,
+                    "{pad}    visited = visited + 1u;\n{pad}    if (visited >= {cap}u) {{ break; }}\n{pad}  }}\n{pad}}}"
+                );
             }
-            Stmt::Adjacent { vertex, length, input, of, body, .. } => {
+            Stmt::Adjacent {
+                vertex,
+                length,
+                input,
+                of,
+                body,
+                ..
+            } => {
                 self.meshes.insert(*input);
                 self.locals.insert(*vertex, Ty::Float);
                 self.locals.insert(*length, Ty::Float);
                 let at = self.expr(of)?;
-                let _ = writeln!(out, "{pad}{{\n{pad}  let av = min(to_u({at}), M{input}[0] - 1u);");
-                let _ = writeln!(out, "{pad}  for (var e: u32 = M{input}[M{input}[1] + av]; e < M{input}[M{input}[1] + av + 1u]; e = e + 1u) {{");
-                let _ = writeln!(out, "{pad}    var l{vertex}: f32 = f32(M{input}[M{input}[2] + e]);");
-                let _ = writeln!(out, "{pad}    var l{length}: f32 = bitcast<f32>(M{input}[M{input}[3] + e]);");
+                let _ = writeln!(
+                    out,
+                    "{pad}{{\n{pad}  let av = min(to_u({at}), M{input}[0] - 1u);"
+                );
+                let _ = writeln!(
+                    out,
+                    "{pad}  for (var e: u32 = M{input}[M{input}[1] + av]; e < M{input}[M{input}[1] + av + 1u]; e = e + 1u) {{"
+                );
+                let _ = writeln!(
+                    out,
+                    "{pad}    var l{vertex}: f32 = f32(M{input}[M{input}[2] + e]);"
+                );
+                let _ = writeln!(
+                    out,
+                    "{pad}    var l{length}: f32 = bitcast<f32>(M{input}[M{input}[3] + e]);"
+                );
                 self.block(body, out, depth + 2)?;
                 let _ = writeln!(out, "{pad}  }}\n{pad}}}");
             }
@@ -323,7 +435,14 @@ impl Gen<'_> {
 }
 
 fn kernel(prog: &Program, k: &Kernel, offsets: &[(usize, usize)]) -> Result<GpuKernel, String> {
-    let mut g = Gen { prog, param_offsets: offsets, used: BTreeMap::new(), locals: BTreeMap::new(), meshes: BTreeSet::new(), bones: false };
+    let mut g = Gen {
+        prog,
+        param_offsets: offsets,
+        used: BTreeMap::new(),
+        locals: BTreeMap::new(),
+        meshes: BTreeSet::new(),
+        bones: false,
+    };
     if k.over.is_some() {
         g.locals.insert(0, Ty::Float);
     }
@@ -337,55 +456,115 @@ fn kernel(prog: &Program, k: &Kernel, offsets: &[(usize, usize)]) -> Result<GpuK
         let ty = prog.states[a].ty;
         let writes = k.writes[a] && written;
         if writes {
-            let _ = writeln!(src, "@group(0) @binding({}) var<storage, read_write> S{a}: array<f32>;", 2 + 2 * a);
-            let _ = writeln!(src, "@group(0) @binding({}) var<storage, read> Snap{a}: array<f32>;", 3 + 2 * a);
+            let _ = writeln!(
+                src,
+                "@group(0) @binding({}) var<storage, read_write> S{a}: array<f32>;",
+                2 + 2 * a
+            );
+            let _ = writeln!(
+                src,
+                "@group(0) @binding({}) var<storage, read> Snap{a}: array<f32>;",
+                3 + 2 * a
+            );
         } else {
-            let _ = writeln!(src, "@group(0) @binding({}) var<storage, read> S{a}: array<f32>;", 2 + 2 * a);
+            let _ = writeln!(
+                src,
+                "@group(0) @binding({}) var<storage, read> S{a}: array<f32>;",
+                2 + 2 * a
+            );
         }
         arrays.push((a, writes, writes));
         let load = |name: &str| {
-            let comps: Vec<String> = (0..w).map(|c| format!("{name}{a}[j * {w}u + {c}u]")).collect();
-            if ty == Ty::Bool { format!("({} != 0.0)", comps[0]) } else if w == 1 { comps[0].clone() } else { format!("{}({})", wty(ty), comps.join(", ")) }
+            let comps: Vec<String> = (0..w)
+                .map(|c| format!("{name}{a}[j * {w}u + {c}u]"))
+                .collect();
+            if ty == Ty::Bool {
+                format!("({} != 0.0)", comps[0])
+            } else if w == 1 {
+                comps[0].clone()
+            } else {
+                format!("{}({})", wty(ty), comps.join(", "))
+            }
         };
         let live = load("S");
         let _ = writeln!(src, "fn rdl{a}(j: u32) -> {} {{ return {live}; }}", wty(ty));
         let other = if writes { load("Snap") } else { live.clone() };
-        let _ = writeln!(src, "fn rd{a}(i: u32, elem: u32) -> {} {{ let n = arrayLength(&S{a}) / {w}u; let j = min(i, n - 1u); if (j == elem) {{ return {live}; }} return {other}; }}", wty(ty));
+        let _ = writeln!(
+            src,
+            "fn rd{a}(i: u32, elem: u32) -> {} {{ let n = arrayLength(&S{a}) / {w}u; let j = min(i, n - 1u); if (j == elem) {{ return {live}; }} return {other}; }}",
+            wty(ty)
+        );
     }
     let mut inputs = Vec::new();
     let first_input = u32::try_from(2 + 2 * prog.states.len()).unwrap_or(u32::MAX);
     if g.bones {
-        let _ = writeln!(src, "@group(0) @binding({first_input}) var<storage, read> Bn: array<f32>;");
+        let _ = writeln!(
+            src,
+            "@group(0) @binding({first_input}) var<storage, read> Bn: array<f32>;"
+        );
         src.push_str(&bone_helper());
-        inputs.push(GpuBinding { binding: first_input, input: 0, bone: true });
+        inputs.push(GpuBinding {
+            binding: first_input,
+            input: 0,
+            bone: true,
+        });
     }
     for &m in &g.meshes {
         let binding = first_input + 1 + u32::try_from(m).unwrap_or(0);
-        let _ = writeln!(src, "@group(0) @binding({binding}) var<storage, read> M{m}: array<u32>;");
+        let _ = writeln!(
+            src,
+            "@group(0) @binding({binding}) var<storage, read> M{m}: array<u32>;"
+        );
         src.push_str(&mesh_helper(m));
-        inputs.push(GpuBinding { binding, input: m, bone: false });
+        inputs.push(GpuBinding {
+            binding,
+            input: m,
+            bone: false,
+        });
     }
-    let count = k.over.map_or_else(|| "1u".to_owned(), |a| {
-        let w = prog.states[a].ty.width();
-        // the threads follow the array's length; its binding is declared above when the kernel touches it, so name it explicitly otherwise
-        format!("arrayLength(&S{a}) / {w}u")
-    });
+    let count = k.over.map_or_else(
+        || "1u".to_owned(),
+        |a| {
+            let w = prog.states[a].ty.width();
+            // the threads follow the array's length; its binding is declared above when the kernel touches it, so name it explicitly otherwise
+            format!("arrayLength(&S{a}) / {w}u")
+        },
+    );
     if let Some(a) = k.over
         && !g.used.contains_key(&a)
     {
-        let _ = writeln!(src, "@group(0) @binding({}) var<storage, read> S{a}: array<f32>;", 2 + 2 * a);
+        let _ = writeln!(
+            src,
+            "@group(0) @binding({}) var<storage, read> S{a}: array<f32>;",
+            2 + 2 * a
+        );
         arrays.push((a, false, false));
     }
-    let _ = writeln!(src, "@compute @workgroup_size(64)\nfn main(@builtin(global_invocation_id) gid: vec3<u32>) {{");
+    let _ = writeln!(
+        src,
+        "@compute @workgroup_size(64)\nfn main(@builtin(global_invocation_id) gid: vec3<u32>) {{"
+    );
     if k.over.is_some() {
-        let _ = writeln!(src, "  let elem = gid.x;\n  if (elem >= {count}) {{ return; }}");
+        let _ = writeln!(
+            src,
+            "  let elem = gid.x;\n  if (elem >= {count}) {{ return; }}"
+        );
         let _ = writeln!(src, "  var l0: f32 = f32(elem);");
     } else {
-        let _ = writeln!(src, "  if (gid.x != 0u) {{ return; }}\n  let elem = 0xffffffffu;");
+        let _ = writeln!(
+            src,
+            "  if (gid.x != 0u) {{ return; }}\n  let elem = 0xffffffffu;"
+        );
     }
     src.push_str(&body);
     src.push_str("}\n");
-    Ok(GpuKernel { name: k.name.clone(), wgsl: src, over: k.over, arrays, inputs })
+    Ok(GpuKernel {
+        name: k.name.clone(),
+        wgsl: src,
+        over: k.over,
+        arrays,
+        inputs,
+    })
 }
 
 fn steps(list: &[Step]) -> Vec<GpuStep> {
@@ -416,10 +595,33 @@ pub(super) fn generate(prog: &Program) -> Result<GpuPlan, String> {
             name: s.name.clone(),
             width: s.ty.width(),
             count: s.count.resolve(&defaults, &[]),
-            mesh: if let Count::Mesh(m) = s.count { Some(m) } else { None },
+            mesh: if let Count::Mesh(m) = s.count {
+                Some(m)
+            } else {
+                None
+            },
         })
         .collect();
-    let inputs = prog.inputs.iter().map(|i| GpuInput { name: i.name.clone(), bone: i.kind == InputKind::Bone }).collect();
-    let kernels: Result<Vec<GpuKernel>, String> = prog.kernels.iter().map(|k| kernel(prog, k, &offsets)).collect();
-    Ok(GpuPlan { states, inputs, params, kernels: kernels?, schedule: steps(&prog.schedule), param_offsets: offsets, init: prog.init })
+    let inputs = prog
+        .inputs
+        .iter()
+        .map(|i| GpuInput {
+            name: i.name.clone(),
+            bone: i.kind == InputKind::Bone,
+        })
+        .collect();
+    let kernels: Result<Vec<GpuKernel>, String> = prog
+        .kernels
+        .iter()
+        .map(|k| kernel(prog, k, &offsets))
+        .collect();
+    Ok(GpuPlan {
+        states,
+        inputs,
+        params,
+        kernels: kernels?,
+        schedule: steps(&prog.schedule),
+        param_offsets: offsets,
+        init: prog.init,
+    })
 }

@@ -20,7 +20,10 @@ impl World {
         queue: &mut Vec<Event>,
         effects: &mut Vec<Effect>,
     ) -> Result<(), GameError> {
-        if self.flow_action(action, event, queue) || self.combat_action(action, event, queue) || self.party_action(action, event, queue) {
+        if self.flow_action(action, event, queue)
+            || self.combat_action(action, event, queue)
+            || self.party_action(action, event, queue)
+        {
             return Ok(());
         }
         if let Some(body) = action.strip_prefix("add:") {
@@ -252,8 +255,17 @@ impl World {
         };
         if kind_name == "camera" {
             // `camera:NAME` cuts to a camera, `camera:NAME:SECONDS` blends to it
-            let (name, seconds) = target.rsplit_once(':').map_or((target, 0.0), |(name, seconds)| (name, seconds.parse().unwrap_or(0.0)));
-            return vec![Effect { kind: crate::EffectKind::Camera, name: name.into(), target: None, value: Some(seconds) }];
+            let (name, seconds) = target
+                .rsplit_once(':')
+                .map_or((target, 0.0), |(name, seconds)| {
+                    (name, seconds.parse().unwrap_or(0.0))
+                });
+            return vec![Effect {
+                kind: crate::EffectKind::Camera,
+                name: name.into(),
+                target: None,
+                value: Some(seconds),
+            }];
         }
         let (name, selector) = target.split_once('@').unwrap_or((target, ""));
         let kind = match kind_name {

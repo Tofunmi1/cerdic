@@ -254,7 +254,10 @@ fn spawn_from_set(node: &Node, set: &crate::instances::InstanceSet) -> GameFragm
                 m.w_axis.x,
                 m.w_axis.y,
                 m.w_axis.z,
-                text(node, "level").filter(|level| !level.is_empty()).map(|level| format!(" level={level}")).unwrap_or_default()
+                text(node, "level")
+                    .filter(|level| !level.is_empty())
+                    .map(|level| format!(" level={level}"))
+                    .unwrap_or_default()
             ),
             name: None,
         })

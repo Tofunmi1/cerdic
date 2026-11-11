@@ -105,6 +105,10 @@ pub(super) fn apply(
     if family == "poly.unwrap_uv" {
         return unwrap(node, poly, &edges, context);
     }
+    if family == "poly.triangulate" {
+        return ve_geometry::triangulate(poly, context)
+            .map_err(|error| poly_fail(node, &error, Some(poly)));
+    }
     if family == "poly.pack_uv" {
         if !poly.attributes().contains_key("u") || !poly.attributes().contains_key("v") {
             return Err(super::errors::refuse(

@@ -54,14 +54,26 @@ pub(super) fn agent(node: &Node) -> Result<GameFragment, Fail> {
 /// means "automatic" is left out.
 pub(super) fn controller(node: &Node) -> Result<GameFragment, Fail> {
     let kind = text(node, "kind").unwrap_or("");
-    let mut line = format!("controller {kind} mode={}", text(node, "mode").unwrap_or("walk"));
+    let mut line = format!(
+        "controller {kind} mode={}",
+        text(node, "mode").unwrap_or("walk")
+    );
     for key in ["speed", "accel", "decel"] {
         let value = number_or(node, key, 0.0);
         if value > 0.0 {
             let _ = write!(line, " {key}={value}");
         }
     }
-    for (key, default) in [("air", 0.6), ("jump", 0.0), ("gravity", 20.0), ("coyote", 0.1), ("buffer", 0.1), ("cut", 0.5), ("turn", 0.0), ("step", 0.3)] {
+    for (key, default) in [
+        ("air", 0.6),
+        ("jump", 0.0),
+        ("gravity", 20.0),
+        ("coyote", 0.1),
+        ("buffer", 0.1),
+        ("cut", 0.5),
+        ("turn", 0.0),
+        ("step", 0.3),
+    ] {
         let value = number_or(node, key, default);
         if (value - default).abs() > f64::EPSILON {
             let _ = write!(line, " {key}={value}");
@@ -94,7 +106,10 @@ pub(super) fn controller(node: &Node) -> Result<GameFragment, Fail> {
 pub(super) fn camera(node: &Node) -> Result<GameFragment, Fail> {
     let name = text(node, "name").unwrap_or("main");
     let mode = text(node, "mode").unwrap_or("third");
-    let mut line = format!("camera {name} mode={mode} target={}", text(node, "target").unwrap_or("tag:hero"));
+    let mut line = format!(
+        "camera {name} mode={mode} target={}",
+        text(node, "target").unwrap_or("tag:hero")
+    );
     if number_or(node, "distance", 0.0) > 0.0 {
         let _ = write!(line, " distance={}", number_or(node, "distance", 0.0));
     }
@@ -110,7 +125,13 @@ pub(super) fn camera(node: &Node) -> Result<GameFragment, Fail> {
             let _ = write!(line, " {key}={value}");
         }
     }
-    for (key, default) in [("shoulder", 0.0), ("fov", 60.0), ("deadzone", 0.0), ("min_pitch", -60.0), ("max_pitch", 75.0)] {
+    for (key, default) in [
+        ("shoulder", 0.0),
+        ("fov", 60.0),
+        ("deadzone", 0.0),
+        ("min_pitch", -60.0),
+        ("max_pitch", 75.0),
+    ] {
         let value = number_or(node, key, default);
         if (value - default).abs() > f64::EPSILON {
             let _ = write!(line, " {key}={value}");
@@ -132,11 +153,22 @@ pub(super) fn ui(node: &Node) -> Result<GameFragment, Fail> {
     let name = text(node, "name").unwrap_or("");
     let mut line = format!("ui {name} type={}", text(node, "type").unwrap_or(""));
     for key in [
-        "parent", "show", "hide", "when", "icon", "key", "text", "do", "tip", "anchor", "at", "size", "value", "max_var", "label", "dir", "align", "cell", "follow", "tags", "kinds", "fill", "border", "color", "font",
-        "plate",
+        "parent", "show", "hide", "when", "icon", "key", "text", "do", "tip", "anchor", "at",
+        "size", "value", "max_var", "label", "dir", "align", "cell", "follow", "tags", "kinds",
+        "fill", "border", "color", "font", "plate",
     ] {
-        if let Some(value) = text(node, key).map(str::trim).filter(|value| !value.is_empty()) {
-            let value = if matches!(key, "show" | "hide" | "tags" | "kinds" | "at" | "size" | "cell") { value.replace(' ', "") } else { value.to_owned() };
+        if let Some(value) = text(node, key)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            let value = if matches!(
+                key,
+                "show" | "hide" | "tags" | "kinds" | "at" | "size" | "cell"
+            ) {
+                value.replace(' ', "")
+            } else {
+                value.to_owned()
+            };
             // the tree calls the variable form of a bar's maximum `max`
             let key = if key == "max_var" { "max" } else { key };
             // a value with a space, or a `#` (which would start a comment), is quoted
@@ -157,7 +189,11 @@ pub(super) fn ui(node: &Node) -> Result<GameFragment, Fail> {
     // the letter height is `size` on a text and `text_size` on a button
     let letter = number_or(node, "letter", -1.0);
     if letter > 0.0 {
-        let key = if text(node, "type") == Some("button") { "text_size" } else { "size" };
+        let key = if text(node, "type") == Some("button") {
+            "text_size"
+        } else {
+            "size"
+        };
         let _ = write!(line, " {key}={letter}");
     }
     Ok(item(node, Section::Ui, line, Some(name.to_owned())))
@@ -167,7 +203,11 @@ pub(super) fn ui(node: &Node) -> Result<GameFragment, Fail> {
 pub(super) fn state(node: &Node) -> Result<GameFragment, Fail> {
     let name = text(node, "name").unwrap_or("");
     let frozen = matches!(node.params.get("frozen"), Some(Param::Bool(true)));
-    let line = if frozen { format!("state {name} frozen=1") } else { format!("state {name}") };
+    let line = if frozen {
+        format!("state {name} frozen=1")
+    } else {
+        format!("state {name}")
+    };
     Ok(item(node, Section::State, line, Some(name.to_owned())))
 }
 

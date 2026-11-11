@@ -24,14 +24,21 @@ pub(super) fn tag(t: Ty) -> &'static str {
 }
 
 pub(super) fn splat(code: &str, from: Ty, to: Ty) -> String {
-    if from == to || to == Ty::Float || to == Ty::Bool { code.to_owned() } else { format!("{}({code})", wty(to)) }
+    if from == to || to == Ty::Float || to == Ty::Bool {
+        code.to_owned()
+    } else {
+        format!("{}({code})", wty(to))
+    }
 }
 
 pub(super) fn float_lit(x: f32) -> String {
-    format!("{x:?}").replace("inf", "3.4e38").replace("NaN", "0.0")
+    format!("{x:?}")
+        .replace("inf", "3.4e38")
+        .replace("NaN", "0.0")
 }
 
-pub(super) const PRELUDE: &str = "struct Clock { dt: f32, t: f32, step: f32, seed: u32, count: u32, p0: u32, p1: u32, p2: u32 }
+pub(super) const PRELUDE: &str =
+    "struct Clock { dt: f32, t: f32, step: f32, seed: u32, count: u32, p0: u32, p1: u32, p2: u32 }
 @group(0) @binding(0) var<uniform> clock: Clock;
 @group(0) @binding(1) var<storage, read> params: array<f32>;
 fn hash_u32(a: u32, b: u32, seed: u32) -> u32 {
@@ -84,14 +91,34 @@ pub(super) fn helpers() -> String {
     let mut s = String::new();
     for t in [Ty::Float, Ty::Vec2, Ty::Vec3, Ty::Vec4] {
         let (n, ty) = (tag(t), wty(t));
-        let zero = if t == Ty::Float { "0.0".to_owned() } else { format!("{ty}(0.0)") };
-        let _ = writeln!(s, "fn div_{n}(a: {ty}, b: {ty}) -> {ty} {{ return select(a / b, {zero}, b == {zero}); }}");
-        let _ = writeln!(s, "fn rem_{n}(a: {ty}, b: {ty}) -> {ty} {{ return select(a - b * floor(a / b), {zero}, b == {zero}); }}");
+        let zero = if t == Ty::Float {
+            "0.0".to_owned()
+        } else {
+            format!("{ty}(0.0)")
+        };
+        let _ = writeln!(
+            s,
+            "fn div_{n}(a: {ty}, b: {ty}) -> {ty} {{ return select(a / b, {zero}, b == {zero}); }}"
+        );
+        let _ = writeln!(
+            s,
+            "fn rem_{n}(a: {ty}, b: {ty}) -> {ty} {{ return select(a - b * floor(a / b), {zero}, b == {zero}); }}"
+        );
         if t == Ty::Float {
             let _ = writeln!(s, "fn nrm_f(a: f32) -> f32 {{ return sign(a); }}");
         } else {
-            let _ = writeln!(s, "fn nrm_{n}(a: {ty}) -> {ty} {{ let l = length(a); return select(a / l, {zero}, l <= 0.0); }}");
-            let _ = writeln!(s, "fn ss_{n}(a: {ty}, b: {ty}, x: {ty}) -> {ty} {{ return {ty}({}); }}", (0..t.width()).map(|k| format!("ss_f(a[{k}], b[{k}], x[{k}])")).collect::<Vec<_>>().join(", "));
+            let _ = writeln!(
+                s,
+                "fn nrm_{n}(a: {ty}) -> {ty} {{ let l = length(a); return select(a / l, {zero}, l <= 0.0); }}"
+            );
+            let _ = writeln!(
+                s,
+                "fn ss_{n}(a: {ty}, b: {ty}, x: {ty}) -> {ty} {{ return {ty}({}); }}",
+                (0..t.width())
+                    .map(|k| format!("ss_f(a[{k}], b[{k}], x[{k}])"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
         }
     }
     s

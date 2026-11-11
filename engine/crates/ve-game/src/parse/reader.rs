@@ -55,7 +55,22 @@ fn parse_line(raw: &str, line: usize, definition: &mut GameDef) -> Result<(), St
     let command = tokens.next().unwrap_or("");
     let positional = if matches!(
         command,
-        "kind" | "spawn" | "goal" | "input" | "agent" | "surface" | "controller" | "camera" | "state" | "level" | "ui" | "health" | "projectile" | "weapon" | "brain" | "ability"
+        "kind"
+            | "spawn"
+            | "goal"
+            | "input"
+            | "agent"
+            | "surface"
+            | "controller"
+            | "camera"
+            | "state"
+            | "level"
+            | "ui"
+            | "health"
+            | "projectile"
+            | "weapon"
+            | "brain"
+            | "ability"
     ) {
         tokens.next()
     } else {

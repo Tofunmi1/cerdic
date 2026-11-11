@@ -30,11 +30,18 @@ pub(super) fn ticks(seconds: f64) -> u32 {
     if seconds <= 0.0 {
         return 0;
     }
-    format!("{:.0}", (seconds * DT_STEPS).round().clamp(1.0, 1.0e9)).parse().unwrap_or(1)
+    format!("{:.0}", (seconds * DT_STEPS).round().clamp(1.0, 1.0e9))
+        .parse()
+        .unwrap_or(1)
 }
 
 fn queue_event(queue: &mut Vec<Event>, name: &str, a: Option<u32>, b: Option<u32>) {
-    queue.push(Event { name: name.to_owned(), a, b, depth: 1 });
+    queue.push(Event {
+        name: name.to_owned(),
+        a,
+        b,
+        depth: 1,
+    });
 }
 
 impl World {
@@ -44,27 +51,56 @@ impl World {
 
     /// How tall an entity's hit shape is: the kind's `height`, else twice its size.
     pub(super) fn hit_height(&self, entity: &Entity) -> f64 {
-        let size = self.def.kinds.iter().find(|kind| kind.name == entity.kind).map_or(0.5, |kind| kind.size);
-        self.health_def(&entity.kind).and_then(|health| health.height).unwrap_or(2.0 * size)
+        let size = self
+            .def
+            .kinds
+            .iter()
+            .find(|kind| kind.name == entity.kind)
+            .map_or(0.5, |kind| kind.size);
+        self.health_def(&entity.kind)
+            .and_then(|health| health.height)
+            .unwrap_or(2.0 * size)
     }
 
     /// The distance from a point to the vertical line segment from an entity's feet to the top of its hit shape.
     pub(super) fn distance_to_body(&self, entity: &Entity, point: [f64; 3]) -> f64 {
         let top = entity.position[1] + self.hit_height(entity);
         let y = point[1].clamp(entity.position[1], top);
-        ((point[0] - entity.position[0]).powi(2) + (point[1] - y).powi(2) + (point[2] - entity.position[2]).powi(2)).sqrt()
+        ((point[0] - entity.position[0]).powi(2)
+            + (point[1] - y).powi(2)
+            + (point[2] - entity.position[2]).powi(2))
+        .sqrt()
     }
 
     /// Whether an entity can be hurt right now: it has health left and is not a shot in flight.
     pub(super) fn is_victim(&self, entity: &Entity) -> bool {
-        entity.props.get("health").is_some_and(|health| *health > 0.0) && !self.def.projectiles.iter().any(|shot| shot.kind == entity.kind)
+        entity
+            .props
+            .get("health")
+            .is_some_and(|health| *health > 0.0)
+            && !self
+                .def
+                .projectiles
+                .iter()
+                .any(|shot| shot.kind == entity.kind)
     }
 
     /// Starts a floating number over an entity's head (`kind`: 0 damage, 1 healing, 2 dodge).
     fn float_over(&mut self, entity: u32, text: String, kind: u8) {
-        let Some(found) = self.entities.iter().find(|e| e.id == entity) else { return };
-        let pos = [found.position[0], found.position[1] + self.hit_height(found), found.position[2]];
-        self.floaters.push(Floater { pos, text, kind, age: 0 });
+        let Some(found) = self.entities.iter().find(|e| e.id == entity) else {
+            return;
+        };
+        let pos = [
+            found.position[0],
+            found.position[1] + self.hit_height(found),
+            found.position[2],
+        ];
+        self.floaters.push(Floater {
+            pos,
+            text,
+            kind,
+            age: 0,
+        });
         if self.floaters.len() > 32 {
             self.floaters.remove(0);
         }
@@ -79,8 +115,19 @@ impl World {
         if self.def.healths.is_empty() {
             return;
         }
-        let pushable: Vec<String> = self.def.healths.iter().filter(|h| h.knock > 0.0).map(|h| h.kind.clone()).collect();
-        let controlled: Vec<String> = self.def.controllers.iter().map(|c| c.kind.clone()).collect();
+        let pushable: Vec<String> = self
+            .def
+            .healths
+            .iter()
+            .filter(|h| h.knock > 0.0)
+            .map(|h| h.kind.clone())
+            .collect();
+        let controlled: Vec<String> = self
+            .def
+            .controllers
+            .iter()
+            .map(|c| c.kind.clone())
+            .collect();
         for entity in &mut self.entities {
             if let Some(left) = entity.props.get_mut("iframes_left")
                 && *left > 0.0
@@ -109,12 +156,16 @@ impl World {
 
     /// Puts the full magazine of every weapon an entity carries on it as the prop `ammo_NAME`, so a HUD can show it before the first shot.
     pub(super) fn give_ammo(&mut self, id: u32) {
-        let Some(entity) = self.entities.iter().find(|entity| entity.id == id) else { return };
+        let Some(entity) = self.entities.iter().find(|entity| entity.id == id) else {
+            return;
+        };
         let full: Vec<(String, u32)> = self
             .def
             .weapons
             .iter()
-            .filter(|weapon| weapon.ammo > 0 && super::matches_selector(&self.def, &weapon.owner, entity))
+            .filter(|weapon| {
+                weapon.ammo > 0 && super::matches_selector(&self.def, &weapon.owner, entity)
+            })
             .map(|weapon| (format!("ammo_{}", weapon.name), weapon.ammo))
             .collect();
         if let Some(entity) = self.entities.iter_mut().find(|entity| entity.id == id) {
@@ -125,10 +176,22 @@ impl World {
     }
 
     /// Takes `amount` from an entity's health unless it is untouchable; raises `hurt`, and `killed` at zero. Returns whether it was hurt.
-    pub(super) fn apply_damage(&mut self, victim: u32, amount: f64, source: Option<u32>, queue: &mut Vec<Event>) -> bool {
-        let Some(index) = self.entities.iter().position(|entity| entity.id == victim) else { return false };
-        let Some(health) = self.health_def(&self.entities[index].kind).cloned() else { return false };
-        let from = source.and_then(|id| self.entities.iter().find(|entity| entity.id == id)).map(|entity| entity.position);
+    pub(super) fn apply_damage(
+        &mut self,
+        victim: u32,
+        amount: f64,
+        source: Option<u32>,
+        queue: &mut Vec<Event>,
+    ) -> bool {
+        let Some(index) = self.entities.iter().position(|entity| entity.id == victim) else {
+            return false;
+        };
+        let Some(health) = self.health_def(&self.entities[index].kind).cloned() else {
+            return false;
+        };
+        let from = source
+            .and_then(|id| self.entities.iter().find(|entity| entity.id == id))
+            .map(|entity| entity.position);
         let entity = &mut self.entities[index];
         let now = entity.props.get("health").copied().unwrap_or(0.0);
         if now <= 0.0 {
@@ -143,7 +206,9 @@ impl World {
         let entity = &mut self.entities[index];
         entity.props.insert("health".into(), left);
         if health.iframes > 0.0 {
-            entity.props.insert("iframes_left".into(), f64::from(ticks(health.iframes)));
+            entity
+                .props
+                .insert("iframes_left".into(), f64::from(ticks(health.iframes)));
         }
         if health.knock > 0.0
             && let Some(from) = from
@@ -181,15 +246,30 @@ impl World {
     }
 
     /// Runs `hurt`, `heal`, `fire` and `reload`; returns whether `action` was one of them.
-    pub(super) fn combat_action(&mut self, action: &str, event: &Event, queue: &mut Vec<Event>) -> bool {
-        if let Some(body) = action.strip_prefix("hurt:").or_else(|| action.strip_prefix("heal:")) {
-            let (spec, source) = body.split_once('@').map_or((body, None), |(spec, source)| (spec, Some(source)));
-            let Some((selector, amount)) = spec.rsplit_once(':') else { return true };
+    pub(super) fn combat_action(
+        &mut self,
+        action: &str,
+        event: &Event,
+        queue: &mut Vec<Event>,
+    ) -> bool {
+        if let Some(body) = action
+            .strip_prefix("hurt:")
+            .or_else(|| action.strip_prefix("heal:"))
+        {
+            let (spec, source) = body
+                .split_once('@')
+                .map_or((body, None), |(spec, source)| (spec, Some(source)));
+            let Some((selector, amount)) = spec.rsplit_once(':') else {
+                return true;
+            };
             let amount = amount.parse::<f64>().unwrap_or(0.0);
             let victims = self.select_ids(selector, event);
             let source_id = match source {
                 Some(selector) => self.select_ids(selector, event).first().copied(),
-                None => [event.a, event.b].into_iter().flatten().find(|id| !victims.contains(id)),
+                None => [event.a, event.b]
+                    .into_iter()
+                    .flatten()
+                    .find(|id| !victims.contains(id)),
             };
             for victim in victims {
                 if action.starts_with("hurt:") {
@@ -200,10 +280,25 @@ impl World {
             }
             return true;
         }
-        if let Some(body) = action.strip_prefix("fire:").or_else(|| action.strip_prefix("reload:")) {
-            let (name, selector) = body.split_once('@').map_or((body, None), |(name, selector)| (name, Some(selector)));
-            let Some(weapon) = self.def.weapons.iter().position(|weapon| weapon.name == name) else { return true };
-            let owners = self.select_ids(selector.unwrap_or(&self.def.weapons[weapon].owner.clone()), event);
+        if let Some(body) = action
+            .strip_prefix("fire:")
+            .or_else(|| action.strip_prefix("reload:"))
+        {
+            let (name, selector) = body
+                .split_once('@')
+                .map_or((body, None), |(name, selector)| (name, Some(selector)));
+            let Some(weapon) = self
+                .def
+                .weapons
+                .iter()
+                .position(|weapon| weapon.name == name)
+            else {
+                return true;
+            };
+            let owners = self.select_ids(
+                selector.unwrap_or(&self.def.weapons[weapon].owner.clone()),
+                event,
+            );
             for owner in owners {
                 if action.starts_with("fire:") {
                     self.fire_weapon(weapon, owner, queue);

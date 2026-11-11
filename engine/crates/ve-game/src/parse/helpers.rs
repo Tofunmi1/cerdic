@@ -27,9 +27,12 @@ pub(super) fn valid_event(event: &str) -> bool {
             | "swing"
             | "out"
             | "pocket"
-    ) || ["var:", "emit:", "timer:", "input:", "host:", "state:", "level:", "ui:", "ability:", "refused:"]
-        .iter()
-        .any(|prefix| event.starts_with(prefix) && event.len() > prefix.len())
+    ) || [
+        "var:", "emit:", "timer:", "input:", "host:", "state:", "level:", "ui:", "ability:",
+        "refused:",
+    ]
+    .iter()
+    .any(|prefix| event.starts_with(prefix) && event.len() > prefix.len())
 }
 pub(crate) fn validate_selector(selector: &str) -> Result<(), String> {
     if matches!(selector, "a" | "b" | "other")
@@ -98,11 +101,17 @@ pub(super) fn event_raised(def: &GameDef, event: &str) -> bool {
     if let Some(name) = event.strip_prefix("level:") {
         return def.levels.iter().any(|level| level.name == name);
     }
-    if let Some(name) = event.strip_prefix("ability:").or_else(|| event.strip_prefix("refused:")) {
+    if let Some(name) = event
+        .strip_prefix("ability:")
+        .or_else(|| event.strip_prefix("refused:"))
+    {
         return def.abilities.iter().any(|ability| ability.name == name);
     }
     if let Some(id) = event.strip_prefix("ui:") {
-        return def.ui.iter().any(|item| item.kind == "button" && item.id == id);
+        return def
+            .ui
+            .iter()
+            .any(|item| item.kind == "button" && item.id == id);
     }
     if let Some(name) = event.strip_prefix("var:") {
         return def
@@ -135,15 +144,25 @@ pub(super) fn event_raised(def: &GameDef, event: &str) -> bool {
     false
 }
 pub(crate) fn validate_action(action: &str) -> Result<(), String> {
-    if matches!(action, "win" | "lose" | "restart" | "checkpoint" | "respawn") {
+    if matches!(
+        action,
+        "win" | "lose" | "restart" | "checkpoint" | "respawn"
+    ) {
         return Ok(());
     }
     // flow: `go:STATE`, `restart:STATE`, `level:LEVEL` (the names are checked against the declarations once everything is read), and the
     // optional selector of `checkpoint:SELECTOR` and `respawn:SELECTOR`
-    if let Some(name) = action.strip_prefix("go:").or_else(|| action.strip_prefix("restart:")).or_else(|| action.strip_prefix("level:")) {
+    if let Some(name) = action
+        .strip_prefix("go:")
+        .or_else(|| action.strip_prefix("restart:"))
+        .or_else(|| action.strip_prefix("level:"))
+    {
         return nonempty(name, "this action needs a name");
     }
-    if let Some(selector) = action.strip_prefix("checkpoint:").or_else(|| action.strip_prefix("respawn:")) {
+    if let Some(selector) = action
+        .strip_prefix("checkpoint:")
+        .or_else(|| action.strip_prefix("respawn:"))
+    {
         return validate_selector(selector);
     }
     // party: `target:next|prev`, `dash:SELECTOR:SPEED:SECONDS`, `iframes:SELECTOR:SECONDS`, `blast:CENTRE:RADIUS:AMOUNT[@FOES]`
@@ -154,7 +173,9 @@ pub(crate) fn validate_action(action: &str) -> Result<(), String> {
         let shape = "dash needs a selector, a speed and seconds, such as dash:tag:hero:12:0.25";
         let (rest, seconds) = body.rsplit_once(':').ok_or(shape)?;
         let (selector, speed) = rest.rsplit_once(':').ok_or(shape)?;
-        number(seconds).and(number(speed)).map_err(|_| shape.to_owned())?;
+        number(seconds)
+            .and(number(speed))
+            .map_err(|_| shape.to_owned())?;
         return validate_selector(selector);
     }
     if let Some(body) = action.strip_prefix("iframes:") {
@@ -165,24 +186,41 @@ pub(crate) fn validate_action(action: &str) -> Result<(), String> {
     }
     if let Some(body) = action.strip_prefix("blast:") {
         let shape = "blast needs a centre, a radius and an amount, such as blast:a:5:30@tag:enemy";
-        let (spec, foes) = body.split_once('@').map_or((body, None), |(spec, foes)| (spec, Some(foes)));
+        let (spec, foes) = body
+            .split_once('@')
+            .map_or((body, None), |(spec, foes)| (spec, Some(foes)));
         let (rest, amount) = spec.rsplit_once(':').ok_or(shape)?;
         let (centre, radius) = rest.rsplit_once(':').ok_or(shape)?;
-        number(amount).and(number(radius)).map_err(|_| shape.to_owned())?;
+        number(amount)
+            .and(number(radius))
+            .map_err(|_| shape.to_owned())?;
         validate_selector(centre)?;
         return foes.map_or(Ok(()), validate_selector);
     }
     // combat: `hurt:SELECTOR:AMOUNT[@SOURCE]`, `heal:SELECTOR:AMOUNT`, `fire:WEAPON[@SELECTOR]`, `reload:WEAPON[@SELECTOR]`
-    if let Some(body) = action.strip_prefix("hurt:").or_else(|| action.strip_prefix("heal:")) {
-        let (spec, source) = body.split_once('@').map_or((body, None), |(spec, source)| (spec, Some(source)));
-        let Some((selector, _)) = spec.rsplit_once(':').filter(|(_, amount)| number(amount).is_ok()) else {
+    if let Some(body) = action
+        .strip_prefix("hurt:")
+        .or_else(|| action.strip_prefix("heal:"))
+    {
+        let (spec, source) = body
+            .split_once('@')
+            .map_or((body, None), |(spec, source)| (spec, Some(source)));
+        let Some((selector, _)) = spec
+            .rsplit_once(':')
+            .filter(|(_, amount)| number(amount).is_ok())
+        else {
             return Err("hurt and heal need an amount (a number) after the selector, such as hurt:tag:enemy:10".into());
         };
         validate_selector(selector)?;
         return source.map_or(Ok(()), validate_selector);
     }
-    if let Some(body) = action.strip_prefix("fire:").or_else(|| action.strip_prefix("reload:")) {
-        let (name, selector) = body.split_once('@').map_or((body, None), |(name, selector)| (name, Some(selector)));
+    if let Some(body) = action
+        .strip_prefix("fire:")
+        .or_else(|| action.strip_prefix("reload:"))
+    {
+        let (name, selector) = body
+            .split_once('@')
+            .map_or((body, None), |(name, selector)| (name, Some(selector)));
         nonempty(name, "fire and reload need a weapon name")?;
         return selector.map_or(Ok(()), validate_selector);
     }
@@ -227,7 +265,9 @@ pub(crate) fn validate_action(action: &str) -> Result<(), String> {
         };
         if kind == "camera" {
             // `camera:NAME` or `camera:NAME:SECONDS`
-            let (name, seconds) = rest.rsplit_once(':').map_or((rest, None), |(name, seconds)| (name, Some(seconds)));
+            let (name, seconds) = rest
+                .rsplit_once(':')
+                .map_or((rest, None), |(name, seconds)| (name, Some(seconds)));
             nonempty(name, "a camera effect needs a camera name")?;
             return seconds.map_or(Ok(()), |seconds| number(seconds).map(|_| ()));
         }

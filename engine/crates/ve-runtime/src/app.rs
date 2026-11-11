@@ -154,7 +154,11 @@ pub(crate) fn start(canvas_id: &str, scene: SceneKind) -> Result<(), PlatformErr
                 crate::animation::animate_lights,
                 crate::animation::animate_instances,
                 crate::skinning::skin_meshes,
-                (crate::cloth_live::simulate, crate::fluid_live::simulate, crate::sim_live::simulate),
+                (
+                    crate::cloth_live::simulate,
+                    crate::fluid_live::simulate,
+                    crate::sim_live::simulate,
+                ),
             )
                 .chain()
                 .after(crate::projection::update),

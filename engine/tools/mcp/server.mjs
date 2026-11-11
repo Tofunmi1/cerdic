@@ -33,6 +33,7 @@ const pendingTips = [];
 const PORT = Number(process.env.VE_MCP_PORT ?? 8765);
 const TIMEOUT_MS = 90000;
 const GUIDE_ARG = process.argv.indexOf('--guide');
+const DESCRIBE = process.argv.includes('--describe');
 let page = null;
 let counter = 0;
 const pending = new Map();
@@ -40,7 +41,7 @@ const pending = new Map();
 const log = (...args) => console.error('[spatial-engine mcp]', ...args);
 
 // (not started for `--guide`, which only prints text)
-const bridge = GUIDE_ARG >= 0 ? null : Bun.serve({
+const bridge = GUIDE_ARG >= 0 || DESCRIBE ? null : Bun.serve({
   hostname: '127.0.0.1',
   port: PORT,
   fetch(request, server) {
@@ -848,6 +849,7 @@ const TOOL_ORDER = [
   'diff', 'undo', 'redo', 'batch', 'run', 'world', 'script', 'snapshot', 'frame_view', 'set_view', 'start_from', 'recipes',
 ];
 TOOLS.sort((a, b) => TOOL_ORDER.indexOf(a.name) - TOOL_ORDER.indexOf(b.name));
+if (DESCRIBE) { console.log(JSON.stringify({ instructions: INSTRUCTIONS, tools: TOOLS, guide: coreWithMenu(GUIDE_SPLIT) })); process.exit(0); }
 
 const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\n');
 const content = (value, isError = false) => ({ content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }], isError });

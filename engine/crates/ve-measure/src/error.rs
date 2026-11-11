@@ -51,7 +51,9 @@ pub enum MeasureError {
         limit: usize,
     },
     /// A bounded measurement ran out of its work allowance before it finished.
-    #[error("the measurement needs more than its {limit}-step work budget; check fewer or smaller parts")]
+    #[error(
+        "the measurement needs more than its {limit}-step work budget; check fewer or smaller parts"
+    )]
     WorkBudget {
         /// The work allowance that ran out (closest-point queries and ray casts).
         limit: usize,

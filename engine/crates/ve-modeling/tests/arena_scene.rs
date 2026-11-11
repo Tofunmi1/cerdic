@@ -9,7 +9,10 @@ use ve_modeling::{Evaluator, Quality};
 const ASPECT: f64 = 16.0 / 9.0;
 
 fn scene_world() -> World {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../web/tests/scenes/arena/arena.txt");
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../web/tests/scenes/arena/arena.txt"
+    );
     let source = std::fs::read_to_string(path).unwrap();
     let commands = match parse_text(&builtin_registry(), &source) {
         Ok(parsed) => parsed.commands,
@@ -23,26 +26,47 @@ fn scene_world() -> World {
         label: None,
         commands,
     });
-    assert!(matches!(applied, Outcome::Committed { .. }), "apply: {applied:?}");
+    assert!(
+        matches!(applied, Outcome::Committed { .. }),
+        "apply: {applied:?}"
+    );
     let evaluated = match Evaluator::default().evaluate(session.document(), Quality::Final) {
         Ok(ev) => ev,
         Err(e) => panic!("evaluate: {} {}", e.code, e.message),
     };
-    assert!(evaluated.warnings.is_empty(), "no warnings: {:?}", evaluated.warnings);
+    assert!(
+        evaluated.warnings.is_empty(),
+        "no warnings: {:?}",
+        evaluated.warnings
+    );
     World::new(&evaluated.game.expect("the scene is a game"), 1)
 }
 
 fn start(world: &mut World) {
-    world.step(&Inputs { pressed: vec!["ui_accept".into()], ..Inputs::default() }).unwrap();
+    world
+        .step(&Inputs {
+            pressed: vec!["ui_accept".into()],
+            ..Inputs::default()
+        })
+        .unwrap();
     assert_eq!(world.flow_state(), "playing");
 }
 
 fn hero_health(world: &World) -> f64 {
-    world.entities().iter().find(|e| e.kind == "player").and_then(|e| e.props.get("health").copied()).unwrap_or(0.0)
+    world
+        .entities()
+        .iter()
+        .find(|e| e.kind == "player")
+        .and_then(|e| e.props.get("health").copied())
+        .unwrap_or(0.0)
 }
 
 fn turrets(world: &World) -> usize {
-    world.entities().iter().filter(|e| e.kind == "turret").count()
+    world
+        .entities()
+        .iter()
+        .filter(|e| e.kind == "turret")
+        .count()
 }
 
 #[test]
@@ -54,7 +78,12 @@ fn a_hero_holding_fire_clears_the_arena_and_wins() {
         let mut inputs = Inputs::default();
         inputs.axes.insert("fire".into(), 1.0);
         // reload when the magazine runs dry, as a player would
-        let ammo = world.entities().iter().find(|e| e.kind == "player").and_then(|e| e.props.get("ammo_blaster").copied()).unwrap_or(16.0);
+        let ammo = world
+            .entities()
+            .iter()
+            .find(|e| e.kind == "player")
+            .and_then(|e| e.props.get("ammo_blaster").copied())
+            .unwrap_or(16.0);
         if ammo < 1.0 && step >= reloading_until {
             inputs.pressed.push("reload".into());
             reloading_until = step + 80;
@@ -64,7 +93,13 @@ fn a_hero_holding_fire_clears_the_arena_and_wins() {
             break;
         }
     }
-    assert_eq!(world.status(), Status::Won, "turrets left: {}, hero health {}", turrets(&world), hero_health(&world));
+    assert_eq!(
+        world.status(),
+        Status::Won,
+        "turrets left: {}, hero health {}",
+        turrets(&world),
+        hero_health(&world)
+    );
     assert_eq!(world.flow_state(), "win");
     assert_eq!(world.vars().get("kills").copied(), Some(4.0));
     assert!(hero_health(&world) > 0.0, "and the hero lived");
@@ -80,7 +115,10 @@ fn a_hero_that_only_stands_there_is_shot_down() {
             break;
         }
     }
-    assert_eq!((world.status(), world.flow_state()), (Status::Lost, "game_over"));
+    assert_eq!(
+        (world.status(), world.flow_state()),
+        (Status::Lost, "game_over")
+    );
     assert_eq!(turrets(&world), 4, "it never fired");
 }
 
@@ -92,10 +130,20 @@ fn the_hud_shows_health_and_ammo_read_from_the_hero() {
     let by = |id: &str| boxes.iter().find(|b| b.id == id).unwrap();
     assert!((by("h_hp").fraction - 1.0).abs() < 1e-9, "full health");
     assert_eq!(by("h_ammo").text, "Ammo 16 / 16");
-    world.step(&Inputs { axes: [("fire".to_owned(), 1.0)].into(), ..Inputs::default() }).unwrap();
+    world
+        .step(&Inputs {
+            axes: [("fire".to_owned(), 1.0)].into(),
+            ..Inputs::default()
+        })
+        .unwrap();
     assert_eq!(by_text(&world, "h_ammo"), "Ammo 15 / 16", "one round gone");
 }
 
 fn by_text(world: &World, id: &str) -> String {
-    world.ui_layout(ASPECT).into_iter().find(|b| b.id == id).map(|b| b.text).unwrap()
+    world
+        .ui_layout(ASPECT)
+        .into_iter()
+        .find(|b| b.id == id)
+        .map(|b| b.text)
+        .unwrap()
 }

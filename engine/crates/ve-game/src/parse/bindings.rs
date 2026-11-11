@@ -26,8 +26,15 @@ fn list(fields: &BTreeMap<String, String>, key: &str) -> Result<Vec<String>, Str
         return Ok(Vec::new());
     };
     let items: Vec<String> = text.split(',').map(str::to_owned).collect();
-    if items.iter().any(|item| item.is_empty() || !item.chars().all(|c| c.is_ascii_alphanumeric() || c == ':' || c == '+' || c == '-')) {
-        return Err(format!("{key} needs names separated by commas (letters and digits, no spaces)"));
+    if items.iter().any(|item| {
+        item.is_empty()
+            || !item
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == ':' || c == '+' || c == '-')
+    }) {
+        return Err(format!(
+            "{key} needs names separated by commas (letters and digits, no spaces)"
+        ));
     }
     Ok(items)
 }
@@ -35,37 +42,53 @@ fn list(fields: &BTreeMap<String, String>, key: &str) -> Result<Vec<String>, Str
 /// Whether a gamepad control fits an input with `axes` axes: a button drives a press (no axes), a stick an axis pair, and one direction of
 /// one gamepad axis a one-axis input.
 fn pad_ok(control: &str, axes: usize) -> Result<(), String> {
-    let number = |rest: &str| !rest.is_empty() && rest.len() <= 2 && rest.chars().all(|c| c.is_ascii_digit());
+    let number = |rest: &str| {
+        !rest.is_empty() && rest.len() <= 2 && rest.chars().all(|c| c.is_ascii_digit())
+    };
     let good = match control {
         "stick:left" | "stick:right" => axes == 2,
         _ if control.starts_with("button") => axes == 0 && number(&control["button".len()..]),
         _ => {
             let direction = control.ends_with('+') || control.ends_with('-');
-            let digits = control.strip_prefix("axis").map(|rest| &rest[..rest.len().saturating_sub(1)]);
+            let digits = control
+                .strip_prefix("axis")
+                .map(|rest| &rest[..rest.len().saturating_sub(1)]);
             axes == 1 && direction && digits.is_some_and(number)
         }
     };
     if good {
         Ok(())
     } else {
-        Err(format!("pad control '{control}' does not fit this input (button<N> for a press, stick:left or stick:right for two axes, axis<N>+ or axis<N>- for one axis)"))
+        Err(format!(
+            "pad control '{control}' does not fit this input (button<N> for a press, stick:left or stick:right for two axes, axis<N>+ or axis<N>- for one axis)"
+        ))
     }
 }
 
 /// Reads and checks `keys=`, `pad=` and `label=` for an input with `axes` axes.
-pub(super) fn parse_bindings(axes: usize, fields: &BTreeMap<String, String>) -> Result<Bindings, String> {
+pub(super) fn parse_bindings(
+    axes: usize,
+    fields: &BTreeMap<String, String>,
+) -> Result<Bindings, String> {
     let keys = list(fields, "keys")?;
     if fields.contains_key("keys") && keys.is_empty() {
         return Err("keys needs at least one key".into());
     }
     if axes > 0 && !keys.is_empty() && keys.len() != axes * 2 {
-        return Err(format!("keys needs {} names for {axes} axis(es): a positive and a negative key per axis", axes * 2));
+        return Err(format!(
+            "keys needs {} names for {axes} axis(es): a positive and a negative key per axis",
+            axes * 2
+        ));
     }
     let pad = list(fields, "pad")?;
     for control in &pad {
         pad_ok(control, axes)?;
     }
-    Ok(Bindings { keys, pad, label: fields.get("label").cloned().unwrap_or_default() })
+    Ok(Bindings {
+        keys,
+        pad,
+        label: fields.get("label").cloned().unwrap_or_default(),
+    })
 }
 
 /// The bindings as the trailing text of an `input` line.

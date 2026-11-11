@@ -31,16 +31,27 @@ fn flag(fields: &BTreeMap<String, String>, key: &str) -> Result<bool, String> {
     }
 }
 
-pub(super) fn parse_state(def: &mut GameDef, name: Option<&str>, fields: &BTreeMap<String, String>) -> Result<(), String> {
+pub(super) fn parse_state(
+    def: &mut GameDef,
+    name: Option<&str>,
+    fields: &BTreeMap<String, String>,
+) -> Result<(), String> {
     let name = name.ok_or("a state needs a name")?;
     if def.states.iter().any(|state| state.name == name) {
         return Err(format!("duplicate state '{name}'"));
     }
-    def.states.push(StateDef { name: name.to_owned(), frozen: flag(fields, "frozen")? });
+    def.states.push(StateDef {
+        name: name.to_owned(),
+        frozen: flag(fields, "frozen")?,
+    });
     Ok(())
 }
 
-pub(super) fn parse_level(def: &mut GameDef, name: Option<&str>, fields: &BTreeMap<String, String>) -> Result<(), String> {
+pub(super) fn parse_level(
+    def: &mut GameDef,
+    name: Option<&str>,
+    fields: &BTreeMap<String, String>,
+) -> Result<(), String> {
     let name = name.ok_or("a level needs a name")?;
     if def.levels.iter().any(|level| level.name == name) {
         return Err(format!("duplicate level '{name}'"));
@@ -48,20 +59,28 @@ pub(super) fn parse_level(def: &mut GameDef, name: Option<&str>, fields: &BTreeM
     let start = match fields.get("start") {
         None => None,
         Some(text) => {
-            let numbers: Result<Vec<f64>, _> = text.split(',').map(super::helpers::number).collect();
+            let numbers: Result<Vec<f64>, _> =
+                text.split(',').map(super::helpers::number).collect();
             match numbers {
                 Ok(v) if v.len() == 3 => Some([v[0], v[1], v[2]]),
                 _ => return Err("level start needs x,y,z".into()),
             }
         }
     };
-    def.levels.push(LevelDef { name: name.to_owned(), start });
+    def.levels.push(LevelDef {
+        name: name.to_owned(),
+        start,
+    });
     Ok(())
 }
 
 impl StateDef {
     pub(super) fn to_text(&self) -> String {
-        if self.frozen { format!("state {} frozen=1", self.name) } else { format!("state {}", self.name) }
+        if self.frozen {
+            format!("state {} frozen=1", self.name)
+        } else {
+            format!("state {}", self.name)
+        }
     }
 }
 
@@ -80,32 +99,50 @@ pub(super) fn check(def: &GameDef) -> Vec<Diagnostic> {
     let state_ok = |name: &str| def.states.iter().any(|state| state.name == name);
     let level_ok = |name: &str| def.levels.iter().any(|level| level.name == name);
     for rule in &def.rules {
-        let mut complain = |message: String, hint: &str| out.push(Diagnostic::new(rule.line, 1, message, hint));
+        let mut complain =
+            |message: String, hint: &str| out.push(Diagnostic::new(rule.line, 1, message, hint));
         if let Some(name) = &rule.state
             && !state_ok(name)
         {
-            complain(format!("rule state '{name}' is not declared"), "declare it with: state NAME");
+            complain(
+                format!("rule state '{name}' is not declared"),
+                "declare it with: state NAME",
+            );
         }
         if let Some(name) = rule.event.strip_prefix("state:")
             && !state_ok(name)
         {
-            complain(format!("event state:{name} names a state that is not declared"), "declare it with: state NAME");
+            complain(
+                format!("event state:{name} names a state that is not declared"),
+                "declare it with: state NAME",
+            );
         }
         if let Some(name) = rule.event.strip_prefix("level:")
             && !level_ok(name)
         {
-            complain(format!("event level:{name} names a level that is not declared"), "declare it with: level NAME");
+            complain(
+                format!("event level:{name} names a level that is not declared"),
+                "declare it with: level NAME",
+            );
         }
         for action in &rule.actions {
-            if let Some(name) = action.strip_prefix("go:").or_else(|| action.strip_prefix("restart:"))
+            if let Some(name) = action
+                .strip_prefix("go:")
+                .or_else(|| action.strip_prefix("restart:"))
                 && !state_ok(name)
             {
-                complain(format!("no state named '{name}' for {action}"), "declare it with: state NAME");
+                complain(
+                    format!("no state named '{name}' for {action}"),
+                    "declare it with: state NAME",
+                );
             }
             if let Some(name) = action.strip_prefix("level:")
                 && !level_ok(name)
             {
-                complain(format!("no level named '{name}' for {action}"), "declare it with: level NAME");
+                complain(
+                    format!("no level named '{name}' for {action}"),
+                    "declare it with: level NAME",
+                );
             }
         }
     }
@@ -113,7 +150,12 @@ pub(super) fn check(def: &GameDef) -> Vec<Diagnostic> {
         if let Some(name) = &spawn.level
             && !level_ok(name)
         {
-            out.push(Diagnostic::new(1, 1, format!("spawn level '{name}' is not declared"), "declare it with: level NAME"));
+            out.push(Diagnostic::new(
+                1,
+                1,
+                format!("spawn level '{name}' is not declared"),
+                "declare it with: level NAME",
+            ));
         }
     }
     out

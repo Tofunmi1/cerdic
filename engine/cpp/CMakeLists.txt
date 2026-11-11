@@ -53,15 +53,12 @@ target_compile_options(ve_opensubdiv PRIVATE
   -Wno-gnu-zero-variadic-macro-arguments -Wno-format-pedantic
   -Wno-unused-but-set-variable -Wno-unused-template)
 
-# Selected Blender code (bevel, UV unwrapping, ...) under its own flags; see blender/CMakeLists.txt.
-add_subdirectory(blender)
-
 add_library(ve_kernel STATIC src/kernel.cpp src/profiles.cpp src/subdivision.cpp
   src/field_mesh.cpp src/field_tape.cpp src/subdivision_channels.cpp src/tangents.cpp)
 target_include_directories(ve_kernel PUBLIC include)
 # MikkTSpace (vendored from Blender, Apache-2.0): headers only; SYSTEM so its warnings stay upstream's.
 target_include_directories(ve_kernel SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../lib/mikktspace")
-target_link_libraries(ve_kernel PUBLIC manifold ve_meshopt ve_opensubdiv ve_blender_ops)
+target_link_libraries(ve_kernel PUBLIC manifold ve_meshopt ve_opensubdiv)
 target_compile_options(ve_kernel PRIVATE
   -Wall -Wextra -Wpedantic -Werror -fno-rtti -ffp-contract=off -fexcess-precision=standard)
 set_source_files_properties(src/field_mesh.cpp src/field_tape.cpp PROPERTIES COMPILE_OPTIONS "-frtti")
@@ -78,15 +75,6 @@ if(VE_BUILD_TESTS)
   add_executable(tangents_test tests/tangents_test.cpp)
   target_link_libraries(tangents_test PRIVATE ve_kernel)
   target_compile_options(tangents_test PRIVATE -Wall -Wextra -Wpedantic -Werror -fno-rtti)
-  add_executable(bevel_test tests/bevel_test.cpp)
-  target_link_libraries(bevel_test PRIVATE ve_kernel)
-  target_compile_options(bevel_test PRIVATE -Wall -Wextra -Wpedantic -Werror -fno-rtti)
-  add_executable(skin_test tests/skin_test.cpp)
-  target_link_libraries(skin_test PRIVATE ve_kernel)
-  target_compile_options(skin_test PRIVATE -Wall -Wextra -Wpedantic -Werror -fno-rtti)
-  add_executable(uv_test tests/uv_test.cpp)
-  target_link_libraries(uv_test PRIVATE ve_kernel)
-  target_compile_options(uv_test PRIVATE -Wall -Wextra -Wpedantic -Werror -fno-rtti)
   add_executable(field_test tests/field_test.cpp)
   target_link_libraries(field_test PRIVATE ve_kernel)
   target_compile_options(field_test PRIVATE -Wall -Wextra -Wpedantic -Werror -fno-rtti)

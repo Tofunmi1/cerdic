@@ -5,7 +5,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { families, shared, themes } from '../src/studio/tokens';
 
 const root = new URL('../src/studio/', import.meta.url);
-const parts = ['base', 'shell', 'chat', 'panels', 'graph'];
+const parts = ['base', 'shell', 'chat', 'panels', 'graph', 'start', 'projects'];
 
 const vars = (entries: Record<string, string>, indent = '  ') =>
   Object.entries(entries).map(([key, value]) => `${indent}--${key}: ${value};`).join('\n');

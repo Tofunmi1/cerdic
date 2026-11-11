@@ -97,7 +97,11 @@ fn multiply(a: [f32; 4], b: [f32; 4]) -> [f32; 4] {
 }
 
 fn finite(pose: &Trs) -> bool {
-    pose.translation.iter().chain(&pose.rotation).chain(&pose.scale).all(|v| v.is_finite())
+    pose.translation
+        .iter()
+        .chain(&pose.rotation)
+        .chain(&pose.scale)
+        .all(|v| v.is_finite())
 }
 
 /// Adds an overlay clip to a base pose: what the clip changed since its `reference` (its first frame) is applied on top of `base`, scaled by
@@ -105,7 +109,12 @@ fn finite(pose: &Trs) -> bool {
 /// by normalised interpolation), scale multiplies by the ratio. Anything not finite, or a weight that is not, gives `base` back.
 #[must_use]
 pub fn apply_additive(base: &Trs, reference: &Trs, current: &Trs, weight: f32) -> Trs {
-    if !weight.is_finite() || weight <= 0.0 || !finite(base) || !finite(reference) || !finite(current) {
+    if !weight.is_finite()
+        || weight <= 0.0
+        || !finite(base)
+        || !finite(reference)
+        || !finite(current)
+    {
         return *base;
     }
     let weight = weight.min(1.0);
@@ -113,21 +122,43 @@ pub fn apply_additive(base: &Trs, reference: &Trs, current: &Trs, weight: f32) -
     let mut scale = base.scale;
     for axis in 0..3 {
         translation[axis] += weight * (current.translation[axis] - reference.translation[axis]);
-        let ratio = if reference.scale[axis].abs() > 1.0e-6 { current.scale[axis] / reference.scale[axis] } else { 1.0 };
+        let ratio = if reference.scale[axis].abs() > 1.0e-6 {
+            current.scale[axis] / reference.scale[axis]
+        } else {
+            1.0
+        };
         scale[axis] = base.scale[axis] * (1.0 + weight * (ratio - 1.0));
     }
     let Some(reference_q) = normalize(reference.rotation) else {
-        return Trs { translation, scale, ..*base };
+        return Trs {
+            translation,
+            scale,
+            ..*base
+        };
     };
     let Some(current_q) = normalize(current.rotation) else {
-        return Trs { translation, scale, ..*base };
+        return Trs {
+            translation,
+            scale,
+            ..*base
+        };
     };
-    let inverse = [-reference_q[0], -reference_q[1], -reference_q[2], reference_q[3]];
+    let inverse = [
+        -reference_q[0],
+        -reference_q[1],
+        -reference_q[2],
+        reference_q[3],
+    ];
     let mut delta = multiply(current_q, inverse);
     if delta[3] < 0.0 {
         delta = delta.map(|c| -c);
     }
-    let partway = [delta[0] * weight, delta[1] * weight, delta[2] * weight, (1.0 - weight) + delta[3] * weight];
+    let partway = [
+        delta[0] * weight,
+        delta[1] * weight,
+        delta[2] * weight,
+        (1.0 - weight) + delta[3] * weight,
+    ];
     let rotation = normalize(multiply(partway, base.rotation)).unwrap_or(base.rotation);
     Trs {
         translation,

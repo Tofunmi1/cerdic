@@ -1,7 +1,7 @@
 <h1 align="center">Cerdic 3D</h1>
 
 <p align="center">
-  <a href="https://cerdic.xyz">cerdic.xyz</a> · <a href="#quick-start">quick start</a> · <a href="#the-agent-loop">agent loop</a> · <a href="#gallery">gallery</a> · <a href="#the-language">language</a> · <a href="#architecture">architecture</a> · <a href="#docs">docs</a>
+  <a href="https://cerdic-3d.vercel.app">cerdic-3d.vercel.app</a> · <a href="#quick-start">quick start</a> · <a href="#the-agent-loop">agent loop</a> · <a href="#gallery">gallery</a> · <a href="#the-language">language</a> · <a href="#architecture">architecture</a> · <a href="#docs">docs</a>
 </p>
 
 <p align="center">
@@ -328,8 +328,10 @@ strict validation needs cargo-nextest, cargo-deny, clang-format, clang-tidy and 
 engine/
   crates/      the rust workspace (29 crates)
   cpp/         our C++ kernel layer behind a C ABI
-  lib/         vendored sources: bevy (trimmed), manifold, clipper2, opensubdiv,
-               meshoptimizer, eigen, fmt, mikktspace, material-maker, wgpu-hal
+  lib/         third-party sources we build against, each with its licence file
+               and a record of our changes in PATCHES.md: bevy (trimmed), wgpu-hal,
+               manifold, clipper2, opensubdiv, meshoptimizer, mikktspace, quadrs
+               and the material-maker node library
   web/         the viewer page, demos, browser tests and the example scenes
   tools/       the mcp server, renderers, audits, world generators
 src/           the React + TypeScript editor
@@ -348,3 +350,7 @@ cerdic 3d does not import models, textures or sounds. the one dataset it reads i
 With Codex installed and signed in (`codex login`), run the web app and the local API server (`bun server/index.ts` if Vite is already running). Open a project, choose **Connect assistant → Connect local Codex**, select a model, then **Start chatting**. Prompts in the sidebar can now inspect, build and edit the current world through its engine tools; replies and tool activity stream back into the conversation. Use **Stop** to interrupt work. No extra API key is required for this local integration.
 
 Project/world conversations keep separate agent threads. See [projects and assistant setup](docs/project-workspace.md) for persistence, external MCP, and the opt-in live verification command.
+
+The same sidebar also supports **Anthropic · Claude API** and **OpenAI-compatible** providers. Enter the model ID and API key in **Connect assistant → API provider**; for OpenAI-compatible services, the base URL is optional. The key is sent to the local Bun server for that connection and is held in memory only. It is not written to local storage or the project conversation. Keep this local server private; provider calls have not been verified against every third-party endpoint.
+
+For a separate agent session, the **External agent · MCP** section provides setup commands for Claude Code and Codex CLI. That connection lets the external agent control the active workspace; it does not forward messages from sidebar chat.

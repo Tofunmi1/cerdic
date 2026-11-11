@@ -96,7 +96,10 @@ fn machine(reason: String) -> Error {
 /// Whether `name` is a plain identifier: letters, digits, `_`, `-` and `.`.
 #[must_use]
 pub fn plain_name(name: &str) -> bool {
-    !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
 }
 
 impl Extras {
@@ -106,32 +109,56 @@ impl Extras {
     /// [`Error::Machine`] naming what to change.
     pub fn validate(&self) -> Result<(), Error> {
         if self.layers.len() > MAX_OVERLAYS {
-            return Err(machine(format!("{} layers is more than the {MAX_OVERLAYS} allowed", self.layers.len())));
+            return Err(machine(format!(
+                "{} layers is more than the {MAX_OVERLAYS} allowed",
+                self.layers.len()
+            )));
         }
         if self.events.len() > MAX_EVENTS {
-            return Err(machine(format!("{} events is more than the {MAX_EVENTS} allowed", self.events.len())));
+            return Err(machine(format!(
+                "{} events is more than the {MAX_EVENTS} allowed",
+                self.events.len()
+            )));
         }
         for (index, layer) in self.layers.iter().enumerate() {
-            if !plain_name(&layer.name) || self.layers[..index].iter().any(|other| other.name == layer.name) {
-                return Err(machine(format!("layer name {:?} must be unique letters, digits, _, - or .", layer.name)));
+            if !plain_name(&layer.name)
+                || self.layers[..index]
+                    .iter()
+                    .any(|other| other.name == layer.name)
+            {
+                return Err(machine(format!(
+                    "layer name {:?} must be unique letters, digits, _, - or .",
+                    layer.name
+                )));
             }
             let fixed_ok = match &layer.weight {
                 LayerWeight::Fixed(w) => w.is_finite() && (0.0..=1.0).contains(w),
                 LayerWeight::Parameter(name) => plain_name(name),
             };
-            if !(fixed_ok && layer.speed.is_finite() && layer.speed > 0.0 && layer.fade.is_finite() && layer.fade >= 0.0) {
+            if !(fixed_ok
+                && layer.speed.is_finite()
+                && layer.speed > 0.0
+                && layer.fade.is_finite()
+                && layer.fade >= 0.0)
+            {
                 return Err(machine(format!(
                     "layer {:?}: weight must be 0 to 1 or a parameter name, speed above 0, fade not negative",
                     layer.name
                 )));
             }
             if layer.mask.iter().any(String::is_empty) {
-                return Err(machine(format!("layer {:?} names an empty part in its mask", layer.name)));
+                return Err(machine(format!(
+                    "layer {:?} names an empty part in its mask",
+                    layer.name
+                )));
             }
         }
         for event in &self.events {
             if !plain_name(&event.name) || !event.time.is_finite() || event.time < 0.0 {
-                return Err(machine(format!("event {:?} needs a plain name and a time of 0 or more", event.name)));
+                return Err(machine(format!(
+                    "event {:?} needs a plain name and a time of 0 or more",
+                    event.name
+                )));
             }
         }
         Ok(())

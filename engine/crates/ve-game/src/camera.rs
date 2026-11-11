@@ -118,7 +118,11 @@ struct Blend {
 type Collide<'a> = &'a dyn Fn([f64; 3], [f64; 3]) -> Option<f64>;
 
 fn forward(yaw: f64, pitch: f64) -> [f64; 3] {
-    [pitch.cos() * yaw.sin(), pitch.sin(), pitch.cos() * yaw.cos()]
+    [
+        pitch.cos() * yaw.sin(),
+        pitch.sin(),
+        pitch.cos() * yaw.cos(),
+    ]
 }
 
 fn lerp(a: f64, b: f64, t: f64) -> f64 {
@@ -136,7 +140,11 @@ impl CameraDef {
 
     /// The anchor the view follows this step: the target's pivot, smoothed, outside the dead zone, inside the bounds.
     fn anchor(&self, state: &mut State, input: &CameraInput) -> [f64; 3] {
-        let mut want = [input.target[0], input.target[1] + self.height, input.target[2]];
+        let mut want = [
+            input.target[0],
+            input.target[1] + self.height,
+            input.target[2],
+        ];
         if let Some([x0, x1, z0, z1]) = self.bounds {
             want[0] = want[0].clamp(x0, x1);
             want[2] = want[2].clamp(z0, z1);
@@ -147,7 +155,11 @@ impl CameraDef {
         };
         if self.deadzone > 0.0 {
             // a side-scroller also lets the hero jump inside a vertical band without the picture bobbing with it
-            let axes: &[usize] = if self.mode == "side" { &[0, 1, 2] } else { &[0, 2] };
+            let axes: &[usize] = if self.mode == "side" {
+                &[0, 1, 2]
+            } else {
+                &[0, 2]
+            };
             for &axis in axes {
                 let gap = want[axis] - anchor[axis];
                 if gap.abs() > self.deadzone {
@@ -157,7 +169,11 @@ impl CameraDef {
                 }
             }
         }
-        let follow = if self.smoothing > 0.0 { 1.0 - (-input.dt / self.smoothing).exp() } else { 1.0 };
+        let follow = if self.smoothing > 0.0 {
+            1.0 - (-input.dt / self.smoothing).exp()
+        } else {
+            1.0
+        };
         for axis in 0..3 {
             anchor[axis] = lerp(anchor[axis], want[axis], follow);
         }
@@ -168,26 +184,60 @@ impl CameraDef {
     fn pose(&self, state: &mut State, input: &CameraInput, collide: Collide) -> CameraPose {
         let anchor = self.anchor(state, input);
         match self.mode.as_str() {
-            "first" => CameraPose { eye: anchor, yaw: input.orbit_yaw, pitch: input.orbit_pitch, fov: self.fov },
+            "first" => CameraPose {
+                eye: anchor,
+                yaw: input.orbit_yaw,
+                pitch: input.orbit_pitch,
+                fov: self.fov,
+            },
             "fixed" => {
                 let eye = self.at.unwrap_or([0.0; 3]);
                 let (dx, dy, dz) = (anchor[0] - eye[0], anchor[1] - eye[1], anchor[2] - eye[2]);
-                CameraPose { eye, yaw: dx.atan2(dz), pitch: dy.atan2(dx.hypot(dz)), fov: self.fov }
+                CameraPose {
+                    eye,
+                    yaw: dx.atan2(dz),
+                    pitch: dy.atan2(dx.hypot(dz)),
+                    fov: self.fov,
+                }
             }
             _ => {
                 let (yaw, pitch) = if self.fixed_angle() {
                     // the player may turn a top-down or isometric view and tilt an isometric one; a side-scroller keeps its plane
-                    let turn = if matches!(self.mode.as_str(), "top_down" | "iso") { input.yaw_offset } else { 0.0 };
-                    let tilt = if self.mode == "iso" { input.pitch_offset } else { 0.0 };
+                    let turn = if matches!(self.mode.as_str(), "top_down" | "iso") {
+                        input.yaw_offset
+                    } else {
+                        0.0
+                    };
+                    let tilt = if self.mode == "iso" {
+                        input.pitch_offset
+                    } else {
+                        0.0
+                    };
                     let pitch = self.pitch.to_radians() + tilt;
-                    (self.yaw.to_radians() + turn, if self.mode == "iso" { pitch.min(MOST_LEVEL) } else { pitch })
+                    (
+                        self.yaw.to_radians() + turn,
+                        if self.mode == "iso" {
+                            pitch.min(MOST_LEVEL)
+                        } else {
+                            pitch
+                        },
+                    )
                 } else {
-                    (input.orbit_yaw, input.orbit_pitch.clamp(self.min_pitch.to_radians(), self.max_pitch.to_radians()))
+                    (
+                        input.orbit_yaw,
+                        input
+                            .orbit_pitch
+                            .clamp(self.min_pitch.to_radians(), self.max_pitch.to_radians()),
+                    )
                 };
                 let look = forward(yaw, pitch);
                 let right = [-yaw.cos(), 0.0, yaw.sin()];
                 let mut arm = self.distance * input.zoom.clamp(ZOOM_IN, ZOOM_OUT);
-                let shoulder = if self.fixed_angle() { 0.0 } else { self.shoulder };
+                let shoulder = if self.fixed_angle() {
+                    0.0
+                } else {
+                    self.shoulder
+                };
                 if self.collide && !self.fixed_angle() {
                     let wanted = [
                         anchor[0] - look[0] * arm + right[0] * shoulder,
@@ -203,7 +253,12 @@ impl CameraDef {
                     anchor[1] - look[1] * arm,
                     anchor[2] - look[2] * arm + right[2] * shoulder,
                 ];
-                CameraPose { eye, yaw, pitch, fov: self.fov }
+                CameraPose {
+                    eye,
+                    yaw,
+                    pitch,
+                    fov: self.fov,
+                }
             }
         }
     }
@@ -214,7 +269,12 @@ impl CameraRig {
     #[must_use]
     pub fn new(cameras: Vec<CameraDef>) -> Self {
         let states = vec![State::default(); cameras.len()];
-        Self { cameras, states, active: 0, blend: None }
+        Self {
+            cameras,
+            states,
+            active: 0,
+            blend: None,
+        }
     }
 
     /// Whether the game declared any camera.
@@ -226,7 +286,9 @@ impl CameraRig {
     /// The name of the active camera (empty when there are none).
     #[must_use]
     pub fn active(&self) -> &str {
-        self.cameras.get(self.active).map_or("", |camera| camera.name.as_str())
+        self.cameras
+            .get(self.active)
+            .map_or("", |camera| camera.name.as_str())
     }
 
     /// The active camera's definition.
@@ -247,12 +309,24 @@ impl CameraRig {
             "prev" if count > 0 => Some((self.active + count - 1) % count),
             _ => None,
         };
-        let Some(next) = cycled.or_else(|| self.cameras.iter().position(|camera| camera.name == name)) else {
-            let names: Vec<&str> = self.cameras.iter().map(|camera| camera.name.as_str()).collect();
-            return Err(format!("no camera named {name:?} (the cameras are {names:?})"));
+        let Some(next) =
+            cycled.or_else(|| self.cameras.iter().position(|camera| camera.name == name))
+        else {
+            let names: Vec<&str> = self
+                .cameras
+                .iter()
+                .map(|camera| camera.name.as_str())
+                .collect();
+            return Err(format!(
+                "no camera named {name:?} (the cameras are {names:?})"
+            ));
         };
         if next != self.active {
-            self.blend = (seconds > 0.0).then_some(Blend { from: self.active, seconds, elapsed: 0.0 });
+            self.blend = (seconds > 0.0).then_some(Blend {
+                from: self.active,
+                seconds,
+                elapsed: 0.0,
+            });
             self.active = next;
         }
         Ok(())
@@ -261,7 +335,12 @@ impl CameraRig {
     /// The view for this step.
     pub fn pose(&mut self, input: &CameraInput, collide: Collide) -> CameraPose {
         let Some(camera) = self.cameras.get(self.active) else {
-            return CameraPose { eye: [0.0; 3], yaw: 0.0, pitch: 0.0, fov: 60.0 };
+            return CameraPose {
+                eye: [0.0; 3],
+                yaw: 0.0,
+                pitch: 0.0,
+                fov: 60.0,
+            };
         };
         let now = camera.pose(&mut self.states[self.active], input, collide);
         let Some(blend) = self.blend.as_mut() else {
@@ -277,7 +356,11 @@ impl CameraRig {
         }
         let eased = t * t * (3.0 - 2.0 * t);
         CameraPose {
-            eye: [lerp(before.eye[0], now.eye[0], eased), lerp(before.eye[1], now.eye[1], eased), lerp(before.eye[2], now.eye[2], eased)],
+            eye: [
+                lerp(before.eye[0], now.eye[0], eased),
+                lerp(before.eye[1], now.eye[1], eased),
+                lerp(before.eye[2], now.eye[2], eased),
+            ],
             yaw: before.yaw + wrap(now.yaw - before.yaw) * eased,
             pitch: lerp(before.pitch, now.pitch, eased),
             fov: lerp(before.fov, now.fov, eased),
@@ -285,28 +368,52 @@ impl CameraRig {
     }
 }
 
-fn number(fields: &BTreeMap<String, String>, key: &str, default: f64, zero: bool) -> Result<f64, String> {
-    let value = fields.get(key).map_or(Ok(default), |text| text.parse::<f64>()).map_err(|_| format!("{key} must be a finite number"))?;
+fn number(
+    fields: &BTreeMap<String, String>,
+    key: &str,
+    default: f64,
+    zero: bool,
+) -> Result<f64, String> {
+    let value = fields
+        .get(key)
+        .map_or(Ok(default), |text| text.parse::<f64>())
+        .map_err(|_| format!("{key} must be a finite number"))?;
     if !value.is_finite() || value < 0.0 || (!zero && value == 0.0) {
-        return Err(format!("{key} must be finite and {}", if zero { "nonnegative" } else { "positive" }));
+        return Err(format!(
+            "{key} must be finite and {}",
+            if zero { "nonnegative" } else { "positive" }
+        ));
     }
     Ok(value)
 }
 
 fn signed(fields: &BTreeMap<String, String>, key: &str, default: f64) -> Result<f64, String> {
-    let value = fields.get(key).map_or(Ok(default), |text| text.parse::<f64>()).map_err(|_| format!("{key} must be a finite number"))?;
-    if value.is_finite() { Ok(value) } else { Err(format!("{key} must be a finite number")) }
+    let value = fields
+        .get(key)
+        .map_or(Ok(default), |text| text.parse::<f64>())
+        .map_err(|_| format!("{key} must be a finite number"))?;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(format!("{key} must be a finite number"))
+    }
 }
 
 fn numbers(text: &str, key: &str, count: usize) -> Result<Vec<f64>, String> {
     let values: Result<Vec<f64>, _> = text.split(',').map(str::parse::<f64>).collect();
     match values {
         Ok(values) if values.len() == count && values.iter().all(|v| v.is_finite()) => Ok(values),
-        _ => Err(format!("{key} needs {count} finite numbers separated by commas")),
+        _ => Err(format!(
+            "{key} needs {count} finite numbers separated by commas"
+        )),
     }
 }
 
-pub(crate) fn parse_camera(def: &mut GameDef, name: Option<&str>, fields: &BTreeMap<String, String>) -> Result<(), String> {
+pub(crate) fn parse_camera(
+    def: &mut GameDef,
+    name: Option<&str>,
+    fields: &BTreeMap<String, String>,
+) -> Result<(), String> {
     let name = name.ok_or("camera needs a name")?;
     if def.cameras.iter().any(|camera| camera.name == name) {
         return Err(format!("duplicate camera '{name}'"));
@@ -315,7 +422,10 @@ pub(crate) fn parse_camera(def: &mut GameDef, name: Option<&str>, fields: &BTree
     if !MODES.contains(&mode) {
         return Err(format!("mode must be one of {}", MODES.join(", ")));
     }
-    let target = fields.get("target").cloned().unwrap_or_else(|| "tag:hero".into());
+    let target = fields
+        .get("target")
+        .cloned()
+        .unwrap_or_else(|| "tag:hero".into());
     validate_selector(&target).map_err(|message| format!("target: {message}"))?;
     let (distance, height, pitch, yaw, smoothing) = match mode {
         "first" => (0.0, 1.6, 0.0, 0.0, 0.0),
@@ -330,20 +440,28 @@ pub(crate) fn parse_camera(def: &mut GameDef, name: Option<&str>, fields: &BTree
             let v = numbers(text, "at", 3)?;
             Some([v[0], v[1], v[2]])
         }
-        None if mode == "fixed" => return Err("a fixed camera needs at=x,y,z (where it stands)".into()),
+        None if mode == "fixed" => {
+            return Err("a fixed camera needs at=x,y,z (where it stands)".into());
+        }
         None => None,
     };
     let bounds = match fields.get("bounds") {
         Some(text) => {
-            let v = numbers(text, "bounds", 4).map_err(|_| "bounds needs four numbers: x_min,x_max,z_min,z_max".to_owned())?;
+            let v = numbers(text, "bounds", 4)
+                .map_err(|_| "bounds needs four numbers: x_min,x_max,z_min,z_max".to_owned())?;
             if v[0] > v[1] || v[2] > v[3] {
-                return Err("bounds must run from the smaller to the larger value on each axis".into());
+                return Err(
+                    "bounds must run from the smaller to the larger value on each axis".into(),
+                );
             }
             Some([v[0], v[1], v[2], v[3]])
         }
         None => None,
     };
-    let (min_pitch, max_pitch) = (signed(fields, "min_pitch", -60.0)?, signed(fields, "max_pitch", 75.0)?);
+    let (min_pitch, max_pitch) = (
+        signed(fields, "min_pitch", -60.0)?,
+        signed(fields, "max_pitch", 75.0)?,
+    );
     if min_pitch >= max_pitch {
         return Err("min_pitch must be below max_pitch".into());
     }
@@ -356,7 +474,12 @@ pub(crate) fn parse_camera(def: &mut GameDef, name: Option<&str>, fields: &BTree
         name: name.to_owned(),
         mode: mode.to_owned(),
         target,
-        distance: number(fields, "distance", distance, mode == "first" || mode == "fixed")?,
+        distance: number(
+            fields,
+            "distance",
+            distance,
+            mode == "first" || mode == "fixed",
+        )?,
         height: number(fields, "height", height, true)?,
         shoulder: signed(fields, "shoulder", 0.0)?,
         pitch: signed(fields, "pitch", pitch)?,
@@ -379,7 +502,12 @@ pub(crate) fn error_column(raw: &str, message: &str) -> Option<usize> {
     }
     raw.split_whitespace().find_map(|token| {
         let key = token.split_once('=').map_or(token, |(key, _)| key);
-        (message.contains(key) && key != "camera").then(|| raw.find(token).map(|index| raw[..index].chars().count() + 1)).flatten()
+        (message.contains(key) && key != "camera")
+            .then(|| {
+                raw.find(token)
+                    .map(|index| raw[..index].chars().count() + 1)
+            })
+            .flatten()
     })
 }
 
@@ -387,7 +515,20 @@ impl CameraDef {
     pub(crate) fn to_text(&self) -> String {
         let mut line = format!(
             "camera {} mode={} target={} distance={} height={} shoulder={} pitch={} yaw={} fov={} smoothing={} collide={} deadzone={} min_pitch={} max_pitch={}",
-            self.name, self.mode, self.target, self.distance, self.height, self.shoulder, self.pitch, self.yaw, self.fov, self.smoothing, u8::from(self.collide), self.deadzone, self.min_pitch, self.max_pitch
+            self.name,
+            self.mode,
+            self.target,
+            self.distance,
+            self.height,
+            self.shoulder,
+            self.pitch,
+            self.yaw,
+            self.fov,
+            self.smoothing,
+            u8::from(self.collide),
+            self.deadzone,
+            self.min_pitch,
+            self.max_pitch
         );
         if let Some([x, y, z]) = self.at {
             let _ = write!(line, " at={x},{y},{z}");

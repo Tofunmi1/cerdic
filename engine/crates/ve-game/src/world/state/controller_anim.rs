@@ -23,13 +23,30 @@ impl World {
         if self.def.controllers.is_empty() {
             return;
         }
-        let controlled: Vec<String> = self.def.controllers.iter().map(|c| c.kind.clone()).collect();
-        for entity in self.entities.iter_mut().filter(|entity| controlled.contains(&entity.kind)) {
+        let controlled: Vec<String> = self
+            .def
+            .controllers
+            .iter()
+            .map(|c| c.kind.clone())
+            .collect();
+        for entity in self
+            .entities
+            .iter_mut()
+            .filter(|entity| controlled.contains(&entity.kind))
+        {
             // the model is drawn from the orientation, so it turns with the heading (the controller or the motion sets the heading)
             let half = entity.heading / 2.0;
             entity.orientation = [0.0, half.sin(), 0.0, half.cos()];
             let target = Some(entity.id);
-            let emit = |effects: &mut Vec<Effect>, kind: EffectKind, name: &str, value: Option<f64>| effects.push(Effect { kind, name: name.into(), target, value });
+            let emit =
+                |effects: &mut Vec<Effect>, kind: EffectKind, name: &str, value: Option<f64>| {
+                    effects.push(Effect {
+                        kind,
+                        name: name.into(),
+                        target,
+                        value,
+                    })
+                };
             let speed = (entity.props.get("speed").copied().unwrap_or(0.0) * 10.0).round() / 10.0;
             let grounded = entity.props.get("grounded").copied().unwrap_or(0.0) > 0.5;
             let jumping = !grounded && entity.velocity[1] > 0.0;
@@ -38,7 +55,12 @@ impl World {
             }
             let was_grounded = last(entity, SENT_GROUNDED).map(|before| before > 0.5);
             if was_grounded != Some(grounded) {
-                emit(effects, EffectKind::AnimFlag, "grounded", Some(flag(grounded)));
+                emit(
+                    effects,
+                    EffectKind::AnimFlag,
+                    "grounded",
+                    Some(flag(grounded)),
+                );
                 if was_grounded == Some(true) && jumping {
                     emit(effects, EffectKind::Anim, "jump", None);
                 }
@@ -47,7 +69,12 @@ impl World {
                 }
             }
             if last(entity, SENT_JUMPING).is_none_or(|before| (before > 0.5) != jumping) {
-                emit(effects, EffectKind::AnimFlag, "jumping", Some(flag(jumping)));
+                emit(
+                    effects,
+                    EffectKind::AnimFlag,
+                    "jumping",
+                    Some(flag(jumping)),
+                );
             }
             entity.props.insert(SENT_SPEED.into(), speed);
             entity.props.insert(SENT_GROUNDED.into(), flag(grounded));

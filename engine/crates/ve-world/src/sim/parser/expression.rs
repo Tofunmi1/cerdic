@@ -11,7 +11,9 @@ impl Parser {
     }
 
     fn peek_binary(&self) -> Option<(Bin, u8)> {
-        let Tok::Sym(s) = self.peek() else { return None };
+        let Tok::Sym(s) = self.peek() else {
+            return None;
+        };
         Some(match *s {
             "||" => (Bin::Or, 1),
             "&&" => (Bin::And, 2),
@@ -45,7 +47,11 @@ impl Parser {
                 suggestion: "arithmetic takes equal types or a number with a vector; comparisons take numbers; && and || take bools".to_owned(),
                 ..at_operator
             })?;
-            left = Expr { kind: Kind::Bin(op, Box::new(left), Box::new(right)), ty, line };
+            left = Expr {
+                kind: Kind::Bin(op, Box::new(left), Box::new(right)),
+                ty,
+                line,
+            };
         }
         Ok(left)
     }
@@ -58,25 +64,49 @@ impl Parser {
                 return Err(self.err("cannot negate a bool", "use `!` for a bool"));
             }
             let ty = inner.ty;
-            return Ok(Expr { kind: Kind::Neg(Box::new(inner)), ty, line });
+            return Ok(Expr {
+                kind: Kind::Neg(Box::new(inner)),
+                ty,
+                line,
+            });
         }
         if self.eat_sym("!") {
             let inner = self.unary()?;
             if inner.ty != Ty::Bool {
-                return Err(self.err("`!` takes a bool", "compare first, for example `!(x > 1.0)`"));
+                return Err(self.err(
+                    "`!` takes a bool",
+                    "compare first, for example `!(x > 1.0)`",
+                ));
             }
-            return Ok(Expr { kind: Kind::Not(Box::new(inner)), ty: Ty::Bool, line });
+            return Ok(Expr {
+                kind: Kind::Not(Box::new(inner)),
+                ty: Ty::Bool,
+                line,
+            });
         }
         let mut e = self.primary()?;
         while self.is_sym(".") {
             self.at += 1;
             let swz = self.ident()?;
-            let idxs = swizzle_indices(&swz).ok_or_else(|| self.err(format!("`{swz}` is not a swizzle"), "use letters x y z w (or r g b a)"))?;
+            let idxs = swizzle_indices(&swz).ok_or_else(|| {
+                self.err(
+                    format!("`{swz}` is not a swizzle"),
+                    "use letters x y z w (or r g b a)",
+                )
+            })?;
             if e.ty == Ty::Float || e.ty == Ty::Bool || idxs.iter().any(|&i| i >= e.ty.width()) {
-                return Err(self.err(format!("a {} has no `.{swz}`", e.ty.name()), "use components the vector has"));
+                return Err(self.err(
+                    format!("a {} has no `.{swz}`", e.ty.name()),
+                    "use components the vector has",
+                ));
             }
-            let ty = Ty::of_width(idxs.len()).ok_or_else(|| self.err("a swizzle has one to four letters", "shorten it"))?;
-            e = Expr { kind: Kind::Swizzle(Box::new(e), idxs), ty, line };
+            let ty = Ty::of_width(idxs.len())
+                .ok_or_else(|| self.err("a swizzle has one to four letters", "shorten it"))?;
+            e = Expr {
+                kind: Kind::Swizzle(Box::new(e), idxs),
+                ty,
+                line,
+            };
         }
         Ok(e)
     }
@@ -86,15 +116,29 @@ impl Parser {
         match self.peek().clone() {
             Tok::Int(n) => {
                 self.at += 1;
-                #[expect(clippy::cast_precision_loss, reason = "source integers are small constants")]
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "source integers are small constants"
+                )]
                 let x = n as f32;
-                Ok(Expr { kind: Kind::Num(x), ty: Ty::Float, line })
+                Ok(Expr {
+                    kind: Kind::Num(x),
+                    ty: Ty::Float,
+                    line,
+                })
             }
             Tok::Float(x) => {
                 self.at += 1;
-                #[expect(clippy::cast_possible_truncation, reason = "source numbers are f32 constants")]
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "source numbers are f32 constants"
+                )]
                 let x = x as f32;
-                Ok(Expr { kind: Kind::Num(x), ty: Ty::Float, line })
+                Ok(Expr {
+                    kind: Kind::Num(x),
+                    ty: Ty::Float,
+                    line,
+                })
             }
             Tok::Sym("(") => {
                 self.at += 1;
@@ -106,13 +150,20 @@ impl Parser {
                 self.at += 1;
                 self.name(&name, line)
             }
-            _ => Err(self.err("expected a value", "write a number, a name, a call or a parenthesised expression")),
+            _ => Err(self.err(
+                "expected a value",
+                "write a number, a name, a call or a parenthesised expression",
+            )),
         }
     }
 
     fn name(&mut self, name: &str, line: usize) -> R<Expr> {
         if name == "true" || name == "false" {
-            return Ok(Expr { kind: Kind::Bool(name == "true"), ty: Ty::Bool, line });
+            return Ok(Expr {
+                kind: Kind::Bool(name == "true"),
+                ty: Ty::Bool,
+                line,
+            });
         }
         if self.is_sym("(") {
             return self.call(name, line);
@@ -123,13 +174,28 @@ impl Parser {
             let idx = self.expr()?;
             self.expect_sym("]")?;
             let ty = self.prog.states[arr].ty;
-            return Ok(Expr { kind: Kind::Elem { arr, idx: Box::new(idx) }, ty, line });
+            return Ok(Expr {
+                kind: Kind::Elem {
+                    arr,
+                    idx: Box::new(idx),
+                },
+                ty,
+                line,
+            });
         }
         if let Some(slot) = self.locals.iter().rposition(|(n, _)| n == name) {
-            return Ok(Expr { kind: Kind::Local(slot), ty: self.locals[slot].1, line });
+            return Ok(Expr {
+                kind: Kind::Local(slot),
+                ty: self.locals[slot].1,
+                line,
+            });
         }
         if let Some(at) = self.prog.params.iter().position(|p| p.name == name) {
-            return Ok(Expr { kind: Kind::Param(at), ty: self.prog.params[at].ty, line });
+            return Ok(Expr {
+                kind: Kind::Param(at),
+                ty: self.prog.params[at].ty,
+                line,
+            });
         }
         let builtin = match name {
             "dt" => Some(Builtin::Dt),
@@ -140,13 +206,24 @@ impl Parser {
             _ => None,
         };
         if let Some(b) = builtin {
-            return Ok(Expr { kind: Kind::Builtin(b), ty: Ty::Float, line });
+            return Ok(Expr {
+                kind: Kind::Builtin(b),
+                ty: Ty::Float,
+                line,
+            });
         }
-        let known = self.locals.iter().map(|(n, _)| n.as_str()).chain(self.prog.params.iter().map(|p| p.name.as_str()));
+        let known = self
+            .locals
+            .iter()
+            .map(|(n, _)| n.as_str())
+            .chain(self.prog.params.iter().map(|p| p.name.as_str()));
         let hint = closest(name, known);
         Err(Diagnostic {
             message: format!("`{name}` is not defined here"),
-            suggestion: hint.map_or_else(|| "declare it with `let`, `param`, or index a state as `name[i]`".to_owned(), |h| format!("did you mean `{h}`?")),
+            suggestion: hint.map_or_else(
+                || "declare it with `let`, `param`, or index a state as `name[i]`".to_owned(),
+                |h| format!("did you mean `{h}`?"),
+            ),
             ..self.err("", "")
         })
     }
@@ -174,21 +251,50 @@ impl Parser {
         };
         if let Some(width) = vec_width {
             if args.iter().any(|a| a.ty == Ty::Bool) {
-                return Err(self.err("a vector is made of numbers", "pass numbers or smaller vectors"));
+                return Err(self.err(
+                    "a vector is made of numbers",
+                    "pass numbers or smaller vectors",
+                ));
             }
             let total: usize = args.iter().map(|a| a.ty.width()).sum();
             let broadcast = args.len() == 1 && args[0].ty == Ty::Float;
             if total != width && !broadcast {
-                return Err(self.err(format!("{name} needs {width} numbers, got {total}"), format!("pass {width} numbers, or one number for all")));
+                return Err(self.err(
+                    format!("{name} needs {width} numbers, got {total}"),
+                    format!("pass {width} numbers, or one number for all"),
+                ));
             }
             let ty = Ty::of_width(width).unwrap_or(Ty::Vec3);
-            return Ok(Expr { kind: Kind::Vector(args), ty, line });
+            return Ok(Expr {
+                kind: Kind::Vector(args),
+                ty,
+                line,
+            });
         }
-        let func = FUNCS.iter().find(|(n, _)| *n == name).map(|(_, f)| *f).ok_or_else(|| {
-            let hint = closest(name, FUNCS.iter().map(|(n, _)| *n));
-            self.err(format!("unknown function `{name}`"), hint.map_or_else(|| "see the SimL function list in the guide".to_owned(), |h| format!("did you mean `{h}`?")))
+        let func = FUNCS
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, f)| *f)
+            .ok_or_else(|| {
+                let hint = closest(name, FUNCS.iter().map(|(n, _)| *n));
+                self.err(
+                    format!("unknown function `{name}`"),
+                    hint.map_or_else(
+                        || "see the SimL function list in the guide".to_owned(),
+                        |h| format!("did you mean `{h}`?"),
+                    ),
+                )
+            })?;
+        let ty = func_type(func, &args).map_err(|m| {
+            self.err(
+                format!("{name}: {m}"),
+                "check the number and types of the arguments",
+            )
         })?;
-        let ty = func_type(func, &args).map_err(|m| self.err(format!("{name}: {m}"), "check the number and types of the arguments"))?;
-        Ok(Expr { kind: Kind::Call(func, args), ty, line })
+        Ok(Expr {
+            kind: Kind::Call(func, args),
+            ty,
+            line,
+        })
     }
 }

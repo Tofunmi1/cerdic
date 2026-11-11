@@ -7,7 +7,10 @@ use ve_graph::{CommandBatch, Outcome, Session, TransactionId, builtin_registry, 
 use ve_modeling::{Evaluator, Quality};
 
 fn scene_world() -> World {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../web/tests/scenes/walker/walker.txt");
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../web/tests/scenes/walker/walker.txt"
+    );
     let source = std::fs::read_to_string(path).unwrap();
     let commands = match parse_text(&builtin_registry(), &source) {
         Ok(parsed) => parsed.commands,
@@ -21,12 +24,19 @@ fn scene_world() -> World {
         label: None,
         commands,
     });
-    assert!(matches!(applied, Outcome::Committed { .. }), "apply: {applied:?}");
+    assert!(
+        matches!(applied, Outcome::Committed { .. }),
+        "apply: {applied:?}"
+    );
     let evaluated = match Evaluator::default().evaluate(session.document(), Quality::Final) {
         Ok(ev) => ev,
         Err(e) => panic!("evaluate: {} {}", e.code, e.message),
     };
-    assert!(evaluated.warnings.is_empty(), "no warnings: {:?}", evaluated.warnings);
+    assert!(
+        evaluated.warnings.is_empty(),
+        "no warnings: {:?}",
+        evaluated.warnings
+    );
     let game = evaluated.game.expect("the scene is a game");
     assert_eq!(game.cameras.len(), 3, "behind, above and through its eyes");
     assert_eq!(game.controllers.len(), 1, "the hero has a controller");
@@ -34,7 +44,12 @@ fn scene_world() -> World {
 }
 
 fn hero(world: &World) -> [f64; 3] {
-    world.entities().iter().find(|e| e.kind == "player").expect("the hero exists").position
+    world
+        .entities()
+        .iter()
+        .find(|e| e.kind == "player")
+        .expect("the hero exists")
+        .position
 }
 
 /// Walks toward `goal` on the ground plane as a player would with the camera looking along +z, and jumps when close.
@@ -67,10 +82,16 @@ fn a_bot_climbs_the_ledges_of_the_walker_scene() {
     let mut world = scene_world();
     walk_to(&mut world, [4.0, 0.0, 3.0], 2.6, 6.0);
     let on_first = hero(&world);
-    assert!((on_first[1] - 1.0).abs() < 0.05, "standing on the first ledge (top at 1 m): {on_first:?}");
+    assert!(
+        (on_first[1] - 1.0).abs() < 0.05,
+        "standing on the first ledge (top at 1 m): {on_first:?}"
+    );
     walk_to(&mut world, [6.4, 0.0, 3.0], 2.6, 4.0);
     let on_second = hero(&world);
-    assert!((on_second[1] - 1.5).abs() < 0.05, "and then on the second (top at 1.5 m): {on_second:?}");
+    assert!(
+        (on_second[1] - 1.5).abs() < 0.05,
+        "and then on the second (top at 1.5 m): {on_second:?}"
+    );
 }
 
 #[test]
@@ -84,5 +105,9 @@ fn walking_into_the_tall_stack_without_jumping_is_blocked() {
     for _ in 0..600 {
         world.step(&input).unwrap();
     }
-    assert!(hero(&world)[1] < 0.05, "still on the ground: {:?}", hero(&world));
+    assert!(
+        hero(&world)[1] < 0.05,
+        "still on the ground: {:?}",
+        hero(&world)
+    );
 }

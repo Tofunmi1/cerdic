@@ -92,30 +92,46 @@ pub struct WeaponDef {
 fn num(fields: &BTreeMap<String, String>, key: &str, default: f64) -> Result<f64, String> {
     match fields.get(key) {
         None => Ok(default),
-        Some(text) => number(text).ok().filter(|v| v.is_finite() && *v >= 0.0).ok_or_else(|| format!("{key} must be a number that is not negative")),
+        Some(text) => number(text)
+            .ok()
+            .filter(|v| v.is_finite() && *v >= 0.0)
+            .ok_or_else(|| format!("{key} must be a number that is not negative")),
     }
 }
 
 fn positive(fields: &BTreeMap<String, String>, key: &str, default: f64) -> Result<f64, String> {
     let value = num(fields, key, default)?;
-    if value > 0.0 { Ok(value) } else { Err(format!("{key} must be more than 0")) }
+    if value > 0.0 {
+        Ok(value)
+    } else {
+        Err(format!("{key} must be more than 0"))
+    }
 }
 
 fn whole(fields: &BTreeMap<String, String>, key: &str) -> Result<u32, String> {
     match fields.get(key) {
         None => Ok(0),
-        Some(text) => text.parse().map_err(|_| format!("{key} must be a whole number")),
+        Some(text) => text
+            .parse()
+            .map_err(|_| format!("{key} must be a whole number")),
     }
 }
 
-pub(super) fn parse_health(def: &mut GameDef, kind: Option<&str>, fields: &BTreeMap<String, String>) -> Result<(), String> {
+pub(super) fn parse_health(
+    def: &mut GameDef,
+    kind: Option<&str>,
+    fields: &BTreeMap<String, String>,
+) -> Result<(), String> {
     let kind = kind.ok_or("health needs a kind")?;
     let health = HealthDef {
         kind: kind.to_owned(),
         hp: positive(fields, "hp", 1.0).map_err(|_| "hp must be more than 0".to_owned())?,
         iframes: num(fields, "iframes", 0.0)?,
         knock: num(fields, "knock", 0.0)?,
-        height: fields.get("height").map(|_| positive(fields, "height", 1.0)).transpose()?,
+        height: fields
+            .get("height")
+            .map(|_| positive(fields, "height", 1.0))
+            .transpose()?,
     };
     // a later statement for the same kind replaces the earlier one
     def.healths.retain(|existing| existing.kind != kind);
@@ -123,14 +139,23 @@ pub(super) fn parse_health(def: &mut GameDef, kind: Option<&str>, fields: &BTree
     Ok(())
 }
 
-pub(super) fn parse_projectile(def: &mut GameDef, kind: Option<&str>, fields: &BTreeMap<String, String>) -> Result<(), String> {
+pub(super) fn parse_projectile(
+    def: &mut GameDef,
+    kind: Option<&str>,
+    fields: &BTreeMap<String, String>,
+) -> Result<(), String> {
     let kind = kind.ok_or("projectile needs a kind")?;
     let shot = ProjectileDef {
         kind: kind.to_owned(),
         speed: positive(fields, "speed", 20.0)?,
         life: positive(fields, "life", 2.0)?,
         damage: num(fields, "damage", 10.0)?,
-        gravity: fields.get("gravity").map_or(Ok(0.0), |g| number(g).ok().filter(|v| v.is_finite()).ok_or("gravity must be a number"))?,
+        gravity: fields.get("gravity").map_or(Ok(0.0), |g| {
+            number(g)
+                .ok()
+                .filter(|v| v.is_finite())
+                .ok_or("gravity must be a number")
+        })?,
         pierce: whole(fields, "pierce")?,
         splash: num(fields, "splash", 0.0)?,
         homing: num(fields, "homing", 0.0)?,
@@ -140,7 +165,11 @@ pub(super) fn parse_projectile(def: &mut GameDef, kind: Option<&str>, fields: &B
     Ok(())
 }
 
-pub(super) fn parse_weapon(def: &mut GameDef, name: Option<&str>, fields: &BTreeMap<String, String>) -> Result<(), String> {
+pub(super) fn parse_weapon(
+    def: &mut GameDef,
+    name: Option<&str>,
+    fields: &BTreeMap<String, String>,
+) -> Result<(), String> {
     let name = name.ok_or("a weapon needs a name")?;
     if def.weapons.iter().any(|weapon| weapon.name == name) {
         return Err(format!("duplicate weapon '{name}'"));
@@ -149,11 +178,14 @@ pub(super) fn parse_weapon(def: &mut GameDef, name: Option<&str>, fields: &BTree
     if !matches!(mode, "projectile" | "hitscan" | "melee") {
         return Err("mode must be projectile, hitscan or melee".into());
     }
-    let owner = fields.get("owner").ok_or("a weapon needs owner= (a selector such as tag:hero)")?;
+    let owner = fields
+        .get("owner")
+        .ok_or("a weapon needs owner= (a selector such as tag:hero)")?;
     validate_selector(owner)?;
     let aim = fields.get("aim").map_or("heading", String::as_str);
     if !matches!(aim, "heading" | "camera") {
-        validate_selector(aim).map_err(|_| "aim must be heading, camera or a selector such as tag:hero".to_owned())?;
+        validate_selector(aim)
+            .map_err(|_| "aim must be heading, camera or a selector such as tag:hero".to_owned())?;
     }
     let range = num(fields, "range", 0.0)?;
     if mode != "projectile" && range <= 0.0 {
@@ -171,7 +203,10 @@ pub(super) fn parse_weapon(def: &mut GameDef, name: Option<&str>, fields: &BTree
         name: name.to_owned(),
         mode: mode.to_owned(),
         shot: fields.get("shot").cloned(),
-        input: fields.get("input").cloned().unwrap_or_else(|| "none".into()),
+        input: fields
+            .get("input")
+            .cloned()
+            .unwrap_or_else(|| "none".into()),
         reload_input: fields.get("reload_input").cloned(),
         owner: owner.clone(),
         ammo: whole(fields, "ammo")?,
@@ -191,7 +226,10 @@ pub(super) fn parse_weapon(def: &mut GameDef, name: Option<&str>, fields: &BTree
 
 impl HealthDef {
     pub(super) fn to_text(&self) -> String {
-        let mut line = format!("health {} hp={} iframes={} knock={}", self.kind, self.hp, self.iframes, self.knock);
+        let mut line = format!(
+            "health {} hp={} iframes={} knock={}",
+            self.kind, self.hp, self.iframes, self.knock
+        );
         if let Some(height) = self.height {
             let _ = write!(line, " height={height}");
         }
@@ -203,7 +241,14 @@ impl ProjectileDef {
     pub(super) fn to_text(&self) -> String {
         format!(
             "projectile {} speed={} life={} damage={} gravity={} pierce={} splash={} homing={}",
-            self.kind, self.speed, self.life, self.damage, self.gravity, self.pierce, self.splash, self.homing
+            self.kind,
+            self.speed,
+            self.life,
+            self.damage,
+            self.gravity,
+            self.pierce,
+            self.splash,
+            self.homing
         )
     }
 }
@@ -212,7 +257,19 @@ impl WeaponDef {
     pub(super) fn to_text(&self) -> String {
         let mut line = format!(
             "weapon {} mode={} input={} owner={} ammo={} reload={} cooldown={} spread={} aim={} muzzle={} range={} damage={} auto={}",
-            self.name, self.mode, self.input, self.owner, self.ammo, self.reload, self.cooldown, self.spread, self.aim, self.muzzle, self.range, self.damage, u8::from(self.auto)
+            self.name,
+            self.mode,
+            self.input,
+            self.owner,
+            self.ammo,
+            self.reload,
+            self.cooldown,
+            self.spread,
+            self.aim,
+            self.muzzle,
+            self.range,
+            self.damage,
+            u8::from(self.auto)
         );
         let _ = write!(line, " arc={}", self.arc);
         if !self.foes.is_empty() {
@@ -232,41 +289,100 @@ impl WeaponDef {
 pub(super) fn check(def: &GameDef) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     let kind_ok = |name: &str| def.kinds.iter().any(|kind| kind.name == name);
-    let mut complain = |line: usize, message: String, hint: &str| out.push(Diagnostic::new(line, 1, message, hint));
+    let mut complain = |line: usize, message: String, hint: &str| {
+        out.push(Diagnostic::new(line, 1, message, hint))
+    };
     for health in &def.healths {
         if !kind_ok(&health.kind) {
-            complain(1, format!("health names the kind '{}', which is not declared", health.kind), "declare the kind first");
+            complain(
+                1,
+                format!(
+                    "health names the kind '{}', which is not declared",
+                    health.kind
+                ),
+                "declare the kind first",
+            );
         }
     }
     for shot in &def.projectiles {
         if !kind_ok(&shot.kind) {
-            complain(1, format!("projectile names the kind '{}', which is not declared", shot.kind), "declare the kind first");
+            complain(
+                1,
+                format!(
+                    "projectile names the kind '{}', which is not declared",
+                    shot.kind
+                ),
+                "declare the kind first",
+            );
         }
     }
     for weapon in &def.weapons {
         if let Some(shot) = &weapon.shot
             && !def.projectiles.iter().any(|p| p.kind == *shot)
         {
-            complain(1, format!("weapon {} fires '{shot}', which has no projectile statement", weapon.name), "add: projectile KIND speed=20 ...");
+            complain(
+                1,
+                format!(
+                    "weapon {} fires '{shot}', which has no projectile statement",
+                    weapon.name
+                ),
+                "add: projectile KIND speed=20 ...",
+            );
         }
         if weapon.mode == "projectile" && weapon.shot.is_none() {
-            complain(1, format!("weapon {} is a projectile weapon and needs shot=KIND", weapon.name), "name the projectile kind");
+            complain(
+                1,
+                format!(
+                    "weapon {} is a projectile weapon and needs shot=KIND",
+                    weapon.name
+                ),
+                "name the projectile kind",
+            );
         }
         if !selector_exists(def, &weapon.owner) {
-            complain(1, format!("weapon {} owner '{}' cannot match", weapon.name, weapon.owner), "declare a kind or tag used by this selector");
+            complain(
+                1,
+                format!(
+                    "weapon {} owner '{}' cannot match",
+                    weapon.name, weapon.owner
+                ),
+                "declare a kind or tag used by this selector",
+            );
         }
-        for input in [weapon.input.as_str()].into_iter().chain(weapon.reload_input.as_deref()).filter(|name| *name != "none") {
-            if !def.inputs.iter().any(|declaration| declaration.name == input && declaration.key) {
-                complain(1, format!("weapon {} uses the input '{input}', which is not declared with key=press", weapon.name), "declare: input NAME key=press");
+        for input in [weapon.input.as_str()]
+            .into_iter()
+            .chain(weapon.reload_input.as_deref())
+            .filter(|name| *name != "none")
+        {
+            if !def
+                .inputs
+                .iter()
+                .any(|declaration| declaration.name == input && declaration.key)
+            {
+                complain(
+                    1,
+                    format!(
+                        "weapon {} uses the input '{input}', which is not declared with key=press",
+                        weapon.name
+                    ),
+                    "declare: input NAME key=press",
+                );
             }
         }
     }
     for rule in &def.rules {
         for action in &rule.actions {
-            if let Some(body) = action.strip_prefix("fire:").or_else(|| action.strip_prefix("reload:")) {
+            if let Some(body) = action
+                .strip_prefix("fire:")
+                .or_else(|| action.strip_prefix("reload:"))
+            {
                 let name = body.split('@').next().unwrap_or("");
                 if !def.weapons.iter().any(|weapon| weapon.name == name) {
-                    complain(rule.line, format!("no weapon named '{name}' for {action}"), "declare it with: weapon NAME ...");
+                    complain(
+                        rule.line,
+                        format!("no weapon named '{name}' for {action}"),
+                        "declare it with: weapon NAME ...",
+                    );
                 }
             }
         }

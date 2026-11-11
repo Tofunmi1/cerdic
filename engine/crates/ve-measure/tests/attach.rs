@@ -105,7 +105,13 @@ fn too_many_parts_are_refused() {
 fn grid(x0: f32, cells: usize) -> (Vec<[f32; 3]>, Vec<u32>) {
     let side = cells + 1;
     let positions = (0..side * side)
-        .map(|k| [x0 + (k % side) as f32 / cells as f32, 0.0, (k / side) as f32 / cells as f32])
+        .map(|k| {
+            [
+                x0 + (k % side) as f32 / cells as f32,
+                0.0,
+                (k / side) as f32 / cells as f32,
+            ]
+        })
         .collect();
     let mut indices = Vec::new();
     for row in 0..cells {
@@ -129,10 +135,21 @@ fn the_bounded_check_finds_the_same_floating_parts_as_the_exact_one() {
     let bounded = attachments_within(&parts, 0.01, 1_000_000).unwrap();
     for (e, b) in exact.iter().zip(&bounded) {
         assert_eq!(e.name, b.name);
-        assert_eq!(e.gap > 0.01, b.gap > 0.01, "{}: exact {} bounded {}", e.name, e.gap, b.gap);
+        assert_eq!(
+            e.gap > 0.01,
+            b.gap > 0.01,
+            "{}: exact {} bounded {}",
+            e.name,
+            e.gap,
+            b.gap
+        );
     }
     let c_gap = bounded.iter().find(|item| item.name == "c").unwrap();
-    assert!((c_gap.gap - 2.0).abs() < 1e-4, "a floating part keeps its exact gap: {}", c_gap.gap);
+    assert!(
+        (c_gap.gap - 2.0).abs() < 1e-4,
+        "a floating part keeps its exact gap: {}",
+        c_gap.gap
+    );
     assert_eq!(c_gap.nearest, "b");
 }
 
@@ -142,10 +159,16 @@ fn attached_parts_stop_the_search_early_so_a_big_scene_stays_cheap() {
     let grids: Vec<_> = (0..20).map(|i| grid(i as f32, 40)).collect();
     let parts: Vec<_> = grids
         .iter()
-        .map(|(positions, indices)| NamedMesh { name: "tile", mesh: Mesh::new(positions, indices) })
+        .map(|(positions, indices)| NamedMesh {
+            name: "tile",
+            mesh: Mesh::new(positions, indices),
+        })
         .collect();
     let measured = attachments_within(&parts, 0.01, 5_000).unwrap();
-    assert!(measured.iter().all(|item| item.gap <= 0.01), "every tile touches a neighbour");
+    assert!(
+        measured.iter().all(|item| item.gap <= 0.01),
+        "every tile touches a neighbour"
+    );
 }
 
 #[test]
@@ -153,11 +176,20 @@ fn a_hopeless_scene_is_refused_by_the_budget_instead_of_running_for_minutes() {
     let (pa, ia) = grid(0.0, 40);
     let (pb, ib) = grid(50.0, 40);
     let parts = [
-        NamedMesh { name: "near", mesh: Mesh::new(&pa, &ia) },
-        NamedMesh { name: "far", mesh: Mesh::new(&pb, &ib) },
+        NamedMesh {
+            name: "near",
+            mesh: Mesh::new(&pa, &ia),
+        },
+        NamedMesh {
+            name: "far",
+            mesh: Mesh::new(&pb, &ib),
+        },
     ];
     let error = attachments_within(&parts, 0.01, 100).unwrap_err();
-    assert!(matches!(error, MeasureError::WorkBudget { limit: 100 }), "{error:?}");
+    assert!(
+        matches!(error, MeasureError::WorkBudget { limit: 100 }),
+        "{error:?}"
+    );
 }
 
 #[test]

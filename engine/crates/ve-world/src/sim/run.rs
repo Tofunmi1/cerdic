@@ -9,7 +9,7 @@
     clippy::cast_precision_loss,
     reason = "element numbers are small non-negative numbers carried as f32 in the language"
 )]
-use super::ast::{Bin, Builtin, Expr, Kind, Program, Stmt, Step};
+use super::ast::{Bin, Builtin, Expr, Kind, Program, Step, Stmt};
 use super::grid::Grid;
 use super::inputs::Inputs;
 use super::ops::{arith, call, map};
@@ -43,17 +43,28 @@ struct Machine<'a> {
 }
 
 fn fail<T>(line: usize, message: impl Into<String>) -> Result<T, RunError> {
-    Err(RunError { line, message: message.into() })
+    Err(RunError {
+        line,
+        message: message.into(),
+    })
 }
 
 fn vec3(v: [f32; 3]) -> Value {
-    Value { ty: Ty::Vec3, v: [v[0], v[1], v[2], 0.0] }
+    Value {
+        ty: Ty::Vec3,
+        v: [v[0], v[1], v[2], 0.0],
+    }
 }
 
 impl Machine<'_> {
     fn spend(&mut self, line: usize) -> Result<(), RunError> {
         if self.budget == 0 {
-            return fail(line, format!("one element ran more than {MAX_WORK_PER_ELEMENT} statements in one kernel"));
+            return fail(
+                line,
+                format!(
+                    "one element ran more than {MAX_WORK_PER_ELEMENT} statements in one kernel"
+                ),
+            );
         }
         self.budget -= 1;
         Ok(())
@@ -63,7 +74,14 @@ impl Machine<'_> {
         let width = self.prog.states[arr].ty.width();
         let len = self.state[arr].len() / width;
         if !at.is_finite() || at < 0.0 || at >= len as f32 {
-            return fail(line, format!("index {at} is outside `{}` (0 to {})", self.prog.states[arr].name, len - 1));
+            return fail(
+                line,
+                format!(
+                    "index {at} is outside `{}` (0 to {})",
+                    self.prog.states[arr].name,
+                    len - 1
+                ),
+            );
         }
         Ok(at as usize)
     }
@@ -71,14 +89,24 @@ impl Machine<'_> {
     fn mesh(&self, input: usize, line: usize) -> Result<&super::inputs::MeshData, RunError> {
         match self.inputs.meshes.get(input).and_then(Option::as_ref) {
             Some(mesh) => Ok(mesh),
-            None => fail(line, format!("no mesh is bound to input `{}`", self.prog.inputs[input].name)),
+            None => fail(
+                line,
+                format!(
+                    "no mesh is bound to input `{}`",
+                    self.prog.inputs[input].name
+                ),
+            ),
         }
     }
 
     fn read(&self, arr: usize, idx: usize) -> Value {
         let ty = self.prog.states[arr].ty;
         let width = ty.width();
-        let source = if self.writes[arr] && idx != self.elem { &self.snap[arr] } else { &self.state[arr] };
+        let source = if self.writes[arr] && idx != self.elem {
+            &self.snap[arr]
+        } else {
+            &self.state[arr]
+        };
         let mut v = [0.0; 4];
         v[..width].copy_from_slice(&source[idx * width..(idx + 1) * width]);
         Value { ty, v }
@@ -159,22 +187,44 @@ impl Machine<'_> {
             }
             Kind::Bone { input, vector, v } => {
                 let x = self.eval(v)?;
-                vec3(self.inputs.carry(*input, [x.v[0], x.v[1], x.v[2]], if *vector { 0.0 } else { 1.0 }))
+                vec3(self.inputs.carry(
+                    *input,
+                    [x.v[0], x.v[1], x.v[2]],
+                    if *vector { 0.0 } else { 1.0 },
+                ))
             }
             Kind::Rest { input, idx } => {
                 let at = self.eval(idx)?.v[0];
                 let mesh = self.mesh(*input, e.line)?;
-                let point = if at.is_finite() && at >= 0.0 { mesh.point(at as usize) } else { None };
+                let point = if at.is_finite() && at >= 0.0 {
+                    mesh.point(at as usize)
+                } else {
+                    None
+                };
                 match point {
                     Some(p) => vec3(p),
-                    None => return fail(e.line, format!("point {at} is outside the mesh `{}`", self.prog.inputs[*input].name)),
+                    None => {
+                        return fail(
+                            e.line,
+                            format!(
+                                "point {at} is outside the mesh `{}`",
+                                self.prog.inputs[*input].name
+                            ),
+                        );
+                    }
                 }
             }
         })
     }
 
     /// Elements that may be within `r` of `centre`, ascending: from the grid (built on the first query of the kernel) or every element.
-    fn neighbour_candidates(&mut self, arr: usize, len: usize, centre: [f32; 3], r: f32) -> Vec<usize> {
+    fn neighbour_candidates(
+        &mut self,
+        arr: usize,
+        len: usize,
+        centre: [f32; 3],
+        r: f32,
+    ) -> Vec<usize> {
         if self.grid.as_ref().is_none_or(|g| g.arr != arr) {
             let this = &*self;
             let built = Grid::build(arr, len, r, |j| {
@@ -183,7 +233,11 @@ impl Machine<'_> {
             });
             self.grid = built;
         }
-        let mut found = self.grid.as_ref().and_then(|g| g.candidates(centre, r)).unwrap_or_else(|| (0..len).collect());
+        let mut found = self
+            .grid
+            .as_ref()
+            .and_then(|g| g.candidates(centre, r))
+            .unwrap_or_else(|| (0..len).collect());
         // This element's own position may have been written since the grid was built.
         if self.elem < len && found.binary_search(&self.elem).is_err() {
             found.push(self.elem);
@@ -214,12 +268,25 @@ impl Machine<'_> {
                     None => v,
                 };
             }
-            Stmt::SetElem { arr, idx, comp, op, value, line } => {
+            Stmt::SetElem {
+                arr,
+                idx,
+                comp,
+                op,
+                value,
+                line,
+            } => {
                 self.spend(*line)?;
                 let at = self.eval(idx)?.v[0];
                 let i = self.element_index(*arr, at, *line)?;
                 if self.elem != usize::MAX && i != self.elem {
-                    return fail(*line, format!("a kernel may write only its own element ({}), not {i}", self.elem));
+                    return fail(
+                        *line,
+                        format!(
+                            "a kernel may write only its own element ({}), not {i}",
+                            self.elem
+                        ),
+                    );
                 }
                 let v = self.eval(value)?;
                 let ty = self.prog.states[*arr].ty;
@@ -243,14 +310,27 @@ impl Machine<'_> {
                     self.block(other)?;
                 }
             }
-            Stmt::Repeat { slot, from, to, body } => {
+            Stmt::Repeat {
+                slot,
+                from,
+                to,
+                body,
+            } => {
                 for k in *from..*to {
                     self.spend(0)?;
                     self.frame[*slot] = Value::float(k as f32);
                     self.block(body)?;
                 }
             }
-            Stmt::Neighbors { slot, arr, centre, radius, cap, body, line } => {
+            Stmt::Neighbors {
+                slot,
+                arr,
+                centre,
+                radius,
+                cap,
+                body,
+                line,
+            } => {
                 self.spend(*line)?;
                 let c = self.eval(centre)?;
                 let r = self.eval(radius)?.v[0];
@@ -271,15 +351,30 @@ impl Machine<'_> {
                     }
                 }
             }
-            Stmt::Adjacent { vertex, length, input, of, body, line } => {
+            Stmt::Adjacent {
+                vertex,
+                length,
+                input,
+                of,
+                body,
+                line,
+            } => {
                 self.spend(*line)?;
                 let at = self.eval(of)?.v[0];
                 let inputs = self.inputs;
                 let mesh = self.mesh(*input, *line)?;
                 if !(at.is_finite() && at >= 0.0 && (at as usize) < mesh.len()) {
-                    return fail(*line, format!("point {at} is outside the mesh `{}`", self.prog.inputs[*input].name));
+                    return fail(
+                        *line,
+                        format!(
+                            "point {at} is outside the mesh `{}`",
+                            self.prog.inputs[*input].name
+                        ),
+                    );
                 }
-                let joined = inputs.meshes[*input].as_ref().map_or(&[][..], |m| m.neighbours(at as usize));
+                let joined = inputs.meshes[*input]
+                    .as_ref()
+                    .map_or(&[][..], |m| m.neighbours(at as usize));
                 for &(j, len) in joined {
                     self.spend(*line)?;
                     self.frame[*vertex] = Value::float(j as f32);
@@ -303,7 +398,12 @@ pub(super) fn constant(e: &Expr, params: &[Value]) -> Result<Value, String> {
         writes: &[],
         params,
         inputs: &inputs,
-        clock: Clock { dt: 0.0, t: 0.0, step: 0.0, seed: 0 },
+        clock: Clock {
+            dt: 0.0,
+            t: 0.0,
+            step: 0.0,
+            seed: 0,
+        },
         frame: Vec::new(),
         elem: usize::MAX,
         count: 0,
@@ -314,10 +414,24 @@ pub(super) fn constant(e: &Expr, params: &[Value]) -> Result<Value, String> {
 }
 
 /// Runs kernel `index` for every element of its array (or once).
-pub(super) fn kernel(prog: &Program, state: &mut Vec<Vec<f32>>, params: &[Value], inputs: &Inputs, index: usize, clock: Clock) -> Result<(), RunError> {
+pub(super) fn kernel(
+    prog: &Program,
+    state: &mut Vec<Vec<f32>>,
+    params: &[Value],
+    inputs: &Inputs,
+    index: usize,
+    clock: Clock,
+) -> Result<(), RunError> {
     let k = &prog.kernels[index];
-    let snap = k.writes.iter().enumerate().map(|(a, w)| if *w { state[a].clone() } else { Vec::new() }).collect();
-    let count = k.over.map_or(1, |a| state[a].len() / prog.states[a].ty.width());
+    let snap = k
+        .writes
+        .iter()
+        .enumerate()
+        .map(|(a, w)| if *w { state[a].clone() } else { Vec::new() })
+        .collect();
+    let count = k
+        .over
+        .map_or(1, |a| state[a].len() / prog.states[a].ty.width());
     let mut m = Machine {
         prog,
         state,
@@ -344,7 +458,14 @@ pub(super) fn kernel(prog: &Program, state: &mut Vec<Vec<f32>>, params: &[Value]
 }
 
 /// Runs a schedule once.
-pub(super) fn schedule(prog: &Program, state: &mut Vec<Vec<f32>>, params: &[Value], inputs: &Inputs, steps: &[Step], clock: Clock) -> Result<(), RunError> {
+pub(super) fn schedule(
+    prog: &Program,
+    state: &mut Vec<Vec<f32>>,
+    params: &[Value],
+    inputs: &Inputs,
+    steps: &[Step],
+    clock: Clock,
+) -> Result<(), RunError> {
     for s in steps {
         match s {
             Step::Run(k) => kernel(prog, state, params, inputs, *k, clock)?,

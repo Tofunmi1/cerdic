@@ -1,0 +1,213 @@
+# CASA LUMEN — original U-shaped courtyard house, designed from scratch for a walk-through view.
+# Warm limestone, smoked oak, bronze frames, planted court, reflecting pool. Y is up; courtyard opens toward -Z.
+
+sky = scene.sky@1(sun_elevation=34,sun_azimuth=-42,sun_intensity=2.0,turbidity=2.6,clouds=false,haze=0.035,ground_color=[0.28,0.34,0.32],contact_shadows=true)
+output sky = sky
+env = scene.environment@1(sky_color=[0.55,0.66,0.69],ground_color=[0.22,0.28,0.27],intensity=0.68,reflection=0.22,bounce=0.32,bounce_color=[0.72,0.76,0.72])
+output environment = env
+
+# Reusable solid furniture and architecture primitives. Every box call creates one editable output.
+def cube_part(tag,sx,sy,sz,x,y,z,r,g,b,rough)
+  cp_{tag}_shape = solid.box@1(size=[{sx},{sy},{sz}])
+  cp_{tag}_at = xform.move@1(cp_{tag}_shape,by=[{x},{y},{z}])
+  cp_{tag}_mat = solid.material@1(cp_{tag}_at,color=[{r},{g},{b}],roughness={rough})
+  output {tag} = cp_{tag}_mat
+end
+
+
+# Site: a clipped landscape court, mineral terrace and long dark reflecting pool.
+site = solid.box@1(size=[34,0.22,28])
+site_at = xform.move@1(site,by=[0,-0.11,0])
+site_mat = solid.material@1(site_at,color=[0.26,0.34,0.29],roughness=0.95)
+site_tex = solid.texture@1(site_mat,tile=5,size="512",no_repeat=true,program="g = fbm(scale_x=4,scale_y=5,iterations=4); f = fbm(scale_x=24,scale_y=21,iterations=2); albedo = colorize(g,gradient=[0:#29392f,0.5:#465747,1:#64735c]); roughness = colorize(f,gradient=[0:#d4d4d4,1:#eeeeee])")
+output landscape = site_tex
+cube_part("entry_walk",7.2,0.10,6.2,-5.0,0.035,-8.0,0.48,0.50,0.47,0.82)
+cube_part("pool_shell",8.4,0.34,4.6,4.8,0.10,-8.7,0.17,0.22,0.23,0.42)
+cube_part("pool_water",7.9,0.035,4.15,4.8,0.29,-8.7,0.16,0.39,0.43,0.20)
+cube_part("pool_deck",10.0,0.16,6.0,4.6,0.08,-8.8,0.47,0.43,0.36,0.74)
+cube_part("courtyard_paving",4.1,0.10,6.3,0,0.02,-1.15,0.60,0.57,0.49,0.72)
+
+# U-plan ground floor: two glazed wings and a full-width rear kitchen/dining bar around an open planted court.
+west_floor = solid.box@1(size=[6.0,0.24,9.2])
+west_floor_at = xform.move@1(west_floor,by=[-4.5,0.12,0])
+west_floor_mat = solid.material@1(west_floor_at,color=[0.43,0.31,0.22],roughness=0.65)
+west_floor_tex = solid.texture@1(west_floor_mat,tile=3.2,size="512",program="p = bricks(rows=10,columns=34,mortar=0.025,bevel=0.06,round=0.02,row_offset=0.5); g = fbm(scale_x=6,scale_y=17,iterations=3); albedo = colorize(g,gradient=[0:#574336,0.5:#82664d,1:#a68768]); roughness = 0.78; height = p")
+output west_floor = west_floor_tex
+east_floor = solid.box@1(size=[6.0,0.24,9.2])
+east_floor_at = xform.move@1(east_floor,by=[4.5,0.12,0])
+east_floor_mat = solid.material@1(east_floor_at,color=[0.43,0.31,0.22],roughness=0.65)
+east_floor_tex = solid.texture@1(east_floor_mat,tile=3.2,size="512",program="p = bricks(rows=10,columns=34,mortar=0.025,bevel=0.06,round=0.02,row_offset=0.5); g = fbm(scale_x=6,scale_y=17,iterations=3); albedo = colorize(g,gradient=[0:#574336,0.5:#82664d,1:#a68768]); roughness = 0.78; height = p")
+output east_floor = east_floor_tex
+rear_floor = solid.box@1(size=[15.0,0.24,2.5])
+rear_floor_at = xform.move@1(rear_floor,by=[0,0.12,3.35])
+rear_floor_mat = solid.material@1(rear_floor_at,color=[0.43,0.31,0.22],roughness=0.65)
+rear_floor_tex = solid.texture@1(rear_floor_mat,tile=3.2,size="512",program="p = bricks(rows=10,columns=34,mortar=0.025,bevel=0.06,round=0.02,row_offset=0.5); g = fbm(scale_x=6,scale_y=17,iterations=3); albedo = colorize(g,gradient=[0:#574336,0.5:#82664d,1:#a68768]); roughness = 0.78; height = p")
+output rear_floor = rear_floor_tex
+
+# Limestone outer shell and a deliberately open courtyard facade.
+cube_part("outer_west",0.34,3.55,9.3,-7.32,1.91,0,0.74,0.71,0.64,0.84)
+cube_part("outer_east",0.34,3.55,9.3,7.32,1.91,0,0.74,0.71,0.64,0.84)
+cube_part("outer_rear",15.0,3.55,0.34,0,1.91,4.32,0.74,0.71,0.64,0.84)
+court_glass_src = solid.box@1(size=[0.055,3.0,4.8])
+court_glass_at = xform.move@1(court_glass_src,by=[-1.52,1.68,-2.15])
+court_glass_mat = solid.material@1(court_glass_at,color=[0.55,0.73,0.75],roughness=0.14,metallic=0.04,opacity=0.18)
+output courtyard_glazing = court_glass_mat
+partition_l = solid.box@1(size=[2.2,2.35,0.14])
+partition_l_at = xform.move@1(partition_l,by=[-2.55,1.35,2.12])
+partition_r = solid.box@1(size=[2.2,2.35,0.14])
+partition_r_at = xform.move@1(partition_r,by=[2.55,1.35,2.12])
+partition_pair = solid.union@1(partition_l_at,partition_r_at)
+partition_mat = solid.material@1(partition_pair,color=[0.76,0.73,0.66],roughness=0.86)
+output kitchen_partition = partition_mat
+# Warm oak-lined portal returns and bronze columns carry the floating roof edge.
+front_col_src = solid.box@1(size=[0.20,3.34,0.20])
+front_col_set = inst.place@1(front_col_src,at=[[-7.05,1.88,-4.40],[-1.55,1.88,-4.40],[1.55,1.88,-4.40],[7.05,1.88,-4.40]])
+front_col_mat = solid.material@1(front_col_set,color=[0.18,0.20,0.19],roughness=0.34)
+output front_columns = front_col_mat
+ground_mul_src = solid.box@1(size=[0.055,3.18,0.075])
+ground_mul_set = inst.place@1(ground_mul_src,at=[[-5.7,1.86,-4.47],[-3.1,1.86,-4.47],[3.1,1.86,-4.47],[5.7,1.86,-4.47]])
+ground_mul_mat = solid.material@1(ground_mul_set,color=[0.14,0.17,0.17],roughness=0.30)
+output ground_mullions = ground_mul_mat
+front_glass = solid.box@1(size=[2.5,3.0,0.035])
+front_glass_set = inst.place@1(front_glass,at=[[-5.0,1.82,-4.48],[-2.45,1.82,-4.48],[2.45,1.82,-4.48],[5.0,1.82,-4.48]])
+front_glass_mat = solid.material@1(front_glass_set,color=[0.58,0.76,0.79],roughness=0.12,metallic=0.08,opacity=0.20)
+output ground_glazing = front_glass_mat
+front_rail_src = solid.box@1(size=[5.4,0.075,0.11])
+front_rail_set = inst.place@1(front_rail_src,at=[[-4.3,0.28,-4.45],[-4.3,3.43,-4.45],[4.3,0.28,-4.45],[4.3,3.43,-4.45]])
+front_rail_mat = solid.material@1(front_rail_set,color=[0.15,0.17,0.17],roughness=0.34)
+output front_rails = front_rail_mat
+cube_part("pivot_door",1.14,2.65,0.09,-6.12,1.59,-4.45,0.28,0.20,0.13,0.37)
+cube_part("door_pull",0.035,0.72,0.045,-5.68,1.56,-4.38,0.66,0.52,0.31,0.22)
+
+# West wing mezzanine and master suite; the double-height east lounge remains open to the roof light.
+upper_floor_solid = solid.box@1(size=[6.0,0.26,9.0])
+upper_floor_at = xform.move@1(upper_floor_solid,by=[-4.5,3.55,0])
+# A real stairwell opening: the upper landing remains solid, but the flight does not pass through the slab.
+stairwell_cut = solid.box@1(size=[1.82,1.4,5.55])
+stairwell_cut_at = xform.move@1(stairwell_cut,by=[-3.2,3.55,-0.75])
+upper_floor = solid.difference@1(upper_floor_at,stairwell_cut_at)
+upper_floor_mat = solid.material@1(upper_floor,color=[0.42,0.30,0.21],roughness=0.68)
+upper_floor_tex = solid.texture@1(upper_floor_mat,tile=3.2,size="512",program="p = bricks(rows=10,columns=34,mortar=0.025,bevel=0.06,round=0.02,row_offset=0.5); g = fbm(scale_x=6,scale_y=17,iterations=3); albedo = colorize(g,gradient=[0:#574336,0.5:#82664d,1:#a68768]); roughness = 0.78; height = p")
+output upper_floor = upper_floor_tex
+cube_part("upper_west_wall",0.30,2.82,9.2,-7.32,5.12,0,0.72,0.69,0.63,0.86)
+cube_part("upper_rear_wall",5.9,2.82,0.28,-4.5,5.12,4.32,0.72,0.69,0.63,0.86)
+cube_part("upper_divider",0.22,2.82,8.9,-1.52,5.12,0,0.72,0.69,0.63,0.86)
+upper_glass = solid.box@1(size=[2.5,2.25,0.035])
+upper_glass_set = inst.place@1(upper_glass,at=[[-5.0,5.05,-4.48],[-2.45,5.05,-4.48]])
+upper_glass_mat = solid.material@1(upper_glass_set,color=[0.61,0.78,0.80],roughness=0.12,metallic=0.06,opacity=0.22)
+output upper_glazing = upper_glass_mat
+upper_mul_src = solid.box@1(size=[0.055,2.48,0.075])
+upper_mul_set = inst.place@1(upper_mul_src,at=[[-6.22,5.08,-4.47],[-3.75,5.08,-4.47],[-1.30,5.08,-4.47]])
+upper_mul_mat = solid.material@1(upper_mul_set,color=[0.14,0.17,0.17],roughness=0.30)
+output upper_mullions = upper_mul_mat
+cube_part("upper_rail",5.7,0.08,0.11,-4.5,6.31,-4.43,0.14,0.17,0.17,0.34)
+# Long floating roof planes with a skylight gap over the planted court.
+cube_part("west_roof",6.5,0.38,10.0,-4.50,6.50,0,0.76,0.74,0.68,0.79)
+cube_part("rear_canopy",9.0,0.30,2.8,3.0,3.82,3.3,0.76,0.74,0.68,0.78)
+cube_part("lounge_canopy",6.5,0.30,9.4,4.50,3.82,0.0,0.76,0.74,0.68,0.78)
+fin_src = solid.box@1(size=[0.11,2.55,0.10])
+fin_set = inst.place@1(fin_src,at=[[-6.9,5.0,-4.18],[-6.3,5.0,-4.18],[-5.7,5.0,-4.18],[-5.1,5.0,-4.18],[-4.5,5.0,-4.18],[-3.9,5.0,-4.18],[-3.3,5.0,-4.18],[-2.7,5.0,-4.18],[-2.1,5.0,-4.18]])
+fin_mat = solid.material@1(fin_set,color=[0.28,0.18,0.12],roughness=0.52)
+output oak_sun_fins = fin_mat
+# Courtyard balcony edge and an open-riser stair leading to the upper gallery.
+court_post_src = solid.box@1(size=[0.055,0.88,0.055])
+court_post_set = inst.place@1(court_post_src,at=[[-1.55,4.15,-3.6],[-1.55,4.15,-2.6],[-1.55,4.15,-1.6],[-1.55,4.15,-0.6]])
+court_post_mat = solid.material@1(court_post_set,color=[0.56,0.70,0.70],roughness=0.18)
+output court_balustrade = court_post_mat
+stair = solid.box@1(size=[1.30,0.17,0.30])
+stair_set = inst.place@1(stair,at=[[-3.2,0.340,1.65],[-3.2,0.543,1.35],[-3.2,0.747,1.05],[-3.2,0.950,0.75],[-3.2,1.154,0.45],[-3.2,1.357,0.15],[-3.2,1.561,-0.15],[-3.2,1.764,-0.45],[-3.2,1.968,-0.75],[-3.2,2.171,-1.05],[-3.2,2.374,-1.35],[-3.2,2.578,-1.65],[-3.2,2.781,-1.95],[-3.2,2.985,-2.25],[-3.2,3.188,-2.55],[-3.2,3.392,-2.85],[-3.2,3.595,-3.15]])
+stair_mat = solid.material@1(stair_set,color=[0.55,0.43,0.32],roughness=0.62)
+output floating_stair = stair_mat
+stair_post_src = solid.box@1(size=[0.045,1.45,0.045])
+stair_post_set = inst.place@1(stair_post_src,at=[[-3.92,1.44,0.5],[-3.92,1.98,-0.4],[-3.92,2.52,-1.3],[-3.92,3.06,-2.2]])
+stair_post_mat = solid.material@1(stair_post_set,color=[0.17,0.19,0.18],roughness=0.34)
+output stair_spindles = stair_post_mat
+stair_rail_shape = solid.box@1(size=[0.075,0.075,5.65])
+stair_rail_tilt = xform.rotate@1(stair_rail_shape,angles=[35,0,0])
+stair_rail_at = xform.move@1(stair_rail_tilt,by=[-3.92,2.75,-0.75])
+stair_rail_mat = solid.material@1(stair_rail_at,color=[0.25,0.19,0.13],roughness=0.40)
+output stair_handrail = stair_rail_mat
+
+# Interior: a quiet living room opens to the pool; kitchen and dining occupy the rear bridge.
+cube_part("lounge_rug",4.5,0.045,3.4,4.55,0.29,-1.15,0.54,0.51,0.45,0.94)
+cube_part("sofa_base",3.6,0.42,1.22,4.55,0.66,-1.28,0.56,0.54,0.48,0.88)
+cube_part("sofa_back",3.6,0.88,0.28,4.55,1.20,-1.70,0.62,0.59,0.52,0.91)
+sofa_cushion_src = solid.box@1(size=[1.12,0.35,1.0])
+sofa_cushion_set = inst.place@1(sofa_cushion_src,at=[[3.32,1.01,-1.22],[4.55,1.01,-1.22],[5.78,1.01,-1.22]])
+sofa_cushion_mat = solid.material@1(sofa_cushion_set,color=[0.73,0.70,0.63],roughness=0.92)
+output sofa_cushions = sofa_cushion_mat
+cube_part("coffee_stone",1.62,0.13,0.92,4.45,0.74,-0.15,0.67,0.65,0.59,0.31)
+coffee_leg_src = solid.box@1(size=[0.08,0.39,0.08])
+coffee_leg_set = inst.place@1(coffee_leg_src,at=[[3.85,0.49,-0.45],[5.05,0.49,-0.45],[3.85,0.49,0.15],[5.05,0.49,0.15]])
+coffee_leg_mat = solid.material@1(coffee_leg_set,color=[0.18,0.19,0.18],roughness=0.33)
+output coffee_legs = coffee_leg_mat
+cube_part("media_console",3.5,0.42,0.40,5.75,0.51,1.35,0.24,0.20,0.16,0.52)
+cube_part("media_panel",3.0,1.55,0.075,5.75,1.54,1.56,0.07,0.09,0.10,0.24)
+# A sculptural dining table, six upholstered seats and a monolithic kitchen island.
+cube_part("dining_top",3.1,0.12,1.18,0.20,1.04,3.13,0.53,0.37,0.25,0.40)
+cube_part("dining_pedestal",0.34,0.82,0.34,0.20,0.57,3.13,0.19,0.20,0.19,0.36)
+chair_seat_src = solid.box@1(size=[0.70,0.11,0.64])
+chair_seat = xform.move@1(chair_seat_src,by=[0,0.48,0])
+chair_back_src = solid.box@1(size=[0.70,0.72,0.10])
+chair_back = xform.move@1(chair_back_src,by=[0,0.88,-0.27])
+chair_lf_src = solid.box@1(size=[0.065,0.48,0.065])
+chair_lf = xform.move@1(chair_lf_src,by=[-0.27,0.24,0.24])
+chair_rf = xform.move@1(chair_lf_src,by=[0.27,0.24,0.24])
+chair_lb = xform.move@1(chair_lf_src,by=[-0.27,0.24,-0.24])
+chair_rb = xform.move@1(chair_lf_src,by=[0.27,0.24,-0.24])
+chair_a = solid.union@1(chair_seat,chair_back)
+chair_b = solid.union@1(chair_a,chair_lf)
+chair_c = solid.union@1(chair_b,chair_rf)
+chair_d = solid.union@1(chair_c,chair_lb)
+chair_solid = solid.union@1(chair_d,chair_rb)
+dining_chair_set = inst.place@1(chair_solid,at=[[-1.10,0.25,2.35],[-0.05,0.25,2.35],[1.00,0.25,2.35],[-1.10,0.25,3.92],[-0.05,0.25,3.92],[1.00,0.25,3.92]])
+dining_chair_mat = solid.material@1(dining_chair_set,color=[0.39,0.35,0.30],roughness=0.78)
+output dining_chairs = dining_chair_mat
+cube_part("kitchen_island",4.1,0.92,1.06,4.50,0.77,3.05,0.68,0.66,0.59,0.46)
+cube_part("island_counter",4.35,0.10,1.23,4.50,1.28,3.05,0.82,0.81,0.75,0.21)
+cube_part("rear_cabinets",6.2,1.05,0.56,4.05,0.83,4.04,0.30,0.27,0.23,0.52)
+cube_part("rear_counter",6.5,0.10,0.78,4.05,1.42,3.94,0.80,0.78,0.72,0.22)
+pendant_src = solid.box@1(size=[0.14,0.55,0.14])
+pendant_set = inst.place@1(pendant_src,at=[[2.9,2.95,3.0],[4.1,2.95,3.0],[5.3,2.95,3.0]])
+pendant_mat = solid.material@1(pendant_set,color=[0.18,0.19,0.18],roughness=0.28)
+output pendants = pendant_mat
+# Upper master suite: low oak bed, linen, floating side tables and a quiet writing desk.
+cube_part("bed_base",2.65,0.42,3.2,-5.55,3.95,-0.95,0.24,0.19,0.15,0.52)
+cube_part("bed_mattress",2.55,0.30,3.08,-5.55,4.30,-0.95,0.82,0.80,0.73,0.96)
+cube_part("bed_duvet",2.62,0.12,2.20,-5.55,4.50,-0.45,0.73,0.73,0.68,0.98)
+cube_part("bed_headboard",2.8,1.22,0.18,-5.55,4.60,0.72,0.31,0.22,0.16,0.48)
+pillow_src = solid.box@1(size=[0.90,0.18,0.56])
+pillow_set = inst.place@1(pillow_src,at=[[-6.18,4.62,0.37],[-4.92,4.62,0.37]])
+pillow_mat = solid.material@1(pillow_set,color=[0.91,0.89,0.82],roughness=0.99)
+output bed_pillows = pillow_mat
+nightstand_src = solid.box@1(size=[0.68,0.55,0.68])
+nightstand_set = inst.place@1(nightstand_src,at=[[-7.05,3.98,0.45],[-4.05,3.98,0.45]])
+nightstand_mat = solid.material@1(nightstand_set,color=[0.36,0.27,0.19],roughness=0.46)
+output nightstands = nightstand_mat
+cube_part("writing_desk",2.0,0.12,0.74,-5.55,4.22,-3.25,0.36,0.26,0.18,0.48)
+desk_leg_src = solid.box@1(size=[0.08,0.82,0.08])
+desk_leg_set = inst.place@1(desk_leg_src,at=[[-6.42,3.78,-3.25],[-4.68,3.78,-3.25]])
+desk_leg_mat = solid.material@1(desk_leg_set,color=[0.20,0.20,0.18],roughness=0.36)
+output desk_legs = desk_leg_mat
+cube_part("desk_chair",0.70,0.92,0.70,-5.55,3.95,-2.35,0.41,0.39,0.34,0.80)
+# Exterior planting: a garden-edge birch, low evergreen screening, and a sculptural entry tree.
+garden_birch_src = flora.tree@1(kind="birch",height=4.8,seed=17,lod=1)
+garden_birch_set = inst.place@1(garden_birch_src,at=[[9.8,0.12,1.8]])
+garden_birch_mat = solid.material@1(garden_birch_set,color=[0.28,0.40,0.25],roughness=0.9)
+output garden_birch = garden_birch_mat
+entry_tree_src = flora.tree@1(kind="oak",height=5.7,seed=29,lod=1)
+entry_tree_set = inst.place@1(entry_tree_src,at=[[-11.2,0.05,-5.0]])
+entry_tree_mat = solid.material@1(entry_tree_set,color=[0.30,0.43,0.27],roughness=0.92)
+output entry_oak = entry_tree_mat
+shrub_src = flora.tree@1(kind="shrub",height=1.25,seed=8,lod=1)
+shrub_set = inst.place@1(shrub_src,at=[[-7.7,0.05,-7.1],[-8.6,0.05,-6.8],[8.2,0.05,-4.8],[8.7,0.05,-6.0],[7.7,0.05,-10.4],[0.9,0.05,-3.8]])
+shrub_mat = solid.material@1(shrub_set,color=[0.20,0.34,0.20],roughness=0.94)
+output garden_shrubs = shrub_mat
+
+# Warm, low-output interior lighting; daylight remains the dominant source.
+pendant_light_a = light.point@1(position=[2.9,2.65,3.0],color=[1.0,0.74,0.48],intensity=34,range=7)
+output pendant_light_a = pendant_light_a
+pendant_light_b = light.point@1(position=[4.6,2.65,3.0],color=[1.0,0.78,0.55],intensity=34,range=7)
+output pendant_light_b = pendant_light_b
+lounge_light = light.point@1(position=[5.9,2.6,-0.9],color=[1.0,0.80,0.61],intensity=24,range=6)
+output lounge_light = lounge_light

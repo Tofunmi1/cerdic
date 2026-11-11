@@ -53,7 +53,12 @@ impl World {
     /// Whether the simulation stands still: the game has states and is in a frozen one, or has ended.
     pub(super) fn is_frozen(&self) -> bool {
         !self.def.states.is_empty()
-            && (self.status != Status::Playing || self.def.states.iter().any(|state| state.frozen && state.name == self.flow.state))
+            && (self.status != Status::Playing
+                || self
+                    .def
+                    .states
+                    .iter()
+                    .any(|state| state.frozen && state.name == self.flow.state))
     }
 
     /// Puts a new world into its first state and loads its first level.
@@ -91,13 +96,30 @@ impl World {
         self.entities.retain(|entity| !gone.contains(&entity.id));
         self.agents.retain(|id, _| !gone.contains(id));
         self.flow.checkpoint.clear();
-        let spawns: Vec<crate::SpawnDef> = self.def.spawns.iter().filter(|spawn| spawn.level.as_deref() == Some(name)).cloned().collect();
+        let spawns: Vec<crate::SpawnDef> = self
+            .def
+            .spawns
+            .iter()
+            .filter(|spawn| spawn.level.as_deref() == Some(name))
+            .cloned()
+            .collect();
         for spawn in &spawns {
             let made = self.spawn_line(spawn);
             self.flow.level_entities.extend(made);
         }
-        if let Some(start) = self.def.levels.iter().find(|level| level.name == name).and_then(|level| level.start) {
-            let heroes: Vec<u32> = self.entities.iter().filter(|e| self.matches("tag:hero", e)).map(|e| e.id).collect();
+        if let Some(start) = self
+            .def
+            .levels
+            .iter()
+            .find(|level| level.name == name)
+            .and_then(|level| level.start)
+        {
+            let heroes: Vec<u32> = self
+                .entities
+                .iter()
+                .filter(|e| self.matches("tag:hero", e))
+                .map(|e| e.id)
+                .collect();
             for entity in self.entities.iter_mut().filter(|e| heroes.contains(&e.id)) {
                 entity.position = start;
                 entity.velocity = [0.0; 3];
@@ -105,24 +127,45 @@ impl World {
         }
         name.clone_into(&mut self.flow.level);
         if let Some(queue) = queue {
-            queue.push(Event { name: format!("level:{name}"), a: None, b: None, depth: 1 });
+            queue.push(Event {
+                name: format!("level:{name}"),
+                a: None,
+                b: None,
+                depth: 1,
+            });
         }
     }
 
     fn enter_state(&mut self, name: &str, queue: &mut Vec<Event>) {
         if self.flow.state != name {
             name.clone_into(&mut self.flow.state);
-            queue.push(Event { name: format!("state:{name}"), a: None, b: None, depth: 1 });
+            queue.push(Event {
+                name: format!("state:{name}"),
+                a: None,
+                b: None,
+                depth: 1,
+            });
         }
     }
 
     /// Runs the flow actions (`go`, `restart`, `level`, `checkpoint`, `respawn`); returns whether `action` was one of them.
-    pub(super) fn flow_action(&mut self, action: &str, event: &Event, queue: &mut Vec<Event>) -> bool {
+    pub(super) fn flow_action(
+        &mut self,
+        action: &str,
+        event: &Event,
+        queue: &mut Vec<Event>,
+    ) -> bool {
         if let Some(name) = action.strip_prefix("go:") {
             self.enter_state(name, queue);
         } else if action == "restart" {
             // by default a restart goes to the first state that is not frozen (the game proper), or the first state
-            let target = self.def.states.iter().find(|state| !state.frozen).or_else(|| self.def.states.first()).map(|state| state.name.clone());
+            let target = self
+                .def
+                .states
+                .iter()
+                .find(|state| !state.frozen)
+                .or_else(|| self.def.states.first())
+                .map(|state| state.name.clone());
             self.pending_restart = Some(target.unwrap_or_default());
         } else if let Some(name) = action.strip_prefix("restart:") {
             self.pending_restart = Some(name.to_owned());
@@ -131,10 +174,19 @@ impl World {
         } else if action == "checkpoint" || action.starts_with("checkpoint:") {
             let selector = action.strip_prefix("checkpoint:").unwrap_or("tag:hero");
             let ids = self.select_ids(selector, event);
-            self.flow.checkpoint = self.entities.iter().filter(|e| ids.contains(&e.id)).map(|e| (e.id, e.position)).collect();
+            self.flow.checkpoint = self
+                .entities
+                .iter()
+                .filter(|e| ids.contains(&e.id))
+                .map(|e| (e.id, e.position))
+                .collect();
         } else if action == "respawn" || action.starts_with("respawn:") {
             let stored = self.flow.checkpoint.clone();
-            for entity in self.entities.iter_mut().filter(|e| stored.contains_key(&e.id)) {
+            for entity in self
+                .entities
+                .iter_mut()
+                .filter(|e| stored.contains_key(&e.id))
+            {
                 entity.position = stored[&entity.id];
                 entity.velocity = [0.0; 3];
             }
@@ -150,13 +202,27 @@ impl World {
         let mut queue: Vec<Event> = input
             .pressed
             .iter()
-            .filter(|name| self.def.inputs.iter().any(|declaration| declaration.name == **name && declaration.key))
-            .map(|name| Event { name: format!("input:{name}"), a: None, b: None, depth: 0 })
+            .filter(|name| {
+                self.def
+                    .inputs
+                    .iter()
+                    .any(|declaration| declaration.name == **name && declaration.key)
+            })
+            .map(|name| Event {
+                name: format!("input:{name}"),
+                a: None,
+                b: None,
+                depth: 0,
+            })
             .collect();
         self.ui_input(&input.pressed, &mut queue, &mut effects)?;
         let actions = self.process_events(&mut queue, &mut effects)?;
         self.finish_flow(&mut effects)?;
-        Ok(Outcome { status: self.status, effects, events_count: actions })
+        Ok(Outcome {
+            status: self.status,
+            effects,
+            events_count: actions,
+        })
     }
 
     /// After a step: a pending restart rebuilds the world, and a won or lost game enters its `win` or `game_over` state.

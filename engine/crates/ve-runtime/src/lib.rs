@@ -68,12 +68,12 @@ pub use instance_exports::{
 pub use tangent_exports::eval_tangents;
 mod cloth_live;
 mod fluid_live;
-mod sim_api;
-mod sim_live;
 mod physics;
 pub mod quality;
 mod scene;
 mod selection;
+mod sim_api;
+mod sim_live;
 mod skinning;
 #[cfg(any(feature = "bevy-webgl", feature = "bevy-webgpu"))]
 mod skinning_gpu;

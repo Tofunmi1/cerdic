@@ -241,14 +241,60 @@ fn draw_panel(items: &mut Vec<Value>, spec: &Value, aspect: f64) {
 /// The strokes of an icon in a unit square (y down). Icons are drawn with the same pen as the procedural font: no image files.
 fn icon_strokes(name: &str) -> Vec<Vec<[f64; 2]>> {
     match name {
-        "sword" => vec![vec![[0.2, 0.8], [0.82, 0.18]], vec![[0.13, 0.58], [0.42, 0.87]], vec![[0.2, 0.8], [0.1, 0.92]]],
-        "shield" => vec![vec![[0.2, 0.2], [0.8, 0.2], [0.8, 0.5], [0.5, 0.86], [0.2, 0.5], [0.2, 0.2]]],
-        "bolt" => vec![vec![[0.58, 0.08], [0.25, 0.55], [0.5, 0.55], [0.4, 0.92], [0.76, 0.4], [0.52, 0.4], [0.58, 0.08]]],
-        "heal" => vec![vec![[0.5, 0.18], [0.5, 0.82]], vec![[0.18, 0.5], [0.82, 0.5]]],
-        "dash" => vec![vec![[0.18, 0.25], [0.48, 0.5], [0.18, 0.75]], vec![[0.5, 0.25], [0.8, 0.5], [0.5, 0.75]]],
-        "flame" => vec![vec![[0.5, 0.08], [0.76, 0.45], [0.7, 0.76], [0.5, 0.92], [0.3, 0.76], [0.26, 0.5], [0.42, 0.62], [0.5, 0.08]]],
+        "sword" => vec![
+            vec![[0.2, 0.8], [0.82, 0.18]],
+            vec![[0.13, 0.58], [0.42, 0.87]],
+            vec![[0.2, 0.8], [0.1, 0.92]],
+        ],
+        "shield" => vec![vec![
+            [0.2, 0.2],
+            [0.8, 0.2],
+            [0.8, 0.5],
+            [0.5, 0.86],
+            [0.2, 0.5],
+            [0.2, 0.2],
+        ]],
+        "bolt" => vec![vec![
+            [0.58, 0.08],
+            [0.25, 0.55],
+            [0.5, 0.55],
+            [0.4, 0.92],
+            [0.76, 0.4],
+            [0.52, 0.4],
+            [0.58, 0.08],
+        ]],
+        "heal" => vec![
+            vec![[0.5, 0.18], [0.5, 0.82]],
+            vec![[0.18, 0.5], [0.82, 0.5]],
+        ],
+        "dash" => vec![
+            vec![[0.18, 0.25], [0.48, 0.5], [0.18, 0.75]],
+            vec![[0.5, 0.25], [0.8, 0.5], [0.5, 0.75]],
+        ],
+        "flame" => vec![vec![
+            [0.5, 0.08],
+            [0.76, 0.45],
+            [0.7, 0.76],
+            [0.5, 0.92],
+            [0.3, 0.76],
+            [0.26, 0.5],
+            [0.42, 0.62],
+            [0.5, 0.08],
+        ]],
         "skull" => vec![
-            vec![[0.25, 0.6], [0.2, 0.4], [0.3, 0.2], [0.7, 0.2], [0.8, 0.4], [0.75, 0.6], [0.65, 0.66], [0.65, 0.86], [0.35, 0.86], [0.35, 0.66], [0.25, 0.6]],
+            vec![
+                [0.25, 0.6],
+                [0.2, 0.4],
+                [0.3, 0.2],
+                [0.7, 0.2],
+                [0.8, 0.4],
+                [0.75, 0.6],
+                [0.65, 0.66],
+                [0.65, 0.86],
+                [0.35, 0.86],
+                [0.35, 0.66],
+                [0.25, 0.6],
+            ],
             vec![[0.38, 0.45], [0.4, 0.47]],
             vec![[0.6, 0.45], [0.62, 0.47]],
         ],
@@ -256,7 +302,10 @@ fn icon_strokes(name: &str) -> Vec<Vec<[f64; 2]>> {
             // a five-pointed star: outer and inner points alternate around the centre
             let points: Vec<[f64; 2]> = (0..=10)
                 .map(|i| {
-                    let (angle, radius) = (f64::from(i) * std::f64::consts::PI / 5.0 - std::f64::consts::FRAC_PI_2, if i % 2 == 0 { 0.42 } else { 0.18 });
+                    let (angle, radius) = (
+                        f64::from(i) * std::f64::consts::PI / 5.0 - std::f64::consts::FRAC_PI_2,
+                        if i % 2 == 0 { 0.42 } else { 0.18 },
+                    );
                     [0.5 + radius * angle.cos(), 0.52 + radius * angle.sin()]
                 })
                 .collect();
@@ -270,7 +319,10 @@ fn draw_icon(items: &mut Vec<Value>, spec: &Value, aspect: f64) {
     let top_left = origin(spec, size, aspect);
     let pen = size[0].min(size[1]) * 0.075;
     for stroke in icon_strokes(text(spec, "name", "star")) {
-        let points: Vec<f64> = stroke.iter().flat_map(|p| [top_left[0] + p[0] * size[0], top_left[1] + p[1] * size[1]]).collect();
+        let points: Vec<f64> = stroke
+            .iter()
+            .flat_map(|p| [top_left[0] + p[0] * size[0], top_left[1] + p[1] * size[1]])
+            .collect();
         items.push(json!({ "k": "path", "pts": points, "w": pen, "color": text(spec, "color", "#ffffff"), "round": true }));
     }
 }

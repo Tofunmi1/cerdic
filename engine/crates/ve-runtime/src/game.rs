@@ -286,7 +286,9 @@ pub(crate) fn update(
 ) {
     if let Some(request) = REQUEST.with(|cell| cell.borrow_mut().take()) {
         runtime.cameras = match &request {
-            LoadRequest::Load(def) if !def.cameras.is_empty() => Some(ve_game::CameraRig::new(def.cameras.clone())),
+            LoadRequest::Load(def) if !def.cameras.is_empty() => {
+                Some(ve_game::CameraRig::new(def.cameras.clone()))
+            }
             _ => None,
         };
         runtime.world = match request {
@@ -409,13 +411,26 @@ pub(crate) fn update(
             // Where the player looks, for a controller that moves relative to the camera (compass yaw: 0 looks along +z).
             // the direction the camera is actually drawn looking (a fixed-angle camera's own angle, not the free viewer's stale look)
             let forward = rig.rotation() * Vec3::NEG_Z;
-            input.axes.insert("camera.yaw".to_owned(), f64::from(forward.x.atan2(forward.z)));
+            input.axes.insert(
+                "camera.yaw".to_owned(),
+                f64::from(forward.x.atan2(forward.z)),
+            );
             // the rest of the camera's pose, so a weapon with aim=camera can shoot through the crosshair
             let eye = rig.position();
             // the pose the camera is actually drawn with (a blend's mid-point, a fixed angle) so floating numbers land on what is on screen
-            input.axes.insert("camera.pitch".to_owned(), f64::from(forward.y.clamp(-1.0, 1.0).asin()));
-            input.axes.insert("camera.fov".to_owned(), f64::from(crate::viewer::fov_degrees()));
-            for (name, value) in [("camera.x", eye.x), ("camera.y", eye.y), ("camera.z", eye.z)] {
+            input.axes.insert(
+                "camera.pitch".to_owned(),
+                f64::from(forward.y.clamp(-1.0, 1.0).asin()),
+            );
+            input.axes.insert(
+                "camera.fov".to_owned(),
+                f64::from(crate::viewer::fov_degrees()),
+            );
+            for (name, value) in [
+                ("camera.x", eye.x),
+                ("camera.y", eye.y),
+                ("camera.z", eye.z),
+            ] {
                 input.axes.insert(name.to_owned(), f64::from(value));
             }
             input.hands = hands_now
@@ -462,7 +477,11 @@ pub(crate) fn update(
                         {
                             match rig_cam.switch(&effect.name, effect.value.unwrap_or(0.0)) {
                                 Ok(()) => crate::game_camera::enter(rig_cam, world, &mut rig),
-                                Err(problem) => crate::world_api::push_event("game.script_log", "", serde_json::json!({ "text": format!("error: {problem}"), "error": true })),
+                                Err(problem) => crate::world_api::push_event(
+                                    "game.script_log",
+                                    "",
+                                    serde_json::json!({ "text": format!("error: {problem}"), "error": true }),
+                                ),
                             }
                         }
                         if effect.kind == EffectKind::Message {
@@ -563,7 +582,12 @@ pub(crate) fn update(
             let _ = crate::viewer::set_look_at(point(eye), point(target));
         }
         if let Some(camera) = cameras.as_mut() {
-            crate::game_camera::drive(camera, world, &mut rig, f64::from(time.delta_secs()).min(MAX_FRAME_DELTA));
+            crate::game_camera::drive(
+                camera,
+                world,
+                &mut rig,
+                f64::from(time.delta_secs()).min(MAX_FRAME_DELTA),
+            );
         }
         if count == MAX_STEPS {
             *accumulator = accumulator.min(STEP);
@@ -636,7 +660,10 @@ pub(crate) fn update(
 
     let mut wanted = HashSet::new();
     // in first person the camera sits inside the hero, so the hero's own body is not drawn
-    let inside = world.as_ref().zip(cameras.as_ref()).and_then(|(world, cameras)| crate::game_camera::hidden_in_first_person(cameras, world));
+    let inside = world
+        .as_ref()
+        .zip(cameras.as_ref())
+        .and_then(|(world, cameras)| crate::game_camera::hidden_in_first_person(cameras, world));
     for (id, _, part, position, orientation) in &bindings {
         let Some(part) = part.as_deref() else {
             continue;
@@ -664,7 +691,11 @@ pub(crate) fn update(
                     orientation[3] as f32,
                 )
                 .normalize(),
-                scale: if inside == Some(*id) { Vec3::ZERO } else { Vec3::ONE },
+                scale: if inside == Some(*id) {
+                    Vec3::ZERO
+                } else {
+                    Vec3::ONE
+                },
             };
             if let Some(drawing) = drawings.get(&key).copied() {
                 if let Ok(mut current) = drawing_transforms.get_mut(drawing) {

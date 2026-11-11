@@ -31,12 +31,17 @@ impl MeshData {
             starts.push(joined.len());
             for &j in row.iter() {
                 let (p, q) = (points[v], points[j as usize]);
-                let len = ((p[0] - q[0]).powi(2) + (p[1] - q[1]).powi(2) + (p[2] - q[2]).powi(2)).sqrt();
+                let len =
+                    ((p[0] - q[0]).powi(2) + (p[1] - q[1]).powi(2) + (p[2] - q[2]).powi(2)).sqrt();
                 joined.push((j, len));
             }
         }
         starts.push(joined.len());
-        Arc::new(Self { points, starts, joined })
+        Arc::new(Self {
+            points,
+            starts,
+            joined,
+        })
     }
 
     /// How many points.
@@ -62,7 +67,13 @@ impl MeshData {
         let lengths_at = joined_at + edges;
         let rest_at = lengths_at + edges;
         let word = |x: usize| u32::try_from(x).unwrap_or(u32::MAX);
-        let mut words = vec![word(n), word(starts_at), word(joined_at), word(lengths_at), word(rest_at)];
+        let mut words = vec![
+            word(n),
+            word(starts_at),
+            word(joined_at),
+            word(lengths_at),
+            word(rest_at),
+        ];
         words.extend(self.starts.iter().map(|&s| word(s)));
         words.extend(self.joined.iter().map(|&(j, _)| j));
         words.extend(self.joined.iter().map(|&(_, len)| len.to_bits()));
@@ -83,7 +94,9 @@ impl MeshData {
 }
 
 /// The identity pose.
-pub const IDENTITY: [f32; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+pub const IDENTITY: [f32; 16] = [
+    1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+];
 
 /// The bound inputs of one simulation, by input number.
 #[derive(Debug, Default)]

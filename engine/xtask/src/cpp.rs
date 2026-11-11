@@ -24,14 +24,6 @@ const SOURCES: &[&str] = &[
     "cpp/tests/field_test.cpp",
     "cpp/tests/subdivision_test.cpp",
     "cpp/tests/tangents_test.cpp",
-    "cpp/tests/bevel_test.cpp",
-    "cpp/blender/ops/polymesh.hh",
-    "cpp/blender/ops/polymesh.cc",
-    "cpp/blender/ops/bevel.cc",
-    "cpp/blender/shim/det_libm.cc",
-    "cpp/blender/shim/memory_usage.cc",
-    "cpp/blender/shim/ve_stubs.cc",
-    "cpp/blender/shim/PRF_profile.hh",
     "cpp/include/ve_kernel.h",
 ];
 const SAN_DIR: &str = "target/cpp-san";
@@ -52,10 +44,7 @@ pub(crate) fn run() -> Result<(), Failure> {
     format_check()?;
     sanitized_tests()?;
     match wasi_sdk() {
-        Some(sdk) => {
-            tidy(&sdk)?;
-            crate::blender_audit::run(&sdk, WASM_DIR)?;
-        }
+        Some(sdk) => tidy(&sdk)?,
         None => println!("-- cpp: clang-tidy skipped (set WASI_SDK to a wasi-sdk install)"),
     }
     Ok(())

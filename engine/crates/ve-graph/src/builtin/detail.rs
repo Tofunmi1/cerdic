@@ -4,12 +4,32 @@ use super::{SOLID, single, spec};
 use crate::spec::{OperatorSpec, OutputSpec, ParamSpec, PortType};
 use crate::value::{ParamType, Unit, Value};
 
-fn number(name: &'static str, unit: Unit, range: (f64, f64), default: f64, doc: &'static str) -> ParamSpec {
-    ParamSpec { name, ty: ParamType::Num { unit, min: range.0, max: range.1 }, default: Some(Value::Num(default)), doc }
+fn number(
+    name: &'static str,
+    unit: Unit,
+    range: (f64, f64),
+    default: f64,
+    doc: &'static str,
+) -> ParamSpec {
+    ParamSpec {
+        name,
+        ty: ParamType::Num {
+            unit,
+            min: range.0,
+            max: range.1,
+        },
+        default: Some(Value::Num(default)),
+        doc,
+    }
 }
 
 fn count(name: &'static str, max: i64, default: i64, doc: &'static str) -> ParamSpec {
-    ParamSpec { name, ty: ParamType::Int { min: 1, max }, default: Some(Value::Int(default)), doc }
+    ParamSpec {
+        name,
+        ty: ParamType::Int { min: 1, max },
+        default: Some(Value::Int(default)),
+        doc,
+    }
 }
 
 pub(super) fn all() -> Vec<Option<OperatorSpec>> {
@@ -22,19 +42,58 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
             vec![
                 ParamSpec {
                     name: "face",
-                    ty: ParamType::Choice { options: &["+x", "-x", "+y", "-y", "+z", "-z"] },
+                    ty: ParamType::Choice {
+                        options: &["+x", "-x", "+y", "-y", "+z", "-z"],
+                    },
                     default: Some(Value::Str("+z".to_owned())),
                     doc: "Which side of the input's bounding box the plates cover.",
                 },
-                count("cols", 32, 4, "Plates along the face's first direction (x for +z and -z, z for +x and -x, x for +y and -y)."),
-                count("rows", 32, 3, "Plates along the face's second direction (y for the x and z faces, z for the y faces)."),
-                number("gap", Unit::Length, (0.0, 1.0), 0.02, "Seam between neighbouring plates in metres; each plate is inset by half of it on every side. A gap as wide as a plate is refused."),
-                number("depth", Unit::Length, (0.001, 1.0), 0.04, "Thickness of a flat plate in metres."),
-                number("raised", Unit::Ratio, (0.0, 1.0), 0.3, "Share of plates that stand out, each 1.5 to 3 times `depth` thick."),
-                number("vents", Unit::Ratio, (0.0, 1.0), 0.1, "Share of plates drawn as a vent: a flat plate with 4 to 6 slats standing on it."),
+                count(
+                    "cols",
+                    32,
+                    4,
+                    "Plates along the face's first direction (x for +z and -z, z for +x and -x, x for +y and -y).",
+                ),
+                count(
+                    "rows",
+                    32,
+                    3,
+                    "Plates along the face's second direction (y for the x and z faces, z for the y faces).",
+                ),
+                number(
+                    "gap",
+                    Unit::Length,
+                    (0.0, 1.0),
+                    0.02,
+                    "Seam between neighbouring plates in metres; each plate is inset by half of it on every side. A gap as wide as a plate is refused.",
+                ),
+                number(
+                    "depth",
+                    Unit::Length,
+                    (0.001, 1.0),
+                    0.04,
+                    "Thickness of a flat plate in metres.",
+                ),
+                number(
+                    "raised",
+                    Unit::Ratio,
+                    (0.0, 1.0),
+                    0.3,
+                    "Share of plates that stand out, each 1.5 to 3 times `depth` thick.",
+                ),
+                number(
+                    "vents",
+                    Unit::Ratio,
+                    (0.0, 1.0),
+                    0.1,
+                    "Share of plates drawn as a vent: a flat plate with 4 to 6 slats standing on it.",
+                ),
                 ParamSpec {
                     name: "seed",
-                    ty: ParamType::Int { min: 0, max: 2_147_483_647 },
+                    ty: ParamType::Int {
+                        min: 0,
+                        max: 2_147_483_647,
+                    },
                     default: Some(Value::Int(1)),
                     doc: "Chooses which plates are raised or vented and how tall.",
                 },
@@ -49,7 +108,9 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
                 ParamSpec {
                     name: "rooms",
                     ty: ParamType::Str { max_len: 2048 },
-                    default: Some(Value::Str("hall:5,5,7,7; office:3,3,4,4; store:3,3,5,5".to_owned())),
+                    default: Some(Value::Str(
+                        "hall:5,5,7,7; office:3,3,4,4; store:3,3,5,5".to_owned(),
+                    )),
                     doc: "The rooms: `name:minWidth,minDepth,maxWidth,maxDepth` in metres, separated by semicolons (1 to 64 rooms).",
                 },
                 ParamSpec {
@@ -60,14 +121,41 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
                 },
                 ParamSpec {
                     name: "seed",
-                    ty: ParamType::Int { min: 0, max: 2_147_483_647 },
+                    ty: ParamType::Int {
+                        min: 0,
+                        max: 2_147_483_647,
+                    },
                     default: Some(Value::Int(1)),
                     doc: "Chooses the room sizes, their order along the corridor and where the doors are.",
                 },
-                number("wall_height", Unit::Length, (1.0, 10.0), 2.8, "Height of the walls in metres."),
-                number("wall", Unit::Length, (0.05, 1.0), 0.15, "Thickness of the walls in metres."),
-                number("corridor_width", Unit::Length, (0.8, 4.0), 1.6, "Narrowest corridor in metres."),
-                number("door_width", Unit::Length, (0.6, 2.5), 1.0, "Narrowest door in metres."),
+                number(
+                    "wall_height",
+                    Unit::Length,
+                    (1.0, 10.0),
+                    2.8,
+                    "Height of the walls in metres.",
+                ),
+                number(
+                    "wall",
+                    Unit::Length,
+                    (0.05, 1.0),
+                    0.15,
+                    "Thickness of the walls in metres.",
+                ),
+                number(
+                    "corridor_width",
+                    Unit::Length,
+                    (0.8, 4.0),
+                    1.6,
+                    "Narrowest corridor in metres.",
+                ),
+                number(
+                    "door_width",
+                    Unit::Length,
+                    (0.6, 2.5),
+                    1.0,
+                    "Narrowest door in metres.",
+                ),
             ],
         ),
         spec(
@@ -82,15 +170,41 @@ pub(super) fn all() -> Vec<Option<OperatorSpec>> {
                     default: Some(Value::Str("SIGN".to_owned())),
                     doc: "The words, 1 to 48 characters (capitals, digits and common punctuation).",
                 },
-                number("height", Unit::Length, (0.05, 10.0), 0.5, "Height of the letters in metres."),
-                number("depth", Unit::Length, (0.005, 1.0), 0.04, "How far the letters stand out, in metres."),
+                number(
+                    "height",
+                    Unit::Length,
+                    (0.05, 10.0),
+                    0.5,
+                    "Height of the letters in metres.",
+                ),
+                number(
+                    "depth",
+                    Unit::Length,
+                    (0.005, 1.0),
+                    0.04,
+                    "How far the letters stand out, in metres.",
+                ),
                 ParamSpec {
                     name: "color",
-                    ty: ParamType::Vec3 { unit: Unit::None, min: 0.0, max: 100.0 },
-                    default: Some(Value::List(vec![Value::Num(1.0), Value::Num(0.1), Value::Num(0.6)])),
+                    ty: ParamType::Vec3 {
+                        unit: Unit::None,
+                        min: 0.0,
+                        max: 100.0,
+                    },
+                    default: Some(Value::List(vec![
+                        Value::Num(1.0),
+                        Value::Num(0.1),
+                        Value::Num(0.6),
+                    ])),
                     doc: "Colour of the letters [r, g, b]; the housing is this colour scaled to 0.15, the glow is this colour times `glow`.",
                 },
-                number("glow", Unit::None, (0.0, 20.0), 3.0, "Brightness multiplier of the emissive light; 0 is unlit, above 1 blooms."),
+                number(
+                    "glow",
+                    Unit::None,
+                    (0.0, 20.0),
+                    3.0,
+                    "Brightness multiplier of the emissive light; 0 is unlit, above 1 blooms.",
+                ),
             ],
         ),
     ]

@@ -1,6 +1,8 @@
 .studio { position: fixed; inset: 0; overflow: hidden; background: var(--bg); }
 .stage { position: absolute; inset: 0; }
 .stage canvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+.stage[data-loading='true'] canvas { visibility: hidden; }
+.world-loading { z-index: 8; background: var(--bg); align-content: center; gap: var(--gap-3); font-size: var(--text-sm); }
 /* View aids drawn over the canvas; they never take the pointer. */
 .overlay-canvas { position: fixed; z-index: 5; pointer-events: none; }
 /* The transform handles: invisible fat lines to grab, thin coloured lines to see. */

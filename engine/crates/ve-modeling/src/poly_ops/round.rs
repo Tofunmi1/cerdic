@@ -54,7 +54,12 @@ pub(super) fn run(
     // can fold into a polygon that cannot be triangulated. Try the requested number of segments, then fewer, and say so when it had to.
     let mut segments = requested;
     loop {
-        let options = NetworkBevel { width, segments, profile: 0.5, offset: BevelOffset::Offset };
+        let options = NetworkBevel {
+            width,
+            segments,
+            profile: 0.5,
+            offset: BevelOffset::Offset,
+        };
         let attempt = ve_geometry::bevel_network(poly, &hard, &options, context)
             .map_err(|e| poly_fail(node, &e, Some(poly)))
             .and_then(|result| value_from_poly(node, result, input.material.clone(), context));
@@ -72,7 +77,11 @@ pub(super) fn run(
                 }
                 return Ok(value);
             }
-            Err(error) if segments > 1 && error.code != "eval.cancelled" && !context.is_cancelled() => segments -= 1,
+            Err(error)
+                if segments > 1 && error.code != "eval.cancelled" && !context.is_cancelled() =>
+            {
+                segments -= 1
+            }
             Err(error) => return Err(error),
         }
     }

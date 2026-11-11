@@ -120,7 +120,10 @@ fn mix_slice(node: &Node) -> Result<(f64, f64), Fail> {
     let bad = || {
         fail_suggest(
             "scatter.bad_mix",
-            format!("mix {:?} is not a list of positive numbers (at most 16) separated by commas", text(node, "mix")),
+            format!(
+                "mix {:?} is not a list of positive numbers (at most 16) separated by commas",
+                text(node, "mix")
+            ),
             "write the weights like `0.5, 0.3, 0.2`, or leave `mix` at 1 to plant everything with this node",
         )
     };
@@ -129,7 +132,10 @@ fn mix_slice(node: &Node) -> Result<(f64, f64), Fail> {
         .map(|part| part.trim().parse::<f64>())
         .collect::<Result<_, _>>()
         .map_err(|_| bad())?;
-    if weights.is_empty() || weights.len() > 16 || weights.iter().any(|w| !w.is_finite() || *w <= 0.0) {
+    if weights.is_empty()
+        || weights.len() > 16
+        || weights.iter().any(|w| !w.is_finite() || *w <= 0.0)
+    {
         return Err(bad());
     }
     let pick = param(node, "pick")? as usize;
@@ -156,7 +162,10 @@ fn share_of(position: [f32; 3], seed: u32) -> f64 {
         state = state.wrapping_mul(0xc4ce_b9fe_1a85_ec53);
         state ^= state >> 29;
     }
-    #[expect(clippy::cast_precision_loss, reason = "53 bits fill an f64 mantissa exactly")]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "53 bits fill an f64 mantissa exactly"
+    )]
     let fraction = (state >> 11) as f64 / (1_u64 << 53) as f64;
     fraction
 }

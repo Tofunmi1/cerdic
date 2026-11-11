@@ -138,9 +138,14 @@ fn map_materials(
     let effects_changed = *seen_effects != Some(quality.effects);
     *seen_effects = Some(quality.effects);
     let work: Vec<(Entity, VeMaterial)> = if effects_changed {
-        all.iter().map(|(entity, surface)| (entity, *surface)).collect()
+        all.iter()
+            .map(|(entity, surface)| (entity, *surface))
+            .collect()
     } else {
-        changed.iter().map(|(entity, surface)| (entity, *surface)).collect()
+        changed
+            .iter()
+            .map(|(entity, surface)| (entity, *surface))
+            .collect()
     };
     for (entity, authored) in &work {
         let entity = *entity;

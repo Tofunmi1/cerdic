@@ -1,0 +1,142 @@
+# NORTHFIELD REGIONAL — compact passenger airport with runway, apron, terminal and control tower.
+# Metres, Y up; runway points east-west, terminal and apron lie to the north.
+sky = scene.sky@1(sun_elevation=34,sun_azimuth=-35,sun_intensity=1.8,turbidity=2.6,clouds=true,cloud_cover=0.18,haze=0.02,ground_color=[0.30,0.36,0.30],contact_shadows=true)
+output sky = sky
+env = scene.environment@1(sky_color=[0.61,0.73,0.84],ground_color=[0.30,0.35,0.29],intensity=0.75,reflection=0.22,bounce=0.28,bounce_color=[0.78,0.80,0.77])
+output environment = env
+
+def box_part(tag,sx,sy,sz,x,y,z,r,g,b,rough)
+  sh_{tag} = solid.box@1(size=[{sx},{sy},{sz}])
+  at_{tag} = xform.move@1(sh_{tag},by=[{x},{y},{z}])
+  mat_{tag} = solid.material@1(at_{tag},color=[{r},{g},{b}],roughness={rough})
+  output {tag} = mat_{tag}
+end
+
+# Airfield base, runway shoulders, taxiway and broad aircraft apron.
+box_part("airfield",150,0.32,110,0,-0.16,0,0.25,0.33,0.24,0.96)
+field_tex = solid.texture@1(mat_airfield,tile=8,size="512",no_repeat=true,program="g = fbm(scale_x=5,scale_y=4,iterations=4); albedo = colorize(g,gradient=[0:#35472f,0.5:#526146,1:#71805c])")
+output airfield = field_tex
+box_part("runway_shoulder",116,0.20,22,0,0.02,-18,0.34,0.35,0.34,0.9)
+box_part("runway_asphalt",110,0.16,16,0,0.12,-18,0.12,0.14,0.15,0.86)
+box_part("taxiway",110,0.12,8,0,0.09,-2,0.25,0.26,0.25,0.86)
+box_part("taxiway_link",8,0.12,19,38,0.09,8.5,0.25,0.26,0.25,0.86)
+box_part("apron",72,0.18,25,7,0.04,17,0.48,0.48,0.45,0.88)
+
+# Runway markings, taxi lines and parking guides.
+center_dash = solid.box@1(size=[3.2,0.025,0.24])
+center_set = inst.place@1(center_dash,at=[[-48,0.215,-18],[-40,0.215,-18],[-32,0.215,-18],[-24,0.215,-18],[-16,0.215,-18],[-8,0.215,-18],[0,0.215,-18],[8,0.215,-18],[16,0.215,-18],[24,0.215,-18],[32,0.215,-18],[40,0.215,-18],[48,0.215,-18]])
+center_mat = solid.material@1(center_set,color=[0.91,0.91,0.86],roughness=0.82)
+output runway_centerline = center_mat
+edge_line = solid.box@1(size=[106,0.024,0.15])
+edge_set = inst.place@1(edge_line,at=[[0,0.214,-25.0],[0,0.214,-11.0]])
+edge_mat = solid.material@1(edge_set,color=[0.87,0.88,0.82],roughness=0.82)
+output runway_edges = edge_mat
+threshold_bar = solid.box@1(size=[0.18,0.025,4.8])
+threshold_set = inst.place@1(threshold_bar,at=[[-52,0.215,-20.5],[-52,0.215,-18],[-52,0.215,-15.5],[52,0.215,-20.5],[52,0.215,-18],[52,0.215,-15.5]])
+threshold_mat = solid.material@1(threshold_set,color=[0.92,0.92,0.87],roughness=0.82)
+output runway_thresholds = threshold_mat
+aim_box = solid.box@1(size=[5.2,0.026,0.32])
+aim_set = inst.place@1(aim_box,at=[[-32,0.216,-21.5],[-32,0.216,-14.5],[32,0.216,-21.5],[32,0.216,-14.5]])
+aim_mat = solid.material@1(aim_set,color=[0.92,0.92,0.87],roughness=0.82)
+output aiming_marks = aim_mat
+taxi_yellow = solid.box@1(size=[104,0.025,0.12])
+taxi_yellow_at = xform.move@1(taxi_yellow,by=[0,0.165,-2])
+taxi_yellow_mat = solid.material@1(taxi_yellow_at,color=[0.91,0.69,0.13],roughness=0.8)
+output taxi_centerline = taxi_yellow_mat
+stand_line = solid.box@1(size=[0.12,0.025,13])
+stand_set = inst.place@1(stand_line,at=[[-18,0.155,17],[-4,0.155,17],[10,0.155,17],[24,0.155,17]])
+stand_mat = solid.material@1(stand_set,color=[0.90,0.75,0.28],roughness=0.82)
+output stand_guides = stand_mat
+
+# Runway edge lights and taxiway lamps.
+edge_lamp = solid.box@1(size=[0.20,0.36,0.20])
+edge_lamps = inst.place@1(edge_lamp,at=[[-48,0.36,-27],[-36,0.36,-27],[-24,0.36,-27],[-12,0.36,-27],[0,0.36,-27],[12,0.36,-27],[24,0.36,-27],[36,0.36,-27],[48,0.36,-27],[-48,0.36,-9],[-36,0.36,-9],[-24,0.36,-9],[-12,0.36,-9],[0,0.36,-9],[12,0.36,-9],[24,0.36,-9],[36,0.36,-9],[48,0.36,-9]])
+edge_lamps_mat = solid.material@1(edge_lamps,color=[0.75,0.82,0.88],roughness=0.28,emissive=[0.12,0.18,0.23])
+output runway_lights = edge_lamps_mat
+
+# Main terminal: a glazed two-storey concourse with a deep silver roof and service core.
+box_part("terminal_base",48,0.55,13,0,0.28,35,0.35,0.35,0.33,0.76)
+box_part("terminal_core",46,7.0,11.8,0,4.05,35,0.77,0.78,0.75,0.64)
+box_part("terminal_roof",50,0.55,14.5,0,7.72,35,0.24,0.27,0.28,0.42)
+box_part("terminal_curb",54,0.16,5.0,0,0.36,25.3,0.31,0.32,0.31,0.76)
+glass_band = solid.box@1(size=[45,4.5,0.08])
+glass_at = xform.move@1(glass_band,by=[0,4.35,29.05])
+glass_mat = solid.material@1(glass_at,color=[0.24,0.43,0.51],roughness=0.18,metallic=0.12,opacity=0.42)
+output terminal_glazing = glass_mat
+glass_mullion = solid.box@1(size=[0.12,5.1,0.14])
+glass_mullions = inst.place@1(glass_mullion,at=[[-21,4.3,28.98],[-16,4.3,28.98],[-11,4.3,28.98],[-6,4.3,28.98],[-1,4.3,28.98],[4,4.3,28.98],[9,4.3,28.98],[14,4.3,28.98],[19,4.3,28.98],[22,4.3,28.98]])
+glass_mullions_mat = solid.material@1(glass_mullions,color=[0.18,0.22,0.23],roughness=0.34,metallic=0.28)
+output terminal_mullions = glass_mullions_mat
+box_part("terminal_sign",12,1.0,0.16,0,6.0,28.96,0.82,0.84,0.80,0.56)
+box_part("checkin_lobby",17,4.8,0.18,-12,3.2,40.95,0.68,0.70,0.68,0.72)
+box_part("baggage_hall",16,4.8,0.18,12,3.2,40.95,0.68,0.70,0.68,0.72)
+
+# Three covered boarding bridges lead from terminal face to aircraft stands.
+bridge = solid.box@1(size=[3.2,3.4,8.5])
+bridge_set = inst.place@1(bridge,at=[[-17,2.9,25.0],[-3,2.9,25.0],[11,2.9,25.0]])
+bridge_mat = solid.material@1(bridge_set,color=[0.64,0.67,0.67],roughness=0.52,metallic=0.12)
+output boarding_bridges = bridge_mat
+bridge_glass = solid.box@1(size=[3.24,1.3,8.1])
+bridge_glass_set = inst.place@1(bridge_glass,at=[[-17,3.4,24.8],[-3,3.4,24.8],[11,3.4,24.8]])
+bridge_glass_mat = solid.material@1(bridge_glass_set,color=[0.31,0.53,0.60],roughness=0.18,opacity=0.38)
+output bridge_windows = bridge_glass_mat
+
+# Single-aisle passenger jet on stand 2, pointing east along the apron.
+fuselage = solid.cylinder@1(radius=0.72,height=17,segments=32)
+fuselage_turn = xform.rotate@1(fuselage,angles=[0,0,90])
+fuselage_at = xform.move@1(fuselage_turn,by=[8,1.35,16.7])
+nose = solid.cone@1(radius=0.72,height=2.4,segments=32)
+nose_turn = xform.rotate@1(nose,angles=[0,0,-90])
+nose_at = xform.move@1(nose_turn,by=[17.7,1.35,16.7])
+wing = solid.box@1(size=[3.0,0.22,21.5])
+wing_at = xform.move@1(wing,by=[7.7,1.3,16.7])
+tailplane = solid.box@1(size=[2.4,0.18,7.2])
+tailplane_at = xform.move@1(tailplane,by=[0.8,2.0,16.7])
+fin = solid.box@1(size=[2.6,3.2,0.22])
+fin_at = xform.move@1(fin,by=[0.2,2.55,16.7])
+engine_src = solid.cylinder@1(radius=0.52,height=2.8,segments=24)
+engine_turn = xform.rotate@1(engine_src,angles=[0,0,90])
+engine_a = xform.move@1(engine_turn,by=[7.3,0.76,11.7])
+engine_b = xform.move@1(engine_turn,by=[7.3,0.76,21.7])
+jet_a = solid.union@1(fuselage_at,nose_at)
+jet_b = solid.union@1(jet_a,wing_at)
+jet_c = solid.union@1(jet_b,tailplane_at)
+jet_d = solid.union@1(jet_c,fin_at)
+jet_e = solid.union@1(jet_d,engine_a)
+jet_solid = solid.union@1(jet_e,engine_b)
+jet_mat = solid.material@1(jet_solid,color=[0.83,0.85,0.83],roughness=0.38,metallic=0.12)
+output passenger_jet = jet_mat
+jet_stripe = solid.box@1(size=[10.0,0.24,0.045])
+jet_stripe_at = xform.move@1(jet_stripe,by=[8.0,1.68,15.96])
+jet_stripe_mat = solid.material@1(jet_stripe_at,color=[0.12,0.32,0.52],roughness=0.42)
+output jet_livery = jet_stripe_mat
+cockpit_glass = solid.box@1(size=[1.25,0.43,0.62])
+cockpit_at = xform.move@1(cockpit_glass,by=[16.0,1.79,16.7])
+cockpit_mat = solid.material@1(cockpit_at,color=[0.10,0.22,0.28],roughness=0.18,metallic=0.14)
+output cockpit_windows = cockpit_mat
+
+# Tower with concrete shaft, glazed cab and aerial.
+box_part("tower_base",10,0.5,10,37,0.25,40,0.42,0.43,0.42,0.76)
+box_part("tower_shaft",4.2,22,4.2,37,11.5,40,0.68,0.69,0.66,0.78)
+box_part("tower_cab",7.2,3.4,7.2,37,24.2,40,0.23,0.28,0.30,0.45)
+box_part("tower_glass",7.35,2.35,7.35,37,24.25,40,0.23,0.43,0.52,0.18)
+box_part("tower_roof",8.0,0.34,8.0,37,26.05,40,0.26,0.28,0.29,0.42)
+box_part("tower_aerial",0.12,5.0,0.12,37,28.7,40,0.18,0.19,0.19,0.38)
+
+# Low hangar, fuel depot and ground-service equipment.
+box_part("hangar",22,8.0,16,47,4.0,30,0.72,0.73,0.70,0.78)
+box_part("hangar_roof",23,0.5,17,47,8.25,30,0.28,0.30,0.30,0.58)
+box_part("hangar_door",12,6.0,0.12,47,3.35,21.92,0.24,0.30,0.33,0.5)
+box_part("fuel_tank",4.0,3.6,4.0,61,1.8,39,0.75,0.76,0.72,0.52)
+box_part("baggage_tractor",3.8,1.7,2.2,-27,0.95,21,0.88,0.56,0.13,0.62)
+box_part("baggage_cart",5.0,1.3,2.3,-32,0.75,21,0.70,0.72,0.70,0.74)
+box_part("fire_engine",6.2,2.4,2.6,29,1.2,24,0.72,0.12,0.08,0.48)
+box_part("parking_canopy",20,0.28,6,4,4.2,48,0.32,0.34,0.34,0.5)
+box_part("parking_deck",24,0.16,11,4,0.08,51,0.31,0.32,0.31,0.84)
+
+# Warm approach lights; daylight remains dominant.
+approach_light = light.point@1(position=[0,5,26],color=[1.0,0.82,0.58],intensity=24,range=18)
+output terminal_approach_light = approach_light
+taxi_light = light.point@1(position=[38,1.2,2],color=[0.55,0.78,1.0],intensity=10,range=8)
+output taxiway_light = taxi_light
+

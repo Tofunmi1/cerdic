@@ -79,7 +79,10 @@ fn wind_drags_a_particle_to_the_wind_speed_and_plain_drag_slows_it() {
     });
     run(&mut windy, 4.0, &Plane { height: -1.0e6 });
     let v = windy.alive(0)[0].velocity;
-    assert!((v[0] - 3.0).abs() < 0.05 && v[1].abs() < 1e-4 && v[2].abs() < 1e-4, "{v:?}");
+    assert!(
+        (v[0] - 3.0).abs() < 0.05 && v[1].abs() < 1e-4 && v[2].abs() < 1e-4,
+        "{v:?}"
+    );
 
     let mut slowing = one(Emitter {
         speed: [10.0, 10.0],
@@ -91,10 +94,16 @@ fn wind_drags_a_particle_to_the_wind_speed_and_plain_drag_slows_it() {
     for _ in 0..240 {
         slowing.step(DT, &Plane { height: -1.0e6 });
         let speed = slowing.alive(0)[0].velocity[0];
-        assert!(speed < last && speed > 0.0, "drag must slow monotonically: {speed}");
+        assert!(
+            speed < last && speed > 0.0,
+            "drag must slow monotonically: {speed}"
+        );
         last = speed;
     }
-    assert!(last < 10.0 * (-1.5_f32 * 2.0).exp() * 1.1 && last > 10.0 * (-1.5_f32 * 2.0).exp() * 0.9, "{last}");
+    assert!(
+        last < 10.0 * (-1.5_f32 * 2.0).exp() * 1.1 && last > 10.0 * (-1.5_f32 * 2.0).exp() * 0.9,
+        "{last}"
+    );
 }
 
 #[test]
@@ -116,7 +125,11 @@ fn a_vortex_circulates_around_its_axis_and_an_attractor_pulls_inward() {
     run(&mut swirl, 0.3, &Plane { height: -1.0e6 });
     let p = swirl.alive(0)[0];
     // Right-handed about +Y at a point on +X of the axis: the push is towards -Z.
-    assert!(p.velocity[2] < -0.5, "circulates the right-handed way: {:?}", p.velocity);
+    assert!(
+        p.velocity[2] < -0.5,
+        "circulates the right-handed way: {:?}",
+        p.velocity
+    );
     assert!(p.velocity[1].abs() < 1e-3, "stays in the plane");
 
     let mut pull = one(Emitter {
@@ -129,7 +142,10 @@ fn a_vortex_circulates_around_its_axis_and_an_attractor_pulls_inward() {
     });
     run(&mut pull, 1.0, &Plane { height: -1.0e6 });
     let p = pull.alive(0)[0];
-    assert!(p.velocity[0] > 1.0 && p.position[0] > 0.5 && p.position[1].abs() < 1e-4, "{p:?}");
+    assert!(
+        p.velocity[0] > 1.0 && p.position[0] > 0.5 && p.position[1].abs() < 1e-4,
+        "{p:?}"
+    );
     // Sitting exactly on the centre must not blow up.
     let mut at_centre = one(Emitter {
         forces: vec![Force::Attractor {
@@ -151,19 +167,34 @@ fn the_turbulence_field_is_swirly_not_a_source_or_a_sink() {
     let mut n = 0.0;
     for i in 0..300 {
         let t = i as f32;
-        let p = [(t * 0.37).fract() * 8.0, (t * 0.61).fract() * 8.0, (t * 0.83).fract() * 8.0];
+        let p = [
+            (t * 0.37).fract() * 8.0,
+            (t * 0.61).fract() * 8.0,
+            (t * 0.83).fract() * 8.0,
+        ];
         let f = |q: [f32; 3]| turbulence_field(1.0, 0.7, 0.3, q);
         let (px, mx) = (f([p[0] + h, p[1], p[2]]), f([p[0] - h, p[1], p[2]]));
         let (py, my) = (f([p[0], p[1] + h, p[2]]), f([p[0], p[1] - h, p[2]]));
         let (pz, mz) = (f([p[0], p[1], p[2] + h]), f([p[0], p[1], p[2] - h]));
         div += ((px[0] - mx[0]) + (py[1] - my[1]) + (pz[2] - mz[2])).abs() / (2.0 * h);
-        change += (px[0] - mx[0]).abs() / (2.0 * h) + (py[1] - my[1]).abs() / (2.0 * h) + (pz[2] - mz[2]).abs() / (2.0 * h);
+        change += (px[0] - mx[0]).abs() / (2.0 * h)
+            + (py[1] - my[1]).abs() / (2.0 * h)
+            + (pz[2] - mz[2]).abs() / (2.0 * h);
         let v = f(p);
         magnitude += (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
         n += 1.0;
     }
-    assert!(magnitude / n > 0.2, "the field moves things: {}", magnitude / n);
-    assert!(div / n < 0.1 * change / n, "divergence {} against change {}", div / n, change / n);
+    assert!(
+        magnitude / n > 0.2,
+        "the field moves things: {}",
+        magnitude / n
+    );
+    assert!(
+        div / n < 0.1 * change / n,
+        "divergence {} against change {}",
+        div / n,
+        change / n
+    );
     // Strength scales it, and time moves it.
     let a = turbulence_field(1.0, 0.7, 0.3, [1.0, 2.0, 3.0]);
     let b = turbulence_field(2.0, 0.7, 0.3, [1.0, 2.0, 3.0]);
@@ -185,7 +216,12 @@ fn a_bouncing_particle_loses_energy_by_the_restitution_and_never_sinks_into_the_
         if last_vy < -1.0 && p.velocity[1] > 0.0 {
             bounces += 1;
             // Speed after is e times the speed before (a step of slack for the discrete impact).
-            assert!((p.velocity[1] / -last_vy - e).abs() < 0.08, "{} after {}", p.velocity[1], last_vy);
+            assert!(
+                (p.velocity[1] / -last_vy - e).abs() < 0.08,
+                "{} after {}",
+                p.velocity[1],
+                last_vy
+            );
             if bounces == 1 {
                 peak_after = p.velocity[1] * p.velocity[1] / (2.0 * 9.8);
             }
@@ -193,7 +229,10 @@ fn a_bouncing_particle_loses_energy_by_the_restitution_and_never_sinks_into_the_
         last_vy = p.velocity[1];
     }
     assert!(bounces >= 2, "it keeps bouncing: {bounces}");
-    assert!(peak_after < 2.0 * e * e * 1.2 && peak_after > 2.0 * e * e * 0.8, "first rebound height {peak_after}");
+    assert!(
+        peak_after < 2.0 * e * e * 1.2 && peak_after > 2.0 * e * e * 0.8,
+        "first rebound height {peak_after}"
+    );
 }
 
 /// A resting particle at a given height with only the ground to hit.
@@ -238,7 +277,10 @@ fn stick_stops_kill_removes_and_friction_slows_the_slide() {
     let mut stick = make(Reaction::Stick);
     run(&mut stick, 2.0, &ground);
     let p = stick.alive(0)[0];
-    assert!(p.velocity.iter().all(|v| v.abs() < 1e-3) && p.position[1] < 1e-3, "{p:?}");
+    assert!(
+        p.velocity.iter().all(|v| v.abs() < 1e-3) && p.position[1] < 1e-3,
+        "{p:?}"
+    );
     let mut kill = make(Reaction::Kill);
     run(&mut kill, 2.0, &ground);
     assert!(kill.alive(0).is_empty());
@@ -265,7 +307,11 @@ struct Ball {
 
 impl World for Ball {
     fn contact(&self, p: [f32; 3], r: f32) -> Option<Contact> {
-        let d = [p[0] - self.centre[0], p[1] - self.centre[1], p[2] - self.centre[2]];
+        let d = [
+            p[0] - self.centre[0],
+            p[1] - self.centre[1],
+            p[2] - self.centre[2],
+        ];
         let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt().max(1e-6);
         let depth = self.radius + r - len;
         (depth > 0.0).then(|| Contact {
@@ -349,7 +395,10 @@ fn sub_emitters_spawn_children_where_and_when_the_trigger_fires() {
     assert_eq!(system.alive(0).len(), 0);
     let children = system.alive(1);
     assert_eq!(children.len(), 15);
-    assert!(children.iter().all(|c| (c.position[1] - 1.0).abs() < 1e-4), "born where the parent died");
+    assert!(
+        children.iter().all(|c| (c.position[1] - 1.0).abs() < 1e-4),
+        "born where the parent died"
+    );
     // On birth: children exist at once.
     let mut system = System::new(parent_child(SubTrigger::Birth, 2), 1).unwrap();
     system.step(DT, &Plane { height: -1.0e6 });
@@ -366,7 +415,10 @@ fn sub_emitters_spawn_children_where_and_when_the_trigger_fires() {
     run(&mut system, 1.0, &Plane { height: 0.0 });
     let children = system.alive(1);
     assert_eq!(children.len(), 20);
-    assert!(children.iter().all(|c| c.position[1].abs() < 0.05), "born on the ground");
+    assert!(
+        children.iter().all(|c| c.position[1].abs() < 0.05),
+        "born on the ground"
+    );
 }
 
 #[test]
@@ -394,7 +446,11 @@ fn trails_keep_the_recent_path_and_start_fresh_for_a_reused_slot() {
     let trail = system.trail(0, p.id);
     assert!(trail.len() >= 2 && trail.len() <= 8, "{}", trail.len());
     let head = trail[trail.len() - 1];
-    assert!((head[0] - p.position[0]).abs() < 0.11, "the newest point is at the particle: {head:?} vs {:?}", p.position);
+    assert!(
+        (head[0] - p.position[0]).abs() < 0.11,
+        "the newest point is at the particle: {head:?} vs {:?}",
+        p.position
+    );
     for pair in trail.windows(2).take(trail.len().saturating_sub(2)) {
         let gap = (pair[1][0] - pair[0][0]).abs();
         assert!(gap >= 0.09, "points are at least min_step apart: {gap}");
@@ -407,7 +463,10 @@ fn trails_keep_the_recent_path_and_start_fresh_for_a_reused_slot() {
     system.step(DT, &Plane { height: -1.0e6 });
     let fresh = system.alive(0)[0];
     let trail = system.trail(0, fresh.id);
-    assert!(trail.iter().all(|t| (t[0] - fresh.position[0]).abs() < 0.2), "no stale points: {trail:?}");
+    assert!(
+        trail.iter().all(|t| (t[0] - fresh.position[0]).abs() < 0.2),
+        "no stale points: {trail:?}"
+    );
 }
 
 #[test]
@@ -422,7 +481,10 @@ fn spawn_rate_bursts_delay_duration_and_loops_follow_the_clock() {
     let mut system = one(e.clone());
     run(&mut system, 1.0, &Plane { height: -1.0e6 });
     let born = system.alive(0).len() as i64;
-    assert!((born - 100).abs() <= 1, "100 per second for 1 s gave {born}");
+    assert!(
+        (born - 100).abs() <= 1,
+        "100 per second for 1 s gave {born}"
+    );
 
     let mut delayed = e.clone();
     delayed.spawn.delay = 0.5;
@@ -445,7 +507,10 @@ fn spawn_rate_bursts_delay_duration_and_loops_follow_the_clock() {
     let mut system = one(looped);
     run(&mut system, 1.5, &Plane { height: -1.0e6 });
     let born = system.alive(0).len() as i64;
-    assert!((born - 150).abs() <= 2, "a looping emitter keeps going: {born}");
+    assert!(
+        (born - 150).abs() <= 2,
+        "a looping emitter keeps going: {born}"
+    );
 
     let mut bursting = emitter();
     bursting.spawn.bursts = vec![
@@ -510,7 +575,12 @@ fn the_same_seed_gives_bit_identical_systems_and_another_seed_a_different_one() 
     let key = |s: &System| -> Vec<u32> {
         s.alive(0)
             .iter()
-            .flat_map(|p| p.position.iter().chain(p.velocity.iter()).map(|v| v.to_bits()))
+            .flat_map(|p| {
+                p.position
+                    .iter()
+                    .chain(p.velocity.iter())
+                    .map(|v| v.to_bits())
+            })
             .collect()
     };
     assert_eq!(key(&a), key(&b));
@@ -549,7 +619,12 @@ fn bad_effects_are_refused_with_the_field_to_fix() {
         count: 1,
     }];
     invalid(Effect { emitters: vec![e] }, "sub");
-    invalid(Effect { emitters: Vec::new() }, "emitters");
+    invalid(
+        Effect {
+            emitters: Vec::new(),
+        },
+        "emitters",
+    );
     // A and B spawning each other would never end.
     let mut a = emitter();
     let mut b = emitter();
@@ -563,7 +638,12 @@ fn bad_effects_are_refused_with_the_field_to_fix() {
         emitter: 0,
         count: 1,
     }];
-    invalid(Effect { emitters: vec![a, b] }, "sub");
+    invalid(
+        Effect {
+            emitters: vec![a, b],
+        },
+        "sub",
+    );
 }
 
 #[test]
@@ -580,20 +660,37 @@ fn an_emitter_rides_on_a_placement_that_moves_and_turns_its_births() {
     system.burst(0, 1);
     system.step(DT, &Plane { height: -1.0e6 });
     let p = system.alive(0)[0];
-    assert!((p.position[0] - 5.0).abs() < 0.05, "born at the placement: {:?}", p.position);
-    assert!(p.velocity[0] < -1.99 && p.velocity[1].abs() < 0.01, "its direction turned with it: {:?}", p.velocity);
+    assert!(
+        (p.position[0] - 5.0).abs() < 0.05,
+        "born at the placement: {:?}",
+        p.position
+    );
+    assert!(
+        p.velocity[0] < -1.99 && p.velocity[1].abs() < 0.01,
+        "its direction turned with it: {:?}",
+        p.velocity
+    );
     // Moving the placement later moves where new particles appear, not the ones already flying.
     system.place([-3.0, 2.0, 0.0], [0.0, 0.0, 0.0, 1.0]);
     system.burst(0, 1);
     system.step(DT, &Plane { height: -1.0e6 });
     let alive = system.alive(0);
-    assert!((alive[0].position[0] - 5.0).abs() < 0.2, "the first keeps flying: {:?}", alive[0].position);
+    assert!(
+        (alive[0].position[0] - 5.0).abs() < 0.2,
+        "the first keeps flying: {:?}",
+        alive[0].position
+    );
     assert!((alive[1].position[0] + 3.0).abs() < 0.05 && (alive[1].position[1] - 2.0).abs() < 0.1);
     // A rotation that is not a unit quaternion is normalised, a zero one is ignored (identity).
     system.place([0.0; 3], [0.0, 0.0, 0.0, 0.0]);
     system.burst(0, 1);
     system.step(DT, &Plane { height: -1.0e6 });
-    assert!(system.alive(0).iter().all(|p| p.position.iter().all(|c| c.is_finite())));
+    assert!(
+        system
+            .alive(0)
+            .iter()
+            .all(|p| p.position.iter().all(|c| c.is_finite()))
+    );
 }
 
 #[test]
@@ -630,12 +727,24 @@ fn how_a_particle_looks_is_checked() {
         blend: Blend::Additive,
         ..Look::default()
     };
-    assert!(Effect { emitters: vec![ribbon.clone()] }.validate().is_ok());
+    assert!(
+        Effect {
+            emitters: vec![ribbon.clone()]
+        }
+        .validate()
+        .is_ok()
+    );
     ribbon.trail = Some(Trail {
         points: 8,
         min_step: 0.05,
     });
-    assert!(Effect { emitters: vec![ribbon] }.validate().is_ok());
+    assert!(
+        Effect {
+            emitters: vec![ribbon]
+        }
+        .validate()
+        .is_ok()
+    );
 }
 
 #[test]
@@ -669,7 +778,10 @@ fn an_effect_round_trips_through_json_and_omitted_fields_take_their_defaults() {
     // A minimal description fills in the rest.
     let minimal: Effect = serde_json::from_str(r#"{"emitters":[{"spawn":{"rate":5.0}}]}"#).unwrap();
     assert_eq!(minimal.emitters[0].spawn.rate, 5.0);
-    assert_eq!(minimal.emitters[0].max_particles, Emitter::default().max_particles);
+    assert_eq!(
+        minimal.emitters[0].max_particles,
+        Emitter::default().max_particles
+    );
     assert!(minimal.validate().is_ok());
 }
 

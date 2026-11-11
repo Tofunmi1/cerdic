@@ -1,8 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowUp, ChevronRight, CircleAlert, Check, LoaderCircle, Trash2, Wrench } from 'lucide-react';
-import type { Entry, ToolCall } from './transcript';
+import { ArrowUp, ChevronDown, ChevronRight, CircleAlert, Check, LoaderCircle, Plug, Plus, Square, Trash2, Wrench } from 'lucide-react';
+import type { Conversation, Entry, ToolCall } from './transcript';
 import { host } from '../engine/host';
+import { AssistantConnection } from './AssistantConnection';
+import type { SidebarAgent } from './sidebarAgent';
 
 /** Paragraphs, ``` fences and `inline code`: all the assistant's text needs. */
 function Markdown({ text }: { text: string }) {
@@ -86,10 +88,13 @@ export function BuildCard() {
   );
 }
 
-export function ChatPanel({ entries, onSend, onClear }: { entries: Entry[]; onSend: (text: string) => void; onClear: () => void }) {
+type ChatProps = { entries: Entry[]; onSend: (text: string) => void; onClear: () => void; projectName?: string; disabled: boolean;
+  conversations: Conversation[]; conversationId: string; onNewChat: () => void; onSelectChat: (id: string) => void; error?: string; agent: SidebarAgent };
+export function ChatPanel({ entries, onSend, onClear, projectName, disabled, conversations, conversationId, onNewChat, onSelectChat, error, agent }: ChatProps) {
   const scroll = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState('');
+  const [connectionOpen, setConnectionOpen] = useState(false);
   const stick = useRef(true);
 
   useLayoutEffect(() => {
@@ -105,7 +110,7 @@ export function ChatPanel({ entries, onSend, onClear }: { entries: Entry[]; onSe
 
   const submit = () => {
     const value = text.trim();
-    if (!value) return;
+    if (!value || disabled) return;
     onSend(value);
     setText('');
   };
@@ -114,8 +119,13 @@ export function ChatPanel({ entries, onSend, onClear }: { entries: Entry[]; onSe
     <aside className="chat glass" aria-label="Assistant">
       <div className="chat-head">
         <h2>Assistant</h2>
-        <button className="btn icon" type="button" onClick={onClear} aria-label="Clear conversation" title="Clear conversation"><Trash2 size={15} /></button>
+        <button className={`btn assistant-connect-trigger${agent.status === 'ready' ? ' icon' : ''}`} type="button" aria-label={agent.status === 'ready' ? 'Assistant connection settings' : 'Connect assistant'} title={agent.status === 'ready' ? 'Assistant connection settings' : 'Connect assistant'} onClick={() => setConnectionOpen(true)}><Plug size={14} />{agent.status !== 'ready' && 'Connect assistant'}</button>
+        <button className="btn icon" type="button" onClick={onClear} disabled={disabled} aria-label="Clear conversation" title="Clear conversation"><Trash2 size={15} /></button>
       </div>
+      <div className="chat-context"><span>{projectName ? `${projectName} / World 01` : 'Create or open a project to start'}</span><div className="chat-context-row">
+        <div className="chat-conversation-select"><select aria-label="Conversation" value={conversationId} disabled={disabled} onChange={event => onSelectChat(event.target.value)}>{conversations.map(chat => <option key={chat.id} value={chat.id}>{chat.title}</option>)}</select><ChevronDown size={14} strokeWidth={1.8} aria-hidden="true" /></div>
+        <button className="btn icon" type="button" disabled={disabled} onClick={onNewChat} aria-label="New conversation" title="New conversation"><Plus size={15} /></button>
+      </div>{agent.status === 'ready' && <label className="chat-model-label">Model<select aria-label="Assistant model" value={agent.model} disabled={agent.running} onChange={event => agent.setModel(event.target.value)}>{agent.models.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}</select></label>}</div>
       <div className="chat-scroll" ref={scroll} onScroll={e => {
         const el = e.currentTarget;
         stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
@@ -123,7 +133,7 @@ export function ChatPanel({ entries, onSend, onClear }: { entries: Entry[]; onSe
         {entries.length === 0 && (
           <div className="chat-empty">
             <h3>Describe what to build</h3>
-            <p>The assistant writes the model as text and the engine builds it here. Each step appears below as it runs.</p>
+            <p>This conversation belongs to this world. Start another chat whenever you want a fresh direction.</p>
           </div>
         )}
         {entries.map(entry => (
@@ -133,18 +143,20 @@ export function ChatPanel({ entries, onSend, onClear }: { entries: Entry[]; onSe
           </div>
         ))}
         <BuildCard />
+        {agent.running && <div className="assistant-working" role="status"><LoaderCircle size={14} className="spin" />Assistant is working…</div>}
       </div>
       <form className="composer" onSubmit={e => { e.preventDefault(); submit(); }}>
         <div className="box">
           <textarea
-            ref={box} rows={1} value={text} placeholder="Message the assistant" aria-label="Message"
+            ref={box} rows={1} value={text} disabled={disabled} placeholder="Message the assistant" aria-label="Message"
             onChange={e => setText(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }}
           />
-          <button className="send" type="submit" disabled={!text.trim()} aria-label="Send"><ArrowUp size={18} strokeWidth={2.4} /></button>
+          {agent.running ? <button className="send" type="button" onClick={agent.stop} aria-label="Stop assistant"><Square size={14} fill="currentColor" /></button> : <button className="send" type="submit" disabled={disabled || !text.trim()} aria-label="Send"><ArrowUp size={18} strokeWidth={2.4} /></button>}
         </div>
-        <p className="note">No model is connected yet: messages are kept here and the assistant answers from the terminal.</p>
+        <p className="note">{error || (agent.status === 'ready' ? `API key in this browser · this world’s conversation` : host.mcpStatus === 'connected' ? 'External MCP connected. Sidebar chat uses its own assistant connection.' : 'Messages are saved locally. Connect an assistant to get replies here.')}</p>
       </form>
+      {connectionOpen && <AssistantConnection agent={agent} onClose={() => setConnectionOpen(false)} />}
     </aside>
   );
 }

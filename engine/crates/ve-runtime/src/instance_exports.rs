@@ -174,7 +174,13 @@ pub fn viewer_sim() -> String {
 /// vertex each triangle corner comes from (used by a program that drives the mesh).
 #[wasm_bindgen]
 #[must_use]
-pub fn eval_projection_sim(token: &str, node: &str, spec: &str, points: &[f32], corners: &[u32]) -> bool {
+pub fn eval_projection_sim(
+    token: &str,
+    node: &str,
+    spec: &str,
+    points: &[f32],
+    corners: &[u32],
+) -> bool {
     projection::sim(token, node, spec, points, corners)
 }
 

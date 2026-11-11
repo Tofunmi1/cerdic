@@ -27,7 +27,9 @@ fn runs(node: &Node) -> Result<(Vec<[f64; 4]>, f64), KernelError> {
     let pixel = (height / 7.0) as f32;
     let words = layout(text(node), pixel);
     if words.rects.is_empty() {
-        return Err(KernelError::InvalidArgument("the text has no lit pixel: write at least one visible character"));
+        return Err(KernelError::InvalidArgument(
+            "the text has no lit pixel: write at least one visible character",
+        ));
     }
     let pixel = f64::from(pixel);
     let mut rects: Vec<[f64; 4]> = words
@@ -44,7 +46,12 @@ fn runs(node: &Node) -> Result<(Vec<[f64; 4]>, f64), KernelError> {
     let mut merged: Vec<[f64; 4]> = Vec::new();
     for rect in rects {
         match merged.last_mut() {
-            Some(last) if (last[1] - rect[1]).abs() < pixel * 1e-3 && (last[2] - rect[0]).abs() < pixel * 1e-3 => last[2] = rect[2],
+            Some(last)
+                if (last[1] - rect[1]).abs() < pixel * 1e-3
+                    && (last[2] - rect[0]).abs() < pixel * 1e-3 =>
+            {
+                last[2] = rect[2]
+            }
             _ => merged.push(rect),
         }
     }
@@ -60,7 +67,10 @@ fn runs(node: &Node) -> Result<(Vec<[f64; 4]>, f64), KernelError> {
 pub(crate) fn build(node: &Node, context: &ExecutionContext) -> Result<Solid, KernelError> {
     let depth = number(node, "depth").ok_or(KernelError::InvalidArgument("depth is missing"))?;
     let (rects, _) = runs(node)?;
-    let boxes: Result<Vec<Solid>, KernelError> = rects.iter().map(|r| cuboid([r[0], r[1], 0.0], [r[2], r[3], depth])).collect();
+    let boxes: Result<Vec<Solid>, KernelError> = rects
+        .iter()
+        .map(|r| cuboid([r[0], r[1], 0.0], [r[2], r[3], depth]))
+        .collect();
     union_many(boxes?, context)
 }
 
@@ -70,17 +80,27 @@ pub(crate) fn material(node: &Node) -> Result<Material, Fail> {
         Some(Param::List(items)) if items.len() == 3 => {
             let mut out = [0.0_f32; 3];
             for (slot, item) in out.iter_mut().zip(items) {
-                #[expect(clippy::cast_possible_truncation, reason = "colour channels are 0..=100")]
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "colour channels are 0..=100"
+                )]
                 {
-                    *slot = item.as_f64().ok_or_else(|| fail("param.type", "color must be three numbers"))? as f32;
+                    *slot = item
+                        .as_f64()
+                        .ok_or_else(|| fail("param.type", "color must be three numbers"))?
+                        as f32;
                 }
             }
             out
         }
         _ => return Err(fail("param.type", "color must be three numbers")),
     };
-    #[expect(clippy::cast_possible_truncation, reason = "a glow factor of at most 20")]
-    let glow = number(node, "glow").ok_or_else(|| fail("param.type", "glow must be a number"))? as f32;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "a glow factor of at most 20"
+    )]
+    let glow =
+        number(node, "glow").ok_or_else(|| fail("param.type", "glow must be a number"))? as f32;
     Ok(Material {
         color: colour.map(|c| c * 0.15),
         opacity: 1.0,

@@ -178,7 +178,8 @@ export class EvaluationHost {
     if (this.disposed || this.state.worker === 'failed') return;
     clearTimeout(this.refineTimer); this.refineTimer = undefined; this.state.refining = quality === 'final';
     const candidate = JSON.parse(this.runtime.doc_candidate_state()) as Candidate;
-    if (!candidate.document.nodes.length && !candidate.pending) return;
+    // An empty document must still project: it clears geometry, lights and animation
+    // left by the previous world when a project is reset or a blank one is opened.
     const token: Token = { document: candidate.document.id, revision: candidate.document.revision,
       request: ++this.sequence, generation: this.state.generation, quality, hash: candidate.hash };
     if (!this.runtime.eval_bind(JSON.stringify(token))) return;

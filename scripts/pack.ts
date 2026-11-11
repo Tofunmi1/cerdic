@@ -10,11 +10,11 @@ const kits = `${root}engine/crates/ve-modeling/kits/`;
 
 type Source = { name: string; version: string; description: string; license: string; files: { file: string; kind: 'macros' | 'group' }[] };
 export const SOURCES: Source[] = [
-  { name: 'autorig_human', version: '1.0.0', license: 'GPL-2.0-or-later', files: [{ file: 'autorig_human.txt', kind: 'macros' }],
+  { name: 'autorig_human', version: '1.0.0', license: 'UNLICENSED', files: [{ file: 'autorig_human.txt', kind: 'macros' }],
     description: 'Rigs a body.human in three lines: human_rig makes every bone a part with its parent link and output, human_skin skins it with the pack\'s weights, human_ik adds reach targets; the fingers carry fist and point clips.' },
-  { name: 'hair_cards', version: '1.0.0', license: 'GPL-2.0-or-later', files: [{ file: 'hair_cards.txt', kind: 'macros' }],
+  { name: 'hair_cards', version: '1.0.0', license: 'UNLICENSED', files: [{ file: 'hair_cards.txt', kind: 'macros' }],
     description: 'Hair that moves: hair_cards builds strips hanging from a ring of roots and simulates them as cloth pinned to a head bone, so they swing, trail a turning head and blow in the wind.' },
-  { name: 'face_presets', version: '1.0.0', license: 'GPL-2.0-or-later', files: [{ file: 'face_presets.txt', kind: 'macros' }],
+  { name: 'face_presets', version: '1.0.0', license: 'UNLICENSED', files: [{ file: 'face_presets.txt', kind: 'macros' }],
     description: 'Facial expressions for body.human as text constants: face_happy, face_sad, face_angry, face_surprised, face_wink, face_blink, face_talk and face_disgust, each a set of ARKit face actions.' },
 ];
 

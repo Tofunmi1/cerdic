@@ -38,8 +38,8 @@ mod tool;
 mod uv;
 
 pub use attach::{
-    ATTACHMENT_WORK_BUDGET, Attachment, MAX_ATTACHMENT_TRIANGLES, MAX_PARTS, NamedMesh, attachments,
-    attachments_json, attachments_within,
+    ATTACHMENT_WORK_BUDGET, Attachment, MAX_ATTACHMENT_TRIANGLES, MAX_PARTS, NamedMesh,
+    attachments, attachments_json, attachments_within,
 };
 pub use bake::{Bake, LowMesh, MAX_RAYS, MAX_SIZE, MIN_SIZE, PADDING, bake_ao, bake_normals};
 pub use bake_tool::bake_maps_json;

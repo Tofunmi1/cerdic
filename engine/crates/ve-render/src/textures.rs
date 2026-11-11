@@ -233,7 +233,10 @@ impl MaterialTextures {
     /// Replaces the pixels of map `id` with `rgba` of the same size (a live texture drawn again this frame). `false` when there is no such map or the
     /// size differs. Does not change [`generation`](Self::generation), so every other map keeps its image; see [`layer_version`](Self::layer_version).
     pub fn set_layer(&mut self, id: i32, rgba: &[u8]) -> bool {
-        let (Ok(tier), Ok(layer)) = (usize::try_from(id / TIER_STRIDE), usize::try_from(id % TIER_STRIDE)) else {
+        let (Ok(tier), Ok(layer)) = (
+            usize::try_from(id / TIER_STRIDE),
+            usize::try_from(id % TIER_STRIDE),
+        ) else {
             return false;
         };
         let Some(held) = self.tiers.get_mut(tier).and_then(|t| t.get_mut(layer)) else {

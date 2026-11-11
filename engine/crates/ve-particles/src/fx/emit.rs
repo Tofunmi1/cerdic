@@ -83,7 +83,11 @@ pub(super) fn direction(base: [f32; 3], cone: f32, rng: &mut Rng) -> [f32; 3] {
     if cone <= 0.0 {
         return base;
     }
-    let reference = if base[1].abs() < 0.9 { [0.0, 1.0, 0.0] } else { [1.0, 0.0, 0.0] };
+    let reference = if base[1].abs() < 0.9 {
+        [0.0, 1.0, 0.0]
+    } else {
+        [1.0, 0.0, 0.0]
+    };
     let tangent = normalise(cross(base, reference));
     let bitangent = normalise(cross(base, tangent));
     let (jx, jy) = (rng.signed() * cone, rng.signed() * cone);

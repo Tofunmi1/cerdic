@@ -88,13 +88,7 @@ fn map_image_with(side: u32, pixels: &[u8], srgb: bool, usage: RenderAssetUsages
         height: side,
         depth_or_array_layers: 1,
     };
-    let mut image = Image::new(
-        extent,
-        TextureDimension::D2,
-        pixels.to_vec(),
-        format,
-        usage,
-    );
+    let mut image = Image::new(extent, TextureDimension::D2, pixels.to_vec(), format, usage);
     image.data = Some(mip_chain(pixels, side));
     image.texture_descriptor.mip_level_count = mip_levels(side);
     image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {

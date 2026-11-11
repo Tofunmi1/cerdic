@@ -45,7 +45,14 @@ pub(super) fn valid(force: &Force) -> bool {
             axis,
             strength,
             radius,
-        } => ok(centre) && ok(axis) && length(*axis) > 0.0 && strength.is_finite() && *radius > 0.0 && radius.is_finite(),
+        } => {
+            ok(centre)
+                && ok(axis)
+                && length(*axis) > 0.0
+                && strength.is_finite()
+                && *radius > 0.0
+                && radius.is_finite()
+        }
         Force::Attractor {
             centre,
             strength,
@@ -82,14 +89,18 @@ pub fn turbulence_field(strength: f32, scale: f32, time: f32, position: [f32; 3]
         let (mut hi, mut lo) = (p, p);
         hi[axis] += STEP;
         lo[axis] -= STEP;
-        (potential(0x51ED_0000 + component, hi, t) - potential(0x51ED_0000 + component, lo, t)) / (2.0 * STEP)
+        (potential(0x51ED_0000 + component, hi, t) - potential(0x51ED_0000 + component, lo, t))
+            / (2.0 * STEP)
     };
     let curl = [
         slope(2, 1) - slope(1, 2),
         slope(0, 2) - slope(2, 0),
         slope(1, 0) - slope(0, 1),
     ];
-    #[expect(clippy::cast_possible_truncation, reason = "the field is a few metres per second squared")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the field is a few metres per second squared"
+    )]
     let out = curl.map(|c| (c * f64::from(strength) * f64::from(scale)) as f32);
     out
 }
@@ -121,7 +132,10 @@ pub(super) fn apply(force: &Force, position: V, velocity: V, dt: f32, time: f32)
                 return velocity;
             }
             let tangent = scale(cross(axis, radial), 1.0 / distance);
-            add(velocity, scale(tangent, strength * (1.0 - distance / radius) * dt))
+            add(
+                velocity,
+                scale(tangent, strength * (1.0 - distance / radius) * dt),
+            )
         }
         Force::Attractor {
             centre,
@@ -135,7 +149,10 @@ pub(super) fn apply(force: &Force, position: V, velocity: V, dt: f32, time: f32)
             }
             // Softened so a particle sitting on the centre is not flung out by a division by zero.
             let direction = scale(to, 1.0 / (distance * distance + 0.01).sqrt());
-            add(velocity, scale(direction, strength * (1.0 - distance / radius) * dt))
+            add(
+                velocity,
+                scale(direction, strength * (1.0 - distance / radius) * dt),
+            )
         }
         Force::Turbulence {
             strength,
@@ -143,7 +160,10 @@ pub(super) fn apply(force: &Force, position: V, velocity: V, dt: f32, time: f32)
             speed,
         } => add(
             velocity,
-            scale(turbulence_field(strength, features, time * speed, position), dt),
+            scale(
+                turbulence_field(strength, features, time * speed, position),
+                dt,
+            ),
         ),
     }
 }

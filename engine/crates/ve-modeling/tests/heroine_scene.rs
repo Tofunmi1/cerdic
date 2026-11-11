@@ -5,7 +5,10 @@ use ve_graph::{CommandBatch, Outcome, Session, TransactionId, builtin_registry, 
 use ve_modeling::{Evaluator, Quality};
 
 fn evaluate(name: &str) -> ve_modeling::Evaluation {
-    let path = format!("{}/../../web/tests/scenes/characters/{name}.txt", env!("CARGO_MANIFEST_DIR"));
+    let path = format!(
+        "{}/../../web/tests/scenes/characters/{name}.txt",
+        env!("CARGO_MANIFEST_DIR")
+    );
     let source = std::fs::read_to_string(path).unwrap();
     let commands = match parse_text(&builtin_registry(), &source) {
         Ok(parsed) => parsed.commands,
@@ -19,7 +22,10 @@ fn evaluate(name: &str) -> ve_modeling::Evaluation {
         label: None,
         commands,
     });
-    assert!(matches!(applied, Outcome::Committed { .. }), "apply: {applied:?}");
+    assert!(
+        matches!(applied, Outcome::Committed { .. }),
+        "apply: {applied:?}"
+    );
     match Evaluator::default().evaluate(session.document(), Quality::Final) {
         Ok(ev) => ev,
         Err(e) => panic!("evaluate: {} {}", e.code, e.message),
@@ -41,6 +47,10 @@ fn the_heroine_evaluates_into_a_body_and_a_head_of_human_size() {
         }
     }
     eprintln!("height {:.3} m, lowest point {bottom:.3}", top - bottom);
-    assert!((1.6..=1.85).contains(&(top - bottom)), "a human height: {}", top - bottom);
+    assert!(
+        (1.6..=1.85).contains(&(top - bottom)),
+        "a human height: {}",
+        top - bottom
+    );
     assert!(bottom.abs() < 0.03, "she stands on the floor: {bottom}");
 }

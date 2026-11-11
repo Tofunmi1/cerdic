@@ -360,6 +360,14 @@ ve_status ve_solid_copy_mesh(const ve_solid* s, float* positions, size_t positio
 ve_status ve_simplify(const float* positions, size_t vertex_count, const uint32_t* indices,
                       size_t index_count, double target_ratio, double target_error,
                       uint32_t* out_indices, size_t out_capacity, size_t* out_count) {
+  return ve_simplify_border(positions, vertex_count, indices, index_count, target_ratio,
+                            target_error, 0, out_indices, out_capacity, out_count);
+}
+
+ve_status ve_simplify_border(const float* positions, size_t vertex_count, const uint32_t* indices,
+                             size_t index_count, double target_ratio, double target_error,
+                             int lock_border, uint32_t* out_indices, size_t out_capacity,
+                             size_t* out_count) {
   if (positions == nullptr || indices == nullptr || out_indices == nullptr ||
       out_count == nullptr || !std::isfinite(target_ratio) || target_ratio <= 0.0 ||
       target_ratio > 1.0 || !std::isfinite(target_error) || target_error < 0.0 ||
@@ -373,8 +381,8 @@ ve_status ve_simplify(const float* positions, size_t vertex_count, const uint32_
       3, static_cast<size_t>(static_cast<double>(index_count) * target_ratio) / 3 * 3);
   float result_error = 0.0F;
   *out_count = meshopt_simplify(out_indices, indices, index_count, positions, vertex_count,
-                                sizeof(float) * 3, target, static_cast<float>(target_error), 0,
-                                &result_error);
+                                sizeof(float) * 3, target, static_cast<float>(target_error),
+                                lock_border != 0 ? meshopt_SimplifyLockBorder : 0, &result_error);
   return VE_OK;
 }
 

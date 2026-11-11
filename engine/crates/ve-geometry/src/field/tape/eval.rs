@@ -104,13 +104,24 @@ fn evaluate_expr(expr: &FieldExpr, point: [f64; 3]) -> f64 {
                     evaluate_expr(child, q) * scale
                 }
                 1 => {
-                    let angle = super::super::warp::value_at(point, axis, *from, *to, *start, *end).to_radians();
+                    let angle = super::super::warp::value_at(point, axis, *from, *to, *start, *end)
+                        .to_radians();
                     let (s, c) = angle.sin_cos();
                     q[a] = c * point[a] + s * point[b];
                     q[b] = -s * point[a] + c * point[b];
                     evaluate_expr(child, q)
                 }
-                _ => evaluate_expr(child, super::super::warp::bend_inverse(point, axis, *toward as usize, *from, *to, *end)),
+                _ => evaluate_expr(
+                    child,
+                    super::super::warp::bend_inverse(
+                        point,
+                        axis,
+                        *toward as usize,
+                        *from,
+                        *to,
+                        *end,
+                    ),
+                ),
             }
         }
     }
