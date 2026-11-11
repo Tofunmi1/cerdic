@@ -1,4 +1,6 @@
 node_modules/
+# Generated Rust/build outputs and local reports, at any depth.
+target/
 engine/tools/mcp/recipes-local/
 dist/
 public/engine/
@@ -6,6 +8,9 @@ rust/geometry/target/
 src/wasm/
 .env
 .env.local
+.env.*
+!.env.example
+.DS_Store
 test-results/
 playwright-report/
 *.tsbuildinfo
