@@ -1,5 +1,5 @@
 // The agent loop: call the model, run the tools it asks for, send the results back, repeat until it answers without a tool or a budget or a cancel stops it.
-// It runs in the page; the tools are plain functions (`callTool`). Design notes are in docs/plans/llm-pipeline-and-harness.md.
+// It runs in the page; the tools are plain functions (`callTool`).
 //  - The history is kept whole (for the log and for resuming); each request is a trimmed view of it: old tool results are cleared and only the newest pictures stay.
 //  - The system prompt and tools are passed through untouched every turn, so a provider can cache them as a prefix.
 //  - Whatever stops the run, every tool_use in the history has its tool_result, so the conversation can be continued.

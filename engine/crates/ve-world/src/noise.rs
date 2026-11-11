@@ -2,7 +2,7 @@
 //!
 //! A [`Noise`] is a basis (value, Perlin, simplex or cellular), an optional fractal over it (fBm, ridged, billow) and an optional
 //! domain warp. Every sample is in `[-1, 1]`, deterministic, and uses integer hashes and `+ - * /` with `sqrt` only. The fourth
-//! dimension is time, for water, clouds and fire. Plan: `docs/plans/engine-libraries-adoption.md` (W1); the structure follows
+//! dimension is time, for water, clouds and fire. The structure follows
 //! `FastNoise2` (MIT, Jordan Peck).
 
 mod cellular;

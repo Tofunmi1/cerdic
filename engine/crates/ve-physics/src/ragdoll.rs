@@ -1,6 +1,6 @@
 //! Ragdolls: a skeleton of capsule bones joined by ball and hinge joints with limits, built into a [`World`] in one call.
 //!
-//! Plan W5, `docs/plans/engine-libraries-adoption.md`. The shape of the model (capsule per bone, swing-twist limits on shoulders and hips, hinge limits on
+//! The shape of the model (capsule per bone, swing-twist limits on shoulders and hips, hinge limits on
 //! elbows and knees, no collision between a body's own bones) follows Jolt's ragdoll settings (MIT); the code is ours on Rapier.
 use crate::{BodyDesc, BodyId, Error, JointDesc, JointKind, Kind, Layers, Shape, World};
 

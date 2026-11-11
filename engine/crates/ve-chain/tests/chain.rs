@@ -1,5 +1,5 @@
 //! Secondary motion for tails, ears, hair and cloth edges: a pinned Verlet chain that follows its root with lag and settles back to its rest pose.
-//! Every number is worked out by hand from the behaviour in `docs/handoff-codex-chain.md`.
+//! Every number is worked out by hand from the expected behaviour.
 use ve_chain::{Chain, ChainError, ChainSpec, RootPose};
 
 const DT: f64 = 1.0 / 60.0;

@@ -209,8 +209,8 @@ fn keeps_the_closest_lights_when_over_the_cap() {
 #[test]
 fn the_uniform_block_stays_within_the_webgl2_minimum() {
     // 400-byte shared block (ambient, L0/L1 sky/ground band, bounce, sun, three cascade matrices, the shadow settings and the
-    // light-probe grid's origin, spacing and size) + 16 x 32-byte point records + 8 x 48-byte spot records; documented in
-    // docs/modeling/limits.md. WebGL2 guarantees at least 16 KiB per uniform block, so the fixed arrays must fit it.
+    // light-probe grid's origin, spacing and size) + 16 x 32-byte point records + 8 x 48-byte spot records.
+    // WebGL2 guarantees at least 16 KiB per uniform block, so the fixed arrays must fit it.
     assert_eq!(std::mem::size_of::<LightsUniform>(), 1_296);
 }
 

@@ -1,5 +1,5 @@
 //! Procedural gait for any number of legs: where each foot plants and how it swings, from the body's motion and the ground height.
-//! The numbers are worked out by hand from the behaviour in `docs/handoff-codex-gait.md`.
+//! The numbers are worked out by hand from the expected behaviour.
 use ve_gait::{BodyPose, Gait, GaitError, GaitSpec, Leg};
 
 const DT: f64 = 1.0 / 60.0;

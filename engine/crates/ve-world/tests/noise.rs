@@ -1,4 +1,4 @@
-//! Properties of `ve_world::noise` (plan W1, `docs/plans/engine-libraries-adoption.md`).
+//! Properties of `ve_world::noise`.
 //!
 //! These test the mathematics (range, continuity, lattice zeros, periodicity, isotropy, fractal energy), not any reference
 //! implementation's output, so they hold for any correct gradient, simplex or cellular noise.

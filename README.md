@@ -19,14 +19,14 @@
 
 cerdic 3d builds 3d worlds from text, in the browser. a model (or you) writes a short scene file in a typed language; the engine evaluates it into real geometry, materials, light and motion; and a set of tools lets the model look at what it made, measure it, find what is wrong and fix it, without a human in the loop.
 
-- **built for agents** — a model-facing tool surface (mcp) covers the whole loop: read the guide, write, evaluate, check, measure, look, edit one node, undo, export. every tool is typed, bounded and returns errors that say how to fix them. [the agent loop →](#the-agent-loop)
-- **text in, world out** — one line per object. a castle, a street or a character is a text file you can read, diff, review and ask a model to change. no meshes, no texture files, no asset store.
-- **the same commands for people and models** — whatever the model can do, the editor can do, and every edit is undoable and checkable.
-- **real modeling, not toy shapes** — solid booleans, subdivision surfaces, bevel, inset, extrude, loft, skin, uv unwrap, decimation and lod, with much of the work done by by rust and compiled down to webassembly.
-- **procedural materials that read the surface** — 398 texture nodes compiled to shaders and baked in the browser. weathering follows cavities, edges and up-facing surfaces instead of being painted on.
-- **living worlds** — terrain with erosion, rivers, trees and rocks by rule, physically based sky and atmosphere, water, particles and fire, animation tracks and state machines, rigs, walking characters, navigation and game rules.
-- **deterministic** — the same text gives the same geometry on a laptop, in a worker and in the native test build. a parity suite checks it bit for bit, so a model's result is reproducible.
-- **one tab, no server** — the toolchain runs as webassembly. a server is never required.
+- **built for agents**: a model-facing tool surface (mcp) covers the whole loop: read the guide, write, evaluate, check, measure, look, edit one node, undo, export. every tool is typed, bounded and returns errors that say how to fix them. [the agent loop →](#the-agent-loop)
+- **text in, world out**: one line per object. a castle, a street or a character is a text file you can read, diff, review and ask a model to change. no meshes, no texture files, no asset store.
+- **the same commands for people and models**: whatever the model can do, the editor can do, and every edit is undoable and checkable.
+- **real modeling, not toy shapes**: solid booleans, subdivision surfaces, bevel, inset, extrude, loft, skin, uv unwrap, decimation and lod, with much of the work done by by rust and compiled down to webassembly.
+- **procedural materials that read the surface**: 398 texture nodes compiled to shaders and baked in the browser. weathering follows cavities, edges and up-facing surfaces instead of being painted on.
+- **living worlds**: terrain with erosion, rivers, trees and rocks by rule, physically based sky and atmosphere, water, particles and fire, animation tracks and state machines, rigs, walking characters, navigation and game rules.
+- **deterministic**: the same text gives the same geometry on a laptop, in a worker and in the native test build. a parity suite checks it bit for bit, so a model's result is reproducible.
+- **one tab, no server**: the toolchain runs as webassembly. a server is never required.
 
 ---
 
@@ -45,16 +45,7 @@ The sidebar connects to the Codex account signed in on your computer. Choose a m
 
 most "ai makes 3d" tools ask a model to produce a finished mesh in one shot, or call a service that returns a model. that is hard to inspect, hard to fix and impossible to reproduce. cerdic 3d takes the opposite approach: **the model never draws a mesh.** it writes small, typed steps and uses tools to check them, the way a programmer uses a compiler, a debugger and a profiler.
 
-```mermaid
-flowchart LR
-    G["get_guide<br/>list_operators<br/>help_field"] --> W["write<br/>apply_text · edit<br/>start_from · recipes"]
-    W --> C["check<br/>typed diagnostics<br/>+ a suggested fix"]
-    C -->|errors| W
-    C -->|ok| M["measure · inspect · find<br/>size, volume, triangles,<br/>bounds, distances"]
-    M --> L["look<br/>snapshot · survey<br/>set_view · frame_view"]
-    L -->|wrong| W
-    L -->|good| X["export_glb<br/>bake · playtest"]
-```
+![The agent loop: learn, write, check, measure, look and export, with feedback returning to editing.](docs/media/diagrams/agent-loop.svg)
 
 **what each stage gives the model**
 
@@ -244,17 +235,7 @@ albedo = colorize(n, gradient=[0:#3b2210, 1:#c98a4b])
 
 ## architecture
 
-```mermaid
-flowchart LR
-    A["agent · person<br/>typed commands"] --> B["document<br/>typed node graph"]
-    B --> C["evaluator<br/>Rust → WASM, in a worker"]
-    C --> D["parts<br/>meshes · materials · lights · tracks"]
-    D --> E["viewer<br/>trimmed Bevy 0.20 renderer"]
-    D --> F["glTF export"]
-    C <--> G["C++ geometry kernel<br/>"]
-    H["MCP server"] -. drives .-> B
-    H -. snapshots .-> E
-```
+![Engine architecture: typed commands flow through the document and Rust WASM evaluator to scene parts, the Bevy viewer and glTF export. MCP drives the document and captures the viewer.](docs/media/diagrams/architecture.svg)
 
 - **rust owns the rules.** the document, commands, stable ids, history, validation, physics, navigation, game rules and animation live in crates with no engine or platform dependencies, so they are tested natively and run the same in the browser. no `unwrap`, `expect` or `panic!` in library code; lints are workspace-wide and not silenced.
 - **c++ owns the heavy geometry.** solid booleans (Manifold), subdivision surfaces (OpenSubdiv), mesh simplification (meshoptimizer), 2d offsetting (Clipper2), tangents (MikkTSpace), and bevel, inset, extrude, solidify, poke, wireframe, dissolve, symmetrize, decimate, unsubdivide, uv unwrap written in rust. behind a plain C ABI with no exceptions across it.
@@ -351,13 +332,12 @@ engine/
                meshoptimizer, eigen, fmt, mikktspace, material-maker, wgpu-hal
   web/         the viewer page, demos, browser tests and the example scenes
   tools/       the mcp server, renderers, audits, world generators
-  docs/        over 70 architecture decision records, plans and the gallery
 src/           the React + TypeScript editor
 ```
 
 ## docs
 
-everything is in `engine/docs/`: [architecture decisions](engine/docs/adr/) · [plans](engine/docs/plans/) · [what is integrated](engine/docs/integrations-and-goals.md) · [modeling cases](engine/docs/modeling/cases.md) · [architecture overview](docs/architecture.md)
+[Architecture overview](docs/architecture.md) · [Projects and assistant setup](docs/project-workspace.md)
 
 ## a note on assets
 

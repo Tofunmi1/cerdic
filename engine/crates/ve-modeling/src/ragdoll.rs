@@ -1,4 +1,4 @@
-//! `phys.ragdoll`: a skeleton of bone parts that turns into a ragdoll on command (plan W5, `docs/plans/engine-libraries-adoption.md`).
+//! `phys.ragdoll`: a skeleton of bone parts that turns into a ragdoll on command.
 //!
 //! The node records which bone parts make the ragdoll and how loose its joints are; after evaluation it is resolved against the bones (`rig.bone`
 //! segments and `anim.parent` links), and a skeleton that cannot work is dropped with a reason. The runtime builds the bodies with

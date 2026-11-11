@@ -1,5 +1,5 @@
 //! G4b evaluation, part 2: group inputs, bypass, nesting, the expansion budget and recursion in a
-//! loaded document (cases G4b-17, G4b-18, G4b-19 and G4b-E7 of `docs/modeling/cases.md`).
+//! loaded document (cases G4b-17, G4b-18, G4b-19 and G4b-E7).
 
 #[path = "support/groups.rs"]
 mod support;

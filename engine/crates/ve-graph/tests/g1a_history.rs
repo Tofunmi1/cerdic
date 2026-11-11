@@ -1,5 +1,5 @@
 //! Acceptance cases G1a-04 and G1a-08 to G1a-17: cycles, removal, undo and redo, idempotency,
-//! conflicts, the evaluation hash, limits and ID reuse (see `docs/modeling/cases.md`).
+//! conflicts, the evaluation hash, limits and ID reuse.
 #![expect(
     clippy::unwrap_used,
     clippy::panic,

@@ -2,7 +2,7 @@
 //!
 //! Engine-agnostic: no Bevy, no platform code. A render mesh is a derived triangle buffer; the
 //! values here are what operators read and write. Representations are introduced together with the
-//! operation that needs them (see `docs/plans/track2-modeling.md`).
+//! operation that needs them.
 
 mod adapt;
 mod attr;

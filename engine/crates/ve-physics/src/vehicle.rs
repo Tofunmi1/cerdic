@@ -1,6 +1,6 @@
 //! Raycast-wheel vehicles: a chassis body held up by spring-damper suspension at each wheel, driven and steered through tyre friction.
 //!
-//! Plan W5, `docs/plans/engine-libraries-adoption.md`. The model (a ray per wheel, suspension force from compression and its rate, a friction limit
+//! The model (a ray per wheel, suspension force from compression and its rate, a friction limit
 //! of grip times load, engine force on driven wheels, braking) follows the shape of Jolt's wheeled vehicle (MIT);
 //! the code is ours on Rapier. Tyre forces act at the height of the chassis centre, so driving hard does not flip the car (an arcade handling choice).
 //! Call [`Vehicle::update`] once before each [`World::step`].

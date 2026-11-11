@@ -36,7 +36,7 @@ fn run(name: &str, tail: &str) -> usize {
         )
         .unwrap_or_else(|e| panic!("{name}: {}: {}", e.code, e.message));
     let triangles = result.parts[0].indices.len() / 3;
-    // Timings are recorded in docs/modeling/g6-report.md from a release run (`cargo test --release`).
+    // Measure timings with a release run (`cargo test --release`).
     println!(
         "G6-16 {name}: {triangles} triangles in {:?}",
         started.elapsed()

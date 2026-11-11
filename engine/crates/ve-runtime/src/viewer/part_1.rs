@@ -173,8 +173,8 @@ fn wanted_lens(input: &Input, split: bool, presenting: bool) -> LensMode {
     }
 }
 
-/// Jumps the viewer to `position` looking at `target` on the next frame (the fixed review views of
-/// `docs/modeling/fixtures.md`). Needs the viewer to be on; non-finite values or a zero-length view
+/// Jumps the viewer to `position` looking at `target` on the next frame.
+/// Needs the viewer to be on; non-finite values or a zero-length view
 /// are ignored. Returns whether the pose was accepted.
 pub(crate) fn set_look_at(position: Vec3, target: Vec3) -> bool {
     let direction = target - position;

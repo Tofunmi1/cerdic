@@ -1,4 +1,4 @@
-//! Hard limits checked before work begins (see `docs/modeling/limits.md`).
+//! Hard limits checked before work begins.
 
 /// Authored nodes in one document.
 pub const MAX_NODES: usize = 5_000;

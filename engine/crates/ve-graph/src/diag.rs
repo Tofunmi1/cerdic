@@ -1,4 +1,4 @@
-//! Diagnostics: one shape for every problem (see `docs/modeling/diagnostics.md`).
+//! Diagnostics: one shape for every problem.
 
 use serde::{Deserialize, Serialize};
 

@@ -1,6 +1,6 @@
 //! Effects: emitters with spawn timing, forces, collisions with a world, sub-emitters and trails, simulated deterministically on the CPU.
 //!
-//! Plan W4, `docs/plans/engine-libraries-adoption.md`. The effect model (a set of emitters, each with spawn rules, forces, collisions,
+//! The effect model (a set of emitters, each with spawn rules, forces, collisions,
 //! sub-emitters and a trail) follows Effekseer's node tree (MIT); the simulation is our own. This is the
 //! reference path: exact, deterministic, used for tests and for particles that matter to gameplay. Large visual counts will run the same
 //! spec on the GPU.

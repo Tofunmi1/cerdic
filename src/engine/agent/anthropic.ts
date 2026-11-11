@@ -1,6 +1,6 @@
 // The Messages API called straight from the page with the person's own key (the `anthropic-dangerous-direct-browser-access` header is Anthropic's switch for this).
-// The key lives only in the header: it is never put in a body, a log or an error message. A hosted demo with no key of its own needs a proxy, which is an owner decision
-// (docs/plans/llm-pipeline-and-harness.md section 6), so `baseUrl` can point at one.
+// The key lives only in the header: it is never put in a body, a log or an error message. A hosted demo with no key of its own needs a proxy,
+// so `baseUrl` can point at one.
 import type { Block, Message, Provider, ProviderRequest, ProviderResponse, ToolSpec } from './types';
 
 export type AnthropicOptions = {

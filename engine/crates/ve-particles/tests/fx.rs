@@ -1,4 +1,4 @@
-//! The effects simulation (plan W4, `docs/plans/engine-libraries-adoption.md`): emitters with forces, collisions with a world, sub-emitters
+//! The effects simulation: emitters with forces, collisions with a world, sub-emitters
 //! and trails. Written before the bodies. The checks are physical (ballistics, terminal velocity, circulation, divergence, restitution,
 //! conservation of counts), not golden numbers.
 #![expect(

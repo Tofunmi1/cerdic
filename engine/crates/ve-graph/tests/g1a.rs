@@ -1,4 +1,4 @@
-//! Acceptance cases G1a-01 to G1a-03, 05 to 07 and the alias cases (see `docs/modeling/cases.md`).
+//! Acceptance cases G1a-01 to G1a-03, 05 to 07 and the alias cases.
 //! Cases 04 and 08 to 17 are in `g1a_history.rs`; 18 in `ve-geometry`; 19 and 20 in
 //! `g1a_property.rs`.
 #![expect(
